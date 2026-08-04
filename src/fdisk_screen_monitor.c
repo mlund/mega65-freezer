@@ -80,26 +80,21 @@ void setup_screen(void) {
 
     m65_io_enable();
 
-    // Normal 8-bit text mode
-    POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
-
-    // 80-column mode, fast CPU, extended attributes enable
-    POKE(0xD031U, 0xe0);
-
-    // 80 columns requires $D016 = $C9 to be properly positioned
-    POKE(0xD016U, 0xC9);
-
-    // Put screen memory somewhere (2KB required)
-    // We are using $8000-$87FF for screen
-    // Using custom charset @ $A000
+    /* Hot registers first, then the VIC-IV ones with propagation off: any hot
+     * write after this point would recalculate them away. */
+    POKE(0xD031U, 0xe0); // 80-column, fast CPU, extended attributes
+    POKE(0xD016U, 0xC8); // 80 columns needs this for correct positioning
     POKE(0xD018U,
         (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4));
-
-    // VIC RAM Bank to $8000-$BFFF
     v = PEEK(0xDD00U);
     v &= 0xfc;
-    v |= 0x01;
+    v |= 0x01; // VIC RAM bank to $8000-$BFFF
     POKE(0xDD00U, v);
+
+    VIC4_LOCK_ACQUIRE();
+
+    // Normal 8-bit text mode
+    POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
 
     // Screen colours
     POKE(0xD020U, 0);

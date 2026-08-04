@@ -67,6 +67,7 @@
  */
 #include "cc65compat.h"
 #include "freezer.h"
+#include "vic4.h"
 
 #include <mega65/conio.h>
 #include <mega65/hal.h>
@@ -837,7 +838,12 @@ static void Initialize() {
 
     conioinit();
 
-    sethotregs(1);
+    /* conioinit() clears HOTREG; re-enable it for setextendedattrib()'s $D031
+     * write, which is wanted for its propagation.  Not sethotregs(1): that is
+     * PEEK|$80, which re-enables with the update still pending, so all five
+     * hot registers fire at once over the extended set programmed below --
+     * including the sprite pointer table at $D06C-$D06E. */
+    VIC4_LOCK_RELEASE();
 
     setextendedattrib(1);
     setscreensize(SCREEN_COLS, SCREEN_ROWS);
@@ -1369,7 +1375,11 @@ void SetRedrawFullCanvas(void) {
 
 static void DrawHeader() {
     if (g_state.redrawFlags & REDRAW_TOOL_HEADER)
-        cprintf("{home}{rvson}{lgrn}                            the mega65 sprite editor           "
+        /* Escape names stay lowercase -- libc matches them by hash -- but the
+         * text must be uppercase: cprintf runs petsciitoscreencode() on it,
+         * and cc65's charmap had already mapped lowercase to PETSCII 0x41-0x5A
+         * before that conversion saw it. */
+        cprintf("{home}{rvson}{lgrn}                            THE MEGA65 SPRITE EDITOR           "
                 "                 {rvsoff}");
 }
 
@@ -1388,10 +1398,10 @@ static void DrawColorSelector() {
                 cputsxy(SIDEBAR_COLUMN + 8, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
 
                 textcolor(g_state.currentColorIdx == COLOR_BACK ? 1 : COLOUR_DARKGREY);
-                cputsxy(SIDEBAR_COLUMN + 2, 6, "bk");
+                cputsxy(SIDEBAR_COLUMN + 2, 6, "BK");
 
                 textcolor(g_state.currentColorIdx == COLOR_FORE ? 1 : COLOUR_DARKGREY);
-                cputsxy(SIDEBAR_COLUMN + 8 + 2, 6, "fg");
+                cputsxy(SIDEBAR_COLUMN + 8 + 2, 6, "FG");
 
                 break;
 
@@ -1404,7 +1414,7 @@ static void DrawColorSelector() {
                 textcolor(1);
                 cputsxy(SIDEBAR_COLUMN + 2,
                     6,
-                    g_state.color[COLOR_FORE] == 0 ? "background" : "foreground");
+                    g_state.color[COLOR_FORE] == 0 ? "BACKGROUND" : "FOREGROUND");
                 break;
 
             case SPR_COLOR_MODE_MULTICOLOR:
@@ -1418,24 +1428,24 @@ static void DrawColorSelector() {
                 cputsxy(SIDEBAR_COLUMN + 4 * 3, 5, "\xe0\xe0\xe0");
 
                 textcolor(COLOUR_DARKGREY);
-                cputsxy(SIDEBAR_COLUMN + 1, 6, "bk");
-                cputsxy(SIDEBAR_COLUMN + 5, 6, "fg");
-                cputsxy(SIDEBAR_COLUMN + 8, 6, "mc1");
-                cputsxy(SIDEBAR_COLUMN + 12, 6, "mc2");
+                cputsxy(SIDEBAR_COLUMN + 1, 6, "BK");
+                cputsxy(SIDEBAR_COLUMN + 5, 6, "FG");
+                cputsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
+                cputsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
 
                 textcolor(1);
                 switch (g_state.currentColorIdx) {
                     case COLOR_BACK:
-                        cputsxy(SIDEBAR_COLUMN + 1, 6, "bk");
+                        cputsxy(SIDEBAR_COLUMN + 1, 6, "BK");
                         break;
                     case COLOR_FORE:
-                        cputsxy(SIDEBAR_COLUMN + 5, 6, "fg");
+                        cputsxy(SIDEBAR_COLUMN + 5, 6, "FG");
                         break;
                     case COLOR_MC1:
-                        cputsxy(SIDEBAR_COLUMN + 8, 6, "mc1");
+                        cputsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
                         break;
                     case COLOR_MC2:
-                        cputsxy(SIDEBAR_COLUMN + 12, 6, "mc2");
+                        cputsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
                         break;
                 }
 
@@ -1474,11 +1484,11 @@ static void DrawSideBarSpriteInfo() {
     if (g_state.redrawFlags & REDRAW_SB_INFO) {
         textcolor(1);
         gotoxy(SIDEBAR_COLUMN, 2);
-        cputs("sprite ");
+        cputs("SPRITE ");
         cputdec(g_state.spriteNumber, 0, 0);
         cputs(g_state.spriteColorMode == SPR_COLOR_MODE_MONOCHROME
-                ? " mono    "
-                : (g_state.spriteColorMode == SPR_COLOR_MODE_MULTICOLOR ? " multi   " : " 16-col"));
+                ? " MONO    "
+                : (g_state.spriteColorMode == SPR_COLOR_MODE_MULTICOLOR ? " MULTI   " : " 16-COL"));
         gotoxy(SIDEBAR_COLUMN, 3);
         textcolor(3);
         cputhex(g_state.spriteDataAddr, 7);
@@ -1486,11 +1496,11 @@ static void DrawSideBarSpriteInfo() {
         textcolor(IS_SPR_XWIDTH(g_state.spriteNumber) | IS_SPR_16COL(g_state.spriteNumber)
                 ? COLOUR_LIGHTBLUE
                 : COLOUR_DARKGREY);
-        cputs("xwide");
+        cputs("XWIDE");
         textcolor(IS_SPR_HEXPAND(g_state.spriteNumber) ? COLOUR_LIGHTBLUE : COLOUR_DARKGREY);
-        cputs(" hexp");
+        cputs(" HEXP");
         textcolor(IS_SPR_VEXPAND(g_state.spriteNumber) ? COLOUR_LIGHTBLUE : COLOUR_DARKGREY);
-        cputs(" vexp");
+        cputs(" VEXP");
     }
 }
 
@@ -1572,62 +1582,62 @@ static void PrintKeyGroup(const char* list[], BYTE count, BYTE x, BYTE y) {
 static void ShowHelp() {
     // clang-format off
   const char* fileKeys[] = {
-    "  file / txfer     ",
-    "(not impl)       f5", // load
-    "(not impl)     f7,r", // save raw
-    "(not impl)     f7,b", // save basic
-    "fetch slot       f9",
-    "store slot      f11",
-    "exit             f3",
+    "  FILE / TXFER     ",
+    "(NOT IMPL)       F5", // load
+    "(NOT IMPL)     F7,R", // save raw
+    "(NOT IMPL)     F7,B", // save basic
+    "FETCH SLOT       F9",
+    "STORE SLOT      F11",
+    "EXIT             F3",
   };
 
   const char* drawKeys[] = {
-    "       tools       ",
-    "pixel             p",
-    "line              l",
-    "box               x",
-    "filled box      s-x",
-    "(not impl)        o", // circle
-    "(not impl)      s-o", // filled circle
+    "       TOOLS       ",
+    "PIXEL             P",
+    "LINE              L",
+    "BOX               X",
+    "FILLED BOX      S-X",
+    "(NOT IMPL)        O", // circle
+    "(NOT IMPL)      S-O", // filled circle
   };
 
   const char* colorKeys[] = {
-    "       color       ",
-    "select         0..9",
-    "               a..f",
-    "prev component    -",
-    "next component    +",
-    "select background k",
-    "sel pal bank ctrl+p",
+    "       COLOR       ",
+    "SELECT         0..9",
+    "               A..F",
+    "PREV COMPONENT    -",
+    "NEXT COMPONENT    +",
+    "SELECT BACKGROUND K",
+    "SEL PAL BANK CTRL+P",
   };
 
   const char* editKeys[] = {
-    "       edit        ",
-    "spacebar       draw",
-    "del           erase",
-    "clear        ctrl+n",
-    "prev sprite       <",
-    "next sprite       >",
-    "change type       *",
-    "toggle h-expand   h",
-    "toggle v-expand   v",
-    "(not impl)        \x1e", // toggle x-width
-    "copy sprite  ctrl+c",
-    "(not impl)   ctrl+h", // horz flip
-    "(not impl)   ctrl+v", // vert flip
+    "       EDIT        ",
+    "SPACEBAR       DRAW",
+    "DEL           ERASE",
+    "CLEAR        CTRL+N",
+    "PREV SPRITE       <",
+    "NEXT SPRITE       >",
+    "CHANGE TYPE       *",
+    "TOGGLE H-EXPAND   H",
+    "TOGGLE V-EXPAND   V",
+    "(NOT IMPL)        \x1E", // toggle x-width
+    "COPY SPRITE  CTRL+C",
+    "(NOT IMPL)   CTRL+H", // horz flip
+    "(NOT IMPL)   CTRL+V", // vert flip
   };
 
   const char* displayKeys[] = {
-    "     display       ",
-    "aspect ratio  alt+r",
-    "(not impl)    alt+d", // 25/50-line
+    "     DISPLAY       ",
+    "ASPECT RATIO  ALT+R",
+    "(NOT IMPL)    ALT+D", // 25/50-line
   };
 
   const char* tipsNtricks[] = {
-    "   tips & tricks   ",
-    "press f11 to store ",
-    "current sprite     ",
-    "before exiting.    ",
+    "   TIPS & TRICKS   ",
+    "PRESS F11 TO STORE ",
+    "CURRENT SPRITE     ",
+    "BEFORE EXITING.    ",
   };
     // clang-format on
 
@@ -1650,8 +1660,8 @@ static void ShowHelp() {
     textcolor(COLOUR_CYAN);
     revers(1);
     cputncxy(22, SCREEN_ROWS - 4, SCREEN_COLS - 22, 32);
-    cputsxy(22, SCREEN_ROWS - 3, " mega65 sprite editor  v0.10 (c) 2021 hernan di pietro    ");
-    cputsxy(22, SCREEN_ROWS - 2, " mouse/joy code by paul gardner-stephen.                  ");
+    cputsxy(22, SCREEN_ROWS - 3, " MEGA65 SPRITE EDITOR  V0.10 (C) 2021 HERNAN DI PIETRO    ");
+    cputsxy(22, SCREEN_ROWS - 2, " MOUSE/JOY CODE BY PAUL GARDNER-STEPHEN.                  ");
     cputncxy(22, SCREEN_ROWS - 1, SCREEN_COLS - 22, 32);
     revers(0);
 
@@ -1922,7 +1932,7 @@ static void MainLoop() {
                 break;
 
             case 3: // CTRL-C
-                Ask("copy sprite to (0-7)? ", buf, 1);
+                Ask("COPY SPRITE TO (0-7)? ", buf, 1);
                 if (buf[0] >= '0' && buf[0] <= '7') {
                     BYTE toSprite = buf[0] - 48;
                     if (SPRITE_SIZE_BYTES(toSprite) == g_state.spriteSizeBytes) {
@@ -2014,7 +2024,7 @@ static void MainLoop() {
                 /* --------------------------- FILE GROUP ----------------------------- */
 
             case 0xF3: // F3
-                Ask("exit sprite editor: are you sure (yes/no)? ", buf, 3);
+                Ask("EXIT SPRITE EDITOR: ARE YOU SURE (YES/NO)? ", buf, 3);
                 if (buf[0] == 'y' && buf[1] == 'e' && buf[2] == 's') {
                     return;
                 }
@@ -2040,7 +2050,7 @@ static void MainLoop() {
                 break;
 
             case 14: // CTRL-N
-                Ask("clear sprite (yes/no)? ", buf, 3);
+                Ask("CLEAR SPRITE (YES/NO)? ", buf, 3);
                 if (buf[0] == 'y' && buf[1] == 'e' && buf[2] == 's') {
                     ClearSprite();
                 }

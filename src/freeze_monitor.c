@@ -431,8 +431,13 @@ void freeze_monitor(void) {
             case 'X':
                 // Exit monitor
                 // Return screen to normal
+                /* setup_screen() holds the VIC-IV lock; release it before the
+                 * legacy writes so they recalculate the extended set for
+                 * whoever runs next, rather than leaving a half-old
+                 * screen/charset/sprite pointer behind. */
                 POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
-                POKE(0xD018U, 0x15); // VIC-II hot register, so should reset most display settings
+                VIC4_LOCK_RELEASE();
+                POKE(0xD018U, 0x15); // VIC-II hot register, resets display settings
                 POKE(0xD016U, 0xC8);
                 POKE(0xDD00U, PEEK(0xDD00U) | 3);    // video bank 0
                 POKE(0xD031U, PEEK(0xD031U) & 0x7f); // 40 columns
