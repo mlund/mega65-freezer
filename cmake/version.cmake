@@ -19,4 +19,4 @@ endif()
 # byte-for-byte what ca65 produced.
 string(TOUPPER "${v}" v)
 file(WRITE "${OUT}"
-     "__attribute__((used, retain)) const char version[] = \"V:${v}\";\n")
+     "__attribute__((used, retain, section(\".version\"))) const char version[] = \"V:${v}\";\n")

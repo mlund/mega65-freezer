@@ -41,15 +41,12 @@ void setup_menu_screen(void) {
     lfill(0xff80000U, 1, 2000);
 }
 
-#ifdef __CC65__
-void main(void)
-#else
-int main(int argc, char** argv)
-#endif
+int main(void)
 {
-#ifdef __CC65__
+    /* Performs the $D02F knock; without it every later write to a VIC-IV
+     * register such as $D054 is silently ignored and the screen mode is
+     * never established. */
     mega65_fast();
-#endif
 
     // Disable interrupts and interrupt sources
     __asm__("sei");
@@ -96,5 +93,5 @@ int main(int argc, char** argv)
     do_audio_mixer();
     mega65_dos_exechelper("FREEZER.M65");
 
-    return;
+    return 0;
 }

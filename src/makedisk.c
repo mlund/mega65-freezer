@@ -369,15 +369,12 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
     }
 }
 
-#ifdef __CC65__
-void main(void)
-#else
-int main(int argc, char** argv)
-#endif
+int main(void)
 {
-#ifdef __CC65__
+    /* Performs the $D02F knock; without it every later write to a VIC-IV
+     * register such as $D054 is silently ignored and the screen mode is
+     * never established. */
     mega65_fast();
-#endif
 
     // Disable interrupts and interrupt sources
     __asm__("sei");

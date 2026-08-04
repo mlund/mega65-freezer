@@ -930,16 +930,13 @@ void start_freezer_tool(char* toolfile) {
     mega65_dos_exechelper(toolfile);
 }
 
-#ifdef __CC65__
-void main(void)
-#else
-int main(int argc, char** argv)
-#endif
+int main(void)
 {
     unsigned char drive_state, image_state;
-#ifdef __CC65__
+    /* Performs the $D02F knock; without it every later write to a VIC-IV
+     * register such as $D054 is silently ignored and the screen mode is
+     * never established. */
     mega65_fast();
-#endif
 
     // Disable interrupts and interrupt sources
     init_nmi(); // this also does SEI
@@ -1378,5 +1375,5 @@ int main(int argc, char** argv)
             }
     }
 
-    return;
+    return 0;
 }

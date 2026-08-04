@@ -13,6 +13,14 @@ INCLUDE commodore.ld
 
 INPUT(unmap-basic.o)
 
+/* freeze_megainfo.c's format_util_version() scans only the first 512 bytes of
+ * a loaded .M65 for the "V:20" stamp.  cc65 got this for free because
+ * version.s was first in every Makefile file list; under LTO the string lands
+ * wherever, so pin it immediately after the BASIC header. */
+SECTIONS {
+    .version : { KEEP(*(.version)) }
+} INSERT AFTER .basic_header
+
 __stack = 0xd000;
 
 OUTPUT_FORMAT {
