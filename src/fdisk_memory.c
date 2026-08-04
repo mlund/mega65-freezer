@@ -45,6 +45,7 @@ volatile unsigned char dma_byte;
 
 void do_dma(void) {
     m65_io_enable();
+    __asm__ volatile("" ::: "memory");
 
     //  for(unsigned int i=0;i<24;i++)
     // screen_hex_byte(SCREEN_ADDRESS+i*3,PEEK(i+(unsigned int)&dmalist));
