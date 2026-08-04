@@ -8,7 +8,6 @@ void lcopy(long source_address, long destination_address, unsigned int count);
 void lcopy_safe(unsigned long src, unsigned long dst, unsigned int count);
 void lfill(long destination_address, unsigned char value, unsigned int count);
 
-#include "vic4.h"
 /* The SDK's PEEK/POKE are volatile, which hardware access requires. */
 #include <peekpoke.h>
 

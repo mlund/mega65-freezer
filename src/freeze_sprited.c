@@ -67,7 +67,6 @@
  */
 #include "cc65compat.h"
 #include "freezer.h"
-#include "vic4.h"
 
 #include <mega65/conio.h>
 #include <mega65/hal.h>
@@ -838,12 +837,7 @@ static void Initialize() {
 
     conioinit();
 
-    /* conioinit() clears HOTREG; re-enable it for setextendedattrib()'s $D031
-     * write, which is wanted for its propagation.  Not sethotregs(1): that is
-     * PEEK|$80, which re-enables with the update still pending, so all five
-     * hot registers fire at once over the extended set programmed below --
-     * including the sprite pointer table at $D06C-$D06E. */
-    VIC4_LOCK_RELEASE();
+    sethotregs(1);
 
     setextendedattrib(1);
     setscreensize(SCREEN_COLS, SCREEN_ROWS);
