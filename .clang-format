@@ -1,0 +1,51 @@
+BasedOnStyle: LLVM
+Language: Cpp
+
+# rustfmt fundamentals
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+
+# Braces: same line
+BreakBeforeBraces: Attach
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Compact, non-column-aligned layout
+AlignAfterOpenBracket: false
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: None
+AlignOperands: DontAlign
+BinPackArguments: false
+BinPackParameters: false
+
+# Spaces
+SpaceBeforeParens: ControlStatements
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceBeforeAssignmentOperators: true
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+# Function calls and declarations
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+PenaltyBreakBeforeFirstCallParameter: 1
+
+# Initializers: closer to rustfmt's vertical lists
+Cpp11BracedListStyle: true
+BinPackLongBracedList: false
+
+# switch resembles Rust match indentation
+IndentCaseLabels: true
+IndentCaseBlocks: false
+
+# Includes
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
