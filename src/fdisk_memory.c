@@ -43,7 +43,7 @@ struct dmagic_dmalist {
 volatile struct dmagic_dmalist dmalist;
 volatile unsigned char dma_byte;
 
-void do_dma(void) {
+__attribute__((noinline)) void do_dma(void) {
     m65_io_enable();
     __asm__ volatile("" ::: "memory");
 
@@ -57,7 +57,7 @@ void do_dma(void) {
     POKE(0xd705U, ((unsigned int)&dmalist) & 0xff); // triggers enhanced DMA
 }
 
-unsigned char lpeek(long address) {
+__attribute__((noinline)) unsigned char lpeek(long address) {
     // Read the byte at <address> in 28-bit address space
     // XXX - Optimise out repeated setup etc
     // (separate DMA lists for peek, poke and copy should
@@ -82,7 +82,7 @@ unsigned char lpeek(long address) {
     return dma_byte;
 }
 
-void lpoke(long address, unsigned char value) {
+__attribute__((noinline)) void lpoke(long address, unsigned char value) {
 
     dmalist.option_0b = 0x0b;
     dmalist.option_80 = 0x80;
@@ -103,7 +103,7 @@ void lpoke(long address, unsigned char value) {
     return;
 }
 
-void lcopy(long source_address, long destination_address, unsigned int count) {
+__attribute__((noinline)) void lcopy(long source_address, long destination_address, unsigned int count) {
     if (!count)
         return;
     dmalist.option_0b = 0x0b;
@@ -172,7 +172,7 @@ void lcopy_safe(unsigned long src, unsigned long dst, unsigned int count)
 }
 #endif
 
-void lfill(long destination_address, unsigned char value, unsigned int count) {
+__attribute__((noinline)) void lfill(long destination_address, unsigned char value, unsigned int count) {
     if (!count)
         return;
     dmalist.option_0b = 0x0b;
