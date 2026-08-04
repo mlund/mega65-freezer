@@ -83,7 +83,10 @@ void setup_screen(void) {
     /* Hot registers first, then the VIC-IV ones with propagation off: any hot
      * write after this point would recalculate them away. */
     POKE(0xD031U, 0xe0); // 80-column, fast CPU, extended attributes
-    POKE(0xD016U, 0xC8); // 80 columns needs this for correct positioning
+    // 80 columns requires $D016 = $C9 to be properly positioned: bit 0 is the
+    // H640 X-scroll correction.  Not $C8 -- that is the value the exit path
+    // restores for 40 columns.
+    POKE(0xD016U, 0xC9);
     POKE(0xD018U,
         (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4));
     v = PEEK(0xDD00U);
