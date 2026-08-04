@@ -40,7 +40,7 @@ struct dmagic_dmalist {
  *
  * dma_byte is the other direction: the DMAgic writes it during lpeek(), so a
  * plain read may be folded to a value C last stored. */
-volatile struct dmagic_dmalist __zp dmalist;
+volatile struct dmagic_dmalist dmalist;
 volatile unsigned char dma_byte;
 
 __attribute__((noinline)) void do_dma(void) {
