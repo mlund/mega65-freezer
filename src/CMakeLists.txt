@@ -54,5 +54,6 @@ add_m65(MONITOR  monitor.c freeze_monitor.c
                  fdisk_screen_monitor.c charset.c)
 add_m65(MAKEDISK makedisk.c fdisk_fat32.c charset.c)
 add_m65(ROMLOAD  romload.c freeze_romload.c charset.c)
+add_m65(SPRITED  sprited.c freeze_sprited.c charset.c)
 add_m65(MEGAINFO megainfo.c freeze_megainfo.c charset.c
                  infohelper.c cc65compat.c)
