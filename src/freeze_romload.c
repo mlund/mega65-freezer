@@ -373,7 +373,7 @@ unsigned char freeze_load_romarea(void) {
                         // Then progressively save it into the frozen memory
                         request_freeze_region_list();
                         find_freeze_slot_start_sector(0); // we only work on slot 0!
-                        freeze_slot_start_sector = *(uint32_t*)0xD681U;
+                        freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
 
                         for (s = 0; s < 256; s++) { // ROM is 128k, devided by 512 byte sectors is
                                                     // 256 sectors to load
@@ -401,7 +401,7 @@ unsigned char freeze_load_romarea(void) {
 
                         request_freeze_region_list();
                         find_freeze_slot_start_sector(0); // we only work on slot 0!
-                        freeze_slot_start_sector = *(uint32_t*)0xD681U;
+                        freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
 
                         if (freeze_region_flags & FREEZE_REGION_HAS_CHARGEN)
                             // only put that into the slot, if HYPPO supports it!

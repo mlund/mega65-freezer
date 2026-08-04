@@ -345,7 +345,7 @@ void draw_freeze_menu(unsigned char part) {
 
     if (part & UPDATE_CHGSLOT) {
         find_freeze_slot_start_sector(slot_number);
-        freeze_slot_start_sector = *(uint32_t*)0xD681U;
+        freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
     }
 
     // Update messages based on the settings we allow to be easily changed
@@ -996,7 +996,7 @@ int main(void)
     // Now find the start sector of the slot, and make a copy for safe keeping
     slot_number = 0;
     find_freeze_slot_start_sector(slot_number);
-    freeze_slot_start_sector = *(uint32_t*)0xD681U;
+    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
 
     // SD or SDHC card?
     if (PEEK(0xD680U) & 0x10)
@@ -1287,9 +1287,9 @@ int main(void)
                     sdcard_visual_feedback(1);
 
                     find_freeze_slot_start_sector(0);
-                    freeze_slot_start_sector = *(uint32_t*)0xD681U;
+                    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
                     find_freeze_slot_start_sector(slot_number);
-                    dest_freeze_slot_start_sector = *(uint32_t*)0xD681U;
+                    dest_freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
 
                     // 512KB = 1024 sectors
                     // Process in 64KB blocks, so that we can do multi-sector writes

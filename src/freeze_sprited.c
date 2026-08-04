@@ -829,7 +829,7 @@ static void Initialize() {
     // --- Freezer slot setup
 
     find_freeze_slot_start_sector(0);
-    freeze_slot_start_sector = *(uint32_t*)0xD681U;
+    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
 
     request_freeze_region_list();
 

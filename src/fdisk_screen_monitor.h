@@ -3,8 +3,8 @@
 
 void setup_screen(void);
 void display_footer(unsigned char index);
-void write_line(char* s, char col);
-void write_line_len(char* s, char col, char length);
+void write_line(const char* s, char col);
+void write_line_len(const char* s, char col, char length);
 void write_line_raw(char* s, char col, char length);
 void recolour_last_line(char colour);
 void screen_colour_line(unsigned char line, unsigned char colour);

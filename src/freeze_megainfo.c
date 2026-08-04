@@ -270,7 +270,7 @@ char* format_fpga_hash(unsigned char offset, unsigned char reverse) {
 char* format_rom_version(void) {
     // we want to display the version in freeze slot 0!
     find_freeze_slot_start_sector(0);
-    freeze_slot_start_sector = *(uint32_t*)0xD681U;
+    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
     request_freeze_region_list();
 
     return detect_rom();

@@ -12,17 +12,23 @@ char* footer_messages[FOOTER_MAX + 1] = {
     "                                                                                ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};
 
-void write_line_len(char* s, char col, char length) {
-    char len = 0;
-    // Work out length, and convert from ASCII to PETSCII
-    while (s[len]) {
-        if (s[len] >= 'a' && s[len] <= 'z')
-            s[len] -= 0x60;
-        else if (s[len] >= 'A' && s[len] <= 'Z')
-            s[len] -= 0x40;
-        len++;
+char stemp[80];
+
+/* Converts into stemp rather than in place: callers pass string literals, and
+ * modifying those is undefined behaviour. */
+void write_line_len(const char* s, char col, char length) {
+    char i;
+    if (length > (char)sizeof(stemp))
+        length = (char)sizeof(stemp);
+    for (i = 0; i < length; i++) {
+        char c = s[i];
+        if (c >= 'a' && c <= 'z')
+            c -= 0x60;
+        else if (c >= 'A' && c <= 'Z')
+            c -= 0x40;
+        stemp[i] = c;
     }
-    write_line_raw(s, col, length);
+    write_line_raw(stemp, col, length);
 }
 
 void write_line_raw(char* s, char col, char length) {
@@ -37,18 +43,11 @@ void write_line_raw(char* s, char col, char length) {
     }
 }
 
-char stemp[80];
-void write_line(char* s, char col) {
+void write_line(const char* s, char col) {
     char len = 0;
-    // Copy string so that it doesn't get modified if the caller doesn't expect it
-    while (s[len]) {
-        stemp[len] = s[len];
+    while (s[len] && len < 78)
         len++;
-        if (len > 78)
-            break;
-    }
-    stemp[len] = 0;
-    write_line_len(stemp, col, len);
+    write_line_len(s, col, len);
 }
 
 void recolour_last_line(char colour) {
@@ -85,7 +84,7 @@ void setup_screen(void) {
     POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
 
     // 80-column mode, fast CPU, extended attributes enable
-    *((unsigned char*)0xD031) = 0xe0;
+    POKE(0xD031U, 0xe0);
 
     // 80 columns requires $D016 = $C9 to be properly positioned
     POKE(0xD016U, 0xC9);
@@ -93,14 +92,14 @@ void setup_screen(void) {
     // Put screen memory somewhere (2KB required)
     // We are using $8000-$87FF for screen
     // Using custom charset @ $A000
-    *(unsigned char*)0xD018U =
-        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
+    POKE(0xD018U,
+        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4));
 
     // VIC RAM Bank to $8000-$BFFF
-    v = *(unsigned char*)0xDD00U;
+    v = PEEK(0xDD00U);
     v &= 0xfc;
     v |= 0x01;
-    *(unsigned char*)0xDD00U = v;
+    POKE(0xDD00U, v);
 
     // Screen colours
     POKE(0xD020U, 0);
@@ -165,7 +164,7 @@ char read_line(char* buffer, unsigned char maxlen) {
         POKE(0xD610U, 0);
 
     while (len < maxlen) {
-        c = *(unsigned char*)0xD610U; // read char
+        c = PEEK(0xD610U); // read char
 
 #if 0
     reverse ^=0x20;
@@ -236,8 +235,8 @@ char read_line(char* buffer, unsigned char maxlen) {
             // XXX we clear all keys here, and work around a bug that causes crazy
             // fast key repeating. This can be turned back into acknowledging the
             // single key again later
-            while (*(unsigned char*)0xD610U) {
-                *(unsigned char*)0xd610U = 1;
+            while (PEEK(0xD610U)) {
+                POKE(0xD610U, 1);
             }
         }
     }
