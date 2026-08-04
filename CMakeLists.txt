@@ -24,7 +24,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set before CPMAddPackage so mega65-libc's own sources build for this CPU;
 # the c64 platform would otherwise default to 6502.
-set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -mcpu=mos45gs02 -D__MEGA65__")
+# -fnonreentrant: freeze_sprited.c dispatches through a struct of function
+# pointers, and an indirect call defeats the call-graph analysis that places
+# stack frames statically, so everything reachable falls back to the slow
+# soft stack.  Nothing here is re-entered: interrupts are masked throughout
+# and helper.s's NMI handler is a bare rti.
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -mcpu=mos45gs02 -D__MEGA65__ -fnonreentrant")
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=mos45gs02")
 
 include(cmake/CPM.cmake)
