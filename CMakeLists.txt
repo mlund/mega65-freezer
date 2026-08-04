@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
-set(LLVM_MOS_PLATFORM mega65)
+# c64, not mega65: the freezer's loader stub does `jmp $080d`, which is where
+# the C64 BASIC header (SYS 2061) puts the entry point.  The mega65 platform
+# emits a BASIC 65 stub -- "10 BANK 0 : 20 SYS 2071" -- whose BANK token C64
+# BASIC cannot parse and whose entry is $0817.  MEGA65 features come from
+# -mcpu and mega65-libc on top, as the cc65 build did with -t c64.
+set(LLVM_MOS_PLATFORM c64)
 find_package(llvm-mos-sdk REQUIRED)
 project(freezemenu LANGUAGES C ASM)
 
@@ -16,6 +21,11 @@ project(freezemenu LANGUAGES C ASM)
 # Must precede any add_executable, or the targets below are absent from the
 # database and clang-tidy sees only the dependency's entries.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Set before CPMAddPackage so mega65-libc's own sources build for this CPU;
+# the c64 platform would otherwise default to 6502.
+set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -mcpu=mos45gs02 -D__MEGA65__")
+set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=mos45gs02")
 
 include(cmake/CPM.cmake)
 
