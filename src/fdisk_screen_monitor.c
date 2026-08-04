@@ -80,8 +80,17 @@ void setup_screen(void) {
 
     m65_io_enable();
 
-    /* Hot registers first, then the VIC-IV ones with propagation off: any hot
-     * write after this point would recalculate them away. */
+    /* $D054 before the hot registers, and no VIC4 lock here: the hot writes
+     * below are wanted for their propagation.  The recalculation derives the
+     * row width ($D058-$D059) from $D054's CHR16 bit -- 80 bytes per row for
+     * 8-bit characters, 160 for 16-bit -- so 8-bit mode has to be selected
+     * first.  Doing the hot writes first instead recalculates against
+     * whatever the freezer left in $D054, and the fill in this function then
+     * clears a different stride than the VIC-IV displays. */
+
+    // Normal 8-bit text mode
+    POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
+
     POKE(0xD031U, 0xe0); // 80-column, fast CPU, extended attributes
     // 80 columns requires $D016 = $C9 to be properly positioned: bit 0 is the
     // H640 X-scroll correction.  Not $C8 -- that is the value the exit path
@@ -93,11 +102,6 @@ void setup_screen(void) {
     v &= 0xfc;
     v |= 0x01; // VIC RAM bank to $8000-$BFFF
     POKE(0xDD00U, v);
-
-    VIC4_LOCK_ACQUIRE();
-
-    // Normal 8-bit text mode
-    POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
 
     // Screen colours
     POKE(0xD020U, 0);
