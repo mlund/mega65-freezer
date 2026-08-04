@@ -29,8 +29,19 @@ struct dmagic_dmalist {
     unsigned int modulo;
 };
 
-struct dmagic_dmalist dmalist;
-unsigned char dma_byte;
+/* volatile because the DMAgic is a second agent on this memory, and nothing
+ * in C ever reads it.  do_dma() only pokes $D702/$D704/$D701/$D705; a volatile
+ * store to a hardware register does not order plain stores to other objects,
+ * so the compiler is free to drop a whole population of dmalist as dead when
+ * the next call overwrites it -- which is exactly what happened.  Two
+ * back-to-back lfill()s in setup_screen() emitted one population and two
+ * triggers, so the first fill ran on the previous job's list and cleared the
+ * screen with the wrong value.
+ *
+ * dma_byte is the other direction: the DMAgic writes it during lpeek(), so a
+ * plain read may be folded to a value C last stored. */
+volatile struct dmagic_dmalist dmalist;
+volatile unsigned char dma_byte;
 
 void do_dma(void) {
     m65_io_enable();
