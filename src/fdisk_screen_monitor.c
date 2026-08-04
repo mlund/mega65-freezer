@@ -60,13 +60,19 @@ void recolour_last_line(char colour) {
 long addr;
 void display_footer(unsigned char index) {
     char i;
-    addr = (long)footer_messages[index];
-    lcopy(addr, FOOTER_ADDRESS, 80);
-    for (i = 0; i < 80; i++)
-        if (PEEK(FOOTER_ADDRESS + i) >= 'a' && PEEK(FOOTER_ADDRESS + i) <= 'z')
-            POKE(FOOTER_ADDRESS + i, PEEK(FOOTER_ADDRESS + i) - 0x60);
-        else if (PEEK(FOOTER_ADDRESS + i) >= 'A' && PEEK(FOOTER_ADDRESS + i) <= 'Z')
-            POKE(FOOTER_ADDRESS + i, PEEK(FOOTER_ADDRESS + i) - 0x40);
+    /* Convert into a buffer, then copy once.  Converting in place at
+     * FOOTER_ADDRESS meant reading $BF80 back, and that read returns BASIC ROM
+     * rather than screen RAM whenever BASIC is banked in, so nothing matched
+     * 'A'-'Z' and the line stayed in ASCII. */
+    for (i = 0; i < 80; i++) {
+        char c = footer_messages[index][i];
+        if (c >= 'a' && c <= 'z')
+            c -= 0x60;
+        else if (c >= 'A' && c <= 'Z')
+            c -= 0x40;
+        stemp[i] = c;
+    }
+    lcopy((long)stemp, FOOTER_ADDRESS, 80);
     set_screen_attributes(FOOTER_ADDRESS, 80, ATTRIB_REVERSE);
 }
 
