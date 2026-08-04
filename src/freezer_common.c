@@ -9,7 +9,10 @@
 uint8_t sector_buffer[512];
 unsigned short slot_number = 0;
 char mega65_rom_type = 0;
-char mega65_rom_name[12];
+/* 20, not 12: the OpenROM probe below does memcpy(name + 4, ..., 16), which
+ * needs offsets 4..19.  At 12 it wrote eight bytes past the end and then read
+ * [12] and [13] to identify the ROM. */
+char mega65_rom_name[20];
 
 // clang-format off
 static unsigned char c64_palette[64]={

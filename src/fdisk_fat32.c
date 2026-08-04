@@ -211,6 +211,7 @@ unsigned char fat32_open_file_system(void) {
             parse_partition_entry(i);
         }
     }
+    return 0;
 }
 
 unsigned long fat32_follow_cluster(unsigned long cluster) {
