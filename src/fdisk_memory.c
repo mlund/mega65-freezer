@@ -45,6 +45,10 @@ volatile unsigned char dma_byte;
 
 __attribute__((noinline)) void do_dma(void) {
     m65_io_enable();
+    /* The DMAgic reads dmalist, and writes or reads the buffers lcopy/lfill
+     * were given, none of which the compiler can see.  volatile covers the
+     * list itself; this covers the buffers. */
+    __asm__ volatile("" ::: "memory");
 
     //  for(unsigned int i=0;i<24;i++)
     // screen_hex_byte(SCREEN_ADDRESS+i*3,PEEK(i+(unsigned int)&dmalist));
