@@ -18,5 +18,13 @@ endif()
 # translation -- so uppercase it here.  For letters, digits and .-: that is
 # byte-for-byte what ca65 produced.
 string(TOUPPER "${v}" v)
+# The freezer's loader stub does `jmp $080d` -- the entry the C64 BASIC header
+# used before .version was pinned there, which pushed _start well past it.
+# Without a jump at $080d the CPU executes the version string as code and only
+# reaches _start by falling through it, scribbling over zero page on the way.
+# Emit a real trampoline so $080d stays a valid entry point whatever the
+# version string happens to spell.
 file(WRITE "${OUT}"
+     "__asm__(\".section .entrytramp,\\\"axR\\\",@progbits\\n\"\n"
+     "        \"jmp _start\\n\");\n"
      "__attribute__((used, retain, section(\".version\"))) const char version[] = \"V:${v}\";\n")

@@ -18,6 +18,7 @@ INPUT(unmap-basic.o)
  * version.s was first in every Makefile file list; under LTO the string lands
  * wherever, so pin it immediately after the BASIC header. */
 SECTIONS {
+    .entrytramp : { KEEP(*(.entrytramp)) }
     .version : { KEEP(*(.version)) }
 } INSERT AFTER .basic_header
 
