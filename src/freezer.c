@@ -14,58 +14,58 @@
 #include <stdio.h>
 #include <string.h>
 
-unsigned char* freeze_menu_bar = (unsigned char*)"F3-RESUME    F5-RESET      HELP-MEGAINFO"
-                                                 "F3-LOAD SLOT F7-SAVE SLOT  HELP-MEGAINFO";
+unsigned char freeze_menu_bar[] = "F3-RESUME    F5-RESET      HELP-MEGAINFO"
+                                  "F3-LOAD SLOT F7-SAVE SLOT  HELP-MEGAINFO";
 
-unsigned char* freeze_menu = (unsigned char*)"      MEGA65 FREEZE MENU V0.4.1DEV      "
-                                             "  (C) MUSEUM OF ELECTRONIC GAMES & ART  "
-                                             "cccccccccccccccccccccccccccccccccccccccc"
+unsigned char freeze_menu[] = "      MEGA65 FREEZE MENU V0.4.1DEV      "
+                              "  (C) MUSEUM OF ELECTRONIC GAMES & ART  "
+                              "cccccccccccccccccccccccccccccccccccccccc"
 #define LOAD_RESUME_OFFSET (3 * 40)
-                                             "F3-RESUME    F5-RESET      HELP-MEGAINFO"
-                                             "cccccccccccccccccccccccccccccccccccccccc"
+                              "F3-RESUME    F5-RESET      HELP-MEGAINFO"
+                              "cccccccccccccccccccccccccccccccccccccccc"
 #define CPU_MODE_OFFSET (5 * 40 + 13)
 #define JOY_SWAP_OFFSET (5 * 40 + 36)
-                                             " (C)PU MODE:   4510  (J)OY SWAP:    YES "
+                              " (C)PU MODE:   4510  (J)OY SWAP:    YES "
 #define CPU_FREQ_OFFSET (6 * 40 + 13)
 #define CART_ENABLE_OFFSET (6 * 40 + 36)
-                                             " CPU (F)REQ: 40 MHZ  CAR(T) ENABLE: YES "
+                              " CPU (F)REQ: 40 MHZ  CAR(T) ENABLE: YES "
 // #define ROM_NAME_OFFSET (7 * 40 + 8)
 #define CRTEMU_MODE_OFFSET (7 * 40 + 16)
 #define VIDEO_MODE_OFFSET (7 * 40 + 33)
-                                             " C(R)T EMU:     OFF  (V)IDEO:    NTSC60 "
-                                             "cccccccccccccccccccccccccccccccccccccccc"
+                              " C(R)T EMU:     OFF  (V)IDEO:    NTSC60 "
+                              "cccccccccccccccccccccccccccccccccccccccc"
 #define TOOLS_MENU_OFFSET (9 * 40)
-                                             " M - MONITOR         L - LOAD ROM/CHAR  "
-                                             " A - AUDIO & VOLUME                     "
-                                             " S - SPRITE EDITOR                      "
-                                             "cccccccccccccccccccccccccccccccccccccccc"
-                                             "~~~~~~~~~~~~~~~~~~~~                    "
+                              " M - MONITOR         L - LOAD ROM/CHAR  "
+                              " A - AUDIO & VOLUME                     "
+                              " S - SPRITE EDITOR                      "
+                              "cccccccccccccccccccccccccccccccccccccccc"
+                              "~~~~~~~~~~~~~~~~~~~~                    "
 #define PROCESS_NAME_OFFSET (14 * 40 + 21)
-                                             "~~~~~~~~~~~~~~~~~~~~                    "
+                              "~~~~~~~~~~~~~~~~~~~~                    "
 #define PROCESS_ROM_OFFSET (15 * 40 + 26)
-                                             "~~~~~~~~~~~~~~~~~~~~ ROM:               "
+                              "~~~~~~~~~~~~~~~~~~~~ ROM:               "
 #define PROCESS_ID_OFFSET (16 * 40 + 34)
 #define SLOT_NUMBER_OFFSET (17 * 40 + 34)
-                                             "~~~~~~~~~~~~~~~~~~~~ TASK ID:           "
+                              "~~~~~~~~~~~~~~~~~~~~ TASK ID:           "
 #define FREEZE_SLOT_OFFSET (17 * 40 + 20)
-                                             "~~~~~~~~~~~~~~~~~~~~ FREEZE SLOT:       "
-                                             "~~~~~~~~~~~~~~~~~~~~                    "
+                              "~~~~~~~~~~~~~~~~~~~~ FREEZE SLOT:       "
+                              "~~~~~~~~~~~~~~~~~~~~                    "
 
-                                             "~~~~~~~~~~~~~~~~~~~~ (0) INTERNAL DRIVE:"
+                              "~~~~~~~~~~~~~~~~~~~~ (0) INTERNAL DRIVE:"
 #define DRIVE0_NUM_OFFSET (20 * 40 + 35)
-                                             "~~~~~~~~~~~~~~~~~~~~     (8) UNIT #     "
+                              "~~~~~~~~~~~~~~~~~~~~     (8) UNIT #     "
 #define D81_IMAGE0_NAME_OFFSET (21 * 40 + 22)
-                                             "~~~~~~~~~~~~~~~~~~~~                    "
-                                             "~~~~~~~~~~~~~~~~~~~~ (1) EXTERNAL 1565: "
+                              "~~~~~~~~~~~~~~~~~~~~                    "
+                              "~~~~~~~~~~~~~~~~~~~~ (1) EXTERNAL 1565: "
 #define DRIVE1_NUM_OFFSET (23 * 40 + 35)
-                                             "~~~~~~~~~~~~~~~~~~~~     (9) UNIT #     "
+                              "~~~~~~~~~~~~~~~~~~~~     (9) UNIT #     "
 #define D81_IMAGE1_NAME_OFFSET (24 * 40 + 22)
-                                             "~~~~~~~~~~~~~~~~~~~~                    "
-                                             "\0";
-unsigned char* freeze_root_warn = (unsigned char*)" NEED TO CHANGE CURRENT DIR TO ROOT TO  "
-                                                  " START TOOL! THIS WILL BREAK DISK IMAGE "
-                                                  " MOUNTS FROM SUBDIRS!    PROCEED (Y/N)? "
-                                                  "\0";
+                              "~~~~~~~~~~~~~~~~~~~~                    "
+                              "\0";
+unsigned char freeze_root_warn[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
+                                   " START TOOL! THIS WILL BREAK DISK IMAGE "
+                                   " MOUNTS FROM SUBDIRS!    PROCEED (Y/N)? "
+                                   "\0";
 
 // name of the file that is loaded by charset restore F14
 #define DEFAULT_CHARSET "CHARSET.M65"
@@ -930,8 +930,7 @@ void start_freezer_tool(char* toolfile) {
     mega65_dos_exechelper(toolfile);
 }
 
-int main(void)
-{
+int main(void) {
     unsigned char drive_state, image_state;
     /* Performs the $D02F knock; without it every later write to a VIC-IV
      * register such as $D054 is silently ignored and the screen mode is
@@ -964,7 +963,7 @@ int main(void)
             0xFD); // Disable cartridge (core will use forced values above for exrom/game)
 
     // No decimal mode!
-    __asm__("cld");
+    __asm__ volatile("cld");
 
     // Put $DD00 DDR back to default
     POKE(0xDD02, 0xFF);

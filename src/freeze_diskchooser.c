@@ -32,11 +32,11 @@ short file_count = 0, min_dir_entry = 0;
 short selection_number = 0;
 short display_offset = 0;
 
-char* reading_disk_list_message = "SCANNING DIRECTORY ...";
+char reading_disk_list_message[] = "SCANNING DIRECTORY ...";
 
-char* diskchooser_instructions = "  SELECT DISK IMAGE, THEN PRESS RETURN  "
-                                 "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  "
-                                 "UNMOUNT CURRENT  ";
+char diskchooser_instructions[] = "  SELECT DISK IMAGE, THEN PRESS RETURN  "
+                                  "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  "
+                                  "UNMOUNT CURRENT  ";
 
 // use DMA lcopy overlap trick to save space!
 unsigned char normal_row[4] = {0, 1, 0, 1};

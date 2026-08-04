@@ -15,23 +15,23 @@ short display_offset = 0;
 
 unsigned char buffer[512];
 
-char* reading_disk_list_message = "SCANNING DIRECTORY ...";
+char reading_disk_list_message[] = "SCANNING DIRECTORY ...";
 
-char* diskchooser_instructions = "SELECT A ROM FILE, PRESS RETURN TO LOAD,"
-                                 "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  ";
+char diskchooser_instructions[] = "SELECT A ROM FILE, PRESS RETURN TO LOAD,"
+                                  "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  ";
 
-char* rom_reset_screen = "YOU HAVE LOADED THE ROM FILE            "
-                         "                                        "
-                         "                                        "
-                         "    ROM VERSION:                        "
-                         "                                        "
-                         "INTO FROZEN MEMORY, REPLACING THE WHOLE "
-                         "ROM STORED THERE.                       "
-                         "                                        "
-                         "IT IS PROBABLY UNSAFE TO JUST RESUME THE"
-                         "SYSTEM, A FULL RESET IS RECOMMENDED.    "
-                         "                                        "
-                         "        RESET SYSTEM NOW? (Y/N)         ";
+char rom_reset_screen[] = "YOU HAVE LOADED THE ROM FILE            "
+                          "                                        "
+                          "                                        "
+                          "    ROM VERSION:                        "
+                          "                                        "
+                          "INTO FROZEN MEMORY, REPLACING THE WHOLE "
+                          "ROM STORED THERE.                       "
+                          "                                        "
+                          "IT IS PROBABLY UNSAFE TO JUST RESUME THE"
+                          "SYSTEM, A FULL RESET IS RECOMMENDED.    "
+                          "                                        "
+                          "        RESET SYSTEM NOW? (Y/N)         ";
 
 // clang-format off
 unsigned char normal_row[40] = {

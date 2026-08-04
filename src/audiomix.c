@@ -41,15 +41,14 @@ void setup_menu_screen(void) {
     lfill(0xff80000U, 1, 2000);
 }
 
-int main(void)
-{
+int main(void) {
     /* Performs the $D02F knock; without it every later write to a VIC-IV
      * register such as $D054 is silently ignored and the screen mode is
      * never established. */
     mega65_fast();
 
     // Disable interrupts and interrupt sources
-    __asm__("sei");
+    __asm__ volatile("sei" ::: "memory");
     POKE(0xDC0DU, 0x7F);
     POKE(0xDD0DU, 0x7F);
     POKE(0xD01AU, 0x00);
@@ -61,7 +60,7 @@ int main(void)
     POKE(0x01, 0x36);
 
     // No decimal mode!
-    __asm__("cld");
+    __asm__ volatile("cld");
 
     // Enable extended attributes so we can use reverse
     POKE(0xD031U, PEEK(0xD031U) | 0x20);

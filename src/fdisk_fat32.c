@@ -19,12 +19,14 @@ void mega65_serial_monitor_write(char* s) {
     while (*s) {
         // There is almost certainly a better way to do this, but it works.
         POKE(0x380, *s);
-        __asm__("lda $0380");
-
-        // Use CLC in the spare instruction slot, in case assembler tries to
-        // optimise a NOP away.
-        __asm__("sta $d643");
-        __asm__("clc");
+        /* One block, not three: the value travels from lda to sta in A, and
+         * separate asm statements declare nothing, so the compiler is free to
+         * use A in between.  CLC fills the spare slot after the hypervisor
+         * trap, where a NOP might be optimised away. */
+        __asm__ volatile("lda $0380\n\t"
+                         "sta $d643\n\t"
+                         "clc" ::
+                             : "a", "p");
         s++;
     }
 }

@@ -62,6 +62,12 @@ find_program(CLANG_TIDY_EXE NAMES clang-tidy HINTS ${LLVM_MOS_PREFIX}/bin)
 find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_PREFIX}/bin)
 
 if(CLANG_TIDY_EXE)
+    # High-volume but genuine: kept out of `tidy` so it cannot bury the rest.
+    add_custom_target(tidy-widening
+        COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR}
+                --checks=-*,bugprone-implicit-widening-of-multiplication-result
+                ${TIDY_SOURCES}
+        COMMENT "Checking 16-bit multiplication overflows")
     add_custom_target(tidy
         COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} ${TIDY_SOURCES}
         COMMENT "Running clang-tidy")

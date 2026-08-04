@@ -30,10 +30,25 @@ void screen_hex(unsigned int addr, long value) {
     POKE(addr + 7, to_screen_hex(value >> 0));
 }
 
+/* Writes eight hex digits to a buffer.  format_hex() used to reach its local
+ * array by passing (int)&dec[0] to screen_hex(), which stores through a
+ * pointer rebuilt from that integer -- the compiler cannot connect those
+ * stores to the local, so the reads below are undefined behaviour. */
+static void hex_to_buf(char* out, const long value) {
+    out[0] = to_screen_hex(value >> 28);
+    out[1] = to_screen_hex(value >> 24);
+    out[2] = to_screen_hex(value >> 20);
+    out[3] = to_screen_hex(value >> 16);
+    out[4] = to_screen_hex(value >> 12);
+    out[5] = to_screen_hex(value >> 8);
+    out[6] = to_screen_hex(value >> 4);
+    out[7] = to_screen_hex(value >> 0);
+}
+
 void format_hex(const int addr, const long value, const char columns) {
     char i, c;
     char dec[9];
-    screen_hex((int)&dec[0], value);
+    hex_to_buf(dec, value);
 
     c = 8 - columns;
     while (c) {
