@@ -12,20 +12,14 @@
 
 	.zeropage __rc2, __rc3, __rc4, __rc5
 
-	.section .zp.bss,"az",@nobits
+	.section .zp.bss.hptr,"az",@nobits
 ;; Indirect addressing needs a zero-page pointer, and the argument registers do
 ;; not survive the fallback path in mega65_dos_exechelper.
 hptr:	.zero 2
 
-	.section .bss,"aw",@nobits
+	.section .bss.haddr,"aw",@nobits
 ;; The filename copy clobbers A/X, which carry two bytes of the load address.
 haddr:	.zero 2
-
-	.section .text,"ax",@progbits
-
-	;; fall-back to FREEZER.M65 if other .M65 file can't be loaded
-freezer_m65:
-	.asciz "freezer.m65"
 
 ;;; void init_nmi(void)
 	.section .text.init_nmi,"ax",@progbits
@@ -41,12 +35,10 @@ init_nmi:
 nmi_handler:
 	rti
 
-	.section .data,"aw",@progbits
+	.section .data.hdos_new_attach,"aw",@progbits
 	.global hdos_new_attach
 hdos_new_attach:
 	.byte 1
-
-	.section .text,"ax",@progbits
 
 ;;; uint8_t mega65_dos_init(void)   -> A
 	.section .text.mega65_dos_init,"ax",@progbits
@@ -75,6 +67,10 @@ mega65_dos_init:
 ;;; char mega65_dos_exechelper(char *image_name)
 ;;; image_name in __rc2/__rc3.  Effectively exec(); only returns on error.
 	.section .text.mega65_dos_exechelper,"ax",@progbits
+	;; fall-back to FREEZER.M65 if the requested .M65 cannot be loaded
+freezer_m65:
+	.asciz "freezer.m65"
+
 	.global mega65_dos_exechelper
 mega65_dos_exechelper:
 	lda __rc2
@@ -162,11 +158,9 @@ load_succeeded:
 	jmp PROGRAM_ENTRY
 	rts
 
-	.section .bss,"aw",@nobits
+	.section .bss.attachDrive,"aw",@nobits
 attachDrive:
 	.zero 1
-
-	.section .text,"ax",@progbits
 
 ;;; char mega65_dos_attach(char *image_name, uint8_t driveid)
 ;;; image_name in __rc2/__rc3, driveid in A.
