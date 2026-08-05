@@ -1,5 +1,4 @@
-#ifndef __FDISK_SCREEN_MONITOR_H__
-#define __FDISK_SCREEN_MONITOR_H__
+#pragma once
 
 void setup_screen(void);
 void display_footer(unsigned char index);
@@ -13,5 +12,3 @@ void set_screen_attributes(long p, unsigned char count, unsigned char attr);
 char read_line(char* buffer, unsigned char maxlen);
 void fatal_error(const unsigned char* filename, unsigned int line_number);
 #define FATAL_ERROR fatal_error(__FILE__, __LINE__)
-
-#endif /* __FDISK_SCREEN_MONITOR_H__ */

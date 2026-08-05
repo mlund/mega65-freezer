@@ -59,7 +59,6 @@ void write_line(const char* s, char col) {
 void recolour_last_line(char colour) {
     long colour_address = COLOUR_RAM_ADDRESS + (screen_line_address - SCREEN_ADDRESS) - 80;
     lfill(colour_address, colour, 80);
-    return;
 }
 
 void display_footer(unsigned char index) {

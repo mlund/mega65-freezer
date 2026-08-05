@@ -1,5 +1,4 @@
-#ifndef __FDISK_SCREEN_H__
-#define __FDISK_SCREEN_H__
+#pragma once
 
 #define SCREEN_ADDRESS (0xB800U)
 // Use default char set, not ASCII charset
@@ -52,5 +51,3 @@ void format_hex(char* out, const long value, const char columns);
 
 extern long screen_line_address;
 extern char screen_column;
-
-#endif /* __FDISK_SCREEN_H__ */

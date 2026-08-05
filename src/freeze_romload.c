@@ -106,12 +106,12 @@ char draw_directory_entry(unsigned char screen_row) {
     unsigned char i, c;
     // Skip first 5 bytes
     for (i = 0; i < 2; i++)
-        c = F011_DATA;
+        (void)F011_DATA;
     type = F011_DATA;
     if (!(type & 0xf))
         invalid = 1;
     for (i = 0; i < 2; i++)
-        c = F011_DATA;
+        (void)F011_DATA;
     // Then draw the 16 chars with quotes
     POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2), '"');
     for (i = 0; i < 16; i++) {
@@ -134,12 +134,16 @@ char draw_directory_entry(unsigned char screen_row) {
     }
     if (type & 0x40)
         POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '<');
-    if (!type & 0xf0)
+    // Parses as `(!type) & 0xf0`, which is always 0, so the '*' never draws.
+    // Left as-is on purpose: the cc65 original has the identical line, and
+    // correcting it changes what the user sees.  See TODO.md section 2 -- it
+    // wants fixing here and upstream together, not silently diverging here.
+    if (!type & 0xf0) // NOLINT(clang-diagnostic-logical-not-parentheses)
         POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '*');
 
     // Read the rest of the entry to advance buffer pointer nicely
     for (i = 0; i < 11; i++)
-        c = F011_DATA;
+        (void)F011_DATA;
 
     if (invalid) {
         // Erase whatever we drew
@@ -465,6 +469,8 @@ unsigned char freeze_load_romarea(void) {
                 if (selection_number < 0)
                     selection_number = 0;
                 break;
+            default:
+                break;
         }
 
         // Adjust display position
@@ -479,7 +485,6 @@ unsigned char freeze_load_romarea(void) {
 
         if (x)
             draw_file_list();
-        x = 0;
     }
 
     return 0;

@@ -46,6 +46,8 @@ unsigned char char_to_hex(char in) {
         case 'E':
         case 'F':
             return (in - 'A') & 0xf;
+        default:
+            break;
     }
     return 0;
 }

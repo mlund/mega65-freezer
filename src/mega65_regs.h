@@ -1,5 +1,4 @@
-#ifndef __MEGA65_REGS_H__
-#define __MEGA65_REGS_H__
+#pragma once
 
 // MEGA65 hardware the SDK's <mega65.h> does not name, plus wrappers for the
 // CPU's math accelerator.  C only -- helper.S has no use for any of it.
@@ -101,5 +100,3 @@ static inline uint16_t hw_div16_ceil(uint32_t a, uint32_t b) {
 // Keyboard event queue: reads the top event as ASCII, 0x00 when empty;
 // assigning any value dequeues.  See the user guide, "Keyboard".
 #define ASCIIKEY MMIO8(0xD610)
-
-#endif /* __MEGA65_REGS_H__ */

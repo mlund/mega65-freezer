@@ -157,6 +157,8 @@ void input_text(
                     out[ofs] = 0;
                     ASCIIKEY = 0;
                     return;
+                default:
+                    break;
             }
         }
         if (c)

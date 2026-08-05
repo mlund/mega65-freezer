@@ -1,5 +1,4 @@
-#ifndef __FREEZER_H__
-#define __FREEZER_H__
+#pragma once
 
 #include <ctype.h>
 #include <mega65/dirent.h>
@@ -61,7 +60,7 @@ extern unsigned long freeze_slot_start_sector;
  * the hypervisor leaves in $D681-$D684 rather than in a return value. */
 uint32_t read_freeze_slot_start_sector(unsigned short slot);
 
-struct file_descriptor_t {
+struct FileDescriptor {
 #define FD_DISK_ID_FILE_CLOSED 0xFF
     unsigned char disk_id;
     unsigned long start_cluster;
@@ -79,7 +78,7 @@ struct file_descriptor_t {
 #define PD_IMGFLAGS_MOUNTED 0b00000001
 #define PD_IMGFLAGS_WRITEEN 0b00000101
 #define PD_IMGFLAGS_NOREAL 0b01000000
-struct process_descriptor_t {
+struct ProcessDescriptor {
     unsigned char task_id;
     char process_name[16];
     unsigned char d81_image0_flags;
@@ -89,10 +88,8 @@ struct process_descriptor_t {
     char d81_image0_name[32];
     char d81_image1_name[32];
     char filler[0x80 - (1 + 16 + 1 + 1 + 1 + 1 + 32 + 32)];
-    struct file_descriptor_t file_descriptors[4];
+    struct FileDescriptor file_descriptors[4];
 
     // Pad out to whole sector size, so we can load it easily
     char padding[256];
 };
-
-#endif /* __FREEZER_H__ */

@@ -1,5 +1,4 @@
-#ifndef __FDISK_HAL_H__
-#define __FDISK_HAL_H__
+#pragma once
 
 #include "fdisk_memory.h"
 
@@ -21,5 +20,3 @@ void sdcard_readsector(const uint32_t sector_number);
 void mega65_fast(void);
 void sdcard_writenextsector(void);
 void sdcard_writemultidone(void);
-
-#endif /* __FDISK_HAL_H__ */

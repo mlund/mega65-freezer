@@ -972,10 +972,7 @@ static void paint_pixel_mono(uint8_t x, uint8_t y) {
 
 static void paint_pixel_multi(uint8_t x, uint8_t y) {
     const long byte_addr = (SPRITE_BUFFER + (y * g_state.sprite_width / 4)) + (x / 4);
-    const uint8_t b = lpeek(byte_addr);
     const uint8_t bitsel = (2 * (x % 4));
-    const uint8_t p0 = b & (0x80 >> bitsel);
-    const uint8_t p1 = b & (0x40 >> bitsel);
     const uint8_t mask = ((0x80 >> bitsel) | (0x40 >> bitsel));
     if (g_state.current_color_idx == COLOR_BACK) {
         lpoke(byte_addr, lpeek(byte_addr) & ~mask);
@@ -1264,8 +1261,12 @@ static void draw_color_selector() {
                     case COLOR_MC2:
                         screen_putsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
                         break;
+                    default:
+                        break;
                 }
 
+                break;
+            default:
                 break;
         }
     }
@@ -1513,7 +1514,6 @@ static void main_loop() {
     static uint8_t edit_color_counter = 0;
     unsigned char buf[64];
     unsigned char key = 0, keymod = 0;
-    uint8_t redraw_status_bar = false;
 
     mouse_set_bounding_box(0 + 24, 0 + 50, 319 + 24 - 8, 199 + 50);
     mouse_warp_to(24, 100);
@@ -1655,7 +1655,6 @@ static void main_loop() {
                     if (g_state.tool_active) {
                         g_state.tool_active = 0;
                         g_state.draw_shape_fn(g_state.paint_cell_fn);
-                        redraw_status_bar = true;
                         set_redraw_full_canvas();
                     } else {
                         g_state.tool_org_x = g_state.cursor_x;
@@ -1721,6 +1720,8 @@ static void main_loop() {
                             FREEZE_PEEK(REG_SPR_16COL) & ~(1 << g_state.sprite_number));
                         FREEZE_POKE(REG_SPR_MULTICOLOR,
                             FREEZE_PEEK(REG_SPR_MULTICOLOR) | (1 << g_state.sprite_number));
+                        break;
+                    default:
                         break;
                 }
                 update_and_full_redraw(false);

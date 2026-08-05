@@ -263,7 +263,6 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             POKE(SD_CTL, 2); // read the sector we just wrote
 
             while (PEEK(SD_CTL) & 3) {
-                continue;
             }
 
             // Copy the read data to a buffer for verification
@@ -301,28 +300,22 @@ void sdcard_writenextsector(void) {
 
     // Command write of follow-on block in multi-block write job
     while (PEEK(SD_CTL) & 3) {
-        continue;
     }
     POKE(SD_CTL, 0x57); // Open SD card write gate
     POKE(SD_CTL, 5);
     while (!(PEEK(SD_CTL) & 3)) {
-        continue;
     }
     while (PEEK(SD_CTL) & 3) {
-        continue;
     }
 }
 
 void sdcard_writemultidone(void) {
     while (PEEK(SD_CTL) & 3) {
-        continue;
     }
     POKE(SD_CTL, 0x57);
     POKE(SD_CTL, 6);
     while (!(PEEK(SD_CTL) & 3)) {
-        continue;
     }
     while (PEEK(SD_CTL) & 3) {
-        continue;
     }
 }

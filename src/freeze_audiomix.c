@@ -349,6 +349,8 @@ void change_db(unsigned char row, unsigned char change) {
   case  9: c = 0xf0; break;
   case 10: c = 0xf2; break;
   case 11: c = 0xfc; break;
+      default:
+          break;
   }
     // clang-format on
 
@@ -580,6 +582,8 @@ void test_audio(unsigned char advanced_view) {
       case 2: sid_num = 1; break;
       case 3: sid_num = 3; break;
       case 4: sid_num = 0; break;
+          default:
+              break;
       }
         // clang-format on
 
@@ -618,6 +622,8 @@ void test_audio(unsigned char advanced_view) {
                         lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x60);
                     break;
+                default:
+                    break;
             }
         } else {
             switch (sid_num) {
@@ -634,6 +640,8 @@ void test_audio(unsigned char advanced_view) {
                     lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 16 * SCREEN_ROW_BYTES, 80);
                     lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 8 * SCREEN_ROW_BYTES, 80);
                     lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 17 * SCREEN_ROW_BYTES, 80);
+                    break;
+                default:
                     break;
             }
         }

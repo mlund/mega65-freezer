@@ -1,5 +1,4 @@
-#ifndef __HELPER_H__
-#define __HELPER_H__
+#pragma once
 
 // Hypervisor interface: the trap and loader constants helper.S writes, the
 // routines it exports, and the short traps that are inline asm instead.
@@ -76,8 +75,14 @@
 
 // The filename pointer is stashed alongside each buffer for post-mortem
 // inspection from the monitor.
-#define NAME_PTR_STASH_EXEC NAME_BUF_EXEC + 0x40
-#define NAME_PTR_STASH_DOS NAME_BUF_DOS + 0x40
+//
+// Deliberately unparenthesised, despite bugprone-macro-parentheses: helper.S
+// includes this header, and in 6502 assembly parentheses are the indirect
+// addressing mode rather than grouping.  Wrapping the replacement list turns
+// `sta NAME_PTR_STASH_EXEC` into an indirect store, which the assembler
+// rejects outright ("operand must be an 8-bit address").
+#define NAME_PTR_STASH_EXEC NAME_BUF_EXEC + 0x40 // NOLINT(bugprone-macro-parentheses)
+#define NAME_PTR_STASH_DOS NAME_BUF_DOS + 0x40   // NOLINT(bugprone-macro-parentheses)
 
 // dos_attach gained its current calling convention in hyppo DOS 1.3.
 #define HDOS_MAJOR_MIN 1
@@ -182,5 +187,3 @@ HELPER_ASM uint8_t mega65_dos_getprocdesc(uint8_t pagemsb);
 HELPER_ASM char read_file_from_sdcard(char* filename, uint32_t load_address);
 
 #endif // __ASSEMBLER__
-
-#endif /* __HELPER_H__ */

@@ -267,7 +267,7 @@ void draw_thumbnail(void) {
     }
 }
 
-struct process_descriptor_t process_descriptor;
+struct ProcessDescriptor process_descriptor;
 
 // clang-format off
 static int8_t last_thumb_frame = -1;
@@ -929,6 +929,8 @@ void start_freezer_tool(char* toolfile) {
                 case 0x03:
                     draw_freeze_menu(UPDATE_TOP);
                     return;
+                default:
+                    break;
             }
         }
     }

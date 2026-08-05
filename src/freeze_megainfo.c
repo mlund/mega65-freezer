@@ -641,12 +641,18 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                     offs = 11;
                     colour = 10;
                 }
+                // No terminator is copied, and none is needed: every strcpy
+                // above writes exactly 24 characters plus a NUL at index 24,
+                // and the longest append here is 12 bytes at offs 11, ending
+                // at index 22.  The terminator is never overwritten.
+                // NOLINTBEGIN(bugprone-not-null-terminated-result)
                 if (offs != 0xff && rtc_pmu != 0xff) {
                     if ((rtc_pmu & 0x30) == 0x20)
                         memcpy(buffer + offs, ", BACKUP ON", 11);
                     else
                         memcpy(buffer + offs, ", BACKUP OFF", 12);
                 }
+                // NOLINTEND(bugprone-not-null-terminated-result)
                 write_text(x, y + 1, colour, buffer);
             } else
                 write_text(x, y + 1, 7, "CHECKING                ");
@@ -853,8 +859,8 @@ void do_megainfo() {
             case 0x1b:  // ESC
             case 0x03:  // RUN-STOP
                 return; // EXIT!
+            default:
+                break;
         }
     }
-
-    return;
 }

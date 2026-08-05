@@ -63,14 +63,9 @@ void parse_partition_entry(const char i) {
 
     int offset = 0x1be + (i << 4);
 
-    char active = sector_buffer[offset + 0];
-    char shead = sector_buffer[offset + 1];
-    char ssector = sector_buffer[offset + 2] & 0x1f;
-    int scylinder = ((sector_buffer[offset + 2] << 2) & 0x300) + sector_buffer[offset + 3];
+    // Only the partition type and the LBA fields are used.  The CHS geometry at
+    // offsets 1-3 and 5-7 is what a BIOS needed; nothing here reads it.
     char id = sector_buffer[offset + 4];
-    char ehead = sector_buffer[offset + 5];
-    char esector = sector_buffer[offset + 6] & 0x1f;
-    int ecylinder = ((sector_buffer[offset + 6] << 2) & 0x300) + sector_buffer[offset + 7];
     uint32_t lba_start, lba_size;
 
     for (j = 0; j < 4; j++)
@@ -104,13 +99,9 @@ void parse_partition_entry(const char i) {
             root_dir_sector = lba_start + reserved_sectors + sectors_per_fat * fat_copies;
             fat1_sector = lba_start + reserved_sectors;
             fat2_sector = lba_start + reserved_sectors + sectors_per_fat;
+        default:
+            break;
     }
-
-#if 0
-  printf("%02X%c : Start=%3d/%2d/%4d or %08X / End=%3d/%2d/%4d or %08X\n",
-	 id,active&80?'*':' ',
-	 shead,ssector,scylinder,lba_start,ehead,esector,ecylinder,lba_end);
-#endif
 }
 
 #define detect_target() (lpeek(0xffd3629))
@@ -278,7 +269,6 @@ long fat32_create_contiguous_file(
     unsigned long k, start_cluster = 0;
     unsigned long dir_cluster = 2;
     unsigned long last_dir_cluster = 2;
-    unsigned long next_cluster;
     unsigned long contiguous_clusters = 0;
     unsigned long fat_sector_num = 0;
     unsigned long fat_sector_count = 0;
@@ -406,7 +396,6 @@ long fat32_create_contiguous_file(
     // Write cluster chain into both FATs
     mega65_serial_monitor_write("Writing FAT sectors for file\r\n");
     fat_sector_num = start_cluster / 128;
-    next_cluster = start_cluster + 1;
     fat_sector_count = clusters / 128;
     if (clusters & 127)
         fat_sector_count++;

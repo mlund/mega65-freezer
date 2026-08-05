@@ -149,6 +149,8 @@ char* hyppoerror_to_screen(unsigned char error) {
               case 0xff:
                 return "NO SUCH TRAP / EOF";
             */
+        default:
+            break;
     }
     default_error[11] = (error >> 4) + (((error >> 4) < 10) ? 0x30 : 0x37);
     default_error[12] = (error & 0xf) + (((error & 0xf) < 10) ? 0x30 : 0x37);
@@ -205,8 +207,8 @@ unsigned char next_directory_entry(void) {
                 next_sector = 254; // first two bytes of sector read
         }
         type = F011_DATA; // file type
-        c = F011_DATA;    // track file
-        c = F011_DATA;    // sector file
+        (void)F011_DATA;  // track file
+        (void)F011_DATA;  // sector file
         // now 16 char filename
         if (type) { // valid
             entry_buffer[17] = ' ';
@@ -218,10 +220,10 @@ unsigned char next_directory_entry(void) {
 
             // skip rest up to 32 bytes
             for (i = 0; i < 11; i++)
-                c = F011_DATA;
+                (void)F011_DATA;
         } else
             for (i = 0; i < 27; i++)
-                c = F011_DATA;
+                (void)F011_DATA;
     }
 
     return type;
@@ -323,6 +325,8 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         case DISK_TYPE_D71:
             // write_entry
             return 1; // not supported
+        default:
+            break;
     }
 
     // Mounted disk, so now get the directory.
@@ -386,7 +390,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
 #else
     // skip start of sector until we reach the disk title
     for (j = 0; j < skip_bytes; j++)
-        c = F011_DATA;
+        (void)F011_DATA;
 
     // Then draw title at the top of the screen
     POKE(SCREEN_ADDRESS + 21 * 2, '"');
@@ -414,7 +418,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         // Skip 1st half of sector
         x = 0;
         do
-            c = F011_DATA;
+            (void)F011_DATA;
         while (++x);
         entries = 8;
     } else { // DISK_TYPE_D64
@@ -458,7 +462,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
 
         if (skip_bytes)
             for (j = 0; j < 256; j++)
-                c = F011_DATA;
+                (void)F011_DATA;
 
         // once more, then we have the 22 entries we can display
         draw_entries();
@@ -808,6 +812,8 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                 selection_number--;
                 if (selection_number < 0)
                     selection_number = 0;
+                break;
+            default:
                 break;
         }
 
