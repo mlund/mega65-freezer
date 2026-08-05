@@ -5,8 +5,8 @@
 // Use default char set, not ASCII charset
 #define CHARSET_ADDRESS (0x9000U)
 #define COLOUR_RAM_ADDRESS (0x1f800)
-// 16-bit text mode: 40 columns of two bytes, 25 rows.
-#define SCREEN_COLS 40
+// 16-bit text mode: 40 columns of two bytes, 25 rows.  No SCREEN_COLS here --
+// freeze_sprited.c defines that as 80 for its own layout.
 #define SCREEN_ROW_BYTES 80
 #define SCREEN_ROWS 25
 #define SCREEN_BYTES (SCREEN_ROW_BYTES * SCREEN_ROWS)

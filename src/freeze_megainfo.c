@@ -1,3 +1,5 @@
+#define RTC_YEAR_EPOCH 2000 // the RTC counts years from 2000, not 1900
+
 #include "cc65compat.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
@@ -197,7 +199,7 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     strcat(buffer, tempstr32);
 
     // save date for external use
-    ymd[0] = (unsigned char)(y - SCREEN_BYTES);
+    ymd[0] = (unsigned char)(y - RTC_YEAR_EPOCH);
     ymd[1] = m;
     ymd[2] = ds;
 

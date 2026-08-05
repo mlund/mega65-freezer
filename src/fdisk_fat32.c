@@ -130,7 +130,7 @@ struct m65_tm {
     unsigned char tm_hour;  /* Hours (0-23) */
     unsigned char tm_mday;  /* Day of the month (1-31) */
     unsigned char tm_mon;   /* Month (0-11) */
-    unsigned short tm_year; /* Year - 1900 (in practice, never < SCREEN_BYTES) */
+    unsigned short tm_year; /* Year - 1900 (in practice, never < 2000) */
     unsigned char tm_wday;  /* Day of the week (0-6, Sunday = 0) */
     int tm_yday;            /* Day in the year (0-365, 1 Jan = 0) */
     unsigned char tm_isdst; /* Daylight saving time */
@@ -191,7 +191,7 @@ void getrtc(struct m65_tm* tm) {
             }
             tm->tm_mday = unbcd(lpeek_debounced(0xffd7113)) - 1;
             tm->tm_mon = unbcd(lpeek_debounced(0xffd7114));
-            // RTC is based on SCREEN_BYTES, not 1900
+            // RTC is based on 2000, not 1900
             tm->tm_year = unbcd(lpeek_debounced(0xffd7115)) + 100;
             tm->tm_wday = unbcd(lpeek_debounced(0xffd7116));
             tm->tm_isdst = lpeek_debounced(0xffd7117) & 0x20;

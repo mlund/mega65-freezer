@@ -3,6 +3,10 @@
 
 */
 
+// D81 geometry, unrelated to screen geometry despite sharing the number 80.
+#define D81_TRACKS 80
+#define D81_SECTORS_PER_TRACK 20
+
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -189,7 +193,7 @@ unsigned char to_hex(unsigned char i) {
 void format_disk_image(unsigned long file_sector, char* diskname, unsigned char isD65) {
     unsigned char i;
     unsigned short s;
-    unsigned short sect_count = SCREEN_ROW_BYTES * 20;
+    unsigned short sect_count = D81_TRACKS * D81_SECTORS_PER_TRACK;
     if (isD65)
         sect_count = 85 * 64;
 
@@ -315,7 +319,7 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
     // Actually create the file
     //  while(!ASCIIKEY) VICIV.bordercol = VICIV.bordercol+1; ASCIIKEY = 0;
     file_sector = fat32_create_contiguous_file(filename,
-        isD65 ? (85 * 64 * 2 * 512L) : (SCREEN_ROW_BYTES * 10 * 2 * 512L),
+        isD65 ? (85 * 64 * 2 * 512L) : (D81_TRACKS * 10L * 2 * SECTOR_SIZE),
         root_dir_sector,
         fat1_sector,
         fat2_sector);
