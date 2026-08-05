@@ -53,17 +53,21 @@ static char* put_hex(char* cursor, uint32_t value, uint8_t digits) {
     return cursor;
 }
 
-static uint32_t read_little_endian(const uint8_t* bytes, uint8_t count) {
-    uint32_t value = 0;
-    while (count-- > 0) {
-        value |= (uint32_t)bytes[count] << (count * 8);
-    }
-    return value;
+static uint16_t read_word(const uint8_t* bytes) {
+    return (uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8);
 }
 
-/* The eight ($nn),Z opcodes -- the only ones an $EA prefix widens to [$nn],Z. */
+/* Only a far JMP/JSR carries an operand wider than a word, so every other mode
+ * reads a fixed two bytes -- a variable-width loop costs far more than the one
+ * branch that picks between these. */
+static uint32_t read_long(const uint8_t* bytes) {
+    return (uint32_t)read_word(bytes) | ((uint32_t)read_word(&bytes[2]) << 16);
+}
+
+/* The eight ($nn),Z opcodes -- $12, $32 ... $F2 -- which are the only ones an
+ * $EA prefix widens to [$nn],Z. */
 static bool is_indirect_zp_z(uint8_t opcode) {
-    return (opcode & 0x0f) == 0x02 && ((opcode >> 4) & 1) != 0;
+    return (opcode & 0x1f) == 0x12;
 }
 
 static bool has_quad_form(uint8_t opcode) {
@@ -97,19 +101,19 @@ static uint32_t branch_target(uint32_t address, uint8_t length, int16_t offset) 
     return (address & 0x0FFF0000UL) | within_bank;
 }
 
-/* Read bytes[0..index] if the scan has not already reached that far.  The
- * prefix scan looks at the same leading bytes the operand fetch would go on to
- * re-read, so keeping them removes about a third of the frozen-memory reads a
- * screenful costs.  A short read leaves `fetched` where it was, so the caller's
- * `&&` chain simply decides there is no prefix. */
-static bool fetch_through(uint32_t address, uint8_t* bytes, uint8_t* fetched, uint8_t index) {
-    while (*fetched <= index) {
-        if (!disasm_read_byte(address + *fetched, &bytes[*fetched])) {
-            return false;
+/* Extend bytes[] to cover index, returning how far it now reaches -- which is
+ * short of index+1 only where frozen memory runs out.  The count never goes
+ * backwards, so a failed prefix probe keeps whatever it did read.  That reuse
+ * is the point: the prefix scan looks at the same leading bytes the operand
+ * fetch would otherwise read again, about a third of a screenful's reads. */
+static uint8_t fetch_through(uint32_t address, uint8_t* bytes, uint8_t fetched, uint8_t index) {
+    while (fetched <= index) {
+        if (!disasm_read_byte(address + fetched, &bytes[fetched])) {
+            break;
         }
-        (*fetched)++;
+        fetched++;
     }
-    return true;
+    return fetched;
 }
 
 bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* layout) {
@@ -120,7 +124,8 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
     bool is_flat_address = false;
     bool is_far = false;
 
-    if (!fetch_through(address, bytes, &fetched, 0)) {
+    fetched = fetch_through(address, bytes, fetched, 0);
+    if (fetched == 0) {
         return false;
     }
     uint8_t opcode = bytes[0];
@@ -130,11 +135,13 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
      * target -- so failing to decode it would desynchronise every following
      * line by two bytes.  It is live on stock hardware: flat32_enabled defaults
      * to '1' and only the hypervisor can clear it, via $D67D.1. */
-    if (opcode == OPCODE_CLD && fetch_through(address, bytes, &fetched, 2) &&
-        bytes[1] == OPCODE_CLD && has_far_form(bytes[2])) {
-        is_far = true;
-        prefix_length = 2;
-        opcode = bytes[2];
+    if (opcode == OPCODE_CLD) {
+        fetched = fetch_through(address, bytes, fetched, 2);
+        if (fetched > 2 && bytes[1] == OPCODE_CLD && has_far_form(bytes[2])) {
+            is_far = true;
+            prefix_length = 2;
+            opcode = bytes[2];
+        }
     }
     /* $42 $42 makes the next instruction operate on Q, and may itself be
      * followed by $EA for a 32-bit vector.  Treated as a prefix only when the
@@ -143,29 +150,35 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
      * before setting the prefix flag), so resuming at the second $42 stays in
      * step with the CPU.  The 39 reserved Q slots land here and render as
      * NEG / NEG / base op -- a mnemonic difference, never an alignment one. */
-    else if (opcode == OPCODE_NEG && fetch_through(address, bytes, &fetched, 2) &&
-        bytes[1] == OPCODE_NEG) {
-        uint8_t quad_opcode = bytes[2];
-        uint8_t quad_prefix_length = 2;
-        if (quad_opcode == OPCODE_EOM && fetch_through(address, bytes, &fetched, 3) &&
-            is_indirect_zp_z(bytes[3])) {
-            quad_opcode = bytes[3];
-            quad_prefix_length = 3;
-        }
-        if (has_quad_form(quad_opcode)) {
-            is_quad = true;
-            is_flat_address = (quad_prefix_length == 3);
-            prefix_length = quad_prefix_length;
-            opcode = quad_opcode;
+    else if (opcode == OPCODE_NEG) {
+        fetched = fetch_through(address, bytes, fetched, 2);
+        if (fetched > 2 && bytes[1] == OPCODE_NEG) {
+            uint8_t quad_opcode = bytes[2];
+            uint8_t quad_prefix_length = 2;
+            if (quad_opcode == OPCODE_EOM) {
+                fetched = fetch_through(address, bytes, fetched, 3);
+                if (fetched > 3 && is_indirect_zp_z(bytes[3])) {
+                    quad_opcode = bytes[3];
+                    quad_prefix_length = 3;
+                }
+            }
+            if (has_quad_form(quad_opcode)) {
+                is_quad = true;
+                is_flat_address = (quad_prefix_length == 3);
+                prefix_length = quad_prefix_length;
+                opcode = quad_opcode;
+            }
         }
     }
     /* $EA before a ($nn),Z opcode widens the vector to 28 bits.  Everywhere
      * else it is EOM. */
-    else if (opcode == OPCODE_EOM && fetch_through(address, bytes, &fetched, 1) &&
-        is_indirect_zp_z(bytes[1])) {
-        is_flat_address = true;
-        prefix_length = 1;
-        opcode = bytes[1];
+    else if (opcode == OPCODE_EOM) {
+        fetched = fetch_through(address, bytes, fetched, 1);
+        if (fetched > 1 && is_indirect_zp_z(bytes[1])) {
+            is_flat_address = true;
+            prefix_length = 1;
+            opcode = bytes[1];
+        }
     }
 
     const uint8_t mode = OPCODE_MODE[opcode];
@@ -177,7 +190,8 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
     }
 
     const uint8_t length = prefix_length + 1 + operand_length;
-    if (!fetch_through(address, bytes, &fetched, length - 1)) {
+    fetched = fetch_through(address, bytes, fetched, length - 1);
+    if (fetched < length) {
         return false;
     }
     const uint8_t* operand = &bytes[prefix_length + 1];
@@ -266,24 +280,25 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
             break;
         case Absolute:
             *cursor++ = '$';
-            cursor = put_hex(
-                cursor, read_little_endian(operand, operand_length), (uint8_t)(operand_length * 2));
+            cursor = put_hex(cursor,
+                operand_length == 4 ? read_long(operand) : read_word(operand),
+                (uint8_t)(operand_length * 2));
             break;
         case AbsoluteX:
         case AbsoluteY:
             *cursor++ = '$';
-            cursor = put_hex(cursor, read_little_endian(operand, 2), 4);
+            cursor = put_hex(cursor, read_word(operand), 4);
             break;
         case IndirectAbsolute:
         case IndirectAbsoluteX:
             *cursor++ = '(';
             *cursor++ = '$';
-            cursor = put_hex(cursor, read_little_endian(operand, 2), 4);
+            cursor = put_hex(cursor, read_word(operand), 4);
             break;
         case ImmediateWord:
             *cursor++ = '#';
             *cursor++ = '$';
-            cursor = put_hex(cursor, read_little_endian(operand, 2), 4);
+            cursor = put_hex(cursor, read_word(operand), 4);
             break;
         case Relative8:
             *cursor++ = '$';
@@ -293,7 +308,7 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
         case Relative16:
             *cursor++ = '$';
             cursor = put_hex(cursor,
-                branch_target(address, length, (int16_t)read_little_endian(operand, 2)),
+                branch_target(address, length, (int16_t)read_word(operand)),
                 ADDRESS_DIGITS);
             break;
         default:
