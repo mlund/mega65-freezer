@@ -28,6 +28,7 @@ freezer_m65:
 	.asciz "freezer.m65"
 
 ;;; void init_nmi(void)
+	.section .text.init_nmi,"ax",@progbits
 	.global init_nmi
 init_nmi:
 	sei
@@ -48,6 +49,7 @@ hdos_new_attach:
 	.section .text,"ax",@progbits
 
 ;;; uint8_t mega65_dos_init(void)   -> A
+	.section .text.mega65_dos_init,"ax",@progbits
 	.global mega65_dos_init
 mega65_dos_init:
 	;; this checks hyppo dos version for dos_attach
@@ -70,6 +72,7 @@ mega65_dos_init:
 	rts
 
 ;;; unsigned char mega65_geterrorcode(void)   -> A
+	.section .text.mega65_geterrorcode,"ax",@progbits
 	.global mega65_geterrorcode
 mega65_geterrorcode:
 	lda #SYSPART_GETERRORCODE		; hyppo_geterrorcode - returns errorcode in A
@@ -79,6 +82,7 @@ mega65_geterrorcode:
 
 ;;; char mega65_dos_exechelper(char *image_name)
 ;;; image_name in __rc2/__rc3.  Effectively exec(); only returns on error.
+	.section .text.mega65_dos_exechelper,"ax",@progbits
 	.global mega65_dos_exechelper
 mega65_dos_exechelper:
 	lda __rc2
@@ -174,6 +178,7 @@ attachDrive:
 
 ;;; char mega65_dos_attach(char *image_name, uint8_t driveid)
 ;;; image_name in __rc2/__rc3, driveid in A.
+	.section .text.mega65_dos_attach,"ax",@progbits
 	.global mega65_dos_attach
 mega65_dos_attach:
 	and #DRIVE_MASK		; only drive 0 or 1 allowed
@@ -229,6 +234,7 @@ mega65_dos_attach:
 	rts
 
 ;;; char mega65_dos_detach(uint8_t driveid_and_flags)   A -> A
+	.section .text.mega65_dos_detach,"ax",@progbits
 	.global mega65_dos_detach
 mega65_dos_detach:
 	and #DETACH_DRIVE_MASK		; only drive 0 or 1, also allow bit 6 - nodrive
@@ -241,6 +247,7 @@ mega65_dos_detach:
 
 ;;; char mega65_dos_chdir(unsigned char *dirname)
 ;;; dirname in __rc2/__rc3.
+	.section .text.mega65_dos_chdir,"ax",@progbits
 	.global mega65_dos_chdir
 mega65_dos_chdir:
 	lda __rc2
@@ -286,6 +293,7 @@ mega65_dos_chdir:
 	rts
 
 ;;; char mega65_dos_cdroot(void)   -> A
+	.section .text.mega65_dos_cdroot,"ax",@progbits
 	.global mega65_dos_cdroot
 mega65_dos_cdroot:
 	lda #HYPPO_GETCURRENTDRIVE		; hyppo_dos_getcurrentdrive - returns drive in A
@@ -304,6 +312,7 @@ mega65_dos_cdroot:
 	rts
 
 ;;; uint8_t mega65_dos_getprocdesc(uint8_t pagemsb)   A -> A
+	.section .text.mega65_dos_getprocdesc,"ax",@progbits
 	.global mega65_dos_getprocdesc
 mega65_dos_getprocdesc:
 	tay
@@ -318,6 +327,7 @@ mega65_dos_getprocdesc:
 	rts
 
 ;;; void unfreeze_slot(unsigned short slot)   A=lo, X=hi
+	.section .text.unfreeze_slot,"ax",@progbits
 	.global unfreeze_slot
 unfreeze_slot:
 	;; Move 16-bit address from A/X to X/Y
@@ -332,6 +342,7 @@ unfreeze_slot:
 	rts
 
 ;;; unsigned short get_freeze_slot_count(void)   -> A=lo, X=hi
+	.section .text.get_freeze_slot_count,"ax",@progbits
 	.global get_freeze_slot_count
 get_freeze_slot_count:
 	lda #SYSPART_SLOT_COUNT
@@ -345,6 +356,7 @@ get_freeze_slot_count:
 	rts
 
 ;;; void fetch_freeze_region_list_from_hypervisor(unsigned short addr)  A=lo, X=hi
+	.section .text.fetch_freeze_region_list_from_hypervisor,"ax",@progbits
 	.global fetch_freeze_region_list_from_hypervisor
 fetch_freeze_region_list_from_hypervisor:
 	;; Move 16-bit address from A/X to X/Y
@@ -359,6 +371,7 @@ fetch_freeze_region_list_from_hypervisor:
 	rts
 
 ;;; unsigned char find_freeze_slot_start_sector(unsigned short slot)  A=lo, X=hi -> A
+	.section .text.find_freeze_slot_start_sector,"ax",@progbits
 	.global find_freeze_slot_start_sector
 find_freeze_slot_start_sector:
 	;; Move 16-bit address from A/X to X/Y
@@ -378,6 +391,7 @@ find_freeze_slot_start_sector:
 ;;;
 ;;; The hypervisor needs the name in a page-aligned buffer in the bottom 32KB,
 ;;; so it is copied to NAME_BUF_DOS (no screen lives there).
+	.section .text.read_file_from_sdcard,"ax",@progbits
 	.global read_file_from_sdcard
 read_file_from_sdcard:
 	;; Stash the two load-address bytes that live in A/X before the name

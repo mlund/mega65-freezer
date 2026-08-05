@@ -36,7 +36,7 @@ include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
 # Cached because add_link_options() appends after CMAKE_EXE_LINKER_FLAGS and
 # would otherwise override -DLTO_ZP from the command line.
 set(LTO_ZP 210 CACHE STRING "Zero-page bytes the LTO allocator may use")
-add_link_options(-mlto-zp=${LTO_ZP})
+add_link_options(-mlto-zp=${LTO_ZP} -Wl,--gc-sections)
 
 set(COMMON
     frozen_memory.c fdisk_memory.c fdisk_screen.c
