@@ -49,6 +49,14 @@ CPMAddPackage(
 
 set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+# Derived from the SDK package location rather than an absolute path, so
+# everything follows wherever llvm-mos is installed.  Used for the MEGA65
+# register headers in src/ and for the clang-tidy/clang-format below, which
+# must be the toolchain's own -- a system clang-tidy does not know the target.
+cmake_path(GET llvm-mos-sdk_DIR PARENT_PATH _sdk_cmake)   # .../lib/cmake
+cmake_path(GET _sdk_cmake PARENT_PATH _sdk_lib)           # .../lib
+cmake_path(GET _sdk_lib PARENT_PATH LLVM_MOS_ROOT)        # install prefix
+
 # OFF does not link: FREEZER needs the hyppo dirent layer, SPRITED needs conio
 # and mouse.  The option is global; the dependency is per-target.
 option(LINK_LIBC "Link mega65-libc" ON)
@@ -60,16 +68,20 @@ add_subdirectory(src)
 file(GLOB TIDY_SOURCES ${SRC}/*.c)
 file(GLOB FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.h)
 
-find_program(CLANG_TIDY_EXE NAMES clang-tidy HINTS ${LLVM_MOS_PREFIX}/bin)
-find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_PREFIX}/bin)
+find_program(CLANG_TIDY_EXE   NAMES clang-tidy   HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
+find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 
 if(CLANG_TIDY_EXE)
-    # High-volume but genuine: kept out of `tidy` so it cannot bury the rest.
-    add_custom_target(tidy-widening
-        COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR}
-                --checks=-*,bugprone-implicit-widening-of-multiplication-result
+    # High-volume but genuine, and excluded from `tidy` in .clang-tidy so they cannot bury the
+    # rest.  Almost all are provably-safe screen arithmetic; the ones that are not are the whole
+    # reason to look, since a 16-bit int overflows before it widens.  Advisory, not enforced.
+    add_custom_target(tidy-arithmetic
+        # `--warnings-as-errors=-*` cancels the WarningsAsErrors: '*' in .clang-tidy, which would
+        # otherwise make this advisory target fail the build.  An empty value does not cancel it.
+        COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} "--warnings-as-errors=-*"
+                --checks=-*,bugprone-implicit-widening-of-multiplication-result,bugprone-narrowing-conversions
                 ${TIDY_SOURCES}
-        COMMENT "Checking 16-bit multiplication overflows")
+        COMMENT "Checking 16-bit overflow and narrowing (advisory)")
     add_custom_target(tidy
         COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} ${TIDY_SOURCES}
         COMMENT "Running clang-tidy")
