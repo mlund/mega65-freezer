@@ -1,16 +1,19 @@
-# Generates version.h, defining BUILD_VERSION for src/version.c.
+# Generates version.h from version.h.in, defining BUILD_VERSION.
 #
 # The format is load-bearing: freeze_megainfo.c's format_util_version() scans
 # memory for "v:20", skips those four bytes and parses the remainder as
-# YYMMDD.HH-branch-commit.  gitversion.sh produces it.
+# YYMMDD.HH-branch-commit.  gitversion.sh produces it, and the cc65 build uses
+# the same script, so the two stay comparable.
 execute_process(COMMAND ./gitversion.sh WORKING_DIRECTORY "${REPO}"
-                OUTPUT_VARIABLE v OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-if(NOT v)
-    set(v "unknown")
+                OUTPUT_VARIABLE BUILD_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE
+                RESULT_VARIABLE status ERROR_QUIET)
+if(NOT status EQUAL 0 OR NOT BUILD_VERSION)
+    set(BUILD_VERSION "unknown")
 endif()
 
 # format_util_version() scans for an uppercase 'V'; llvm-mos does no case
 # translation of string literals, so do it here.
-string(TOUPPER "${v}" v)
+string(TOUPPER "${BUILD_VERSION}" BUILD_VERSION)
 
-file(WRITE "${OUT}" "#define BUILD_VERSION \"${v}\"\n")
+# configure_file() rewrites only on change, so an unmoved stamp costs no relink.
+configure_file("${TEMPLATE}" "${OUT}" @ONLY)

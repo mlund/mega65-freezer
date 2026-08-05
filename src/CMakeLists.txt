@@ -5,10 +5,9 @@
 # actually moved.
 set(VERSION_H ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 add_custom_target(version_stamp
-    COMMAND ${CMAKE_COMMAND} -DOUT=${VERSION_H}.tmp -DREPO=${CMAKE_SOURCE_DIR}
+    COMMAND ${CMAKE_COMMAND} -DOUT=${VERSION_H} -DREPO=${CMAKE_SOURCE_DIR}
+            -DTEMPLATE=${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
             -P ${CMAKE_SOURCE_DIR}/cmake/version.cmake
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VERSION_H}.tmp ${VERSION_H}
-    COMMAND ${CMAKE_COMMAND} -E rm -f ${VERSION_H}.tmp
     BYPRODUCTS ${VERSION_H}
     COMMENT "Stamping version"
 )

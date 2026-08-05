@@ -1,0 +1,5 @@
+#pragma once
+
+/* Substituted by cmake/version.cmake at build time, not configure time: the
+ * stamp must follow HEAD, and .git/HEAD does not move when committing. */
+#define BUILD_VERSION "@BUILD_VERSION@"
