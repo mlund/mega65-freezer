@@ -1,81 +1,95 @@
-# Static analysis for the llvm-mos build.
+# Static analysis for the helper. Run with `make tidy`; read the exit status.
 #
-# Tuned to what actually finds bugs here. These checks caught real defects
-# during the port: an array indexed past its end, a non-void function falling
-# off the end, and an address laundered through an int so the compiler could
-# not see the stores into it.
-#
-# The point of the exclusions is signal: 495 findings that are all style hide
-# the three that are not. Every exclusion says why. Adding one should too.
+# The check list is deliberately narrow at the edges, because a 6502 target trips several checks
+# that are sound advice on a hosted system and wrong here. Each exclusion below says why, so that
+# nobody has to re-derive it — and so that adding one requires the same.
 
 Checks: >
   bugprone-*,
   clang-analyzer-*,
+  performance-*,
   portability-*,
-  misc-*,
-  readability-non-const-parameter,
-  readability-misleading-indentation,
+  readability-identifier-naming,
   readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,
+  readability-non-const-parameter,
+  readability-redundant-control-flow,
+  misc-*,
 
-  -bugprone-easily-swappable-parameters,
-  -bugprone-implicit-widening-of-multiplication-result,
-  -bugprone-switch-missing-default-case,
-  -bugprone-narrowing-conversions,
-  -bugprone-reserved-identifier,
-  -clang-analyzer-deadcode.DeadStores,
   -clang-analyzer-core.FixedAddressDereference,
-  -clang-analyzer-security.insecureAPI.*,
-  -misc-include-cleaner,
+  -performance-no-int-to-ptr,
+  -bugprone-easily-swappable-parameters,
   -misc-no-recursion,
+  -misc-use-anonymous-namespace,
+  -misc-include-cleaner,
+  -portability-avoid-pragma-once,
 
-# This project's own headers, not the SDK's or mega65-libc's.
-HeaderFilterRegex: '(freezer|freezer_common|fdisk_[a-z0-9_]+|helper|infohelper|cc65compat)\.h$'
+WarningsAsErrors: '*'
 
-# Advisory, not fatal: a false positive should not stop a build.
-WarningsAsErrors: ''
+# Everything of substance is in common.hpp, so a filter that does not name it checks almost
+# nothing. The old '.*remotesd_eth.*' matched only the stub, and silently suppressed every
+# diagnostic in the file that holds the whole program.
+HeaderFilterRegex: '(common|remotesd_eth)\.hpp$'
+
+# Rust's naming, because that is what the rest of this repository is written in and there is no
+# reason for the helper to read differently: types UpperCamelCase, functions and variables
+# snake_case, constants SCREAMING_SNAKE_CASE, enum variants UpperCamelCase.
+CheckOptions:
+  # Types: UpperCamelCase
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+
+  # Functions and variables: snake_case
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.MethodCase: lower_case
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.MemberCase: lower_case
+  readability-identifier-naming.NamespaceCase: lower_case
+
+  # Constants: SCREAMING_SNAKE_CASE, and enum variants UpperCamelCase as in Rust.
+  readability-identifier-naming.ConstantCase: UPPER_CASE
+  readability-identifier-naming.ConstexprVariableCase: UPPER_CASE
+  readability-identifier-naming.EnumConstantCase: CamelCase
+
+  # A `let` binding in Rust is snake_case whether or not it can be rebound; only `const` and
+  # `static` items shout. So a plain `const` local is an ordinary variable here, while a local
+  # `constexpr` — the thing Rust spells `const` — is caught by the option above and shouts.
+  readability-identifier-naming.LocalConstantCase: lower_case
+  readability-identifier-naming.LocalConstantPointerCase: lower_case
+  readability-identifier-naming.ConstantParameterCase: lower_case
+  readability-identifier-naming.ConstantMemberCase: lower_case
 
 # Why each exclusion:
 #
-#   bugprone-implicit-widening-of-multiplication-result
-#       Real signal on a 16-bit-int target -- `sector * 512` overflows before
-#       it widens to long -- but 103 sites swamp everything else, so it has its
-#       own target: `cmake --build build --target tidy-widening`.
+#   clang-analyzer-core.FixedAddressDereference
+#       Dereferencing a fixed address is the entire job. $D020 is the border colour, not a wild
+#       pointer. The SDK's own dma.hpp trips this too.
 #
-#   bugprone-switch-missing-default-case
-#       The key-dispatch switches deliberately ignore unlisted keys.
+#   performance-no-int-to-ptr
+#       Casting an integer to a pointer is how a memory-mapped register is reached. $D020 is the
+#       border colour, and there is no other spelling of it.
 #
 #   bugprone-easily-swappable-parameters
-#       lcopy(source, destination, count) mirrors the DMA controller's own
-#       argument order; renaming would move this further from the hardware.
+#       copy(source, destination, count) and fill(destination, value, count) mirror the DMA
+#       controller's own argument order. Renaming or wrapping them to satisfy the check would put
+#       this code further from the hardware it describes, not closer.
 #
-#   bugprone-narrowing-conversions
-#       int is 16-bit and char 8-bit here, so every sector number and screen
-#       offset trips it. Narrowing is how the code is written throughout.
+#   misc-no-recursion
+#       Nothing here recurses, but the check also fires through the SDK's templates.
 #
-#   bugprone-reserved-identifier
-#       The __FDISK_MEMORY_H__ style guards predate the port, and a compat
-#       header has to match one of them exactly in order to pre-empt it.
+#   misc-use-anonymous-namespace
+#       `static` at file scope is what the llvm-mos optimisation guide asks for, and it is what
+#       makes the single-translation-unit layout work when a test #includes the program.
 #
-#   clang-analyzer-deadcode.DeadStores
-#       Mostly hardware reads whose value is deliberately discarded, plus
-#       partially-parsed structures in fdisk_fat32.c.
+#   misc-include-cleaner
+#       Cannot see through the platform headers' own includes and asks for headers that do not
+#       exist in this SDK.
 #
-#   clang-analyzer-core.FixedAddressDereference
-#       Dereferencing a fixed address is the entire job here: $D020 is the
-#       border colour, not a wild pointer. Fires on every hardware access.
-#
-#   clang-analyzer-security.insecureAPI.*
-#       Suggests strlcpy and the C11 _s functions, which this libc lacks.
-#
-#   misc-include-cleaner / misc-no-recursion
-#       Both fire through SDK headers rather than through this code.
-#
-# Kept despite noise, because each has found a real bug here:
-#   clang-analyzer-core.*   uninitialised reads, null dereferences
-#   bugprone-branch-clone   duplicated conditional arms
-#   readability-non-const-parameter
-#
-# readability-identifier-naming is absent on purpose: this tree tracks the
-# upstream cc65 sources, and renaming would make diffing against them useless
-# for no correctness gain. The previous config applied another project's Rust
-# conventions, which is why it wanted `version` spelled `VERSION`.
+#   portability-avoid-pragma-once
+#       Only ever visible once the header filter above was fixed. There is one compiler here and
+#       it supports `#pragma once`; include guards would trade a working line for a name to keep
+#       unique. This was the only thing the broken filter had been hiding.
