@@ -1363,9 +1363,8 @@ void SetRedrawFullCanvas(void) {
 static void DrawHeader() {
     if (g_state.redrawFlags & REDRAW_TOOL_HEADER)
         /* Escape names stay lowercase -- libc matches them by hash -- but the
-         * text must be uppercase: cprintf runs petsciitoscreencode() on it,
-         * and cc65's charmap had already mapped lowercase to PETSCII 0x41-0x5A
-         * before that conversion saw it. */
+         * text must be uppercase, because cprintf runs petsciitoscreencode()
+         * over it. */
         cprintf("{home}{rvson}{lgrn}                            THE MEGA65 SPRITE EDITOR           "
                 "                 {rvsoff}");
 }

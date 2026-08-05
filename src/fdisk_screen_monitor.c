@@ -13,10 +13,8 @@ char* footer_messages[FOOTER_MAX + 1] = {
 
 char stemp[80];
 
-/* Folds `length` ASCII characters into stemp as screen codes.  Converting via
- * stemp rather than in place matters twice over: callers pass string literals,
- * and modifying those is undefined behaviour; and the screen itself cannot be
- * read back reliably (see display_footer). */
+/* Via stemp because neither end can be converted in place: callers pass string
+ * literals, and screen RAM reads back as ROM when BASIC is banked in. */
 static void to_stemp(const char* s, char length) {
     char i;
     for (i = 0; i < length; i++) {
@@ -62,10 +60,6 @@ void recolour_last_line(char colour) {
 }
 
 void display_footer(unsigned char index) {
-    /* Convert into a buffer, then copy once.  Converting in place at
-     * FOOTER_ADDRESS meant reading $BF80 back, and that read returns BASIC ROM
-     * rather than screen RAM whenever BASIC is banked in, so nothing matched
-     * 'A'-'Z' and the line stayed in ASCII. */
     to_stemp(footer_messages[index], 80);
     lcopy((long)stemp, FOOTER_ADDRESS, 80);
     set_screen_attributes(FOOTER_ADDRESS, 80, ATTRIB_REVERSE);
@@ -76,13 +70,9 @@ void setup_screen(void) {
 
     m65_io_enable();
 
-    /* $D054 before the hot registers, and no VIC4 lock here: the hot writes
-     * below are wanted for their propagation.  The recalculation derives the
-     * row width ($D058-$D059) from $D054's CHR16 bit -- 80 bytes per row for
-     * 8-bit characters, 160 for 16-bit -- so 8-bit mode has to be selected
-     * first.  Doing the hot writes first instead recalculates against
-     * whatever the freezer left in $D054, and the fill in this function then
-     * clears a different stride than the VIC-IV displays. */
+    /* $D054 must precede the hot registers: their recalculation derives the
+     * row width ($D058-$D059) from $D054's CHR16 bit, 80 bytes per row for
+     * 8-bit characters and 160 for 16-bit. */
 
     // Normal 8-bit text mode
     POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);

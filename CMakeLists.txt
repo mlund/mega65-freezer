@@ -52,11 +52,8 @@ if(GIT_HEAD AND NOT IS_ABSOLUTE ${GIT_HEAD})
     set(GIT_HEAD ${CMAKE_CURRENT_SOURCE_DIR}/${GIT_HEAD})
 endif()
 
-# Two targets depend on mega65-libc today, so OFF does not link: FREEZER uses
-# the hyppo dirent layer (opendir/readdir/closedir/closeall in
-# freeze_diskchooser.c) and SPRITED uses conio and mouse.  The other five pull
-# in headers only.  The option is per-project but the dependency is per-target;
-# either make it one, or drop the option and link unconditionally.
+# OFF does not link: FREEZER needs the hyppo dirent layer, SPRITED needs conio
+# and mouse.  The option is global; the dependency is per-target.
 option(LINK_LIBC "Link mega65-libc" ON)
 
 add_subdirectory(src)

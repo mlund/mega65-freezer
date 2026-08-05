@@ -17,13 +17,12 @@ extern unsigned short slot_number;
 
 #define CHARGEN_ADDRESS 0xFF7E000L
 
-// this variable is set by detect_rom()
 #define MEGA65_ROM_UNKNOWN 0
 #define MEGA65_ROM_C64 1
 #define MEGA65_ROM_C65 2
 #define MEGA65_ROM_M65 3
 #define MEGA65_ROM_OPENROM 4
-extern char mega65_rom_type;
+extern char mega65_rom_type; // set by detect_rom()
 extern char mega65_rom_name[];
 
 void set_palette(void);

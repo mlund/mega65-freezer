@@ -2,8 +2,7 @@
 char* itoa(int, char*, int);
 char* utoa(unsigned, char*, int);
 
-/* PETSCII key codes from cc65's <cbm.h>, which the -t c64 build supplied.
- * mega65-libc's conio.h does not define them. */
+/* PETSCII key codes; mega65-libc's conio.h does not define them. */
 #define CH_CURS_UP 145
 #define CH_CURS_DOWN 17
 #define CH_CURS_LEFT 157

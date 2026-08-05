@@ -3,12 +3,10 @@
 
 #include <stdint.h>
 
-/* Implemented in helper.s.  leaf promises the callee does not re-enter C:
- * an opaque jsr might otherwise call anything, so the compiler must assume
- * every caller can be re-entered and move it off a statically allocated
- * frame onto the soft stack.  These are hypervisor traps and self-contained
- * routines -- the only transfers out of helper.s are to LOADER_STUB and
- * PROGRAM_ENTRY, neither of which is C in this program. */
+/* Implemented in helper.s.  leaf promises the callee does not re-enter C, so
+ * callers keep their statically allocated frames instead of the soft stack.
+ * It holds here: helper.s only ever transfers to LOADER_STUB and
+ * PROGRAM_ENTRY, neither of which is C. */
 #define HELPER_ASM __attribute__((leaf))
 
 extern uint8_t hdos_new_attach;

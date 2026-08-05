@@ -35,15 +35,7 @@ static char SDessentials[][13] = {
 static char buffer[BUFFER_LENGTH + 2], tempstr32[32], isNTSC = 0, hasRTC = 0, m65model, m65submodel;
 static unsigned char code_buffer[512], ymd[3];
 
-/*
- * write_text(x, y, colour, text)
- *
- *   x, y: screen position
- *   colour: colour top write in
- *   text: zero terminated string
- *
- * writes text to the screen using colour. converts to screencode (upper)
- */
+/* Bit 8 of colour requests the reverse-video attribute. */
 static void write_text_mapped(unsigned char x,
     unsigned char y,
     unsigned short colour,
@@ -70,16 +62,7 @@ void write_text(unsigned char x, unsigned char y, unsigned short colour, char* t
     write_text_mapped(x, y, colour, text, 0xff, 0x20);
 }
 
-/*
- * write_text_upper(x, y, colour, text)
- *
- *   x, y: screen position
- *   colour: colour top write in
- *   text: zero terminated string
- *
- * writes text to the screen using colour. converts to screencode,
- * and all lower is displayed as upper
- */
+/* As write_text(), but folds lower case to upper. */
 void write_text_upper(unsigned char x, unsigned char y, unsigned short colour, char* text) {
     write_text_mapped(x, y, colour, text, 0x7f, 0x60);
 }

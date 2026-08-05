@@ -26,10 +26,8 @@ void screen_hex(unsigned int addr, long value) {
         POKE(addr + i, dec[i]);
 }
 
-/* Writes the low `columns` hex digits of value to out; the higher digits are
- * dropped.  out is a plain buffer, so store through the pointer -- passing an
- * address as an integer and rebuilding a pointer from it inside the callee
- * leaves the compiler unable to connect the stores to the caller's object. */
+/* Writes the low `columns` digits.  out is a plain buffer, so take a pointer:
+ * an address passed as an integer hides the stores from the compiler. */
 void format_hex(char* out, const long value, const char columns) {
     char i;
     char dec[8];

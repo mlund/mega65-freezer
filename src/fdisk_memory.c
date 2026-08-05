@@ -1,8 +1,6 @@
 /*
-  MEGA65 Memory Access routines that allow access to the full RAM of the MEGA65,
-  even though the program is stuck living in the first 64KB of RAM, because CC65
-  doesn't (yet) understand how to make multi-bank MEGA65 programs.
-
+  Full-RAM access for a program confined to the first 64KB: everything goes
+  through the DMAgic rather than through banking.
 */
 
 #include "fdisk_memory.h"
@@ -29,29 +27,18 @@ struct dmagic_dmalist {
     unsigned int modulo;
 };
 
-/* volatile because the DMAgic is a second agent on this memory, and nothing
- * in C ever reads it.  do_dma() only pokes $D702/$D704/$D701/$D705; a volatile
- * store to a hardware register does not order plain stores to other objects,
- * so the compiler is free to drop a whole population of dmalist as dead when
- * the next call overwrites it -- which is exactly what happened.  Two
- * back-to-back lfill()s in setup_screen() emitted one population and two
- * triggers, so the first fill ran on the previous job's list and cleared the
- * screen with the wrong value.
- *
- * dma_byte is the other direction: the DMAgic writes it during lpeek(), so a
- * plain read may be folded to a value C last stored. */
+/* The DMAgic is the only reader of dmalist, so without volatile the compiler
+ * drops a population as dead when the next call overwrites it, and the pending
+ * job runs on the stale list.  dma_byte is the reverse: the DMAgic writes it
+ * during lpeek(). */
 volatile struct dmagic_dmalist dmalist;
 volatile unsigned char dma_byte;
 
 __attribute__((noinline)) void do_dma(void) {
     m65_io_enable();
-    /* The DMAgic reads dmalist, and writes or reads the buffers lcopy/lfill
-     * were given, none of which the compiler can see.  volatile covers the
-     * list itself; this covers the buffers. */
+    /* volatile covers dmalist; this covers the caller's buffers, which the
+     * DMAgic also touches. */
     __asm__ volatile("" ::: "memory");
-
-    //  for(unsigned int i=0;i<24;i++)
-    // screen_hex_byte(SCREEN_ADDRESS+i*3,PEEK(i+(unsigned int)&dmalist));
 
     // Now run DMA job (to and from anywhere, and list is in low 1MB)
     POKE(0xd702U, 0);

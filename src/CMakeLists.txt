@@ -15,24 +15,19 @@ set(MAX_SIZE 34817)
 
 add_compile_options(
     -Os
-    # $0000/$0001 are the CPU port registers, so POKE(0,..) is a store through
-    # a null pointer.  Without this, clang treats it as undefined behaviour and
-    # deletes the rest of the enclosing function; main() disappears entirely.
+    # $0000/$0001 are the CPU port registers, so POKE(0,..) is a legitimate
+    # store through a null pointer rather than undefined behaviour.
     -fno-delete-null-pointer-checks
 )
 # include_directories() also feeds the ASM rule, so helper.s finds mega65.inc
 # here too -- no separate CMAKE_ASM_FLAGS entry needed.
 include_directories(${SRC})
 
-# -mlto-zp governs LTO codegen, which happens at link time; as a compile option
-# it is silently ignored and the zero-page region overflows.
-#
-# The cap and freezemenu.ld's __basic_zp_end are two halves of one fact and
-# must move together: measured occupancy is 108 bytes on six of the seven
-# targets, against a 0x90 ceiling in the script.  Raising one alone either does
-# nothing or fails the link.  Cached so that -DLTO_ZP=<n> on the command line
-# actually takes effect -- add_link_options() appends after
-# CMAKE_EXE_LINKER_FLAGS, so a flag passed there is silently overridden.
+# Must be a link option: -mlto-zp governs LTO codegen, and is silently ignored
+# at compile time.  Moves together with freezemenu.ld's __basic_zp_end -- six
+# of seven targets already use 108 of the 110 bytes that pair allows.  Cached
+# because add_link_options() appends after CMAKE_EXE_LINKER_FLAGS and would
+# otherwise override -DLTO_ZP from the command line.
 set(LTO_ZP 106 CACHE STRING "Zero-page bytes the LTO allocator may use")
 add_link_options(-mlto-zp=${LTO_ZP})
 
