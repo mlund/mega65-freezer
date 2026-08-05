@@ -1,6 +1,5 @@
 #include "fdisk_screen.h"
 
-#include "ascii.h"
 #include "fdisk_memory.h"
 #include "freezer_common.h"
 

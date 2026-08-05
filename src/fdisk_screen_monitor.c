@@ -1,6 +1,5 @@
 #include "fdisk_screen_monitor.h"
 
-#include "ascii.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
 

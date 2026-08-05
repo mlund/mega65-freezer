@@ -15,7 +15,6 @@
   of a disk.
 */
 
-#include "ascii.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"

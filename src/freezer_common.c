@@ -1,6 +1,5 @@
 #include "freezer_common.h"
 
-#include "ascii.h"
 #include "fdisk_memory.h"
 #include "freezer.h"
 

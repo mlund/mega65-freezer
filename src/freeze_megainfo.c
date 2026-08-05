@@ -1,4 +1,3 @@
-#include "ascii.h"
 #include "cc65compat.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"

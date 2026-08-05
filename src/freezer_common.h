@@ -1,7 +1,6 @@
 #ifndef __FREEZER_COMMON_H__
 #define __FREEZER_COMMON_H__
 
-#include "ascii.h"
 #include "fdisk_hal.h"
 
 #include <stdint.h>

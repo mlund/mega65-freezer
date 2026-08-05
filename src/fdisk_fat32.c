@@ -1,4 +1,3 @@
-#include "ascii.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
