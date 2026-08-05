@@ -645,6 +645,44 @@ void hunt_memory(void) {
     }
 }
 
+/* Offsets within the $D640 save area of the registers worth editing, in the
+ * order the R line prints them, and which of those are 16-bit pairs.  MAP, the
+ * CPU port and the megabyte registers are deliberately absent: changing them
+ * changes what every other address means, which wants its own command. */
+static const unsigned char REGISTER_OFFSET[] = {0x08, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x07};
+static const unsigned char REGISTER_IS_PAIR[] = {1, 0, 0, 0, 0, 0, 1, 0};
+constexpr uint8_t REGISTER_COUNT = 8;
+
+/* ; PC A X Y Z B SP FLAGS -- as many as given, the rest left alone.
+ *
+ * The KERNAL monitor prints R with a leading ';' so the line can be cursor-up
+ * edited in place; read_line() here has no cursor movement, so the values are
+ * typed instead.  FLAGS is a hex byte rather than the NVEBDIZC letters R shows,
+ * because everything else on the line is hex too. */
+void set_registers(void) {
+    unsigned char index;
+
+    for (index = 0; index < REGISTER_COUNT && parse_hex(); index++) {
+        uint32_t address = 0xFFD3640UL + REGISTER_OFFSET[index];
+        if (!write_frozen_byte(address, (unsigned char)hex_value) ||
+            (REGISTER_IS_PAIR[index] &&
+                !write_frozen_byte(address + 1, (unsigned char)(hex_value >> 8)))) {
+            flush_sector();
+            report_error("? FROZEN REGISTERS NOT FOUND  ERROR");
+            return;
+        }
+    }
+    if (index == 0) {
+        report_error("? SYNTAX  ERROR");
+        return;
+    }
+    flush_sector();
+
+    /* Read them back rather than announce success, so the line on screen is
+     * what the freeze slot now holds. */
+    show_registers();
+}
+
 unsigned char parse_address(void) {
     // Try to read hex digits from screen_line_buffer[screen_line_offset].
     unsigned char digits = parse_hex();
@@ -744,6 +782,10 @@ void freeze_monitor(void) {
                 CIA2.pra = CIA2.pra | 3;          // video bank 0
                 VICIV.ctrlb = VICIV.ctrlb & 0x7f; // 40 columns
                 return;
+            case ';':
+                // Modify the frozen registers, as the KERNAL monitor's ; does
+                set_registers();
+                break;
             case 0:
                 // Empty line.  Listed after the commands because it is not one,
                 // and because sitting beside the assemble stub made the two
