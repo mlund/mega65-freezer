@@ -240,7 +240,7 @@ void screen_of_death(const char* msg) {
     // TODO: This is broken, obviously...
 #if 0
   POKE(0,0x41);
-  VICIV.key = 0x47; VICIV.key = 0x53;
+  VICIV.key = VIC4_KNOCK_1; VICIV.key = VIC4_KNOCK_2;
 
   // Reset video mode
   POKE(0xD05DU,0x01); VICIV.ctrl1 = 0x1b; VICIV.ctrl2 = 0xc8;

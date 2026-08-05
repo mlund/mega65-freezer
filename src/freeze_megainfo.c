@@ -53,8 +53,8 @@ static void write_text_mapped(unsigned char x,
             c = 94;
         if (colour & 0x100 && c < 128)
             c |= 0x80;
-        lpoke(SCREEN_ADDRESS + y * 80 + x + i, c);
-        lpoke(COLOUR_RAM_ADDRESS + y * 80 + x + i, (unsigned char)(colour & 0xff));
+        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x + i, c);
+        lpoke(COLOUR_RAM_ADDRESS + y * SCREEN_ROW_BYTES + x + i, (unsigned char)(colour & 0xff));
     }
 }
 
@@ -197,7 +197,7 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     strcat(buffer, tempstr32);
 
     // save date for external use
-    ymd[0] = (unsigned char)(y - 2000);
+    ymd[0] = (unsigned char)(y - SCREEN_BYTES);
     ymd[1] = m;
     ymd[2] = ds;
 
@@ -702,7 +702,7 @@ void draw_screen(void) {
     unsigned char row, col, i, fail, artix_ymd[3];
 
     // clear screen
-    lfill(SCREEN_ADDRESS, 0x20, 2000);
+    lfill(SCREEN_ADDRESS, 0x20, SCREEN_BYTES);
 
     // write header
     write_text(0, 0, 1, "MEGA65 INFORMATION");
@@ -820,12 +820,12 @@ void do_megainfo() {
     init_megainfo();
 
     // clear keybuffer
-    while ((x = PEEK(0xD610U)))
-        POKE(0xD610U, x);
+    while ((x = ASCIIKEY))
+        ASCIIKEY = x;
 
     // mainloop
     while (1) {
-        x = PEEK(0xD610U);
+        x = ASCIIKEY;
 
         // update clocks
         if (get_rtc_stats(0)) {
@@ -835,7 +835,7 @@ void do_megainfo() {
 
         if (x == 0)
             continue;
-        POKE(0xD610U, x);
+        ASCIIKEY = x;
 
         switch (x) {
             case 0xF1: // F1 - Toggle DEBUG

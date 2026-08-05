@@ -6,6 +6,7 @@
 #include "fdisk_memory.h"
 
 #include "fdisk_screen.h"
+#include "mega65.inc"
 
 #include <mega65.h>
 
@@ -102,8 +103,8 @@ __attribute__((noinline)) void lfill(
 
 void m65_io_enable(void) {
     // Gate C65 IO enable
-    VICIV.key = 0x47;
-    VICIV.key = 0x53;
+    VICIV.key = VIC4_KNOCK_1;
+    VICIV.key = VIC4_KNOCK_2;
     // Force to full speed
     POKE(0, 65);
 }

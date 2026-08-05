@@ -156,7 +156,7 @@ void setup_menu_screen(void) {
     // Colour RAM at offset $0000
 
     // Fill colour RAM with sensible value at the start
-    lfill(0xff80000U, 1, 2000);
+    lfill(0xff80000U, 1, SCREEN_BYTES);
 }
 
 unsigned char next_cpu_speed(void) {
@@ -287,13 +287,13 @@ void predraw_freeze_menu(void)
   VICIV.bordercol = 6;
   VICIV.screencol = 6;
 
-  lfill(0xFF80000L, 1, 2000);
+  lfill(0xFF80000L, 1, SCREEN_BYTES);
   // Make disk image names different colour to avoid confusion
   for (i = 40; i < 80; i += 2) {
-    lpoke(0xff80000 + 21 * 80 + 1 + i, 0xe);
-    lpoke(0xff80000 + 24 * 80 + 1 + i, 0xe);
+    lpoke(0xff80000 + 21 * SCREEN_ROW_BYTES + 1 + i, 0xe);
+    lpoke(0xff80000 + 24 * SCREEN_ROW_BYTES + 1 + i, 0xe);
     if (i > 50) // ROM VERSION
-      lpoke(0xff80000 + 15 * 80 + 1 + i, 0xf);
+      lpoke(0xff80000 + 15 * SCREEN_ROW_BYTES + 1 + i, 0xf);
   }
 
   // Clear 16-bit text mode screen using DMA copy to copy the
@@ -303,7 +303,7 @@ void predraw_freeze_menu(void)
   lpoke(SCREEN_ADDRESS + 1, 0x00);
   lpoke(SCREEN_ADDRESS + 2, 0x20);
   lpoke(SCREEN_ADDRESS + 3, 0x00);
-  lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 2000 - 4);
+  lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, SCREEN_BYTES - 4);
 
   last_thumb_frame = -1;
 }
@@ -590,11 +590,13 @@ void draw_freeze_menu(unsigned char part) {
             screen_data_start += 0x52000L + 0x40L;
             for (y = 0; y < 13; y++) {
                 // Copy row of screen data
-                lcopy(
-                    screen_data_start + (y << 6), SCREEN_ADDRESS + (13 * 80) + (y * 80), (19 * 2));
+                lcopy(screen_data_start + (y << 6),
+                    SCREEN_ADDRESS + (13 * SCREEN_ROW_BYTES) + (y * SCREEN_ROW_BYTES),
+                    (19 * 2));
                 // Add tile number based on data starting at $52040 = $1481
                 for (x = 0; x < 19; x++) {
-                    tile_num = (unsigned short*)(SCREEN_ADDRESS + (13 * 80) + (y * 80) + (x << 1));
+                    tile_num = (unsigned short*)(SCREEN_ADDRESS + (13 * SCREEN_ROW_BYTES) +
+                        (y * SCREEN_ROW_BYTES) + (x << 1));
                     if (*tile_num)
                         (*tile_num) += tile_offset;
                     else
@@ -617,11 +619,11 @@ void draw_freeze_menu(unsigned char part) {
         draw_thumbnail();
         for (x = 0; x < 9; x++)
             for (y = 0; y < 6; y++) {
-                POKE(SCREEN_ADDRESS + (80 * 13) + ((thumb_xoff + x) * 2) + ((thumb_yoff + y) * 80) +
-                        0,
+                POKE(SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) + ((thumb_xoff + x) * 2) +
+                        ((thumb_yoff + y) * SCREEN_ROW_BYTES) + 0,
                     x * 6 + y); // $50000 base address
-                POKE(SCREEN_ADDRESS + (80 * 13) + ((thumb_xoff + x) * 2) + ((thumb_yoff + y) * 80) +
-                        1,
+                POKE(SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) + ((thumb_xoff + x) * 2) +
+                        ((thumb_yoff + y) * SCREEN_ROW_BYTES) + 1,
                     0x14); // $50000 base address
             }
     }
@@ -685,9 +687,9 @@ unsigned char read_joystick() {
     unsigned char c;
     // TODO: this is very broken, keypresses will generate F3(FIRE) on DC01
     // We use a simple lookup table to do this
-    c = joy_to_key[PEEK(0xDC00) & PEEK(0xDC01) & 0x1f];
+    c = joy_to_key[CIA1.pra & CIA1.prb & 0x1f];
     // Then wait for joystick to release
-    while ((PEEK(0xDC00) & PEEK(0xDC01) & 0x1f) != 0x1f)
+    while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
         continue;
     return c;
 }
@@ -709,7 +711,7 @@ unsigned char last_x;
 void poll_touch_panel(void) {
     unsigned char c = 0;
 
-    if (PEEK(0xD6B0U) & 1) {
+    if (TOUCH_EVENT & 1) {
         x = PEEK(0xD6B9) + ((PEEK(0xD6BB) & 0x03) << 8);
         y = PEEK(0xD6BA) + ((PEEK(0xD6BB) & 0x30) << 4);
         x = x >> 4;
@@ -719,7 +721,7 @@ void poll_touch_panel(void) {
         y = 0;
     }
 
-    if ((last_touch & 1) && (!(PEEK(0xD6B0) & 1))) {
+    if ((last_touch & 1) && (!(TOUCH_EVENT & 1))) {
         if (y > 8 && y < 17) {
             if (x < 26)
                 x = 0;
@@ -728,7 +730,7 @@ void poll_touch_panel(void) {
             c = touch_keys[x][y - 9];
             // Wait for touch to be released
             // XXX - Records touch event as where your finger was when you touched, not released.
-            while (PEEK(0xD6B0) & 1)
+            while (TOUCH_EVENT & 1)
                 continue;
         }
     }
@@ -738,7 +740,7 @@ void poll_touch_panel(void) {
     // including setting the gain for stereo speakers.  This little hack below
     // will likely disappear when we add touch support to the audio mixer)
     if (y > 0 && y < 7) {
-        if (PEEK(0xD6B0) & 1) {
+        if (TOUCH_EVENT & 1) {
             if (x > 5)
                 x -= 5;
             else
@@ -759,7 +761,7 @@ void poll_touch_panel(void) {
     // so we will just infer them.  Move sideways more than 3 characters within a short
     // period of time will be deemed to be a side swipe).
     if (y > 17) {
-        if (PEEK(0xD6B0) & 1) {
+        if (TOUCH_EVENT & 1) {
             if (x > last_x && swipe_dir < 0)
                 swipe_dir = 1;
             if (x > last_x && swipe_dir >= 0)
@@ -768,8 +770,11 @@ void poll_touch_panel(void) {
                 // Swipe screen to the right
 
                 // Copy is overlapping, so copy it somewhere else first, then copy it down
-                lcopy(SCREEN_ADDRESS + (80 * 13), 0x40000L, 12 * 80 - 2);
-                lcopy(0x40000, SCREEN_ADDRESS + (80 * 13) + 2, 12 * 80 - 2);
+                lcopy(
+                    SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13), 0x40000L, 12 * SCREEN_ROW_BYTES - 2);
+                lcopy(0x40000,
+                    SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) + 2,
+                    12 * SCREEN_ROW_BYTES - 2);
             }
 
             if ((x < last_x) && (swipe_dir > 0))
@@ -778,7 +783,9 @@ void poll_touch_panel(void) {
                 swipe_dir--;
             if (x < last_x) {
                 // Swipe screen to the left
-                lcopy(SCREEN_ADDRESS + (80 * 13), SCREEN_ADDRESS + (80 * 13) - 2, 12 * 80 - 2);
+                lcopy(SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13),
+                    SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) - 2,
+                    12 * SCREEN_ROW_BYTES - 2);
             }
 
             if (swipe_dir == -5) {
@@ -796,7 +803,7 @@ void poll_touch_panel(void) {
             }
         }
     }
-    last_touch = PEEK(0xD6B0);
+    last_touch = TOUCH_EVENT;
 
     return c;
 }
@@ -824,30 +831,30 @@ void debug_region_list()
   unsigned short j;
   for (j = 0; j < freeze_region_count; j++) {
     test = freeze_region_list[j].address_base;
-    POKE(SCREEN_ADDRESS + j*80 + 60 - 16, 32);
+    POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 60 - 16, 32);
     for (i = 0; i < 8; i++) {
-      POKE(SCREEN_ADDRESS + j*80 + 60 - i*2, nybl_to_screen((uint8_t)test));
+      POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 60 - i*2, nybl_to_screen((uint8_t)test));
       test >>= 4;
     }
-    POKE(SCREEN_ADDRESS + j*80 + 78 - 16, 32);
+    POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 78 - 16, 32);
     test = freeze_region_list[j].region_length;
     for (i = 0; i < 8; i++) {
-      POKE(SCREEN_ADDRESS + j*80 + 78 - i*2, nybl_to_screen((uint8_t)test));
+      POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 78 - i*2, nybl_to_screen((uint8_t)test));
       test >>= 4;
     }
   }
   test = address_to_freeze_slot_offset(CHARGEN_ADDRESS);
   for (i = 0; i < 8; i++) {
-    POKE(SCREEN_ADDRESS + j*80 + 78 - i*2, nybl_to_screen((uint8_t)test));
+    POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 78 - i*2, nybl_to_screen((uint8_t)test));
     test >>= 4;
   }
 
   // wait for a key
-  while (PEEK(0xD610U))
-    POKE(0xD610U, 0);
-  while (!PEEK(0xD610U))
+  while (ASCIIKEY)
+    ASCIIKEY = 0;
+  while (!ASCIIKEY)
     usleep(1000);
-  POKE(0xD610U, 0);
+  ASCIIKEY = 0;
   VICIV.bordercol = 6;
 }
 #endif
@@ -910,9 +917,9 @@ void start_freezer_tool(char* toolfile) {
         copy_convert_to_screen(freeze_root_warn, TOOLS_MENU_OFFSET);
 
         while (!start_tool) {
-            while (!(x = PEEK(0xD610U)))
+            while (!(x = ASCIIKEY))
                 ;
-            POKE(0xD610U, 0);
+            ASCIIKEY = 0;
             switch (x) {
                 case 'y':
                 case 'Y':
@@ -978,10 +985,10 @@ int main(void) {
     POKE(0xD06A, 0x00);
 
     // Silence SIDs
-    POKE(0xD418U, 0);
-    POKE(0xD438U, 0);
-    POKE(0xD458U, 0);
-    POKE(0xD478U, 0);
+    SID1.amp = 0;
+    SID2.amp = 0;
+    SID3.amp = 0;
+    SID4.amp = 0;
 
     set_palette();
     make_colour_lookup();
@@ -995,7 +1002,7 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (PEEK(0xD680U) & 0x10)
+    if (SD_COMMAND & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;
@@ -1033,20 +1040,20 @@ int main(void) {
     draw_freeze_menu(UPDATE_ALL);
 
     // Flush input buffer
-    while (PEEK(0xD610U))
-        POKE(0xD610U, 0);
+    while (ASCIIKEY)
+        ASCIIKEY = 0;
 
     // Ensure correct keyboard DDR etc
-    POKE(0xDC00U, 0xFF);
+    CIA1.pra = 0xFF;
     POKE(0xDC02U, 0x00);
 
     // Main keyboard input loop
     while (1) {
-        unsigned char c = PEEK(0xD610U);
+        unsigned char c = ASCIIKEY;
 
         if (c)
             // Flush char from input buffer
-            POKE(0xD610U, 0);
+            ASCIIKEY = 0;
 #ifdef WITH_JOYSTICK
         // Joystick Support is old and needs to be overhauled!
         if (!c)

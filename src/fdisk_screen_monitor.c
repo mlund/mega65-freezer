@@ -2,6 +2,7 @@
 
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
+#include "mega65.inc"
 
 #include <mega65.h>
 
@@ -39,12 +40,12 @@ void write_line_len(const char* s, char col, char length) {
 void write_line_raw(char* s, char col, char length) {
     lcopy((long)&s[0], screen_line_address + col, length);
     screen_line_address += 80;
-    if ((screen_line_address - SCREEN_ADDRESS) >= (24 * 80)) {
+    if ((screen_line_address - SCREEN_ADDRESS) >= (24 * SCREEN_ROW_BYTES)) {
         screen_line_address -= 80;
-        lcopy(SCREEN_ADDRESS + 80, SCREEN_ADDRESS, 23 * 80);
-        lcopy(COLOUR_RAM_ADDRESS + 80, COLOUR_RAM_ADDRESS, 23 * 80);
-        lfill(SCREEN_ADDRESS + 23 * 80, ' ', 80);
-        lfill(COLOUR_RAM_ADDRESS + 23 * 80, 1, 80);
+        lcopy(SCREEN_ADDRESS + 80, SCREEN_ADDRESS, 23 * SCREEN_ROW_BYTES);
+        lcopy(COLOUR_RAM_ADDRESS + 80, COLOUR_RAM_ADDRESS, 23 * SCREEN_ROW_BYTES);
+        lfill(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES, ' ', 80);
+        lfill(COLOUR_RAM_ADDRESS + 23 * SCREEN_ROW_BYTES, 1, 80);
     }
 }
 
@@ -96,10 +97,10 @@ void setup_screen(void) {
     VICIV.screencol = 6;
 
     // Clear screen RAM
-    lfill(SCREEN_ADDRESS, 0x20, 2000);
+    lfill(SCREEN_ADDRESS, 0x20, SCREEN_BYTES);
 
     // Clear colour RAM: white text
-    lfill(0x1f800, 0x01, 2000);
+    lfill(0x1f800, 0x01, SCREEN_BYTES);
 
     // Copy ASCII charset into place
     lcopy((int)&charset[0], CHARSET_ADDRESS, 0x800);
@@ -157,11 +158,11 @@ char read_line(char* buffer, unsigned char maxlen) {
     // Read input using hardware keyboard scanner
 
     // Flush keyboard input queue before reading input
-    while (PEEK(0xD610U))
-        POKE(0xD610U, 0);
+    while (ASCIIKEY)
+        ASCIIKEY = 0;
 
     while (len < maxlen) {
-        c = PEEK(0xD610U); // read char
+        c = ASCIIKEY; // read char
 
         // Show cursor
         set_attr(len, 0xf, reverse);
@@ -218,8 +219,8 @@ char read_line(char* buffer, unsigned char maxlen) {
             // XXX we clear all keys here, and work around a bug that causes crazy
             // fast key repeating. This can be turned back into acknowledging the
             // single key again later
-            while (PEEK(0xD610U)) {
-                POKE(0xD610U, 1);
+            while (ASCIIKEY) {
+                ASCIIKEY = 1;
             }
         }
     }
@@ -228,8 +229,8 @@ char read_line(char* buffer, unsigned char maxlen) {
     set_attr(len, 0xf, 0);
 
     // clear char from queue
-    while (c && (PEEK(0xD610U) == c))
-        POKE(0xD610U, 1);
+    while (c && (ASCIIKEY == c))
+        ASCIIKEY = 1;
 
     return len;
 }

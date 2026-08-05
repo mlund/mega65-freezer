@@ -42,8 +42,8 @@ int main(void) {
     VICIV.chrxscl = 0x78;
 
     // Silence SIDs
-    POKE(0xD418U, 0);
-    POKE(0xD438U, 0);
+    SID1.amp = 0;
+    SID2.amp = 0;
 
     set_palette();
 
@@ -54,7 +54,7 @@ int main(void) {
     // freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
 
     // SD or SDHC card?
-    if (PEEK(0xD680U) & 0x10)
+    if (SD_COMMAND & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;

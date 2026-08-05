@@ -101,10 +101,10 @@ void draw_advanced_mixer(void) {
     uint8_t colour;
 
     // debug output gray
-    lpoke(COLOUR_RAM_ADDRESS + 3 * 80 + 5, 12);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * 80 + 7, 12);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * 80 + 11, 12);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * 80 + 13, 12);
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 5, 12);
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 7, 12);
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 11, 12);
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 13, 12);
     audio_menu[3 * 40 + 2] = nybl_to_screen(select_column);
     audio_menu[3 * 40 + 3] = nybl_to_screen(select_row);
 
@@ -537,11 +537,11 @@ void draw_simple_mixer(void) {
     for (i = 6; i < 21; i++) {
         if (i == select_column) {
             // Highligh colouring
-            lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + i * 80, 80);
+            lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + i * SCREEN_ROW_BYTES, 80);
         } else {
             // Normal colouring
             if (i < 12 || i > 14)
-                lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + i * 80, 80);
+                lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + i * SCREEN_ROW_BYTES, 80);
         }
     }
 }
@@ -561,10 +561,10 @@ void test_audio(unsigned char advanced_view) {
     lfill(0xffd3400, 0, 0x100);
 
     // Full volume on all SIDs
-    POKE(0xD418U, 0x0f);
-    POKE(0xD438U, 0x0f);
-    POKE(0xD458U, 0x0f);
-    POKE(0xD478U, 0x0f);
+    SID1.amp = 0x0f;
+    SID2.amp = 0x0f;
+    SID3.amp = 0x0f;
+    SID4.amp = 0x0f;
 
     for (note = 0; note < 5; note++) {
         // clang-format off
@@ -589,41 +589,45 @@ void test_audio(unsigned char advanced_view) {
 
         if (advanced_view) {
             // Highlight the appropriate part of the screen
-            for (i = 5 * 80; i < 7 * 80; i += 2)
+            for (i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2)
                 lpoke(0xff80001L + i, lpeek(0xff80001L + i) & 0x0f);
             switch (sid_num) {
                 case 0:
                     for (i = 0; i < 80; i += 2)
-                        lpoke(0xff80001L + 6 * 80 + i, lpeek(0xff80001L + 6 * 80 + i) | 0x20);
+                        lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
+                            lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x20);
                     break;
                 case 1:
                     for (i = 0; i < 80; i += 2)
-                        lpoke(0xff80001L + 6 * 80 + i, lpeek(0xff80001L + 6 * 80 + i) | 0x60);
+                        lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
+                            lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x60);
                     break;
                 case 2:
                     for (i = 0; i < 80; i += 2)
-                        lpoke(0xff80001L + 5 * 80 + i, lpeek(0xff80001L + 5 * 80 + i) | 0x20);
+                        lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
+                            lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x20);
                     break;
                 case 3:
                     for (i = 0; i < 80; i += 2)
-                        lpoke(0xff80001L + 5 * 80 + i, lpeek(0xff80001L + 5 * 80 + i) | 0x60);
+                        lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
+                            lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x60);
                     break;
             }
         } else {
             switch (sid_num) {
                 case 0:
                 case 1:
-                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 7 * 80, 80);
-                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 16 * 80, 80);
-                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 8 * 80, 80);
-                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 17 * 80, 80);
+                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 7 * SCREEN_ROW_BYTES, 80);
+                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 16 * SCREEN_ROW_BYTES, 80);
+                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 8 * SCREEN_ROW_BYTES, 80);
+                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 17 * SCREEN_ROW_BYTES, 80);
                     break;
                 case 2:
                 case 3:
-                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 7 * 80, 80);
-                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 16 * 80, 80);
-                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 8 * 80, 80);
-                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 17 * 80, 80);
+                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 7 * SCREEN_ROW_BYTES, 80);
+                    lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + 16 * SCREEN_ROW_BYTES, 80);
+                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 8 * SCREEN_ROW_BYTES, 80);
+                    lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 17 * SCREEN_ROW_BYTES, 80);
                     break;
             }
         }
@@ -640,8 +644,8 @@ void test_audio(unsigned char advanced_view) {
             // Make sure all 4 SIDs remain active
             // by proding while waiting
             while (VICIV.rasterline != 0x80) {
-                POKE(0xD438U, 0x0f);
-                POKE(0xD478U, 0x0f);
+                SID2.amp = 0x0f;
+                SID4.amp = 0x0f;
             }
 
             while (VICIV.rasterline == 0x80)
@@ -651,30 +655,30 @@ void test_audio(unsigned char advanced_view) {
 
     // Clear highlight
     if (advanced_view) {
-        for (i = 5 * 80; i < 7 * 80; i += 2)
+        for (i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2)
             lpoke(0xff80001L + i, lpeek(0xff80001L + i) & 0x0f);
     } else {
-        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 9 * 80, 80);
-        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 17 * 80, 80);
-        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 7 * 80, 80);
-        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 15 * 80, 80);
+        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 9 * SCREEN_ROW_BYTES, 80);
+        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 17 * SCREEN_ROW_BYTES, 80);
+        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 7 * SCREEN_ROW_BYTES, 80);
+        lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 15 * SCREEN_ROW_BYTES, 80);
     }
     // Silence SIDs gradually to avoid pops
     /*
     for (frames = 15; frames < 16; frames--) {
       while (VICIV.rasterline != 0x80); // wait for raster
-      POKE(0xD418U, frames);
-      POKE(0xD438U, frames);
-      POKE(0xD458U, frames);
-      POKE(0xD478U, frames);
+      SID1.amp = frames;
+      SID2.amp = frames;
+      SID3.amp = frames;
+      SID4.amp = frames;
     }
     */
     while (VICIV.rasterline != 0x80)
         ;
-    POKE(0xD418U, 0x0);
-    POKE(0xD438U, 0x0);
-    POKE(0xD458U, 0x0);
-    POKE(0xD478U, 0x0);
+    SID1.amp = 0x0;
+    SID2.amp = 0x0;
+    SID3.amp = 0x0;
+    SID4.amp = 0x0;
 
     // Reset all sids
     lfill(0xffd3400, 0, 0x80);
@@ -687,19 +691,19 @@ void do_advanced_mixer(void) {
     select_column = 0;
 
     // reset colour ram
-    lfill(0xff80000U, 1, 2000);
+    lfill(0xff80000U, 1, SCREEN_BYTES);
 
     draw_advanced_mixer();
 
     // clear keybuffer
-    while ((cin = PEEK(0xD610U)))
-        POKE(0xD610U, 0);
+    while ((cin = ASCIIKEY))
+        ASCIIKEY = 0;
 
     while (1) {
-        cin = PEEK(0xD610U);
+        cin = ASCIIKEY;
         if (cin) {
             // Flush char from input buffer
-            POKE(0xD610U, 0);
+            ASCIIKEY = 0;
 
             // Get coefficient number ready
             i = (select_column << 5);
@@ -712,7 +716,7 @@ void do_advanced_mixer(void) {
                 case 0x03:
                 case 0xf3: // RUN/STOP or F3 to exit
                     // reset colour ram
-                    lfill(0xff80000U, 1, 2000);
+                    lfill(0xff80000U, 1, SCREEN_BYTES);
                     return;
                 case 0x11:
                     select_row++;
@@ -812,14 +816,14 @@ void do_audio_mixer(void) {
     draw_simple_mixer();
 
     // clear keybuffer
-    while ((cin = PEEK(0xD610U)))
-        POKE(0xD610U, cin);
+    while ((cin = ASCIIKEY))
+        ASCIIKEY = cin;
 
     while (1) {
-        cin = PEEK(0xD610U);
+        cin = ASCIIKEY;
         if (cin) {
             // Flush char from input buffer
-            POKE(0xD610U, 0);
+            ASCIIKEY = 0;
 
             switch (cin) {
                 case 0x03:

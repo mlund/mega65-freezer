@@ -405,8 +405,8 @@ void freeze_monitor(void) {
     setup_screen();
 
     // Flush input buffer
-    while (PEEK(0xD610U))
-        POKE(0xD610U, 0);
+    while (ASCIIKEY)
+        ASCIIKEY = 0;
 
     show_registers();
 

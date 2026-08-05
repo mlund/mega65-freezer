@@ -1,6 +1,7 @@
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
+#include "mega65.inc"
 
 #include <mega65.h>
 #include <stdio.h>
@@ -47,8 +48,8 @@ void mega65_fast(void) {
     // Fast CPU
     POKE(0, 65);
     // MEGA65 IO registers
-    VICIV.key = 0x47;
-    VICIV.key = 0x53;
+    VICIV.key = VIC4_KNOCK_1;
+    VICIV.key = VIC4_KNOCK_2;
 }
 
 void sdcard_open(void) {

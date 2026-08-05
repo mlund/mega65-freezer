@@ -38,7 +38,7 @@ void setup_menu_screen(void) {
     VICIV.linestep = 80; // $D058-$D059, bytes per row
 
     // Fill colour RAM with a value that won't cause problems in Super-Extended Attribute Mode
-    //  lfill(0xff80000U, 1, 2000);
+    //  lfill(0xff80000U, 1, SCREEN_BYTES);
 }
 
 void draw_box(unsigned char x1,
@@ -52,41 +52,41 @@ void draw_box(unsigned char x1,
     // Clear colour RAM
     for (x = x1; x <= x2; x++) {
         for (y = y1; y <= y2; y++) {
-            lpoke(COLOUR_RAM_ADDRESS + y * 80 + x * 2 + 1, colour);
-            lpoke(COLOUR_RAM_ADDRESS + y * 80 + x * 2 + 0, 0);
+            lpoke(COLOUR_RAM_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 1, colour);
+            lpoke(COLOUR_RAM_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 0, 0);
         }
     }
 
     if (erase) {
         for (x = x1 + 1; x < x2; x++) {
             for (y = y1 + 1; y < y2; y++) {
-                lpoke(SCREEN_ADDRESS + y * 80 + x * 2 + 0, 0x20);
-                lpoke(SCREEN_ADDRESS + y * 80 + x * 2 + 1, 0);
+                lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 0, 0x20);
+                lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 1, 0);
             }
         }
     }
 
     for (x = x1; x < x2; x++) {
-        lpoke(SCREEN_ADDRESS + y1 * 80 + x * 2, 0x40); // horizontal line, centred
-        lpoke(SCREEN_ADDRESS + y1 * 80 + x * 2 + 1, 0);
-        lpoke(SCREEN_ADDRESS + y2 * 80 + x * 2, 0x40); // horizontal line, centred
-        lpoke(SCREEN_ADDRESS + y2 * 80 + x * 2 + 1, 0);
+        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2, 0x40); // horizontal line, centred
+        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 1, 0);
+        lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x * 2, 0x40); // horizontal line, centred
+        lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x * 2 + 1, 0);
     }
 
     for (y = y1; y < y2; y++) {
-        lpoke(SCREEN_ADDRESS + y * 80 + x1 * 2, 0x42); // vertical line, centred
-        lpoke(SCREEN_ADDRESS + y * 80 + x1 * 2 + 1, 0);
-        lpoke(SCREEN_ADDRESS + y * 80 + x2 * 2, 0x42); // vertical line, centred
-        lpoke(SCREEN_ADDRESS + y * 80 + x2 * 2 + 1, 0);
+        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x1 * 2, 0x42); // vertical line, centred
+        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
+        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x2 * 2, 0x42); // vertical line, centred
+        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x2 * 2 + 1, 0);
     }
-    lpoke(SCREEN_ADDRESS + y1 * 80 + x1 * 2, 0x55); // top left corner
-    lpoke(SCREEN_ADDRESS + y1 * 80 + x2 * 2, 73);   // top right corner
-    lpoke(SCREEN_ADDRESS + y2 * 80 + x1 * 2, 74);   // bottom left corner
-    lpoke(SCREEN_ADDRESS + y2 * 80 + x2 * 2, 75);   // bottom right corner
-    lpoke(SCREEN_ADDRESS + y1 * 80 + x1 * 2 + 1, 0);
-    lpoke(SCREEN_ADDRESS + y1 * 80 + x2 * 2 + 1, 0);
-    lpoke(SCREEN_ADDRESS + y2 * 80 + x1 * 2 + 1, 0);
-    lpoke(SCREEN_ADDRESS + y2 * 80 + x2 * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2, 0x55); // top left corner
+    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x2 * 2, 73);   // top right corner
+    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x1 * 2, 74);   // bottom left corner
+    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x2 * 2, 75);   // bottom right corner
+    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x2 * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x2 * 2 + 1, 0);
 }
 
 void write_text(unsigned char x1, unsigned char y1, unsigned char colour, const char* t) {
@@ -97,10 +97,10 @@ void write_text(unsigned char x1, unsigned char y1, unsigned char colour, const 
             c -= 0x60;
         if (c > 0x40)
             c -= 0x40;
-        lpoke(SCREEN_ADDRESS + y1 * 80 + x * 2 + 0, c);
-        lpoke(SCREEN_ADDRESS + y1 * 80 + x * 2 + 1, 0);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + x * 2 + 0, 0x00);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + x * 2 + 1, colour);
+        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 0, c);
+        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 1, 0);
+        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 0, 0x00);
+        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 1, colour);
     }
 }
 
@@ -108,19 +108,19 @@ void input_text(
     unsigned char x1, unsigned char y1, unsigned char len, unsigned char colour, char* out) {
     unsigned char ofs = 0, x, c;
     for (x = x1; x < (x1 + len); x++) {
-        lpoke(SCREEN_ADDRESS + y1 * 80 + x1 * 2 + 0, ' ');
-        lpoke(SCREEN_ADDRESS + y1 * 80 + x1 * 2 + 1, 0);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + x1 * 2 + 0, 0x00);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + x1 * 2 + 1, colour);
+        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 0, ' ');
+        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
+        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 0, 0x00);
+        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 1, colour);
     }
 
     out[0] = 0;
 
     while (1) {
         // Enable cursor on current char
-        lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + (x1 + ofs) * 2 + 1, colour | 0x30);
+        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour | 0x30);
 
-        c = PEEK(0xD610);
+        c = ASCIIKEY;
         if (c >= 0x41 && c <= 0x5a || c >= 0x61 && c <= 0x7a || c >= 0x30 && c <= 0x39) {
             if (ofs < len) {
                 out[ofs] = c;
@@ -128,8 +128,8 @@ void input_text(
                 if (c > 0x60) {
                     c -= 0x60;
                 }
-                lpoke(SCREEN_ADDRESS + y1 * 80 + (x1 + ofs) * 2 + 0, c);
-                lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + (x1 + ofs) * 2 + 1, colour);
+                lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, c);
+                lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
                 ofs++;
             }
         } else {
@@ -137,25 +137,25 @@ void input_text(
                 case 0x14: // delete
                     // XXX actually copy chars down, instead of just erasing from
                     // end of line, and allow cursor left and right
-                    lpoke(SCREEN_ADDRESS + y1 * 80 + (x1 + ofs) * 2 + 0, ' ');
-                    lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + (x1 + ofs) * 2 + 1, colour);
+                    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, ' ');
+                    lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
                     if (ofs)
                         ofs--;
-                    lpoke(SCREEN_ADDRESS + y1 * 80 + (x1 + ofs) * 2 + 0, ' ');
-                    lpoke(COLOUR_RAM_ADDRESS + y1 * 80 + (x1 + ofs) * 2 + 1, colour);
+                    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, ' ');
+                    lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
                     break;
                 case 0x03:
                     out[0] = 0;
-                    POKE(0xD610, 0);
+                    ASCIIKEY = 0;
                     return;
                 case 0x0d:
                     out[ofs] = 0;
-                    POKE(0xD610, 0);
+                    ASCIIKEY = 0;
                     return;
             }
         }
         if (c)
-            POKE(0xD610, 0);
+            ASCIIKEY = 0;
     }
 }
 
@@ -189,7 +189,7 @@ unsigned char to_hex(unsigned char i) {
 void format_disk_image(unsigned long file_sector, char* diskname, unsigned char isD65) {
     unsigned char i;
     unsigned short s;
-    unsigned short sect_count = 80 * 20;
+    unsigned short sect_count = SCREEN_ROW_BYTES * 20;
     if (isD65)
         sect_count = 85 * 64;
 
@@ -273,9 +273,9 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
     if (!fat1_sector) {
         draw_box(10, 8, 30, 13, 2, 1);
         write_text(11, 9, 7, "COULD NOT FIND SD CARD");
-        while (!PEEK(0xD610))
+        while (!ASCIIKEY)
             continue;
-        POKE(0xD610, 0);
+        ASCIIKEY = 0;
         return;
     }
 
@@ -313,9 +313,9 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
     write_text(11, 9, 7, "CREATING IMAGE...");
 
     // Actually create the file
-    //  while(!PEEK(0xD610)) VICIV.bordercol = VICIV.bordercol+1; POKE(0xD610,0);
+    //  while(!ASCIIKEY) VICIV.bordercol = VICIV.bordercol+1; ASCIIKEY = 0;
     file_sector = fat32_create_contiguous_file(filename,
-        isD65 ? (85 * 64 * 2 * 512L) : (80 * 10 * 2 * 512L),
+        isD65 ? (85 * 64 * 2 * 512L) : (SCREEN_ROW_BYTES * 10 * 2 * 512L),
         root_dir_sector,
         fat1_sector,
         fat2_sector);
@@ -324,9 +324,9 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
         draw_box(10, 8, 30, 14, 2, 1);
         write_text(11, 9, 2, "Error creating file");
         write_text(11, 12, 1, "Press almost any key...");
-        while (!PEEK(0xD610))
+        while (!ASCIIKEY)
             continue;
-        POKE(0xD610, 0);
+        ASCIIKEY = 0;
     } else {
         // File creation succeeded
 
@@ -344,9 +344,9 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
 
         write_text(9, 12, 1, "Press almost any key...");
 
-        while (!PEEK(0xD610))
+        while (!ASCIIKEY)
             continue;
-        POKE(0xD610, 0);
+        ASCIIKEY = 0;
     }
 }
 
@@ -378,8 +378,8 @@ int main(void) {
     VICIV.chrxscl = 0x78;
 
     // Silence SIDs
-    POKE(0xD418U, 0);
-    POKE(0xD438U, 0);
+    SID1.amp = 0;
+    SID2.amp = 0;
 
     set_palette();
 
@@ -388,7 +388,7 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (PEEK(0xD680U) & 0x10)
+    if (SD_COMMAND & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;

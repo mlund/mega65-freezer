@@ -170,11 +170,14 @@ void draw_directory_entry(unsigned char screen_row) {
     unsigned char i;
 
     for (i = 0; i < 18; i++)
-        POKE(SCREEN_ADDRESS + (screen_row * 80) + (21 * 2) + (i * 2), entry_buffer[i]);
+        POKE(
+            SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2) + (i * 2), entry_buffer[i]);
 
-    lcopy((unsigned long)dir_line_colour, COLOUR_RAM_ADDRESS + (screen_row * 80) + (21 * 2), 4);
-    lcopy(COLOUR_RAM_ADDRESS + (screen_row * 80) + (21 * 2),
-        COLOUR_RAM_ADDRESS + (screen_row * 80) + (21 * 2) + 4,
+    lcopy((unsigned long)dir_line_colour,
+        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2),
+        4);
+    lcopy(COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2),
+        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2) + 4,
         (19 * 2 - 4));
 }
 
@@ -183,32 +186,32 @@ unsigned char next_directory_entry(void) {
 
     if (disk_type == DISK_TYPE_D81 || disk_type == DISK_TYPE_D64) {
         // D81 || D64
-        i = PEEK(0xD087U);                // track next dir
-        c = PEEK(0xD087U);                // sector next dir
+        i = F011_DATA;                    // track next dir
+        c = F011_DATA;                    // sector next dir
         if (next_sector == 255) {         // only first two bytes of sector count!
             if (i > 0 && c > 1 && c < 41) // track 0 means end of dir
                 next_sector = c;
             else
                 next_sector = 254; // first two bytes of sector read
         }
-        type = PEEK(0xD087U); // file type
-        c = PEEK(0xD087U);    // track file
-        c = PEEK(0xD087U);    // sector file
+        type = F011_DATA; // file type
+        c = F011_DATA;    // track file
+        c = F011_DATA;    // sector file
         // now 16 char filename
         if (type) { // valid
             entry_buffer[17] = ' ';
             for (i = 1; i < 17; i++)
-                entry_buffer[i] = petscii_to_screen(PEEK(0xD087U));
+                entry_buffer[i] = petscii_to_screen(F011_DATA);
             for (; (entry_buffer[i] & 0xbf) == ' ' && i > 1; i--)
                 ; // this might be 0x20 or 0x60
             entry_buffer[i + 1] = '"';
 
             // skip rest up to 32 bytes
             for (i = 0; i < 11; i++)
-                c = PEEK(0xD087U);
+                c = F011_DATA;
         } else
             for (i = 0; i < 27; i++)
-                c = PEEK(0xD087U);
+                c = F011_DATA;
     }
 
     return type;
@@ -237,22 +240,22 @@ int read_sector_with_cancel(void) {
     POKE(0xD084U, dir_track);
     POKE(0xD085U, current_sector);
     POKE(0xD086U, current_side);
-    while (PEEK(0xD082U) & 0x80) {
+    while (F011_STATUS & F011_STATUS_BUSY) {
         // Exit if a key has been pressed
-        if (PEEK(0xD610U)) {
-            POKE(0xD080U, 0);
+        if (ASCIIKEY) {
+            F011_CONTROL = 0;
             return 0;
         }
     }
-    POKE(0xD081U, 0x41); // Read sector
-    while (PEEK(0xD082U) & 0x80) {
+    F011_COMMAND = F011_CMD_READ_SECTOR; // Read sector
+    while (F011_STATUS & F011_STATUS_BUSY) {
         // Exit if a key has been pressed
-        if (PEEK(0xD610U)) {
-            POKE(0xD080U, 0);
+        if (ASCIIKEY) {
+            F011_CONTROL = 0;
             return 0;
         }
     }
-    if (PEEK(0xD082U) & 0x18)
+    if (F011_STATUS & 0x18)
         return 0; // abort if the sector read failed
 
     return 1;
@@ -286,7 +289,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     VICIV.bordercol = 6;
 
     // Exit if a key has been pressed
-    if (PEEK(0xD610U))
+    if (ASCIIKEY)
         return 1;
 
     // determine disk image type
@@ -315,8 +318,8 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     // Mounted disk, so now get the directory.
 
     // Read T40 S1 (sectors begin at 1, not 0)
-    POKE(0xD080U, 0x60 | drive_id); // motor and LED on, and select correct drive
-    POKE(0xD081U, 0x20);            // Wait for motor spin up
+    F011_CONTROL = 0x60 | drive_id; // motor and LED on, and select correct drive
+    F011_COMMAND = F011_CMD_SPINUP; // Wait for motor spin up
 
     if (!read_sector_with_cancel())
         goto exit_with_motor_off;
@@ -333,25 +336,25 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
       while (block < 3) {
         x = 0;
         do {
-          c = PEEK(0xD087U);
+          c = F011_DATA;
           if (c >= 'A' && c <= 'Z')
             c &= 0x1f;
           if (c >= 'a' && c <= 'z')
             c &= 0x1f;
           if (x % 16 == 0) {
-            POKE(SCREEN_ADDRESS + 21 * 2 + ((x >> 4) * 80), nybl_to_screen(x >> 4));
-            POKE(SCREEN_ADDRESS + 22 * 2 + ((x >> 4) * 80), nybl_to_screen(x));
+            POKE(SCREEN_ADDRESS + 21 * 2 + ((x >> 4) * SCREEN_ROW_BYTES), nybl_to_screen(x >> 4));
+            POKE(SCREEN_ADDRESS + 22 * 2 + ((x >> 4) * SCREEN_ROW_BYTES), nybl_to_screen(x));
           }
-          POKE(SCREEN_ADDRESS + ((24 + (x%16)) * 2) + ((x >> 4) * 80), c & 0x7f);
+          POKE(SCREEN_ADDRESS + ((24 + (x%16)) * 2) + ((x >> 4) * SCREEN_ROW_BYTES), c & 0x7f);
         } while (++x);
-        POKE(SCREEN_ADDRESS + 21 * 2 + 17 * 80, nybl_to_screen(dir_track >> 4));
-        POKE(SCREEN_ADDRESS + 22 * 2 + 17 * 80, nybl_to_screen(dir_track));
-        POKE(SCREEN_ADDRESS + 24 * 2 + 17 * 80, current_side + 0x30);
-        POKE(SCREEN_ADDRESS + 26 * 2 + 17 * 80, nybl_to_screen(current_sector >> 4));
-        POKE(SCREEN_ADDRESS + 27 * 2 + 17 * 80, nybl_to_screen(current_sector));
-        POKE(SCREEN_ADDRESS + 30 * 2 + 17 * 80, block);
-        while ((x = PEEK(0xD610U)) == 0);
-        POKE(0xD610U, 0);
+        POKE(SCREEN_ADDRESS + 21 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(dir_track >> 4));
+        POKE(SCREEN_ADDRESS + 22 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(dir_track));
+        POKE(SCREEN_ADDRESS + 24 * 2 + 17 * SCREEN_ROW_BYTES, current_side + 0x30);
+        POKE(SCREEN_ADDRESS + 26 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(current_sector >> 4));
+        POKE(SCREEN_ADDRESS + 27 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(current_sector));
+        POKE(SCREEN_ADDRESS + 30 * 2 + 17 * SCREEN_ROW_BYTES, block);
+        while ((x = ASCIIKEY) == 0);
+        ASCIIKEY = 0;
         if (x == 'q')
           goto exit_with_motor_off;
         block++;
@@ -373,12 +376,12 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
 #else
     // skip start of sector until we reach the disk title
     for (j = 0; j < skip_bytes; j++)
-        c = PEEK(0xD087U);
+        c = F011_DATA;
 
     // Then draw title at the top of the screen
     POKE(SCREEN_ADDRESS + 21 * 2, '"');
     for (x = 0; x < 16; x++) {
-        c = PEEK(0xD087U);
+        c = F011_DATA;
         if (c >= 'A' && c <= 'Z')
             c &= 0x1f;
         POKE(SCREEN_ADDRESS + (22 + x) * 2, c & 0x7f);
@@ -389,7 +392,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + i * 2, 0x2e);
 
     // user impatient?
-    if (PEEK(0xD610U))
+    if (ASCIIKEY)
         goto exit_with_motor_off;
 
     // move to first dir entry depending on disk_type
@@ -401,7 +404,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         // Skip 1st half of sector
         x = 0;
         do
-            c = PEEK(0xD087U);
+            c = F011_DATA;
         while (++x);
         entries = 8;
     } else { // DISK_TYPE_D64
@@ -445,7 +448,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
 
         if (skip_bytes)
             for (j = 0; j < 256; j++)
-                c = PEEK(0xD087U);
+                c = F011_DATA;
 
         // once more, then we have the 22 entries we can display
         draw_entries();
@@ -453,7 +456,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
 #endif
     // Turn floppy LED and motor back off
 exit_with_motor_off:
-    POKE(0xD080U, 0);
+    F011_CONTROL = 0;
     return 1;
 }
 
@@ -475,10 +478,13 @@ void draw_disk_image_list(void) {
 
     // Draw instructions
     for (i = 0; i < 80; i++)
-        POKE(SCREEN_ADDRESS + 23 * 80 + (i << 1), petscii_to_screen(diskchooser_instructions[i]));
+        POKE(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES + (i << 1),
+            petscii_to_screen(diskchooser_instructions[i]));
 
-    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (23 * 80) + 0, 4);
-    lcopy(COLOUR_RAM_ADDRESS + (23 * 80), COLOUR_RAM_ADDRESS + (23 * 80) + 4, 156);
+    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES) + 0, 4);
+    lcopy(COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES),
+        COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES) + 4,
+        156);
 
     for (i = 0; i < 23; i++) {
         if ((display_offset + i) < file_count) {
@@ -502,12 +508,14 @@ void draw_disk_image_list(void) {
         }
         if ((display_offset + i) == selection_number) {
             // Highlight the row
-            lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (i * 80), 4);
+            lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES), 4);
         } else {
             // Normal row
-            lcopy((long)normal_row, COLOUR_RAM_ADDRESS + (i * 80), 4);
+            lcopy((long)normal_row, COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES), 4);
         }
-        lcopy(COLOUR_RAM_ADDRESS + (i * 80), COLOUR_RAM_ADDRESS + (i * 80) + 4, 76);
+        lcopy(COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES),
+            COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES) + 4,
+            76);
         addr += (40 * 2);
     }
     VICIV.bordercol = 6;
@@ -622,17 +630,17 @@ char* freeze_select_disk_image(unsigned char drive_id) {
     // Okay, we have some disk images, now get the user to pick one!
     draw_disk_image_list();
     while (1) {
-        x = PEEK(0xD610U);
+        x = ASCIIKEY;
         if (x)
             // Clear read key
-            POKE(0xD610U, 0);
+            ASCIIKEY = 0;
 
 #ifdef WITH_JOYSTICK
         if (!x) {
             // We use a simple lookup table to do this
-            x = joy_to_key_disk[PEEK(0xDC00) & PEEK(0xDC01) & 0x1f];
+            x = joy_to_key_disk[CIA1.pra & CIA1.prb & 0x1f];
             // Then wait for joystick to release
-            while ((PEEK(0xDC00) & PEEK(0xDC01) & 0x1f) != 0x1f)
+            while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
                 continue;
         }
 #endif
@@ -745,24 +753,24 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                         // Mount succeeded, now seek to track 0 to make sure DOS
                         // knows where we are, and to make sure the drive head is
                         // sitting properly.
-                        POKE(0xD080U, 0x60 | drive_id); // motor and LED on
-                        POKE(0xD081U, 0x20);            // Wait for motor spin up
+                        F011_CONTROL = 0x60 | drive_id; // motor and LED on
+                        F011_COMMAND = F011_CMD_SPINUP; // Wait for motor spin up
 
-                        while (!(PEEK(0xD082) & 0x01)) {
-                            POKE(0xD081, 0x10);
+                        while (!(F011_STATUS & 0x01)) {
+                            F011_COMMAND = 0x10;
                             usleep(7000);
                         }
                         // Now check the contents of $D084 to find out the most recently
                         // requested track, and seek the head to that track.
                         x = freeze_peek(0xFFD3084); // Get last requested track by frozen programme
                         while (x) {
-                            POKE(0xD081, 0x18);
-                            while (PEEK(0xD082) & 0x80)
+                            F011_COMMAND = 0x18;
+                            while (F011_STATUS & F011_STATUS_BUSY)
                                 if (hal_border_flicker > 1)
                                     VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
                             x--;
                         }
-                        POKE(0xD080U, 0); // motor and led off
+                        F011_CONTROL = 0; // motor and led off
                     }
 
                     // Mounted ok, so return this image

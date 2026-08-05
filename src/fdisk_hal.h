@@ -8,7 +8,8 @@
 #include <stdint.h>
 
 extern unsigned char sdhc_card;
-extern uint8_t sector_buffer[512];
+#define SECTOR_SIZE 512
+extern uint8_t sector_buffer[SECTOR_SIZE];
 #define clear_sector_buffer() lfill((uint32_t)sector_buffer, 0, 512)
 
 extern uint8_t hal_border_flicker;

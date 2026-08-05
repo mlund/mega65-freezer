@@ -98,48 +98,48 @@ char draw_directory_entry(unsigned char screen_row) {
     unsigned char i, c;
     // Skip first 5 bytes
     for (i = 0; i < 2; i++)
-        c = PEEK(0xD087U);
-    type = PEEK(0xD087U);
+        c = F011_DATA;
+    type = F011_DATA;
     if (!(type & 0xf))
         invalid = 1;
     for (i = 0; i < 2; i++)
-        c = PEEK(0xD087U);
+        c = F011_DATA;
     // Then draw the 16 chars with quotes
-    POKE(SCREEN_ADDRESS + (screen_row * 80) + (21 * 2), '"');
+    POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2), '"');
     for (i = 0; i < 16; i++) {
-        c = PEEK(0xD087U);
+        c = F011_DATA;
         if (!c)
             invalid = 1;
         if (firsta0 && (c == 0xa0)) {
-            POKE(SCREEN_ADDRESS + (screen_row * 80) + (22 * 2) + (i * 2), 0x22);
+            POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2), 0x22);
             firsta0 = 0;
         } else {
             if (c >= 'A' && c <= 'Z')
                 c &= 0x1f;
             if (c >= 'a' && c <= 'z')
                 c &= 0x1f;
-            POKE(SCREEN_ADDRESS + (screen_row * 80) + (22 * 2) + (i * 2), c & 0x7f);
+            POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2), c & 0x7f);
         }
     }
     if (firsta0) {
-        POKE(SCREEN_ADDRESS + (screen_row * 80) + (38 * 2), '"');
+        POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (38 * 2), '"');
     }
     if (type & 0x40)
-        POKE(SCREEN_ADDRESS + (screen_row * 80) + (39 * 2), '<');
+        POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '<');
     if (!type & 0xf0)
-        POKE(SCREEN_ADDRESS + (screen_row * 80) + (39 * 2), '*');
+        POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '*');
 
     // Read the rest of the entry to advance buffer pointer nicely
     for (i = 0; i < 11; i++)
-        c = PEEK(0xD087U);
+        c = F011_DATA;
 
     if (invalid) {
         // Erase whatever we drew
         for (i = 21; i < 40; i++)
-            POKE(SCREEN_ADDRESS + (screen_row * 80) + (i * 2), ' ');
+            POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (i * 2), ' ');
     } else {
         lcopy((unsigned long)dir_line_colour,
-            COLOUR_RAM_ADDRESS + (screen_row * 80) + (21 * 2),
+            COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2),
             19 * 2);
     }
 
@@ -176,11 +176,11 @@ void draw_file_list(void) {
     clear_screen(23);
 
     // Draw instructions
-    copy_line_to_screen(SCREEN_ADDRESS + 23 * 80, diskchooser_instructions, 80);
-    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (23 * 80) + 0, 40);
-    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (23 * 80) + 40, 40);
-    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (24 * 80) + 0, 40);
-    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (24 * 80) + 40, 40);
+    copy_line_to_screen(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES, diskchooser_instructions, 80);
+    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES) + 0, 40);
+    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES) + 40, 40);
+    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (24 * SCREEN_ROW_BYTES) + 0, 40);
+    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (24 * SCREEN_ROW_BYTES) + 40, 40);
 
     for (i = 0; i < 23; i++) {
         if ((display_offset + i) < file_count) {
@@ -201,10 +201,10 @@ void draw_file_list(void) {
             }*/
         if ((display_offset + i) == selection_number) {
             // Highlight the row
-            lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (i * 80), 40);
+            lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES), 40);
         } else {
             // Normal row
-            lcopy((long)normal_row, COLOUR_RAM_ADDRESS + (i * 80), 40);
+            lcopy((long)normal_row, COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES), 40);
         }
         addr += (40 * 2);
     }
@@ -310,16 +310,16 @@ unsigned char freeze_load_romarea(void) {
     // Okay, we have some disk images, now get the user to pick one!
     draw_file_list();
     while (1) {
-        x = PEEK(0xD610U);
+        x = ASCIIKEY;
         if (x)
-            POKE(0xD610U, 0);
+            ASCIIKEY = 0;
 
 #ifdef WITH_JOYSTICK
         if (!x) {
             // We use a simple lookup table to do this
-            x = joy_to_key_disk[PEEK(0xDC00) & PEEK(0xDC01) & 0x1f];
+            x = joy_to_key_disk[CIA1.pra & CIA1.prb & 0x1f];
             // Then wait for joystick to release
-            while ((PEEK(0xDC00) & PEEK(0xDC01) & 0x1f) != 0x1f)
+            while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
                 continue;
         }
 #endif
@@ -477,21 +477,21 @@ void user_reset_prompt(void) {
     unsigned char x = 0;
 
     clear_screen(25);
-    copy_line_to_screen(SCREEN_ADDRESS + 80, rom_reset_screen, 12 * 80);
-    copy_line_to_screen(SCREEN_ADDRESS + 3 * 80 + 8, rom_name_return, 32);
-    copy_line_to_screen(SCREEN_ADDRESS + 4 * 80 + 34, detect_rom(), 11);
+    copy_line_to_screen(SCREEN_ADDRESS + 80, rom_reset_screen, 12 * SCREEN_ROW_BYTES);
+    copy_line_to_screen(SCREEN_ADDRESS + 3 * SCREEN_ROW_BYTES + 8, rom_name_return, 32);
+    copy_line_to_screen(SCREEN_ADDRESS + 4 * SCREEN_ROW_BYTES + 34, detect_rom(), 11);
 
     while (x != 'Y' && x != 'y' && x != 'N' && x != 'n') {
-        x = PEEK(0xD610U);
+        x = ASCIIKEY;
         if (x)
-            POKE(0xD610U, 0);
+            ASCIIKEY = 0;
 
 #ifdef WITH_JOYSTICK
         if (!x) {
             // We use a simple lookup table to do this
-            x = joy_to_key_disk[PEEK(0xDC00) & PEEK(0xDC01) & 0x1f];
+            x = joy_to_key_disk[CIA1.pra & CIA1.prb & 0x1f];
             // Then wait for joystick to release
-            while ((PEEK(0xDC00) & PEEK(0xDC01) & 0x1f) != 0x1f)
+            while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
                 continue;
             // translate joystick to keys
             if (x == 0xd) // fire is Y

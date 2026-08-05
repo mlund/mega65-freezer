@@ -1717,10 +1717,10 @@ static void MainLoop() {
             joy_delay_countdown = 0;
         } else {
             key = 0;
-            if ((PEEK(0xDC00) & 0x1f) != 0x1f) {
+            if ((CIA1.pra & 0x1f) != 0x1f) {
                 // Check joysticks
 
-                if (!(PEEK(0xDC00) & 0x10)) {
+                if (!(CIA1.pra & 0x10)) {
                     // Toggle pixel
                     if (!fire_lock) {
                         key = 0x20;
@@ -1733,7 +1733,7 @@ static void MainLoop() {
                 if (joy_delay_countdown)
                     joy_delay_countdown--;
                 else {
-                    switch (PEEK(0xDC00) & 0xf) {
+                    switch (CIA1.pra & 0xf) {
                         case 0x7: // RIGHT
                             joy_delay_countdown = JOY_DELAY;
                             fire_lock = 0;

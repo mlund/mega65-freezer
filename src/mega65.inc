@@ -49,6 +49,37 @@
 #define LOAD_ADDR_HI             0x07
 #define PROGRAM_ENTRY            0x080D
 
+// The VIC-III/IV conceals its registers until this knock is written to
+// VICIV.key ($D02F), in this order.
+#define VIC4_KNOCK_1             0x47
+#define VIC4_KNOCK_2             0x53
+
+#ifndef __ASSEMBLER__
+// Registers used only from C, so they are lvalues rather than bare addresses:
+// ASCIIKEY reads and assigns directly instead of through PEEK/POKE.  Guarded
+// because helper.S includes this file and cannot parse a cast.
+#define MMIO8(addr) (*(volatile uint8_t*)(addr))
+
+// F011 floppy controller (45IO27).  See the MEGA65 user guide, "45IO27
+// Multi-Function I/O Controller".
+#define F011_CONTROL             MMIO8(0xD080)  // motor and drive select
+#define F011_COMMAND             MMIO8(0xD081)
+#define F011_STATUS              MMIO8(0xD082)  // BUSY is bit 7
+#define F011_DATA                MMIO8(0xD087)  // sector byte port
+#define F011_CMD_SPINUP          0x20
+#define F011_CMD_READ_SECTOR     0x41
+#define F011_STATUS_BUSY         0x80
+
+// SD controller and touch panel.
+#define SD_COMMAND               MMIO8(0xD680)  // also reads status
+#define SD_STATUS_SDHC           0x10
+#define TOUCH_EVENT              MMIO8(0xD6B0)  // EV1/EV2 validity bits
+
+// Keyboard event queue: reads the top event as ASCII, 0x00 when empty;
+// assigning any value dequeues.  See the user guide, "Keyboard".
+#define ASCIIKEY                 MMIO8(0xD610)
+#endif // __ASSEMBLER__
+
 #define NMI_VECTOR               0x0318
 #define BORDER_COLOUR            0xD020
 

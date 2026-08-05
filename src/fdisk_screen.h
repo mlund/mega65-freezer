@@ -5,7 +5,13 @@
 // Use default char set, not ASCII charset
 #define CHARSET_ADDRESS (0x9000U)
 #define COLOUR_RAM_ADDRESS (0x1f800)
-#define FOOTER_ADDRESS (SCREEN_ADDRESS + 24 * 80)
+// 16-bit text mode: 40 columns of two bytes, 25 rows.
+#define SCREEN_COLS 40
+#define SCREEN_ROW_BYTES 80
+#define SCREEN_ROWS 25
+#define SCREEN_BYTES (SCREEN_ROW_BYTES * SCREEN_ROWS)
+
+#define FOOTER_ADDRESS (SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES)
 
 #define FOOTER_COPYRIGHT 0
 #define FOOTER_SPRITED 1

@@ -38,7 +38,7 @@ void setup_menu_screen(void) {
     VICIV.linestep = 80; // $D058-$D059, bytes per row
 
     // Fill colour RAM with a value that won't cause problems in Super-Extended Attribute Mode
-    lfill(0xff80000U, 1, 2000);
+    lfill(0xff80000U, 1, SCREEN_BYTES);
 }
 
 int main(void) {
@@ -69,8 +69,8 @@ int main(void) {
     VICIV.chrxscl = 0x78;
 
     // Silence SIDs
-    POKE(0xD418U, 0);
-    POKE(0xD438U, 0);
+    SID1.amp = 0;
+    SID2.amp = 0;
 
     set_palette();
 
@@ -79,7 +79,7 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (PEEK(0xD680U) & 0x10)
+    if (SD_COMMAND & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;
