@@ -84,6 +84,10 @@ cmake_path(GET _sdk_lib PARENT_PATH LLVM_MOS_ROOT)        # install prefix
 # and mouse.  The option is global; the dependency is per-target.
 option(LINK_LIBC "Link mega65-libc" ON)
 
+# Must be at top level and precede add_subdirectory, or tests registered in a
+# subdirectory are silently dropped.
+enable_testing()
+
 add_subdirectory(src)
 
 # Static analysis and formatting.  The .c files carry the diagnostics; headers
@@ -117,4 +121,32 @@ if(CLANG_FORMAT_EXE)
     add_custom_target(format-check
         COMMAND ${CLANG_FORMAT_EXE} --style=file --dry-run -Werror ${FORMAT_SOURCES}
         COMMENT "Checking formatting")
+endif()
+
+# The 45GS02 disassembler tables are generated from llvm-mos and committed, so a
+# normal build needs neither Python nor llvm-mc.  Regeneration is a rare action
+# after a toolchain bump, hence a non-default target -- same shape as the
+# clang-tidy and clang-format targets above.
+#
+# NO_DEFAULT_PATH is load-bearing: the tables must come from the *patched* SDK
+# this project builds with, not from a stock llvm-mc that happens to be on PATH.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+find_program(LLVM_MC_EXE NAMES llvm-mc HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
+
+if(Python3_FOUND AND LLVM_MC_EXE)
+    add_custom_target(disasm-tables
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_disasm_tables.py
+                --llvm-mc ${LLVM_MC_EXE} -o ${SRC}/disasm_tables.inc
+        COMMENT "Regenerating 45GS02 disassembler tables")
+
+    # Compiles src/disasm.c for the host and diffs every opcode/prefix
+    # combination against llvm-mc, so a toolchain bump cannot silently change
+    # the tables.  Needs a host compiler as well, so it is registered only when
+    # one is present rather than failing the configure.
+    find_program(HOST_C_COMPILER NAMES cc clang gcc)
+    if(HOST_C_COMPILER)
+        add_test(NAME disasm
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_disasm.py
+                    --llvm-mc ${LLVM_MC_EXE} --cc ${HOST_C_COMPILER})
+    endif()
 endif()

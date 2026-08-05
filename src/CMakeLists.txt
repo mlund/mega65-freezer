@@ -69,7 +69,7 @@ endfunction()
 
 add_m65(FREEZER  freezer.c freeze_diskchooser.c)
 add_m65(AUDIOMIX audiomix.c freeze_audiomix.c charset.c)
-add_m65(MONITOR  monitor.c freeze_monitor.c
+add_m65(MONITOR  monitor.c freeze_monitor.c disasm.c
                  fdisk_screen_monitor.c charset.c)
 add_m65(MAKEDISK makedisk.c fdisk_fat32.c charset.c)
 add_m65(ROMLOAD  romload.c freeze_romload.c charset.c)

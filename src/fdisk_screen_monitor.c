@@ -9,7 +9,8 @@
 extern unsigned char* charset;
 
 char* footer_messages[FOOTER_MAX + 1] = {
-    "MEGA65 FREEZE MONITOR V00.01 :     X - RETURN TO FREEZE MENU, M - DISPLAY MEMORY",
+    /* Exactly 80 columns: display_footer() copies the whole row unconditionally. */
+    "MEGA65 FREEZE MONITOR : X - EXIT, M - MEMORY, D - DISASSEMBLE, S - SET, R - REGS",
     "MEGA65 SPRITE EDITOR V00.01 :        1 - CLEAR, 2- DRAW ETC, H - HELP, F3 - EXIT",
     "                                                                                ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};
@@ -56,9 +57,17 @@ void write_line(const char* s, char col) {
     write_line_len(s, col, len);
 }
 
+/* Recolour one field of the line just written, for callers that colour a line
+ * piecewise rather than in one shade.  `colour` is a whole colour-RAM byte, so
+ * an attribute such as ATTRIB_REVERSE can be OR'd into it. */
+void recolour_last_line_segment(unsigned char column, unsigned char width, unsigned char colour) {
+    long colour_address =
+        COLOUR_RAM_ADDRESS + (screen_line_address - SCREEN_ADDRESS) - SCREEN_ROW_BYTES + column;
+    lfill(colour_address, colour, width);
+}
+
 void recolour_last_line(char colour) {
-    long colour_address = COLOUR_RAM_ADDRESS + (screen_line_address - SCREEN_ADDRESS) - 80;
-    lfill(colour_address, colour, 80);
+    recolour_last_line_segment(0, SCREEN_ROW_BYTES, colour);
 }
 
 void display_footer(unsigned char index) {

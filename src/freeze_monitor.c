@@ -8,6 +8,7 @@
 
 */
 
+#include "disasm.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -65,6 +66,35 @@ char output_buffer[80];
 unsigned char mon_sector[512];
 uint32_t mon_sector_num = 0xffffffffUL;
 
+/* The frozen PC, cached by show_registers() so the disassembly can mark the
+ * instruction the program was about to execute.  Held wider than the 16 bits it
+ * carries so that "not read yet" has a value no PC can collide with. */
+uint32_t frozen_program_counter = 0xffffffffUL;
+
+/* Bring the sector holding `freeze_slot_offset` into mon_sector.  SD reads
+ * dominate the cost of every command here, so the tag check guards all three
+ * callers rather than each keeping its own copy of the same test. */
+static void cache_sector(uint32_t freeze_slot_offset) {
+    if (mon_sector_num != (freeze_slot_offset >> 9)) {
+        mon_sector_num = (freeze_slot_offset >> 9);
+        sdcard_readsector(freeze_slot_start_sector + mon_sector_num);
+        lcopy((long)sector_buffer, (long)mon_sector, 512);
+    }
+}
+
+/* Fetch one byte of frozen memory.  The check is per byte because an
+ * instruction can begin in one sector and end in the next; show_memory_line()
+ * gets away with one check per line only because its runs are 16-byte aligned. */
+bool disasm_read_byte(uint32_t address, uint8_t* value) {
+    uint32_t freeze_slot_offset = address_to_freeze_slot_offset(address);
+    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+        return false;
+    }
+    cache_sector(freeze_slot_offset);
+    *value = mon_sector[freeze_slot_offset & 0x1ff];
+    return true;
+}
+
 void show_memory_line(uint32_t addr) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     unsigned char i;
@@ -82,12 +112,7 @@ void show_memory_line(uint32_t addr) {
         output_buffer[9] = '<';
         output_buffer[9 + 28] = '>';
     } else {
-        // Only fetch sector if we haven't already got it cached
-        if (mon_sector_num != (freeze_slot_offset >> 9)) {
-            mon_sector_num = (freeze_slot_offset >> 9);
-            sdcard_readsector(freeze_slot_start_sector + mon_sector_num);
-            lcopy((long)sector_buffer, (long)mon_sector, 512);
-        }
+        cache_sector(freeze_slot_offset);
         // Two spaces before character rendering of block
         output_buffer[8 + 16 * 3 + 0] = ' ';
         output_buffer[8 + 16 * 3 + 1] = ' ';
@@ -119,6 +144,65 @@ void show_memory(void) {
     }
 }
 
+/* A screenful, matching show_memory()'s sixteen lines. */
+constexpr uint8_t DISASSEMBLY_LINES = 16;
+
+/* Colour-RAM indices for the fields of a disassembled line.  Chosen to stay
+ * legible on a dark background: MONITOR never calls set_palette(), so it
+ * inherits whatever palette the frozen program left behind and no exact hue can
+ * be relied on. */
+constexpr uint8_t COLOUR_ADDRESS = 3; /* cyan */
+constexpr uint8_t COLOUR_BYTES = 12;  /* medium grey: deliberately dim */
+constexpr uint8_t COLOUR_OPERAND = 5; /* green */
+/* Indexed by DisasmMnemonicClass: plain, control flow, MEGA65-only. */
+static const unsigned char MNEMONIC_CLASS_COLOUR[] = {1, 7, 13};
+
+/* Colour the fields of the line just written.  `attribute` is OR'd into every
+ * field so a whole-line marker such as ATTRIB_REVERSE leaves no gaps; the
+ * mnemonic is coloured across its padded field for the same reason. */
+static void colour_disassembly_line(const DisassemblyLayout* layout, unsigned char attribute) {
+    unsigned char mnemonic_colour = MNEMONIC_CLASS_COLOUR[layout->mnemonic_class];
+    unsigned char operand_column = layout->mnemonic_column + DISASM_MNEMONIC_FIELD_WIDTH;
+
+    recolour_last_line_segment(0, DISASM_BYTE_COLUMN, COLOUR_ADDRESS | attribute);
+    recolour_last_line_segment(
+        DISASM_BYTE_COLUMN, layout->mnemonic_column - DISASM_BYTE_COLUMN, COLOUR_BYTES | attribute);
+    recolour_last_line_segment(
+        layout->mnemonic_column, DISASM_MNEMONIC_FIELD_WIDTH, mnemonic_colour | attribute);
+    if (layout->text_length > operand_column) {
+        recolour_last_line_segment(
+            operand_column, layout->text_length - operand_column, COLOUR_OPERAND | attribute);
+    }
+}
+
+void show_disassembly(void) {
+    char text[DISASM_TEXT_MAX];
+    DisassemblyLayout layout;
+    unsigned char line;
+
+    for (line = 0; line < DISASSEMBLY_LINES; line++) {
+        if (!disassemble_instruction(mon_address, text, &layout)) {
+            write_line("? UNMAPPED OR UNFROZEN ADDRESS  ERROR", 0);
+            recolour_last_line(2);
+            /* Step past the hole so a repeated D can walk out of it, as M does.
+             * One byte, because without a decode there is no instruction
+             * boundary to trust. */
+            mon_address++;
+            return;
+        }
+        /* The saved PC is 16 bits, so it names a CPU address whose physical
+         * bank depends on MAP and $01 state this code does not decode.  Marking
+         * only bank 0 gives up the highlight on a banked PC rather than risk
+         * reverse-videoing an unrelated line that happens to share the low 16
+         * bits -- ROM at $3FA23 and RAM at $0FA23 both match $FA23. */
+        unsigned char attribute = (mon_address == frozen_program_counter) ? ATTRIB_REVERSE : 0;
+
+        write_line_len(text, 0, layout.text_length);
+        colour_disassembly_line(&layout, attribute);
+        mon_address += layout.length;
+    }
+}
+
 void set_memory() {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(mon_address);
     unsigned char i;
@@ -128,12 +212,7 @@ void set_memory() {
         recolour_last_line(2);
         return;
     } else {
-        // Only fetch sector if we haven't already got it cached
-        if (mon_sector_num != (freeze_slot_offset >> 9)) {
-            mon_sector_num = (freeze_slot_offset >> 9);
-            sdcard_readsector(freeze_slot_start_sector + mon_sector_num);
-            lcopy((long)sector_buffer, (long)mon_sector, 512);
-        }
+        cache_sector(freeze_slot_offset);
 
         // Get position within sector
         i = 0;
@@ -254,14 +333,15 @@ void show_registers(void) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(0xFFD3640U);
     unsigned short value;
 
-    freeze_slot_offset = freeze_slot_offset >> 9L;
-
     lfill((long)output_buffer, ' ', 80);
 
+    /* Test the sentinel before shifting: 0xFFFFFFFF >> 9 is 0x7FFFFF, so a
+     * shifted value can never equal it and the guard would never fire. */
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         write_line("? FROZEN REGISTERS NOT FOUND  ERROR", 0);
         recolour_last_line(2);
     } else {
+        freeze_slot_offset = freeze_slot_offset >> 9L;
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
         // Now show registers: First the description line
@@ -275,6 +355,7 @@ void show_registers(void) {
         // PC
         value = sector_buffer[0x08] + (sector_buffer[0x09] << 8);
         format_hex(&output_buffer[REGLINE_PC], value, 4);
+        frozen_program_counter = value;
 
         // A
         value = sector_buffer[0x00];
@@ -445,8 +526,14 @@ void freeze_monitor(void) {
                     break;
                 show_memory();
                 break;
-            case 'd': // disassemble
+            case 'd':
             case 'D':
+                // Disassemble; a bare D continues from where the last one
+                // stopped, as M does.
+                if (parse_address())
+                    break;
+                show_disassembly();
+                break;
             case 'a': // assemble
             case 'A':
                 // Not implemented.

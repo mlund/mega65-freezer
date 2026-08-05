@@ -1,0 +1,14 @@
+# Configuration for the build-support scripts in tools/.  Nothing here is
+# Python at runtime -- these only generate and check the 45GS02 disassembler
+# tables -- but pinning the settings keeps `ruff format` from reflowing the
+# generated-code templates differently on someone else's defaults.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"

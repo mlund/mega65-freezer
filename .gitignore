@@ -6,3 +6,4 @@ build/
 TODO.md
 *.swp
 *.swo
+__pycache__/
