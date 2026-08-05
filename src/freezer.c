@@ -71,7 +71,6 @@ unsigned char freeze_root_warn[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
 #define DEFAULT_CHARSET "CHARSET.M65"
 #define MAIN_ROM_FILE "MEGA65.ROM"
 
-static unsigned short i;
 unsigned char rom_changed = 0;
 unsigned char not_in_root = 0;
 #ifdef WITH_TOUCH
@@ -283,6 +282,7 @@ char thumb_frame_name[][13] = {
 
 void predraw_freeze_menu(void)
 {
+  unsigned short i;
   // Clear screen, blue background, white text, like Action Replay
   POKE(0xD020U, 6);
   POKE(0xD021U, 6);
@@ -321,6 +321,7 @@ void predraw_freeze_menu(void)
 // clang-format on
 
 void copy_convert_to_screen(unsigned char* data, short offset) {
+    unsigned short i;
     offset <<= 1;
 
     for (i = 0; data[i]; i++)
@@ -336,6 +337,7 @@ void copy_convert_to_screen(unsigned char* data, short offset) {
 }
 
 void draw_freeze_menu(unsigned char part) {
+    unsigned short i;
     unsigned char x, y;
 
 #if 0
@@ -344,8 +346,7 @@ void draw_freeze_menu(unsigned char part) {
 #endif
 
     if (part & UPDATE_CHGSLOT) {
-        find_freeze_slot_start_sector(slot_number);
-        freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+        freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
     }
 
     // Update messages based on the settings we allow to be easily changed
@@ -946,11 +947,8 @@ int main(void) {
     // C65 UART, ethernet etc
 
     // check border for return codes from other helpers
-    switch (PEEK(0xD020U)) {
-        case 0x83:
-            rom_changed = 1;
-            break;
-    }
+    if (PEEK(0xD020U) == 0x83)
+        rom_changed = 1;
 
     // Bank out BASIC ROM, leave KERNAL and IO in
     POKE(0x00, 0x3F);
@@ -994,8 +992,7 @@ int main(void) {
 
     // Now find the start sector of the slot, and make a copy for safe keeping
     slot_number = 0;
-    find_freeze_slot_start_sector(slot_number);
-    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+    freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
     if (PEEK(0xD680U) & 0x10)
@@ -1285,10 +1282,8 @@ int main(void) {
                     // give visual feedback
                     sdcard_visual_feedback(1);
 
-                    find_freeze_slot_start_sector(0);
-                    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
-                    find_freeze_slot_start_sector(slot_number);
-                    dest_freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+                    freeze_slot_start_sector = read_freeze_slot_start_sector(0);
+                    dest_freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
                     // 512KB = 1024 sectors
                     // Process in 64KB blocks, so that we can do multi-sector writes
