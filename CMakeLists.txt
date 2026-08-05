@@ -17,9 +17,19 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 # the cc65 build in the parent directory; src/ holds its own copy of every
 # source.
 #
-#   cmake -DCMAKE_PREFIX_PATH=$HOME/llvm-mos -B build
+# Needs a patched llvm-mos -- see C_MCPU below for what stock clang 23 gets
+# wrong.  The patched install (compiler plus a matching SDK rebuild) lives at
+# /Users/mikael/llvm-mos-patched:
+#
+#   cmake -B build \
+#     -DCMAKE_TOOLCHAIN_FILE=/Users/mikael/llvm-mos-patched/lib/cmake/llvm-mos-sdk/llvm-mos-toolchain.cmake \
+#     -Dllvm-mos-sdk_DIR=/Users/mikael/llvm-mos-patched/lib/cmake/llvm-mos-sdk
 #   cmake --build build
 #   cmake --build build --target tidy      # also: format, format-check
+#
+# Both variables are needed: the toolchain file alone does not set
+# llvm-mos-sdk_DIR, and find_package then fails.  Nothing in git records which
+# toolchain a build used -- it lives only in the CMake cache.
 #
 # Set CPM_SOURCE_CACHE to a directory to avoid re-fetching mega65-libc.
 
@@ -36,6 +46,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # and helper.s's NMI handler is a bare rti.
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -mcpu=mos45gs02 -D__MEGA65__ -fnonreentrant")
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=mos45gs02")
+
+# This build assumes a patched llvm-mos.  Stock clang 23 miscompiles 16-bit loop
+# counters on 45GS02 with -mlto-zp >= 8: it decrements one location with DEW
+# while the loop-exit test reads another, so the bound is silently dropped and a
+# bounded loop runs past its array.  It hung MAKEDISK in sdcard_writesector's
+# write-verify, and it also affects the SDK's own libc, so a patched compiler
+# needs a rebuilt SDK to match.
+#
+# -DC_MCPU=mos6502 is the escape hatch on an unpatched compiler: no INW/DEW
+# exists there, at a cost of ~3.5KB.  Applied per target rather than to the
+# flags above, because mega65-libc's debug.c needs 65CE02 for `ldz`.  Every
+# inline asm block in our C is plain 6502, so nothing here needs the wider set.
+set(C_MCPU mos45gs02 CACHE STRING "-mcpu for our C sources (mos6502 on an unpatched compiler)")
 
 include(cmake/CPM.cmake)
 

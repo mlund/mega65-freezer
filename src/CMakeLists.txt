@@ -54,6 +54,9 @@ set(COMMON
 function(add_m65 name)
     add_executable(${name} ${ARGN} ${COMMON})
     add_dependencies(${name} version_stamp)
+    # See C_MCPU in the top-level CMakeLists.  Per target so that lowering it
+    # leaves mega65-libc alone; C only, as the ASM rule keeps mos45gs02.
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C>:-mcpu=${C_MCPU}>)
     if(LINK_LIBC)
         target_link_libraries(${name} mega65libc)
     endif()
