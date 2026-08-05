@@ -51,7 +51,7 @@ __attribute__((noinline)) void do_dma(void) {
 }
 
 __attribute__((noinline)) void lcopy(
-    long source_address, long destination_address, unsigned int count) {
+    Addr28 source_address, Addr28 destination_address, unsigned int count) {
     if (!count)
         return;
     dmalist.option_0b = 0x0b;
@@ -74,11 +74,10 @@ __attribute__((noinline)) void lcopy(
         dmalist.dest_bank |= 0x80;
 
     do_dma();
-    return;
 }
 
 __attribute__((noinline)) void lfill(
-    long destination_address, unsigned char value, unsigned int count) {
+    Addr28 destination_address, unsigned char value, unsigned int count) {
     if (!count)
         return;
     dmalist.option_0b = 0x0b;
@@ -98,7 +97,6 @@ __attribute__((noinline)) void lfill(
         dmalist.dest_bank |= 0x80;
 
     do_dma();
-    return;
 }
 
 void m65_io_enable(void) {
