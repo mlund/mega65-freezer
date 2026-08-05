@@ -1,8 +1,6 @@
 /* cc65 extensions the llvm-mos libc does not declare. */
 char* itoa(int, char*, int);
 char* utoa(unsigned, char*, int);
-char* ltoa(long, char*, int);
-char* ultoa(unsigned long, char*, int);
 
 /* PETSCII key codes from cc65's <cbm.h>, which the -t c64 build supplied.
  * mega65-libc's conio.h does not define them. */

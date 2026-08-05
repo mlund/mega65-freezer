@@ -159,25 +159,6 @@ void input_text(
     }
 }
 
-char hexchar(unsigned char v) {
-    v = v & 0xf;
-    if (v < 10)
-        return '0' + v;
-    return 0x41 + v - 10;
-}
-
-void hexout(char* m, unsigned long v, int n) {
-    if (!n)
-        return;
-    do {
-        m[n - 1] = hexchar(v);
-        v = v >> 4L;
-
-    } while (--n);
-}
-
-char msg[80];
-
 // clang-format off
 unsigned char bam_sector1[0x100] = {
   0x28, 0x02, 0x44, 0xbb, 0x39, 0x38, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -404,8 +385,7 @@ int main(void) {
 
     // Now find the start sector of the slot, and make a copy for safe keeping
     slot_number = 0;
-    find_freeze_slot_start_sector(slot_number);
-    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+    freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
     if (PEEK(0xD680U) & 0x10)

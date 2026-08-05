@@ -9,13 +9,9 @@
 const long sd_sectorbuffer = 0xffd6e00L;
 const uint16_t sd_ctl = 0xd680L;
 const uint16_t sd_addr = 0xd681L;
-const uint16_t sd_errorcode = 0xd6daL;
 
 unsigned char sdhc_card = 0;
 uint8_t hal_border_flicker = 0;
-
-// Tell utilpacker what our display name is
-const char* prop_m65u_name = "PROP.M65U.NAME=SDCARD FDISK+FORMAT UTILITY";
 
 void usleep(uint32_t micros) {
     // Sleep for desired number of micro-seconds.
@@ -74,22 +70,9 @@ void sdcard_open(void) {
 
 uint32_t write_count = 0;
 
-void sdcard_map_sector_buffer(void) {
-    m65_io_enable();
-
-    POKE(sd_ctl, 0x81);
-}
-
-void sdcard_unmap_sector_buffer(void) {
-    m65_io_enable();
-
-    POKE(sd_ctl, 0x82);
-}
-
-unsigned short timeout;
-
 void sdcard_readsector(const uint32_t sector_number) {
     char tries = 0;
+    unsigned short timeout;
 
     uint32_t sector_address = sector_number * 512;
     if (sdhc_card)
@@ -176,7 +159,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     // Copy buffer into the SD card buffer, and then execute the write job
     uint32_t sector_address;
     int i;
-    char tries = 0, result;
+    char tries = 0;
     uint16_t counter = 0;
 
     // Set address to read/write
@@ -276,9 +259,6 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         if (hal_border_flicker > 1)
             POKE(0xD020, write_count & 0x0f);
 
-        // Note result
-        result = PEEK(sd_ctl);
-
         if (!(PEEK(sd_ctl) & 0x67)) {
             write_count++;
 
@@ -357,62 +337,4 @@ void sdcard_writemultidone(void) {
     while (PEEK(sd_ctl) & 3) {
         continue;
     }
-}
-
-void sdcard_erase(const uint32_t first_sector, const uint32_t last_sector) {
-    uint32_t n;
-    clear_sector_buffer();
-
-    //  fprintf(stderr,"ERASING SECTORS %d..%d\r\n",first_sector,last_sector);
-
-#ifndef NOFAST_ERASE
-    POKE(sd_addr + 0, (first_sector >> 0) & 0xff);
-    POKE(sd_addr + 1, (first_sector >> 8) & 0xff);
-    POKE(sd_addr + 2, (first_sector >> 16) & 0xff);
-    POKE(sd_addr + 3, (first_sector >> 24) & 0xff);
-#endif
-
-    for (n = first_sector; n <= last_sector; n++) {
-
-#ifndef NOFAST_ERASE
-        // Wait for SD card to go ready
-        while (PEEK(sd_ctl) & 3)
-            continue;
-
-        if (n == first_sector) {
-            // First sector of multi-sector write
-            POKE(sd_ctl, 0x04);
-        } else
-            // All other sectors
-            POKE(sd_ctl, 0x05);
-
-        // Wait for SD card to go busy
-        while (!(PEEK(sd_ctl) & 3))
-            continue;
-
-        // Wait for SD card to go ready
-        while (PEEK(sd_ctl) & 3)
-            continue;
-
-#else
-        sdcard_writesector(n);
-#endif
-
-        // Show count-down
-        screen_decimal(screen_line_address, last_sector - n);
-        //    fprintf(stderr,"."); fflush(stderr);
-    }
-
-#ifndef NOFAST_ERASE
-    // Then say when we are done
-    POKE(sd_ctl, 0x06);
-
-    // Wait for SD card to go busy
-    while (!(PEEK(sd_ctl) & 3))
-        continue;
-
-    // Wait for SD card to go ready
-    while (PEEK(sd_ctl) & 3)
-        continue;
-#endif
 }

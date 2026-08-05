@@ -14,38 +14,6 @@
 #include <stdio.h>
 #include <string.h>
 
-unsigned char colour_table[256];
-
-void setup_menu_screen(void) {
-    POKE(0xD018U, 0x15); // upper case
-
-    // NTSC 60Hz mode for monitor compatibility?
-    //  POKE(0xD06FU, 0x80);
-
-    // Reset border widths
-    POKE(0xD05CU, 80);
-    POKE(0xD05DU, 0xC0);
-
-    // No sprites
-    POKE(0xD015U, 0x00);
-
-    // Move screen to SCREEN_ADDRESS
-    POKE(0xD018U,
-        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4));
-    POKE(0xDD00U, (PEEK(0xDD00U) & 0xfc) | 0x01);
-
-    // 16-bit text mode with full colour for chars >$FF
-    // (which we will use for showing the thumbnail)
-    POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x05);
-    POKE(0xD058U, 80);
-    POKE(0xD059U, 0); // 80 bytes per row
-
-    // Fill colour RAM with a value that won't cause problems in Super-Extended Attribute Mode
-    lfill(0xff80000U, 1, 2000);
-}
-
-unsigned short i;
-
 int main(void) {
     /* Performs the $D02F knock; without it every later write to a VIC-IV
      * register such as $D054 is silently ignored and the screen mode is

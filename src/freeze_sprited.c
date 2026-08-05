@@ -75,7 +75,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-extern int errno;
 // #define SPRITED_STANDALONE
 #define PAGE_SIZE 256
 #define LOCAL_VIC_BASE 0xD000
@@ -828,8 +827,7 @@ static void Initialize() {
 
     // --- Freezer slot setup
 
-    find_freeze_slot_start_sector(0);
-    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+    freeze_slot_start_sector = read_freeze_slot_start_sector(0);
 
     request_freeze_region_list();
 
@@ -1065,14 +1063,9 @@ static void DrawBox(PAINTFUNC pfun) {
     clearattr();
 }
 
-// clang-format off
-#pragma warn(unused-param, push, off)
-static void DrawNothing(PAINTFUNC pfun)
-{
-  return;
+static void DrawNothing(PAINTFUNC pfun) {
+    (void)pfun;
 }
-#pragma warn(unused-param, pop)
-// clang-format on
 
 void SetDrawTool(BYTE dt) {
     g_state.drawingTool = dt;
@@ -1542,22 +1535,6 @@ static void Ask(const char* question, char* outbuffer, unsigned char maxlen) {
     g_state.redrawFlags |= REDRAW_SB_COORD;
 }
 
-// clang-format off
-#pragma warn(unused-param, push, off)
-static BYTE SaveRawData(const BYTE name[16], char deviceNumber)
-{
-  return 0;
-}
-#pragma warn(unused-param, pop)
-
-#pragma warn(unused-param, push, off)
-static BYTE LoadRawData(const BYTE name[16])
-{
-  return 0;
-}
-#pragma warn(unused-param, pop)
-// clang-format on
-
 static void PrintKeyGroup(const char* list[], BYTE count, BYTE x, BYTE y) {
     register BYTE i = 0;
     gotoxy(x, y);
@@ -1575,7 +1552,7 @@ static void PrintKeyGroup(const char* list[], BYTE count, BYTE x, BYTE y) {
 
 static void ShowHelp() {
     // clang-format off
-  const char* fileKeys[] = {
+  static const char* fileKeys[] = {
     "  FILE / TXFER     ",
     "(NOT IMPL)       F5", // load
     "(NOT IMPL)     F7,R", // save raw
@@ -1585,7 +1562,7 @@ static void ShowHelp() {
     "EXIT             F3",
   };
 
-  const char* drawKeys[] = {
+  static const char* drawKeys[] = {
     "       TOOLS       ",
     "PIXEL             P",
     "LINE              L",
@@ -1595,7 +1572,7 @@ static void ShowHelp() {
     "(NOT IMPL)      S-O", // filled circle
   };
 
-  const char* colorKeys[] = {
+  static const char* colorKeys[] = {
     "       COLOR       ",
     "SELECT         0..9",
     "               A..F",
@@ -1605,7 +1582,7 @@ static void ShowHelp() {
     "SEL PAL BANK CTRL+P",
   };
 
-  const char* editKeys[] = {
+  static const char* editKeys[] = {
     "       EDIT        ",
     "SPACEBAR       DRAW",
     "DEL           ERASE",
@@ -1621,13 +1598,13 @@ static void ShowHelp() {
     "(NOT IMPL)   CTRL+V", // vert flip
   };
 
-  const char* displayKeys[] = {
+  static const char* displayKeys[] = {
     "     DISPLAY       ",
     "ASPECT RATIO  ALT+R",
     "(NOT IMPL)    ALT+D", // 25/50-line
   };
 
-  const char* tipsNtricks[] = {
+  static const char* tipsNtricks[] = {
     "   TIPS & TRICKS   ",
     "PRESS F11 TO STORE ",
     "CURRENT SPRITE     ",
