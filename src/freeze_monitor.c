@@ -99,8 +99,8 @@ void show_memory_line(uint32_t addr) {
         }
     }
     // Convert hex back to C64 screen codes
-    constexpr uint8_t hex_field_end = 8 + 16 * 3;
-    for (i = 0; i < hex_field_end; i++) {
+    constexpr uint8_t HEX_FIELD_END = 8 + 16 * 3;
+    for (i = 0; i < HEX_FIELD_END; i++) {
         if (output_buffer[i] >= 'A' && output_buffer[i] <= 'F')
             output_buffer[i] &= 0x0f;
     }
@@ -231,7 +231,7 @@ void set_memory() {
     }
 }
 
-static const char reg_desc_line[] =
+static const char REG_DESC_LINE[] =
     "PC   IRQ  NMI  A  X  Y  Z  B  SP   FLAGS    $01   MAPLO   MAPHI";
 #define REGLINE_PC 0
 #define REGLINE_IRQ 5
@@ -262,7 +262,7 @@ void show_registers(void) {
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
         // Now show registers: First the description line
-        write_line(reg_desc_line, 0);
+        write_line(REG_DESC_LINE, 0);
 
         // Now prepare the line of actual register values
 

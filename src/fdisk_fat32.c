@@ -124,7 +124,7 @@ void parse_partition_entry(const char i) {
 #define TARGET_WUKONG 0xFD
 #define TARGET_SIMULATION 0xFE
 
-struct m65_tm {
+struct M65Tm {
     unsigned char tm_sec;   /* Seconds (0-60) */
     unsigned char tm_min;   /* Minutes (0-59) */
     unsigned char tm_hour;  /* Hours (0-23) */
@@ -161,7 +161,7 @@ unsigned char unbcd(unsigned char in) {
     return bcd_work;
 }
 
-void getrtc(struct m65_tm* tm) {
+void getrtc(struct M65Tm* tm) {
     if (!tm)
         return;
 
@@ -285,7 +285,7 @@ long fat32_create_contiguous_file(
     unsigned char have_dir_slot = 0;
     unsigned long free_dir_sector_num = 0;
     unsigned short free_dir_sector_ofs = 0;
-    struct m65_tm tm;
+    struct M65Tm tm;
 
     char message[40] = "Found file: ????????.???";
 

@@ -190,11 +190,11 @@ unsigned char to_hex(unsigned char i) {
     return 0x41 + i - 10;
 }
 
-void format_disk_image(unsigned long file_sector, char* diskname, unsigned char isD65) {
+void format_disk_image(unsigned long file_sector, char* diskname, unsigned char is_d65) {
     unsigned char i;
     unsigned short s;
     unsigned short sect_count = D81_TRACKS * D81_SECTORS_PER_TRACK;
-    if (isD65)
+    if (is_d65)
         sect_count = 85 * 64;
 
     // Make sure entire image is empty
@@ -242,7 +242,7 @@ void format_disk_image(unsigned long file_sector, char* diskname, unsigned char 
     sector_buffer[0x104] = to_hex(i & 0xf);
     sector_buffer[0x105] = to_hex(i >> 4);
 
-    if (!isD65)
+    if (!is_d65)
         sdcard_writesector(file_sector + (39 * 10 * 2 + 0), 0);
     else
         sdcard_writesector(file_sector + (39 * 64 * 2 + 0), 0);
@@ -260,13 +260,13 @@ void format_disk_image(unsigned long file_sector, char* diskname, unsigned char 
     sector_buffer[0x0FA] = 40;
     sector_buffer[0x0FB] = 0xff;
 
-    if (!isD65)
+    if (!is_d65)
         sdcard_writesector(file_sector + (39 * 10 * 2 + 1), 0);
     else
         sdcard_writesector(file_sector + (39 * 64 * 2 + 1), 0);
 }
 
-void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
+void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
     char diskname[16 + 1];
     char filename[16 + 1];
     unsigned char filename_len;
@@ -285,7 +285,7 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
 
     draw_box(10, 8, 30, 14, 14, 1);
     write_text(11, 9, 14, "ENTER NAME FOR");
-    if (isD65)
+    if (is_d65)
         write_text(11, 10, 14, "HD (D65) IMAGE:");
     else
         write_text(11, 10, 14, "DD (D81) IMAGE:");
@@ -303,7 +303,7 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
 
     filename[filename_len++] = '.';
     filename[filename_len++] = 0x44;
-    if (isD65) {
+    if (is_d65) {
         filename[filename_len++] = 0x36;
         filename[filename_len++] = 0x35;
     } else {
@@ -319,7 +319,7 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
     // Actually create the file
     //  while(!ASCIIKEY) VICIV.bordercol = VICIV.bordercol+1; ASCIIKEY = 0;
     file_sector = fat32_create_contiguous_file(filename,
-        isD65 ? (85 * 64 * 2 * 512L) : (D81_TRACKS * 10L * 2 * SECTOR_SIZE),
+        is_d65 ? (85 * 64 * 2 * 512L) : (D81_TRACKS * 10L * 2 * SECTOR_SIZE),
         root_dir_sector,
         fat1_sector,
         fat2_sector);
@@ -336,7 +336,7 @@ void do_make_disk_image(unsigned char isD65, unsigned char drive_id) {
 
         // Write header, BAM and zero out directory track
         write_text(11, 10, 14, "FORMATTING IMAGE...");
-        format_disk_image(file_sector, diskname, isD65);
+        format_disk_image(file_sector, diskname, is_d65);
 
         draw_box(8, 8, 32, 14, 13, 1);
         write_text(9, 9, 13, "Created disk image");

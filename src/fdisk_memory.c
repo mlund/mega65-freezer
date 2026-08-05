@@ -10,7 +10,7 @@
 
 #include <mega65.h>
 
-struct dmagic_dmalist {
+struct DmagicDmalist {
     // Enhanced DMA options
     unsigned char option_0b;
     unsigned char option_80;
@@ -34,7 +34,7 @@ struct dmagic_dmalist {
  * drops a population as dead when the next call overwrites it, and the pending
  * job runs on the stale list.  dma_byte is the reverse: the DMAgic writes it
  * during lpeek(). */
-volatile struct dmagic_dmalist dmalist;
+volatile struct DmagicDmalist dmalist;
 volatile unsigned char dma_byte;
 
 __attribute__((noinline)) void do_dma(void) {

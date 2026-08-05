@@ -169,7 +169,7 @@ void draw_advanced_mixer(void) {
 
 // clang-format off
 // Decimal 0..79 as text, indexed by the dB value.
-static const char* const db_text[80] = {
+static const char* const DB_TEXT[80] = {
   "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
   "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
   "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
@@ -179,7 +179,7 @@ static const char* const db_text[80] = {
   "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
   "70", "71", "72", "73", "74", "75", "76", "77", "78", "79" };
 
-static const unsigned int minus_db_table[256] = {
+static const unsigned int MINUS_DB_TABLE[256] = {
   65535L, 52026L, 41303L, 32789L, 26031, 20665, 16406, 13024,
   10339, 8208, 6516, 5173, 4107, 3260, 2588, 2054, 
   1631, 1295, 1028, 816, 648, 514, 408, 324,
@@ -218,7 +218,7 @@ unsigned char db = 0;
 
 void val_to_db(unsigned int val) {
     db = 0;
-    while (val < minus_db_table[db])
+    while (val < MINUS_DB_TABLE[db])
         db++;
 }
 
@@ -262,8 +262,8 @@ void draw_db_bar(unsigned char line, unsigned int val) {
         }
         POKE(bar_addr, '-');
         i++;
-        for (; db_text[db][i - 1]; i++)
-            POKE(bar_addr + i, db_text[db][i - 1]);
+        for (; DB_TEXT[db][i - 1]; i++)
+            POKE(bar_addr + i, DB_TEXT[db][i - 1]);
         POKE(bar_addr + i, 'D');
         i++;
         POKE(bar_addr + i, 'B');
@@ -275,7 +275,7 @@ void draw_db_bar(unsigned char line, unsigned int val) {
 
 uint16_t v, v2;
 
-void set_amplifier(unsigned char leftRight, unsigned short v) {
+void set_amplifier(unsigned char left_right, unsigned short v) {
     /*
       Map 16-bit unsigned volume level to amplifier level.
       This is not super simple, as amplifier value $00 = +24dB,
@@ -295,7 +295,7 @@ void set_amplifier(unsigned char leftRight, unsigned short v) {
     // This does not work, disabled!
 
     // avoid compiler warning because of disabled code
-    if (leftRight == v)
+    if (left_right == v)
         return;
 
 #if 0
@@ -361,7 +361,7 @@ void change_db(unsigned char row, unsigned char change) {
         if (db)
             db--;
     }
-    v = minus_db_table[db];
+    v = MINUS_DB_TABLE[db];
     audioxbar_setcoefficient(c + 0, v & 0xff);
     audioxbar_setcoefficient(c + 1, v >> 8);
     // change LFT/RGT (audio jack) to the same value in simple mixer!
@@ -406,10 +406,10 @@ void stereo_toggle(void) {
     v = audioxbar_getcoefficient(0xc0);
     v2 = audioxbar_getcoefficient(0xc2);
     if (v == v2) {
-        v = minus_db_table[4];
-        v2 = minus_db_table[8];
+        v = MINUS_DB_TABLE[4];
+        v2 = MINUS_DB_TABLE[8];
     } else {
-        v = v2 = minus_db_table[6];
+        v = v2 = MINUS_DB_TABLE[6];
     }
 
     // Make stereo with 12dB difference between left and right
@@ -555,7 +555,7 @@ unsigned char frames;
 unsigned char note;
 unsigned char sid_num;
 unsigned int sid_addr;
-static const unsigned int notes[5] = {5001, 5613, 4455, 2227, 3338};
+static const unsigned int NOTES[5] = {5001, 5613, 4455, 2227, 3338};
 
 void test_audio(unsigned char advanced_view) {
     /*
@@ -585,8 +585,8 @@ void test_audio(unsigned char advanced_view) {
         sid_addr = 0xd400 + (0x20 * sid_num);
 
         // Play note
-        POKE(sid_addr + 0, notes[note] & 0xff);
-        POKE(sid_addr + 1, notes[note] >> 8);
+        POKE(sid_addr + 0, NOTES[note] & 0xff);
+        POKE(sid_addr + 1, NOTES[note] >> 8);
         POKE(sid_addr + 4, 0x10);
         POKE(sid_addr + 5, 0x0c);
         POKE(sid_addr + 6, 0x00);

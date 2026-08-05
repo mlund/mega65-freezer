@@ -37,7 +37,7 @@ void format_hex(char* out, const long value, const char columns) {
         out[i] = dec[i + 8 - columns];
 }
 
-static const unsigned char screen_decimal_digits[16][5] = {{0, 0, 0, 0, 1},
+static const unsigned char SCREEN_DECIMAL_DIGITS[16][5] = {{0, 0, 0, 0, 1},
     {0, 0, 0, 0, 2},
     {0, 0, 0, 0, 4},
     {0, 0, 0, 0, 8},
@@ -70,7 +70,7 @@ void screen_decimal(unsigned int addr, unsigned int v) {
         if (v & 1) {
             carry = 0;
             for (j = 4; j < 128; j--) {
-                temp = digits[j] + screen_decimal_digits[ii][j] + carry;
+                temp = digits[j] + SCREEN_DECIMAL_DIGITS[ii][j] + carry;
                 if (temp > 9) {
                     temp -= 10;
                     carry = 1;

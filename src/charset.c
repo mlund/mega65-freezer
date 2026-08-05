@@ -4,10 +4,10 @@
  * #embed (C23) resolves it relative to this file, so no assembly stub is
  * needed just to reach .incbin. */
 
-static const unsigned char charset_data[] = {
+static const unsigned char CHARSET_DATA[] = {
 #embed "ascii8x8.bin"
 };
 
 /* Non-const to match the extern declaration in fdisk_screen_monitor.c; the
  * data is only ever read, and lcopy()'d to CHARSET_ADDRESS. */
-unsigned char* charset = (unsigned char*)charset_data;
+unsigned char* charset = (unsigned char*)CHARSET_DATA;

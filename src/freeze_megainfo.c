@@ -16,7 +16,7 @@
  * Constants
  */
 // clang-format off
-static char SDessentials[][13] = {
+static char s_dessentials[][13] = {
   "FREEZER.M65",
   "ETHLOAD.M65",
   "MEGAINFO.M65",
@@ -34,7 +34,8 @@ static char SDessentials[][13] = {
  */
 #define BUFFER_LENGTH 254
 #define BUFFER_COLOUR 255
-static char buffer[BUFFER_LENGTH + 2], tempstr32[32], isNTSC = 0, hasRTC = 0, m65model, m65submodel;
+static char buffer[BUFFER_LENGTH + 2], tempstr32[32], is_ntsc = 0, has_rtc = 0, m65model,
+                                                      m65submodel;
 static unsigned char code_buffer[512], ymd[3];
 
 /* Bit 8 of colour requests the reverse-video attribute. */
@@ -99,14 +100,14 @@ char* format_mega_model() {
         case 0x01:
             return "MEGA65 R1";
         case 0x02:
-            hasRTC = 1;
+            has_rtc = 1;
             return "MEGA65 R2";
         case 0x03:
         case 0x04:
         case 0x05:
         case 0x06:
             // format new boards with model/submodel scheme
-            hasRTC = 1;
+            has_rtc = 1;
             strncpy(tempstr32, "MEGA65 R3 ", 31);
             tempstr32[8] = 0x30 + m65model;
             tempstr32[9] = m65submodel ? 0x40 + m65submodel : 32;
@@ -464,7 +465,7 @@ unsigned char get_rtc_stats(unsigned char reinit) {
 
     // fetch external RTC state
     if (no_extrtc || lpeek(0xffd7400) == 0xff) { // external not installed
-        if (hasRTC)
+        if (has_rtc)
             rtc_state = 1;
         else
             rtc_state = 0;
@@ -622,7 +623,7 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                 if (rtc_ticks > 2) {
                     rtc_ticking = 1;
                     if (rtc_diff > 1) {
-                        if (no_extrtc && isNTSC)
+                        if (no_extrtc && is_ntsc)
                             strcpy(buffer, "SLOW TICK, SLOW CIA TOD!");
                         else {
                             strcpy(buffer, "SLOW TICK               ");
@@ -688,7 +689,7 @@ void display_rtc_debug(unsigned char x, unsigned char y, unsigned char colour, u
     }
     write_text(x, y, colour, buffer);
     if (mode > 0) {
-        if (isNTSC)
+        if (is_ntsc)
             write_text(strlen(buffer) + 1, y, colour, "NTSC");
         else
             write_text(strlen(buffer) + 1, y, colour, "PAL ");
@@ -720,7 +721,7 @@ void draw_screen(void) {
     write_text(0, 3, 1, "MEGA65 MODEL:");
     write_text(15, 3, 7, format_mega_model());
     write_text(40, 3, 1, "SCREEN MODE:");
-    if (isNTSC)
+    if (is_ntsc)
         write_text(54, 3, 7, "NTSC");
     else
         write_text(54, 3, 7, "PAL");
@@ -776,9 +777,9 @@ void draw_screen(void) {
     // Utility versions (need to load file to parse...)
     row = 12;
     col = 0;
-    for (i = 0; SDessentials[i][0] != 0; i++) {
-        fail = read_file_from_sdcard(SDessentials[i], 0x40000L);
-        strcpy(buffer, SDessentials[i]);
+    for (i = 0; s_dessentials[i][0] != 0; i++) {
+        fail = read_file_from_sdcard(s_dessentials[i], 0x40000L);
+        strcpy(buffer, s_dessentials[i]);
         strcat(buffer, ":");
         write_text(col, row, 1, buffer);
         if (fail)
@@ -802,9 +803,9 @@ void draw_screen(void) {
  * initialize basic structures and screen
  */
 void init_megainfo() {
-    isNTSC = (lpeek(0xFFD306fL) & 0x80) == 0x80;
+    is_ntsc = (lpeek(0xFFD306fL) & 0x80) == 0x80;
     // fix TOD frequency
-    if (isNTSC)
+    if (is_ntsc)
         lpoke(0xffd3c0el, lpeek(0xffd3c0el) & 0x7f);
     else // is PAL, set 50Hz bit
         lpoke(0xffd3c0el, lpeek(0xffd3c0el) | 0x80);
@@ -817,7 +818,7 @@ void init_megainfo() {
  * do_megainfo
  */
 void do_megainfo() {
-    unsigned char x, rtcDEBUG = 0;
+    unsigned char x, rtc_debug = 0;
 
     init_megainfo();
 
@@ -832,7 +833,7 @@ void do_megainfo() {
         // update clocks
         if (get_rtc_stats(0)) {
             display_rtc_status(54, 5);
-            display_rtc_debug(0, 24, 12, rtcDEBUG);
+            display_rtc_debug(0, 24, 12, rtc_debug);
         }
 
         if (x == 0)
@@ -841,8 +842,8 @@ void do_megainfo() {
 
         switch (x) {
             case 0xF1: // F1 - Toggle DEBUG
-                rtcDEBUG = 1 - rtcDEBUG;
-                display_rtc_debug(0, 24, 12, rtcDEBUG);
+                rtc_debug = 1 - rtc_debug;
+                display_rtc_debug(0, 24, 12, rtc_debug);
                 break;
             case 0xF5: // F5 - REFRESH
                 init_megainfo();
