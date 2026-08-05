@@ -11,8 +11,6 @@ extern unsigned char* charset;
 char* footer_messages[FOOTER_MAX + 1] = {
     /* Exactly 80 columns: display_footer() copies the whole row unconditionally. */
     "MEGA65 FREEZE MONITOR : E(X)IT, (M)EMORY, (D)ISASSEMBLE, (S)ET, (R)EGS          ",
-    "MEGA65 SPRITE EDITOR V00.01 :        1 - CLEAR, 2- DRAW ETC, H - HELP, F3 - EXIT",
-    "                                                                                ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};
 
 char stemp[80];
