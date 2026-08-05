@@ -5,7 +5,6 @@
 #include "fdisk_screen.h"
 #include "freezer.h"
 #include "freezer_common.h"
-#include "infohelper.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -279,25 +278,25 @@ char* format_rom_version(void) {
  * fetches and formats hyppo and hdos version as a string '?.? / ?.?'
  */
 char* format_hyppo_version(void) {
-    unsigned char hyppo_version[4] = {0xff, 0xff, 0xff, 0xff};
+    struct hyppo_version v = {0xff, 0xff, 0xff, 0xff};
 
     // hypervisor call, external
-    hyppo_getversion(hyppo_version);
+    gethyppoversion(&v);
 
-    if (hyppo_version[0] == hyppo_version[1] && hyppo_version[1] == hyppo_version[2] &&
-        hyppo_version[2] == hyppo_version[3] && hyppo_version[0] == 0xff)
+    if (v.hyppo_major == 0xff && v.hyppo_minor == 0xff && v.hdos_major == 0xff &&
+        v.hdos_minor == 0xff)
         strcpy(buffer, "?.? / ?.?");
     else {
-        itoa(hyppo_version[0], tempstr32, 10);
+        itoa(v.hyppo_major, tempstr32, 10);
         strcpy(buffer, tempstr32);
         strcat(buffer, ".");
-        itoa(hyppo_version[1], tempstr32, 10);
+        itoa(v.hyppo_minor, tempstr32, 10);
         strcat(buffer, tempstr32);
         strcat(buffer, " / ");
-        itoa(hyppo_version[2], tempstr32, 10);
+        itoa(v.hdos_major, tempstr32, 10);
         strcat(buffer, tempstr32);
         strcat(buffer, ".");
-        itoa(hyppo_version[3], tempstr32, 10);
+        itoa(v.hdos_minor, tempstr32, 10);
         strcat(buffer, tempstr32);
     }
 

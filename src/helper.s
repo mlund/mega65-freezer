@@ -51,8 +51,8 @@ hdos_new_attach:
 	.global mega65_dos_init
 mega65_dos_init:
 	;; this checks hyppo dos version for dos_attach
-	lda #$00
-	sta HTRAP_DOS		; getversion
+	lda #HYPPO_GETVERSION
+	sta HTRAP_DOS
 	clv
 	cpy #HDOS_MAJOR_MIN
 	bcc .Ldi_old

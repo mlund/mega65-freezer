@@ -12,19 +12,6 @@ const uint16_t sd_addr = 0xd681L;
 unsigned char sdhc_card = 0;
 uint8_t hal_border_flicker = 0;
 
-void usleep(uint32_t micros) {
-    // Sleep for desired number of micro-seconds.
-    // Each VIC-II raster line is ~64 microseconds
-    // this is not totally accurate, but is a reasonable approach
-    while (micros > 64) {
-        uint8_t b = PEEK(0xD012);
-        while (PEEK(0xD012) == b)
-            continue;
-        micros -= 64;
-    }
-    return;
-}
-
 /*
  * sdcard_visual_feedback(do_flicker)
  *
