@@ -44,14 +44,6 @@ CPMAddPackage(
 
 set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Re-stamp the version when HEAD moves, as the cc65 Makefile did.
-execute_process(COMMAND git rev-parse --git-path HEAD
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                OUTPUT_VARIABLE GIT_HEAD OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-if(GIT_HEAD AND NOT IS_ABSOLUTE ${GIT_HEAD})
-    set(GIT_HEAD ${CMAKE_CURRENT_SOURCE_DIR}/${GIT_HEAD})
-endif()
-
 # OFF does not link: FREEZER needs the hyppo dirent layer, SPRITED needs conio
 # and mouse.  The option is global; the dependency is per-target.
 option(LINK_LIBC "Link mega65-libc" ON)

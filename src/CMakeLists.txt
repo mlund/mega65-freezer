@@ -1,11 +1,16 @@
-# version.c carries the git describe string.
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/version.c
+# version.c carries the git describe string.  Regenerated on every build:
+# .git/HEAD is a symref, so committing on a branch never touches it, and no
+# other single path tracks a commit across packed refs, detached HEAD and
+# worktrees.  version.cmake rewrites the file only when the stamp changes, so
+# this costs a relink only when it actually moved.
+add_custom_target(version_stamp
     COMMAND ${CMAKE_COMMAND} -DOUT=${CMAKE_CURRENT_SOURCE_DIR}/version.c
             -DREPO=${CMAKE_SOURCE_DIR}
             -P ${CMAKE_SOURCE_DIR}/cmake/version.cmake
-    DEPENDS ${CMAKE_SOURCE_DIR}/gitversion.sh ${GIT_HEAD}
+    BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/version.c
+    COMMENT "Stamping version"
 )
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/version.c PROPERTIES GENERATED TRUE)
 
 # Targets are defined here; the parent CMakeLists handles project setup and
 # the mega65-libc dependency.
@@ -40,6 +45,7 @@ set(COMMON
 
 function(add_m65 name)
     add_executable(${name} ${ARGN} ${COMMON})
+    add_dependencies(${name} version_stamp)
     if(LINK_LIBC)
         target_link_libraries(${name} mega65libc)
     endif()

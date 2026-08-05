@@ -24,7 +24,10 @@ string(TOUPPER "${v}" v)
 # reaches _start by falling through it, scribbling over zero page on the way.
 # Emit a real trampoline so $080d stays a valid entry point whatever the
 # version string happens to spell.
-file(WRITE "${OUT}"
+file(WRITE "${OUT}.tmp"
      "__asm__(\".section .entrytramp,\\\"axR\\\",@progbits\\n\"\n"
      "        \"jmp _start\\n\");\n"
      "__attribute__((used, retain, section(\".version\"))) const char version[] = \"V:${v}\";\n")
+
+execute_process(COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${OUT}.tmp" "${OUT}")
+file(REMOVE "${OUT}.tmp")
