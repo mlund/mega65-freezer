@@ -1,6 +1,7 @@
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
+#include "mega65_regs.h"
 
 #include <mega65.h>
 #include <stdio.h>
@@ -289,17 +290,7 @@ long fat32_create_contiguous_file(
 
     char message[40] = "Found file: ????????.???";
 
-    // The MEGA65's hardware divider gives whole and fractional parts at once,
-    // so the round-up needs no second division.  DIVBUSY must be polled --
-    // unlike the multiplier, the divider takes up to 20 cycles.
-    MATH.multina32 = size;
-    MATH.multinb32 = (uint32_t)sectors_per_cluster << 9;
-    __asm__ volatile("" ::: "memory");
-    while (MATHBUSY & 0x80)
-        continue;
-    clusters = MATH.divout_whole32;
-    if (MATH.divout_fract32)
-        clusters++;
+    clusters = hw_div16_ceil(size, (uint32_t)sectors_per_cluster << 9);
 
     // Look for a free directory slot.
     // Also complain if the file already exists

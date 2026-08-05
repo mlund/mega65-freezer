@@ -14,6 +14,7 @@
 #include "fdisk_screen.h"
 #include "fdisk_screen_monitor.h"
 #include "freezer.h"
+#include "mega65_regs.h"
 
 #include <mega65.h>
 #include <stdio.h>

@@ -28,9 +28,9 @@ SECTIONS {
 } INSERT AFTER .basic_header
 
 /* The loader jumps here blind, so a moved .entrytramp means it executes
- * whatever data took its place.  Must match PROGRAM_ENTRY in mega65.inc. */
+ * whatever data took its place.  Must match PROGRAM_ENTRY in helper.h. */
 ASSERT(ADDR(.entrytramp) == 0x080d,
-    "entry trampoline moved: loader entry is fixed, see PROGRAM_ENTRY in mega65.inc")
+    "entry trampoline moved: loader entry is fixed, see PROGRAM_ENTRY in helper.h")
 
 __stack = 0xd000;
 

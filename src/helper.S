@@ -8,7 +8,7 @@
 ;;; as (zp),Z, so a stray Z silently offsets every compiler-generated pointer
 ;;; dereference, with no diagnostic and no fault at the offending site.
 
-#include "mega65.inc"
+#include "helper.h"
 
 	.zeropage __rc2, __rc3, __rc4, __rc5
 

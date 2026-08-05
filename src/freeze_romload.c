@@ -4,6 +4,14 @@
 #include "fdisk_screen.h"
 #include "freezer.h"
 #include "freezer_common.h"
+#include "mega65_regs.h"
+
+// Same listing buffer and 64-byte stride as the disk chooser: at most
+// 0xffff/64 = 1023 entries, and 1023 << 6 = 65472 fits an unsigned 16-bit
+// value.  file_count and selection_number are short, so the plain product
+// overflowed *signed* int at entry 512.
+#define DIR_NAME_BUF 0x40000L
+#define DIR_ENTRY_INDEX(n) ((uint16_t)(n) << 6)
 
 #include <mega65.h>
 #include <stdio.h>
@@ -241,12 +249,14 @@ void scan_directory(void) {
                     dir_pos = last_dir + 1;
                 if (file_count && dir_pos != file_count) {
                     for (i = file_count - 1; i >= dir_pos; i--)
-                        lcopy(0x40000L + (i * 64), 0x40040L + (i * 64), 64); // can't reverse copy!
+                        lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(i),
+                            DIR_NAME_BUF + 0x40 + DIR_ENTRY_INDEX(i),
+                            64); // can't reverse copy!
                 }
-                lfill(0x40000L + (dir_pos * 64), ' ', 64);
-                lcopy((long)&dirent->d_name[0], 0x40000L + 1 + (dir_pos * 64), x);
+                lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(dir_pos), ' ', 64);
+                lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + 1 + DIR_ENTRY_INDEX(dir_pos), x);
                 // Put / at the start of directory names to make them obviously different
-                lpoke(0x40000L + (dir_pos * 64), '/');
+                lpoke(DIR_NAME_BUF + DIR_ENTRY_INDEX(dir_pos), '/');
                 last_dir++;
                 file_count++;
             }
@@ -262,8 +272,8 @@ void scan_directory(void) {
                 (!strncmp(
                     &dirent->d_name[x - 4], ".tcr", 4)))) { // 8x16 Tall ChaRacter Set FONT files
             // File is a ROM or a CHaRset
-            lfill(0x40000L + (file_count * 64), ' ', 64);
-            lcopy((long)&dirent->d_name[0], 0x40000L + (file_count * 64), x);
+            lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), ' ', 64);
+            lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), x);
             file_count++;
         }
 
@@ -342,7 +352,9 @@ unsigned char freeze_load_romarea(void) {
             case 0x0d:
             case 0x21: // Return = select this file.
                 // Copy name out
-                lcopy(0x40000L + (selection_number * 64), (unsigned long)rom_name_return, 32);
+                lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number),
+                    (unsigned long)rom_name_return,
+                    32);
                 // Then null terminate it
                 for (x = 31; x; x--)
                     if (rom_name_return[x] == ' ') {

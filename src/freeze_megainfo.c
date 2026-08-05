@@ -7,6 +7,7 @@
 #include "fdisk_screen.h"
 #include "freezer.h"
 #include "freezer_common.h"
+#include "mega65_regs.h"
 
 #include <stdio.h>
 #include <stdlib.h>

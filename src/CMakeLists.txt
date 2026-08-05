@@ -26,7 +26,7 @@ add_compile_options(
     # store through a null pointer rather than undefined behaviour.
     -fno-delete-null-pointer-checks
 )
-# include_directories() also feeds the ASM rule, so helper.S finds mega65.inc
+# include_directories() also feeds the ASM rule, so helper.S finds helper.h
 # here too -- no separate CMAKE_ASM_FLAGS entry needed.
 # The SDK's MEGA65 register structs (VICIV, CIA, SID, PALETTE).  Headers only:
 # the platform stays c64, because the mega65 platform emits a BASIC 65 stub

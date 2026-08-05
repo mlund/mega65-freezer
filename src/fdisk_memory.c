@@ -6,7 +6,7 @@
 #include "fdisk_memory.h"
 
 #include "fdisk_screen.h"
-#include "mega65.inc"
+#include "mega65_regs.h"
 
 #include <mega65.h>
 

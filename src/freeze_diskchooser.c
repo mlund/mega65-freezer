@@ -21,6 +21,7 @@
 #include "fdisk_screen.h"
 #include "freezer.h"
 #include "freezer_common.h"
+#include "mega65_regs.h"
 
 // The directory listing is built at $40000, one 64-byte name per entry.
 // DIR_ENTRY_INDEX widens before shifting, so an index past 511 cannot overflow

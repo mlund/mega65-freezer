@@ -2,6 +2,7 @@
 
 #include "fdisk_memory.h"
 #include "freezer.h"
+#include "mega65_regs.h"
 
 #include <mega65.h>
 #include <string.h>
