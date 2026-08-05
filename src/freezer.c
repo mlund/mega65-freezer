@@ -1002,7 +1002,7 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (SD_COMMAND & SD_STATUS_SDHC)
+    if (SD_STATUS & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;

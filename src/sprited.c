@@ -54,7 +54,7 @@ int main(void) {
     // freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
 
     // SD or SDHC card?
-    if (SD_COMMAND & SD_STATUS_SDHC)
+    if (SD_STATUS & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;

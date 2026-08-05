@@ -33,7 +33,7 @@ void setup_menu_screen(void) {
     CIA2.pra = (CIA2.pra & 0xfc) | 0x01;
 
     VICIV.ctrlc = VICIV.ctrlc & 0xf8; // turn off CHR16, FCLRLO/HI
-    VICIV.linestep = 80;              // $D058-$D059, bytes per row
+    VICIV.linestep = SCREEN_ROW_BYTES;
 
     // 80-columns mode
     VICIV.ctrlb = 0xE0;
@@ -76,7 +76,7 @@ int main(void) {
     set_palette();
 
     // SD or SDHC card?
-    if (SD_COMMAND & SD_STATUS_SDHC)
+    if (SD_STATUS & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;

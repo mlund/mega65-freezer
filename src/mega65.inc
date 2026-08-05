@@ -66,14 +66,23 @@
 #define F011_COMMAND             MMIO8(0xD081)
 #define F011_STATUS              MMIO8(0xD082)  // BUSY is bit 7
 #define F011_DATA                MMIO8(0xD087)  // sector byte port
-#define F011_CMD_SPINUP          0x20
+#define F011_CMD_SPINUP          0x20  // guide: write to COMMAND, then poll BUSY
+#define F011_STATUS_BUSY         0x80  // guide: bit 7 of STATUS
+// The rest are read off this program's own usage, not the user guide, which
+// documents only SPINUP and BUSY.  Treat them as less certain.
 #define F011_CMD_READ_SECTOR     0x41
-#define F011_STATUS_BUSY         0x80
+#define F011_CMD_STEP            0x10  // steps the head one track
+#define F011_CMD_SEEK            0x18  // seeks to the requested track
+#define F011_CTRL_MOTOR_LED      0x60  // motor and drive LED on; OR in the drive id
+#define F011_STATUS_AT_TRACK0    0x01
+#define F011_STATUS_READ_ERROR   0x18  // sector read failed
 
 // SD controller and touch panel.
-#define SD_COMMAND               MMIO8(0xD680)  // also reads status
+#define SD_COMMAND               MMIO8(0xD680)
+#define SD_STATUS                MMIO8(0xD680)  // same register; reads status
 #define SD_STATUS_SDHC           0x10
-#define TOUCH_EVENT              MMIO8(0xD6B0)  // EV1/EV2 validity bits
+#define TOUCH_STATUS             MMIO8(0xD6B0)
+#define TOUCH_STATUS_EV1_VALID   0x01
 
 // Keyboard event queue: reads the top event as ASCII, 0x00 when empty;
 // assigning any value dequeues.  See the user guide, "Keyboard".

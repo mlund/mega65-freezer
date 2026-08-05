@@ -39,13 +39,13 @@ void write_line_len(const char* s, char col, char length) {
 
 void write_line_raw(char* s, char col, char length) {
     lcopy((long)&s[0], screen_line_address + col, length);
-    screen_line_address += 80;
+    screen_line_address += SCREEN_ROW_BYTES;
     if ((screen_line_address - SCREEN_ADDRESS) >= (24 * SCREEN_ROW_BYTES)) {
-        screen_line_address -= 80;
-        lcopy(SCREEN_ADDRESS + 80, SCREEN_ADDRESS, 23 * SCREEN_ROW_BYTES);
-        lcopy(COLOUR_RAM_ADDRESS + 80, COLOUR_RAM_ADDRESS, 23 * SCREEN_ROW_BYTES);
-        lfill(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES, ' ', 80);
-        lfill(COLOUR_RAM_ADDRESS + 23 * SCREEN_ROW_BYTES, 1, 80);
+        screen_line_address -= SCREEN_ROW_BYTES;
+        lcopy(SCREEN_ADDRESS + SCREEN_ROW_BYTES, SCREEN_ADDRESS, 23 * SCREEN_ROW_BYTES);
+        lcopy(COLOUR_RAM_ADDRESS + SCREEN_ROW_BYTES, COLOUR_RAM_ADDRESS, 23 * SCREEN_ROW_BYTES);
+        lfill(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES, ' ', SCREEN_ROW_BYTES);
+        lfill(COLOUR_RAM_ADDRESS + 23 * SCREEN_ROW_BYTES, 1, SCREEN_ROW_BYTES);
     }
 }
 
@@ -162,7 +162,7 @@ char read_line(char* buffer, unsigned char maxlen) {
         ASCIIKEY = 0;
 
     while (len < maxlen) {
-        c = ASCIIKEY; // read char
+        c = ASCIIKEY;
 
         // Show cursor
         set_attr(len, 0xf, reverse);

@@ -168,7 +168,8 @@ void draw_advanced_mixer(void) {
 }
 
 // clang-format off
-static const char* const numbers[80] = {
+// Decimal 0..79 as text, indexed by the dB value.
+static const char* const db_text[80] = {
   "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
   "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
   "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
@@ -261,8 +262,8 @@ void draw_db_bar(unsigned char line, unsigned int val) {
         }
         POKE(bar_addr, '-');
         i++;
-        for (; numbers[db][i - 1]; i++)
-            POKE(bar_addr + i, numbers[db][i - 1]);
+        for (; db_text[db][i - 1]; i++)
+            POKE(bar_addr + i, db_text[db][i - 1]);
         POKE(bar_addr + i, 'D');
         i++;
         POKE(bar_addr + i, 'B');
@@ -456,8 +457,8 @@ void stereo_toggle(void) {
     }
 }
 
-unsigned char db_bar_highlight[80];
-unsigned char db_bar_lowlight[80];
+unsigned char db_bar_highlight[SCREEN_ROW_BYTES];
+unsigned char db_bar_lowlight[SCREEN_ROW_BYTES];
 
 void draw_simple_mixer(void) {
     // Update the volume bars and dB levels
@@ -537,11 +538,15 @@ void draw_simple_mixer(void) {
     for (i = 6; i < 21; i++) {
         if (i == select_column) {
             // Highligh colouring
-            lcopy((long)db_bar_highlight, COLOUR_RAM_ADDRESS + i * SCREEN_ROW_BYTES, 80);
+            lcopy((long)db_bar_highlight,
+                COLOUR_RAM_ADDRESS + i * SCREEN_ROW_BYTES,
+                SCREEN_ROW_BYTES);
         } else {
             // Normal colouring
             if (i < 12 || i > 14)
-                lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + i * SCREEN_ROW_BYTES, 80);
+                lcopy((long)db_bar_lowlight,
+                    COLOUR_RAM_ADDRESS + i * SCREEN_ROW_BYTES,
+                    SCREEN_ROW_BYTES);
         }
     }
 }
@@ -593,22 +598,22 @@ void test_audio(unsigned char advanced_view) {
                 lpoke(0xff80001L + i, lpeek(0xff80001L + i) & 0x0f);
             switch (sid_num) {
                 case 0:
-                    for (i = 0; i < 80; i += 2)
+                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2)
                         lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x20);
                     break;
                 case 1:
-                    for (i = 0; i < 80; i += 2)
+                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2)
                         lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x60);
                     break;
                 case 2:
-                    for (i = 0; i < 80; i += 2)
+                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2)
                         lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x20);
                     break;
                 case 3:
-                    for (i = 0; i < 80; i += 2)
+                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2)
                         lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x60);
                     break;

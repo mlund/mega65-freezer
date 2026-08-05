@@ -35,7 +35,7 @@ void setup_menu_screen(void) {
     // 16-bit text mode with full colour for chars >$FF
     // (which we will use for showing the thumbnail)
     VICIV.ctrlc = (VICIV.ctrlc & 0xa8) | 0x05;
-    VICIV.linestep = 80; // $D058-$D059, bytes per row
+    VICIV.linestep = SCREEN_ROW_BYTES;
 
     // Fill colour RAM with a value that won't cause problems in Super-Extended Attribute Mode
     lfill(0xff80000U, 1, SCREEN_BYTES);
@@ -79,7 +79,7 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (SD_COMMAND & SD_STATUS_SDHC)
+    if (SD_STATUS & SD_STATUS_SDHC)
         sdhc_card = 1;
     else
         sdhc_card = 0;

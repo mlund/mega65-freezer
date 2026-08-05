@@ -247,7 +247,7 @@ int read_sector_with_cancel(void) {
             return 0;
         }
     }
-    F011_COMMAND = F011_CMD_READ_SECTOR; // Read sector
+    F011_COMMAND = F011_CMD_READ_SECTOR;
     while (F011_STATUS & F011_STATUS_BUSY) {
         // Exit if a key has been pressed
         if (ASCIIKEY) {
@@ -255,7 +255,7 @@ int read_sector_with_cancel(void) {
             return 0;
         }
     }
-    if (F011_STATUS & 0x18)
+    if (F011_STATUS & F011_STATUS_READ_ERROR)
         return 0; // abort if the sector read failed
 
     return 1;
@@ -318,8 +318,8 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     // Mounted disk, so now get the directory.
 
     // Read T40 S1 (sectors begin at 1, not 0)
-    F011_CONTROL = 0x60 | drive_id; // motor and LED on, and select correct drive
-    F011_COMMAND = F011_CMD_SPINUP; // Wait for motor spin up
+    F011_CONTROL = F011_CTRL_MOTOR_LED | drive_id;
+    F011_COMMAND = F011_CMD_SPINUP;
 
     if (!read_sector_with_cancel())
         goto exit_with_motor_off;
@@ -753,18 +753,18 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                         // Mount succeeded, now seek to track 0 to make sure DOS
                         // knows where we are, and to make sure the drive head is
                         // sitting properly.
-                        F011_CONTROL = 0x60 | drive_id; // motor and LED on
-                        F011_COMMAND = F011_CMD_SPINUP; // Wait for motor spin up
+                        F011_CONTROL = F011_CTRL_MOTOR_LED | drive_id;
+                        F011_COMMAND = F011_CMD_SPINUP;
 
-                        while (!(F011_STATUS & 0x01)) {
-                            F011_COMMAND = 0x10;
+                        while (!(F011_STATUS & F011_STATUS_AT_TRACK0)) {
+                            F011_COMMAND = F011_CMD_STEP;
                             usleep(7000);
                         }
                         // Now check the contents of $D084 to find out the most recently
                         // requested track, and seek the head to that track.
                         x = freeze_peek(0xFFD3084); // Get last requested track by frozen programme
                         while (x) {
-                            F011_COMMAND = 0x18;
+                            F011_COMMAND = F011_CMD_SEEK;
                             while (F011_STATUS & F011_STATUS_BUSY)
                                 if (hal_border_flicker > 1)
                                     VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
