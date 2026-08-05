@@ -206,6 +206,11 @@ void show_memory(void) {
     }
 }
 
+static void report_error(const char* message) {
+    write_line(message, 0);
+    recolour_last_line(2);
+}
+
 /* A screenful, matching show_memory()'s sixteen lines. */
 constexpr uint8_t DISASSEMBLY_LINES = 16;
 
@@ -237,31 +242,36 @@ static void colour_disassembly_line(const DisassemblyLayout* layout, unsigned ch
     }
 }
 
-void show_disassembly(void) {
+/* Print the instruction at mon_address and step past it.  False means frozen
+ * memory does not reach there, and mon_address is left alone. */
+static bool show_disassembly_line(void) {
     char text[DISASM_TEXT_MAX];
     DisassemblyLayout layout;
-    unsigned char line;
 
-    for (line = 0; line < DISASSEMBLY_LINES; line++) {
-        if (!disassemble_instruction(mon_address, text, &layout)) {
-            write_line("? UNMAPPED OR UNFROZEN ADDRESS  ERROR", 0);
-            recolour_last_line(2);
+    if (!disassemble_instruction(mon_address, text, &layout)) {
+        return false;
+    }
+    /* The saved PC is 16 bits, so it names a CPU address whose physical bank
+     * depends on MAP and $01 state this code does not decode.  Marking only
+     * bank 0 gives up the highlight on a banked PC rather than reverse-videoing
+     * an unrelated line -- ROM at $3FA23 and RAM at $0FA23 both match $FA23. */
+    unsigned char attribute = (mon_address == frozen_program_counter) ? ATTRIB_REVERSE : 0;
+
+    write_line_len(text, 0, layout.text_length);
+    colour_disassembly_line(&layout, attribute);
+    mon_address += layout.length;
+    return true;
+}
+
+void show_disassembly(void) {
+    for (unsigned char line = 0; line < DISASSEMBLY_LINES; line++) {
+        if (!show_disassembly_line()) {
+            report_error("? UNMAPPED OR UNFROZEN ADDRESS  ERROR");
             /* Step past the hole so a repeated D can walk out of it, as M does.
-             * One byte, because without a decode there is no instruction
-             * boundary to trust. */
+             * One byte, because without a decode there is no boundary to trust. */
             mon_address++;
             return;
         }
-        /* The saved PC is 16 bits, so it names a CPU address whose physical
-         * bank depends on MAP and $01 state this code does not decode.  Marking
-         * only bank 0 gives up the highlight on a banked PC rather than risk
-         * reverse-videoing an unrelated line that happens to share the low 16
-         * bits -- ROM at $3FA23 and RAM at $0FA23 both match $FA23. */
-        unsigned char attribute = (mon_address == frozen_program_counter) ? ATTRIB_REVERSE : 0;
-
-        write_line_len(text, 0, layout.text_length);
-        colour_disassembly_line(&layout, attribute);
-        mon_address += layout.length;
     }
 }
 
@@ -494,57 +504,17 @@ void show_registers(void) {
     }
 }
 
+/* Hex from the typed line, advancing screen_line_offset past it.  Leading
+ * spaces are skipped so that "M 1000" and "M1000" read alike. */
 unsigned char parse_hex(void) {
-    unsigned char digits = 0;
-    hex_value = 0;
-    while (1) {
-        switch (screen_line_buffer[screen_line_offset]) {
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                hex_value = hex_value << 4;
-                hex_value |= screen_line_buffer[screen_line_offset] & 0xf;
-                digits++;
-                screen_line_offset++;
-                break;
-            case 'a':
-            case 'b':
-            case 'c':
-            case 'd':
-            case 'e':
-            case 'f':
-            case 'A':
-            case 'B':
-            case 'C':
-            case 'D':
-            case 'E':
-            case 'F':
-                hex_value = hex_value << 4;
-                hex_value |= 9 + (screen_line_buffer[screen_line_offset] & 0xf);
-                digits++;
-                screen_line_offset++;
-                break;
-            case ' ': // Allow leading spaces.
-                if (digits == 0) {
-                    screen_line_offset++;
-                    break;
-                }
-            default:
-                return digits;
-        }
-    }
-}
+    uint8_t digits;
 
-static void report_error(const char* message) {
-    write_line(message, 0);
-    recolour_last_line(2);
+    while (screen_line_buffer[screen_line_offset] == ' ') {
+        screen_line_offset++;
+    }
+    const char* from = (const char*)&screen_line_buffer[screen_line_offset];
+    screen_line_offset += (unsigned char)(disasm_parse_hex(from, &hex_value, &digits) - from);
+    return digits;
 }
 
 /* Read the "start end" both F and H open with.  The documented monitor takes
@@ -702,6 +672,58 @@ unsigned char parse_address(void) {
     return 0;
 }
 
+/* Indexed by AssembleStatus. */
+static const char* const ASSEMBLE_ERROR[] = {
+    [AssembleOk] = nullptr,
+    [AssembleUnknownMnemonic] = "? UNKNOWN INSTRUCTION  ERROR",
+    [AssembleBadOperand] = "? SYNTAX  ERROR",
+    [AssembleWrongOperand] = "? SYNTAX  ERROR",
+    [AssembleBranchTooFar] = "? BRANCH OUT OF RANGE  ERROR",
+};
+
+/* A <address> <mnemonic> [operand], then a fresh prompt at the next address
+ * until an empty line ends it. */
+void assemble_memory(void) {
+    uint8_t bytes[ASM_BYTES_MAX];
+    uint8_t length;
+
+    if (parse_address()) {
+        return;
+    }
+    for (;;) {
+        enum AssembleStatus status = assemble_instruction(
+            mon_address, (const char*)&screen_line_buffer[screen_line_offset], bytes, &length);
+        if (status != AssembleOk) {
+            report_error(ASSEMBLE_ERROR[status]);
+            return;
+        }
+
+        unsigned char written = 0;
+        while (written < length && write_frozen_byte(mon_address + written, bytes[written])) {
+            written++;
+        }
+        flush_sector();
+        if (written < length) {
+            report_error("? UNMAPPED OR UNFROZEN ADDRESS  ERROR");
+            return;
+        }
+        /* Show what landed, which also steps to the next address.  It cannot
+         * fail: the bytes were just written there. */
+        (void)show_disassembly_line();
+
+        lfill((long)output_buffer, ' ', 80);
+        output_buffer[0] = 'A';
+        format_hex(&output_buffer[2], mon_address, 7);
+        write_line_len(output_buffer, 0, 9);
+        if (!read_line((char*)screen_line_buffer, 80)) {
+            return;
+        }
+        screen_line_buffer[79] = 0;
+        screen_line_offset = 0;
+        screen_line_length = strlen((char*)screen_line_buffer);
+    }
+}
+
 void freeze_monitor(void) {
 
     setup_screen();
@@ -731,9 +753,10 @@ void freeze_monitor(void) {
         // confusion
         switch (screen_line_buffer[0]) {
             /* Alphabetical, matching the order the footer lists them in. */
-            case 'a': // assemble
+            case 'a':
             case 'A':
-                // Not implemented.
+            case '.': // the KERNAL monitor's alias, so a listing can be retyped
+                assemble_memory();
                 break;
             case 'd':
             case 'D':

@@ -1,9 +1,10 @@
-/* 45GS02 disassembler for the freeze monitor.
+/* 45GS02 disassembler and assembler for the freeze monitor.
  *
- * The 256-entry opcode map is generated from llvm-mos.  What is hand-written
- * here is the prefix handling, because the 45GS02's three prefixes are not
- * describable as table entries -- and because two of them are absent from every
- * published table, llvm-mos included.  See the notes at each decode site.
+ * The opcode map is generated from llvm-mos; the three prefixes are hand-written
+ * here, two of them being absent from every published table.
+ *
+ * One translation unit, because the tables below are 971 bytes and both
+ * directions need all of them.
  */
 
 #include "disasm.h"
@@ -19,11 +20,9 @@ constexpr uint8_t OPCODE_EOM = 0xEA;
 constexpr uint8_t OPCODE_CLD = 0xD8;
 constexpr uint8_t OPCODE_LDA_INDIRECT_Z = 0xB2;
 
-/* Line layout.  The byte field is padded to five entries rather than the seven
- * a far JSR needs: seven would leave six blank columns on every ordinary
- * instruction, and nothing in the documented instruction set exceeds five.  A
- * far call simply overflows and pushes its own mnemonic right, which is why the
- * caller is told the columns instead of assuming them. */
+/* Five byte slots, not the seven a far JSR needs: nothing documented exceeds
+ * five, and a far call may overflow and push its own mnemonic right -- which is
+ * why the caller is told the columns rather than assuming them. */
 constexpr uint8_t ADDRESS_DIGITS = 7;
 constexpr uint8_t BYTE_FIELD_SLOTS = 5;
 constexpr uint8_t MAX_INSTRUCTION_BYTES = 7;
@@ -34,10 +33,8 @@ static_assert(DISASM_MNEMONIC_FIELD_WIDTH > DISASM_MNEMONIC_WIDTH + 1, "mnemonic
 
 static const char HEX_DIGITS[] = "0123456789ABCDEF";
 
-/* The five Q mnemonics that are not the base name with a Q appended, stored as
- * base-then-replacement so one table serves both the test and the substitution.
- * Flat rather than [5][6] so it stays an ordinary NUL-terminated literal, which
- * clang requires: a NUL-less string initialiser is an error. */
+/* The Q mnemonics that are not the base name plus a Q, base then replacement.
+ * Flat because clang rejects a NUL-less string initialiser. */
 constexpr uint8_t QUAD_IRREGULAR_COUNT = 5;
 constexpr uint8_t QUAD_IRREGULAR_STRIDE = 2 * DISASM_MNEMONIC_WIDTH;
 static const char QUAD_IRREGULAR[] = "ORAORQ"
@@ -57,9 +54,8 @@ static uint16_t read_word(const uint8_t* bytes) {
     return (uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8);
 }
 
-/* Only a far JMP/JSR carries an operand wider than a word, so every other mode
- * reads a fixed two bytes -- a variable-width loop costs far more than the one
- * branch that picks between these. */
+/* Only a far JMP/JSR exceeds a word, and a variable-width loop cost far more
+ * than the one branch that picks between these two. */
 static uint32_t read_long(const uint8_t* bytes) {
     return (uint32_t)read_word(bytes) | ((uint32_t)read_word(&bytes[2]) << 16);
 }
@@ -78,19 +74,23 @@ static bool has_quad_form(uint8_t opcode) {
  * Taken from the case list at gs4510.vhdl:6912, deliberately not from the
  * comment above it: the comment also names JMP ($nnnn,X) ($7C), but the code
  * does not list it, so on real silicon the prefix does not survive to $7C. */
+static const uint8_t FAR_OPCODES[] = {
+    0x20, /* JSR $nnnn     */
+    0x22, /* JSR ($nnnn)   */
+    0x23, /* JSR ($nnnn,X) */
+    0x4C, /* JMP $nnnn     */
+    0x60, /* RTS           */
+    0x62, /* RTS #$nn      */
+    0x6C, /* JMP ($nnnn)   */
+};
+
 static bool has_far_form(uint8_t opcode) {
-    switch (opcode) {
-        case 0x20: /* JSR $nnnn   */
-        case 0x22: /* JSR ($nnnn) */
-        case 0x23: /* JSR ($nnnn,X) */
-        case 0x4C: /* JMP $nnnn   */
-        case 0x60: /* RTS         */
-        case 0x62: /* RTS #$nn    */
-        case 0x6C: /* JMP ($nnnn) */
+    for (uint8_t i = 0; i < (uint8_t)sizeof FAR_OPCODES; i++) {
+        if (FAR_OPCODES[i] == opcode) {
             return true;
-        default:
-            return false;
+        }
     }
+    return false;
 }
 
 /* Branches wrap within the 64K bank, so keep the bank bits of the current
@@ -101,11 +101,9 @@ static uint32_t branch_target(uint32_t address, uint8_t length, int16_t offset) 
     return (address & 0x0FFF0000UL) | within_bank;
 }
 
-/* Extend bytes[] to cover index, returning how far it now reaches -- which is
- * short of index+1 only where frozen memory runs out.  The count never goes
- * backwards, so a failed prefix probe keeps whatever it did read.  That reuse
- * is the point: the prefix scan looks at the same leading bytes the operand
- * fetch would otherwise read again, about a third of a screenful's reads. */
+/* Extend bytes[] to cover index, returning how far it reaches.  Never goes
+ * backwards, so a failed prefix probe keeps what it read -- worth about a third
+ * of a screenful's frozen-memory reads. */
 static uint8_t fetch_through(uint32_t address, uint8_t* bytes, uint8_t fetched, uint8_t index) {
     while (fetched <= index) {
         if (!disasm_read_byte(address + fetched, &bytes[fetched])) {
@@ -130,11 +128,9 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
     }
     uint8_t opcode = bytes[0];
 
-    /* $D8 $D8 widens JMP/JSR/RTS to the 28-bit address space.  This is the one
-     * prefix that changes instruction length -- a far JSR carries a 32-bit
-     * target -- so failing to decode it would desynchronise every following
-     * line by two bytes.  It is live on stock hardware: flat32_enabled defaults
-     * to '1' and only the hypervisor can clear it, via $D67D.1. */
+    /* $D8 $D8 widens JMP/JSR/RTS to 28 bits, and is the one prefix that changes
+     * instruction length -- missing it desynchronises every following line.
+     * Live on stock hardware: flat32_enabled defaults to '1'. */
     if (opcode == OPCODE_CLD) {
         fetched = fetch_through(address, bytes, fetched, 2);
         if (fetched > 2 && bytes[1] == OPCODE_CLD && has_far_form(bytes[2])) {
@@ -143,13 +139,9 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
             opcode = bytes[2];
         }
     }
-    /* $42 $42 makes the next instruction operate on Q, and may itself be
-     * followed by $EA for a 32-bit vector.  Treated as a prefix only when the
-     * opcode it reaches actually has a Q form; otherwise these are two ordinary
-     * one-byte NEGs, which the core really does execute (it negates A on each
-     * before setting the prefix flag), so resuming at the second $42 stays in
-     * step with the CPU.  The 39 reserved Q slots land here and render as
-     * NEG / NEG / base op -- a mnemonic difference, never an alignment one. */
+    /* $42 $42 makes the next instruction operate on Q, optionally through $EA.
+     * A prefix only where the opcode has a Q form: otherwise these are two real
+     * NEGs the core executes, so resuming at the second stays in step. */
     else if (opcode == OPCODE_NEG) {
         fetched = fetch_through(address, bytes, fetched, 2);
         if (fetched > 2 && bytes[1] == OPCODE_NEG) {
@@ -388,4 +380,367 @@ bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* la
         layout->mnemonic_class = DisasmClassControlFlow;
     }
     return true;
+}
+
+/* --- Assembler -------------------------------------------------------------
+ *
+ * No reverse table: (mnemonic, mode) already identifies an opcode in the maps
+ * above, uniquely but for the bit-numbered families where the digit decides.
+ * Scanning 256 entries is free when a human just typed the line.
+ * ------------------------------------------------------------------------ */
+
+/* The operand shapes the syntax admits, before deciding how wide the value is. */
+enum OperandShape : uint8_t {
+    ShapeNone,        /* (nothing)      */
+    ShapeAccumulator, /* A              */
+    ShapeImmediate,   /* #$v            */
+    ShapeValue,       /* $v             */
+    ShapeValueX,      /* $v,X           */
+    ShapeValueY,      /* $v,Y           */
+    ShapeIndirectX,   /* ($v,X)         */
+    ShapeIndirectY,   /* ($v),Y         */
+    ShapeIndirectZ,   /* ($v),Z         */
+    ShapeStackY,      /* ($v,SP),Y      */
+    ShapeIndirect,    /* ($v)           */
+    ShapeValuePair,   /* $v,$t          */
+};
+
+/* Modes each shape can mean, narrowest first so that $12 assembles to the
+ * zero-page form and $0012 to the absolute one.  MODE_NONE ends each row. */
+constexpr uint8_t MODE_NONE = 0xFF;
+constexpr uint8_t SHAPE_MODE_MAX = 5;
+static const uint8_t SHAPE_MODES[][SHAPE_MODE_MAX] = {
+    [ShapeNone] = {Implied, Accumulator, MODE_NONE},
+    [ShapeAccumulator] = {Accumulator, MODE_NONE},
+    [ShapeImmediate] = {Immediate, ImmediateWord, MODE_NONE},
+    /* RMBn and the branches share this shape with ordinary loads and stores;
+     * only the mnemonic tells them apart, so those forms simply come later. */
+    [ShapeValue] = {ZeroPage, BitZeroPage, Absolute, Relative8, Relative16},
+    [ShapeValueX] = {ZeroPageX, AbsoluteX, MODE_NONE},
+    [ShapeValueY] = {ZeroPageY, AbsoluteY, MODE_NONE},
+    [ShapeIndirectX] = {IndirectZeroPageX, IndirectAbsoluteX, MODE_NONE},
+    [ShapeIndirectY] = {IndirectZeroPageY, MODE_NONE},
+    [ShapeIndirectZ] = {IndirectZeroPageZ, MODE_NONE},
+    [ShapeStackY] = {StackRelativeIndirectY, MODE_NONE},
+    /* A Q form drops the ,Z the decoder prints for LDQ alone, so ($nn) has to
+     * reach the base-page indirect as well as the absolute one. */
+    [ShapeIndirect] = {IndirectZeroPageZ, IndirectAbsolute, MODE_NONE},
+    [ShapeValuePair] = {BitZeroPageRelative, MODE_NONE},
+};
+
+/* File-scope rather than threaded through every helper; -fnonreentrant. */
+static const char* scan;
+
+static char upper(char c) {
+    return (c >= 'a' && c <= 'z') ? (char)(c - ('a' - 'A')) : c;
+}
+
+static void skip_spaces(void) {
+    while (*scan == ' ') {
+        scan++;
+    }
+}
+
+/* Consume `c` if it is next, spaces first. */
+static bool accept(char c) {
+    skip_spaces();
+    if (upper(*scan) != c) {
+        return false;
+    }
+    scan++;
+    return true;
+}
+
+const char* disasm_parse_hex(const char* text, uint32_t* value, uint8_t* digits) {
+    *value = 0;
+    *digits = 0;
+    for (;;) {
+        char c = upper(*text);
+        uint8_t nibble;
+        if (c >= '0' && c <= '9') {
+            nibble = (uint8_t)(c - '0');
+        } else if (c >= 'A' && c <= 'F') {
+            nibble = (uint8_t)(c - 'A' + 10);
+        } else {
+            return text;
+        }
+        *value = (*value << 4) | nibble;
+        (*digits)++;
+        text++;
+    }
+}
+
+/* Hex, '$' optional. */
+static bool accept_value(uint32_t* value, uint8_t* digits) {
+    (void)accept('$');
+    scan = disasm_parse_hex(scan, value, digits);
+    return *digits > 0;
+}
+
+/* The shapes opening with a bracket, the opener already consumed.  `closer` is
+ * the matching one, so [$12,X) cannot pass for ($12,X). */
+static bool parse_indirect(uint8_t* shape, uint32_t* value, uint8_t* digits, char closer) {
+    if (!accept_value(value, digits)) {
+        return false;
+    }
+    if (accept(',')) {
+        if (accept('S')) {
+            *shape = ShapeStackY;
+            return accept('P') && accept(closer) && accept(',') && accept('Y');
+        }
+        *shape = ShapeIndirectX;
+        return accept('X') && accept(closer);
+    }
+    if (!accept(closer)) {
+        return false;
+    }
+    if (!accept(',')) {
+        /* ($nnnn), or [$nn] where a Q form has dropped the ,Z. */
+        *shape = ShapeIndirect;
+        return true;
+    }
+    if (accept('Y')) {
+        *shape = ShapeIndirectY;
+        return true;
+    }
+    *shape = ShapeIndirectZ;
+    return accept('Z');
+}
+
+/* Classify what follows the mnemonic.  `flat` reports the [..] spelling, which
+ * the caller turns into the $EA prefix. */
+static bool parse_operand(
+    uint8_t* shape, uint32_t* value, uint8_t* digits, uint32_t* second, bool* flat) {
+    *flat = false;
+    *second = 0;
+
+    skip_spaces();
+    if (*scan == '\0') {
+        *shape = ShapeNone;
+        return true;
+    }
+    /* A lone A is the accumulator; anything after it is a hex value, since A is
+     * also a hex digit. */
+    if (upper(*scan) == 'A' && (scan[1] == '\0' || scan[1] == ' ')) {
+        scan++;
+        *shape = ShapeAccumulator;
+        return true;
+    }
+    if (accept('#')) {
+        *shape = ShapeImmediate;
+        return accept_value(value, digits);
+    }
+
+    if (accept('(')) {
+        return parse_indirect(shape, value, digits, ')');
+    }
+    if (accept('[')) {
+        *flat = true;
+        return parse_indirect(shape, value, digits, ']');
+    }
+
+    if (!accept_value(value, digits)) {
+        return false;
+    }
+    if (!accept(',')) {
+        *shape = ShapeValue;
+        return true;
+    }
+    if (accept('X')) {
+        *shape = ShapeValueX;
+        return true;
+    }
+    if (accept('Y')) {
+        *shape = ShapeValueY;
+        return true;
+    }
+
+    /* BBRn $nn,$nnnn -- a second value rather than an index register. */
+    uint8_t second_digits;
+    if (!accept_value(second, &second_digits)) {
+        return false;
+    }
+    *shape = ShapeValuePair;
+    return true;
+}
+
+/* The opcode for this mnemonic and mode; `bit` picks among RMBn and friends. */
+static bool find_opcode(uint8_t mnemonic_index, uint8_t mode, uint8_t bit, uint8_t* opcode) {
+    for (uint16_t candidate = 0; candidate < 256; candidate++) {
+        if (OPCODE_MNEMONIC[candidate] != mnemonic_index || OPCODE_MODE[candidate] != mode) {
+            continue;
+        }
+        if ((mode == BitZeroPage || mode == BitZeroPageRelative) && ((candidate >> 4) & 7) != bit) {
+            continue;
+        }
+        *opcode = (uint8_t)candidate;
+        return true;
+    }
+    return false;
+}
+
+/* Inverse of branch_target(). */
+static bool branch_offset(
+    uint32_t address, uint8_t length, uint32_t target, bool wide, uint16_t* offset) {
+    uint16_t delta = (uint16_t)(target - ((uint16_t)address + length));
+    if (!wide && (int16_t)delta != (int8_t)delta) {
+        return false;
+    }
+    *offset = delta;
+    return true;
+}
+
+enum AssembleStatus assemble_instruction(
+    uint32_t address, const char* text, uint8_t* bytes, uint8_t* length) {
+    char name[4] = {0};
+    uint8_t name_length = 0;
+    uint8_t bit = 0;
+    bool want_quad = false;
+    bool want_far = false;
+
+    scan = text;
+    skip_spaces();
+    while (name_length < 4) {
+        char c = upper(*scan);
+        if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) {
+            break;
+        }
+        name[name_length++] = c;
+        scan++;
+    }
+    if (name_length < 3) {
+        return AssembleUnknownMnemonic;
+    }
+
+    /* A fourth character is a suffix: RMBn's bit, a Q form, or a far F. */
+    if (name_length == 4) {
+        char suffix = name[3];
+        if (suffix >= '0' && suffix <= '7') {
+            bit = (uint8_t)(suffix - '0');
+        } else if (suffix == 'Q') {
+            want_quad = true;
+        } else if (suffix == 'F') {
+            want_far = true;
+        } else {
+            return AssembleUnknownMnemonic;
+        }
+    }
+
+    /* The Q forms whose names are not the base plus a Q, through the same
+     * table the decoder prints them from. */
+    for (uint8_t i = 0; !want_quad && i < QUAD_IRREGULAR_COUNT; i++) {
+        const char* entry = &QUAD_IRREGULAR[i * QUAD_IRREGULAR_STRIDE];
+        if (name[0] == entry[DISASM_MNEMONIC_WIDTH] &&
+            name[1] == entry[DISASM_MNEMONIC_WIDTH + 1] &&
+            name[2] == entry[DISASM_MNEMONIC_WIDTH + 2]) {
+            name[0] = entry[0];
+            name[1] = entry[1];
+            name[2] = entry[2];
+            want_quad = true;
+        }
+    }
+
+    uint8_t mnemonic_index = 0;
+    while (mnemonic_index < DISASM_MNEMONIC_COUNT &&
+        (MNEMONIC_TEXT[mnemonic_index][0] != name[0] ||
+            MNEMONIC_TEXT[mnemonic_index][1] != name[1] ||
+            MNEMONIC_TEXT[mnemonic_index][2] != name[2])) {
+        mnemonic_index++;
+    }
+    if (mnemonic_index == DISASM_MNEMONIC_COUNT) {
+        return AssembleUnknownMnemonic;
+    }
+
+    uint8_t shape;
+    uint32_t value = 0;
+    uint32_t second = 0;
+    uint8_t digits = 0;
+    bool flat = false;
+    if (!parse_operand(&shape, &value, &digits, &second, &flat)) {
+        return AssembleBadOperand;
+    }
+    skip_spaces();
+    if (*scan != '\0') {
+        return AssembleBadOperand;
+    }
+
+    for (uint8_t i = 0; i < SHAPE_MODE_MAX; i++) {
+        uint8_t mode = SHAPE_MODES[shape][i];
+        if (mode == MODE_NONE) {
+            break;
+        }
+
+        uint8_t operand_bytes = MODE_LENGTH[mode] - 1;
+        bool relative = (mode == Relative8 || mode == Relative16);
+        if (want_far && mode == Absolute) {
+            operand_bytes = 4; /* a far JMP/JSR carries a 32-bit target */
+        }
+
+        /* BBRn spends its second operand byte on the branch, so its value is a
+         * zero-page one however long the instruction is. */
+        uint8_t value_bytes = (mode == BitZeroPageRelative) ? 1 : operand_bytes;
+        if (!relative) {
+            /* Reject a value too wide for the form rather than truncating it,
+             * and let four written digits ask for the wide form regardless. */
+            if (value_bytes < 4 && value >= (1UL << (value_bytes * 8))) {
+                continue;
+            }
+            if (value_bytes == 1 && digits > 2) {
+                continue;
+            }
+        }
+
+        uint8_t opcode;
+        if (!find_opcode(mnemonic_index, mode, bit, &opcode)) {
+            continue;
+        }
+        if (want_quad && !has_quad_form(opcode)) {
+            continue;
+        }
+        if (want_far && !has_far_form(opcode)) {
+            continue;
+        }
+        if (flat && !is_indirect_zp_z(opcode)) {
+            continue;
+        }
+
+        uint8_t at = 0;
+        if (want_quad) {
+            bytes[at++] = OPCODE_NEG;
+            bytes[at++] = OPCODE_NEG;
+        } else if (want_far) {
+            bytes[at++] = OPCODE_CLD;
+            bytes[at++] = OPCODE_CLD;
+        }
+        if (flat) {
+            bytes[at++] = OPCODE_EOM;
+        }
+        bytes[at++] = opcode;
+
+        if (relative) {
+            uint16_t offset;
+            /* Out of reach means try the wider form: every 8-bit branch has a
+             * 16-bit counterpart later in the list, and that one always fits. */
+            if (!branch_offset(address, at + operand_bytes, value, mode == Relative16, &offset)) {
+                continue;
+            }
+            value = offset;
+        } else if (mode == BitZeroPageRelative) {
+            bytes[at++] = (uint8_t)value;
+            uint16_t offset;
+            /* BBRn has no wider form, so this one really is out of reach. */
+            if (!branch_offset(address, at + 1, second, false, &offset)) {
+                return AssembleBranchTooFar;
+            }
+            value = offset;
+            operand_bytes = 1;
+        }
+
+        for (uint8_t i = 0; i < operand_bytes; i++) {
+            bytes[at++] = (uint8_t)(value >> (i * 8));
+        }
+        *length = at;
+        return AssembleOk;
+    }
+    return AssembleWrongOperand;
 }

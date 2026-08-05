@@ -10,7 +10,7 @@ extern unsigned char* charset;
 
 char* footer_messages[FOOTER_MAX + 1] = {
     /* Exactly 80 columns: display_footer() copies the whole row unconditionally. */
-    "FMON: (D)ASM (F)ILL (H)UNT (M)EM (R)EG (S)ET E(X)IT SETREG(;)                   ",
+    "FMON: (A)SM (D)ASM (F)ILL (H)UNT (M)EM (R)EG (S)ET E(X)IT SETREG(;)             ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};
 
 char stemp[80];
@@ -208,6 +208,12 @@ char read_line(char* buffer, unsigned char maxlen) {
                 // Hide cursor
                 set_attr(len, 0xf, 0);
 
+                /* Acknowledge RETURN as the character branch below does: a
+                 * caller that reads again promptly would otherwise see it still
+                 * held and take it as a second, empty line. */
+                while (ASCIIKEY) {
+                    ASCIIKEY = 1;
+                }
                 return len;
             } else {
 

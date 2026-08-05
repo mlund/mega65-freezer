@@ -42,3 +42,25 @@ extern bool disasm_read_byte(uint32_t address, uint8_t* value);
  * bytes) and describe it in `layout`.  Returns false if any byte of the
  * instruction could not be read, in which case `text` is untouched. */
 bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* layout);
+
+/* Scan hex digits from `text`, returning where they stopped.  `digits` reports
+ * how many were read, which is what tells $12 from $0012. */
+const char* disasm_parse_hex(const char* text, uint32_t* value, uint8_t* digits);
+
+/* Why an assemble failed, so the caller can say which part it disliked. */
+enum AssembleStatus : uint8_t {
+    AssembleOk,
+    AssembleUnknownMnemonic,
+    AssembleBadOperand,
+    AssembleWrongOperand, /* the mnemonic has no form taking this operand */
+    AssembleBranchTooFar,
+};
+
+/* Longest instruction the assembler can produce -- a far JSR. */
+constexpr uint8_t ASM_BYTES_MAX = 7;
+
+/* Assemble one instruction written as `MNEMONIC [operand]` into `bytes`, with
+ * `address` supplying the origin that branch operands are measured from.
+ * `length` receives the byte count on success and is untouched otherwise. */
+enum AssembleStatus assemble_instruction(
+    uint32_t address, const char* text, uint8_t* bytes, uint8_t* length);

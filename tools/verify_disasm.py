@@ -113,9 +113,13 @@ def build_harness(workdir: Path, host_cc: str) -> Path:
 
 
 def run_harness(binary: Path, cases: list[list[int]]) -> list[tuple[int, str]]:
-    payload = "\n".join(" ".join(f"{byte:02x}" for byte in case) for case in cases)
+    return run_harness_lines(binary, [" ".join(f"{byte:02x}" for byte in case) for case in cases])
+
+
+def run_harness_lines(binary: Path, lines: list[str]) -> list[tuple[int, str]]:
+    """Decode one instruction per line; a leading @<hex> sets its address."""
     result = subprocess.run(
-        [str(binary)], input=payload, capture_output=True, text=True, check=True
+        [str(binary)], input="\n".join(lines), capture_output=True, text=True, check=True
     )
     return [parse_harness_line(line) for line in result.stdout.splitlines()]
 
@@ -274,32 +278,36 @@ def check_undocumented(binary: Path) -> list[str]:
 SENTINEL = 0x02
 
 
-def check_rom(llvm_mc: str, binary: Path, rom: Path, base: int) -> list[str]:
-    """Walk a real ROM image and diff every instruction against llvm-mc.
-
-    Stronger than the synthetic sweep: our decoder chooses the instruction
-    boundaries here, so a wrong length puts the next decode mid-instruction and
-    the disagreement cascades -- which is exactly how a wrong length ruins a
-    listing on screen.
-    """
+def walk_rom(binary: Path, rom: Path, base: int) -> list[tuple[int, bytes, str]]:
+    """Decode a ROM image start to end, following the lengths we report."""
     image = rom.read_bytes()
-    walked = subprocess.run(
+    rows = subprocess.run(
         [str(binary), "--walk", str(rom), f"{base:X}", f"{base:X}", str(len(image))],
         capture_output=True,
         text=True,
         check=True,
     ).stdout.splitlines()
 
-    ours, lines, address = [], [], base
-    for row in walked:
+    walked, address = [], base
+    for row in rows:
         length, text = parse_harness_line(row)
         if length == 0:
             break
-        raw = image[address - base : address - base + length]
-        ours.append((address, raw, text))
-        lines.append(" ".join(f"0x{byte:02x}" for byte in [*raw, SENTINEL]))
+        walked.append((address, image[address - base : address - base + length], text))
         address += length
+    return walked
 
+
+def check_rom(llvm_mc: str, walked: list[tuple[int, bytes, str]], base: int) -> list[str]:
+    """Diff every instruction of a real ROM against llvm-mc.
+
+    Stronger than the synthetic sweep: our decoder chooses the instruction
+    boundaries here, so a wrong length puts the next decode mid-instruction and
+    the disagreement cascades -- which is exactly how a wrong length ruins a
+    listing on screen.
+    """
+    ours = walked
+    lines = [" ".join(f"0x{byte:02x}" for byte in [*raw, SENTINEL]) for _, raw, _ in walked]
     reference = disassemble(llvm_mc, [], hex_operands=True, stdin_text="\n".join(lines))
 
     failures, undocumented, index = [], 0, 0
@@ -336,6 +344,142 @@ def check_rom(llvm_mc: str, binary: Path, rom: Path, base: int) -> list[str]:
     return failures
 
 
+def run_assembler(binary: Path, lines: list[str]) -> list[str]:
+    """Assemble each "<address> <instruction>" line, returning bytes or !status."""
+    result = subprocess.run(
+        [str(binary), "--assemble"],
+        input="\n".join(lines),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.splitlines()
+
+
+def check_round_trip_assembly(binary: Path, walked: list[tuple[int, bytes, str]]) -> list[str]:
+    """Assemble what the disassembler printed and require the original bytes.
+
+    The two halves share the opcode tables but not the code that reads them, so
+    a mode either of them has wrong shows up here as bytes that fail to come
+    back -- and unlike the llvm-mc comparison this also covers the forms
+    llvm-mos has no entry for.
+    """
+    lines = []
+    for address, _, text in walked:
+        # Everything from the mnemonic on; the address and raw bytes are ours.
+        mnemonic, operand = split_ours(text)
+        lines.append(f"{address:X} {mnemonic} {operand}")
+
+    differing = []
+    for (address, raw, text), assembled in zip(walked, run_assembler(binary, lines), strict=True):
+        want = " ".join(f"{byte:02X}" for byte in raw)
+        if assembled != want:
+            differing.append((address, text, want, assembled))
+
+    # Differing bytes are not automatically wrong: a branch reachable by both
+    # widths assembles to the shorter one, and the ROM does not always use it.
+    # Decode what we produced and require it to say the same thing.
+    failures, rewidened = [], 0
+    if differing:
+        # Decode at the original address: a branch operand names a target, so it
+        # only reads back the same from where the instruction actually sits.
+        lines = [
+            f"@{address:X} {assembled}"
+            for address, _, _, assembled in differing
+            if assembled[:1] != "!"
+        ]
+        redecoded = run_harness_lines(binary, lines) if lines else []
+        index = 0
+        for address, text, want, assembled in differing:
+            if assembled[:1] == "!":
+                failures.append(f"${address:05X} {text.strip()!r}: refused with {assembled}")
+                continue
+            _, again = redecoded[index]
+            index += 1
+            if split_ours(again) == split_ours(text):
+                rewidened += 1
+                continue
+            failures.append(f"${address:05X} {text.strip()!r}: assembled {assembled}, want {want}")
+
+    print(
+        f"assembly round trip: {len(walked)} instructions, {rewidened} branches narrowed, "
+        f"{len(failures)} mismatches"
+    )
+    return failures
+
+
+# Assembled at $1000.  Every conditional branch has a 16-bit counterpart, so
+# passing beyond an 8-bit reach must widen rather than fail; BBRn has no wider
+# form, which makes it the only shape that can genuinely be out of range.
+ASSEMBLE_BRANCH_TOO_FAR = 4
+BRANCH_RANGE = [
+    ("BNE $1081", "D0 7F", "furthest forward an 8-bit branch reaches"),
+    ("BNE $0F82", "D0 80", "furthest back"),
+    ("BNE $1082", "D3 7F 00", "one past forward, so it widens to 16-bit"),
+    ("BNE $0F81", "D3 7E FF", "one past back, likewise"),
+    ("BBR0 $12,$1023", "0F 12 20", "BBRn within reach"),
+    ("BBR0 $12,$1200", None, "BBRn out of reach, and it has no wider form"),
+]
+
+
+# Operands that must be refused rather than quietly truncated, and spellings
+# that must not be mistaken for a hex value.  Assembled at $1000; "!n" is the
+# AssembleStatus expected, 2 being a malformed operand and 3 one the mnemonic
+# has no form for.
+ASSEMBLE_EDGE = [
+    ("ASL A", "0A", "the accumulator form"),
+    ("ASL A ", "0A", "trailing space must not turn A into the hex digit"),
+    ("LDA $12345", "!3", "too wide for absolute, so refused rather than truncated"),
+    ("LDA $0012", "AD 12 00", "four digits ask for absolute"),
+    ("LDA $12", "A5 12", "two digits take zero page"),
+    ("BBR0 $123,$1023", "!3", "BBRn's operand is a zero-page one"),
+    ("JSRF $12345678", "D8 D8 20 78 56 34 12", "a far JSR reaches past five bytes"),
+    ("LDA [$12,X)", "!2", "brackets must match"),
+]
+
+
+def check_assembly(binary: Path) -> list[str]:
+    """Assemble every opcode's own disassembly, and check the branch limits.
+
+    Covers the opcodes a ROM happens not to contain, which is most of the
+    prefixed ones.
+    """
+    encodings = [[opcode, 0x34, 0x12] for opcode in range(256)]
+    encodings += [[0x42, 0x42, opcode, 0x34, 0x12] for opcode in range(256)]
+    encodings += [[0xEA, opcode, 0x34, 0x12] for opcode in range(256)]
+
+    failures = []
+    decoded = run_harness(binary, encodings)
+    lines, wanted = [], []
+    for encoding, (length, text) in zip(encodings, decoded, strict=True):
+        mnemonic, operand = split_ours(text)
+        lines.append(f"{HARNESS_BASE:X} {mnemonic} {operand}")
+        wanted.append(" ".join(f"{byte:02X}" for byte in encoding[:length]))
+
+    for want, got, text in zip(
+        wanted, run_assembler(binary, lines), [t for _, t in decoded], strict=False
+    ):
+        if got != want:
+            failures.append(f"{text.strip()!r}: assembled {got}, want {want}")
+    print(f"assembly of every opcode: {len(lines)} forms, {len(failures)} mismatches")
+
+    branch_lines = [f"{HARNESS_BASE:X} {source}" for source, _, _ in BRANCH_RANGE]
+    for (source, want, why), got in zip(
+        BRANCH_RANGE, run_assembler(binary, branch_lines), strict=True
+    ):
+        expected = want if want is not None else f"!{ASSEMBLE_BRANCH_TOO_FAR}"
+        if got != expected:
+            failures.append(f"{source!r}: got {got}, want {expected} ({why})")
+    edge_lines = [f"{HARNESS_BASE:X} {source}" for source, _, _ in ASSEMBLE_EDGE]
+    for (source, want, why), got in zip(
+        ASSEMBLE_EDGE, run_assembler(binary, edge_lines), strict=True
+    ):
+        if got != want:
+            failures.append(f"{source!r}: got {got}, want {want} ({why})")
+    print(f"branch range and edges: {len(BRANCH_RANGE) + len(ASSEMBLE_EDGE)} vectors")
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--llvm-mc", required=True, help="path to the patched SDK's llvm-mc")
@@ -360,9 +504,12 @@ def main() -> int:
             + check_branch_targets(binary)
             + check_undocumented(binary)
         )
+        failures += check_assembly(binary)
         if args.rom is not None:
             if args.rom.is_file():
-                failures += check_rom(args.llvm_mc, binary, args.rom, args.rom_base)
+                walked = walk_rom(binary, args.rom, args.rom_base)
+                failures += check_rom(args.llvm_mc, walked, args.rom_base)
+                failures += check_round_trip_assembly(binary, walked)
             else:
                 print(f"rom walk: skipped, no image at {args.rom}")
 
