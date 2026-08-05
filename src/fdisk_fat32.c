@@ -2,6 +2,7 @@
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -372,7 +373,7 @@ long fat32_create_contiguous_file(
         // This can take a while if the disk is full, because we use a naive search.
         // So show the user that something is happening.
         // XXX Use FAT32's hint of first cluster free _and_ then update it!
-        POKE(0xD020, PEEK(0xD020 + 1));
+        VICIV.bordercol = PEEK(0xD020 + 1);
 
         sdcard_readsector(fat1_sector + fat_sector_num);
 

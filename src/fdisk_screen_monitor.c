@@ -3,6 +3,8 @@
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
 
+#include <mega65.h>
+
 extern unsigned char* charset;
 
 char* footer_messages[FOOTER_MAX + 1] = {
@@ -75,23 +77,23 @@ void setup_screen(void) {
      * 8-bit characters and 160 for 16-bit. */
 
     // Normal 8-bit text mode
-    POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
+    VICIV.ctrlc = (VICIV.ctrlc & 0xa8) | 0x00;
 
-    POKE(0xD031U, 0xe0); // 80-column, fast CPU, extended attributes
+    VICIV.ctrlb = 0xe0; // 80-column, fast CPU, extended attributes
     // 80 columns requires $D016 = $C9 to be properly positioned: bit 0 is the
     // H640 X-scroll correction.  Not $C8 -- that is the value the exit path
     // restores for 40 columns.
-    POKE(0xD016U, 0xC9);
-    POKE(0xD018U,
-        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4));
-    v = PEEK(0xDD00U);
+    VICIV.ctrl2 = 0xC9;
+    VICIV.addr =
+        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
+    v = CIA2.pra;
     v &= 0xfc;
     v |= 0x01; // VIC RAM bank to $8000-$BFFF
-    POKE(0xDD00U, v);
+    CIA2.pra = v;
 
     // Screen colours
-    POKE(0xD020U, 0);
-    POKE(0xD021U, 6);
+    VICIV.bordercol = 0;
+    VICIV.screencol = 6;
 
     // Clear screen RAM
     lfill(SCREEN_ADDRESS, 0x20, 2000);
@@ -168,7 +170,7 @@ char read_line(char* buffer, unsigned char maxlen) {
             // C= + shift, so toggle case
 
             // Toggle upper/lower case font
-            POKE(0xD018U, PEEK(0xD018U) ^ 0x02);
+            VICIV.addr = VICIV.addr ^ 0x02;
 
             while ((PEEK(0xD611U) & 0x0b) >= 0x09)
                 continue;
@@ -178,7 +180,7 @@ char read_line(char* buffer, unsigned char maxlen) {
 
             if (c == 0x0e) {
                 // Toggle upper/lower case font
-                POKE(0xD018U, PEEK(0xD018U) ^ 0x02);
+                VICIV.addr = VICIV.addr ^ 0x02;
             } else if (c == 0x14) {
                 // DELETE
                 if (len) {

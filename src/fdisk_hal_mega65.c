@@ -2,6 +2,7 @@
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -33,7 +34,7 @@ void sdcard_reset(void) {
     // Now wait for SD card reset to complete
     while (PEEK(sd_ctl) & 3)
         if (hal_border_flicker > 1)
-            POKE(0xd020, (PEEK(0xd020) + 1) & 0xf);
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
 
     if (sdhc_card) {
         // Set SDHC flag (else writing doesnt work for some reason)
@@ -46,8 +47,8 @@ void mega65_fast(void) {
     // Fast CPU
     POKE(0, 65);
     // MEGA65 IO registers
-    POKE(0xD02FU, 0x47);
-    POKE(0xD02FU, 0x53);
+    VICIV.key = 0x47;
+    VICIV.key = 0x53;
 }
 
 void sdcard_open(void) {
@@ -130,7 +131,7 @@ void sdcard_readsector(const uint32_t sector_number) {
         }
 
         if (hal_border_flicker > 1)
-            POKE(0xd020, (PEEK(0xd020) + 1) & 0xf);
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
 
         // Reset SD card
         sdcard_open();
@@ -167,7 +168,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     counter = 0;
     while (PEEK(sd_ctl) & 3) {
         if (hal_border_flicker > 1)
-            POKE(0xD020, (PEEK(0xd020) + 1) & 0xf);
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
         counter++;
         if (!counter) {
             // SD card not becoming ready: try reset
@@ -243,13 +244,13 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
         write_count++;
         if (hal_border_flicker > 1)
-            POKE(0xD020, write_count & 0x0f);
+            VICIV.bordercol = write_count & 0x0f;
 
         if (!(PEEK(sd_ctl) & 0x67)) {
             write_count++;
 
             if (hal_border_flicker > 1)
-                POKE(0xD020, write_count & 0x0f);
+                VICIV.bordercol = write_count & 0x0f;
 
             // There is a bug in the SD controller: You have to read between writes, or it
             // gets really upset.
@@ -286,7 +287,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         }
 
         if (hal_border_flicker > 1)
-            POKE(0xd020, (PEEK(0xd020) + 1) & 0xf);
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
     }
 
     //  write_line("Write error @ $$$$$$$$$",2);

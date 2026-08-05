@@ -5,6 +5,7 @@
 #include "freezer.h"
 #include "freezer_common.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -361,7 +362,7 @@ unsigned char freeze_load_romarea(void) {
                     draw_file_list();
                 } else {
                     // XXX - Actually do loading of ROM / ROM diff file
-                    POKE(0xD020U, 0);
+                    VICIV.bordercol = 0;
                     if (!strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".ROM") ||
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".BIN") ||
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".rom") ||
@@ -379,11 +380,11 @@ unsigned char freeze_load_romarea(void) {
                         for (s = 0; s < 256; s++) { // ROM is 128k, devided by 512 byte sectors is
                                                     // 256 sectors to load
                             // Write each sector to frozen memory
-                            POKE(0xD020U, (PEEK(0xD020U) + 1) & 0xf);
+                            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
                             lcopy(0x40000L + 512L * (long)s, (long)buffer, 512);
                             freeze_store_sector(0x20000L + ((long)s) * 512L, buffer);
                         }
-                        POKE(0xD020U, 6);
+                        VICIV.bordercol = 6;
 
                         return 1;
                     }
@@ -517,7 +518,7 @@ void user_reset_prompt(void) {
         unfreeze_slot(0);
 
         while (1)
-            POKE(0xD020U, (PEEK(0xD020U) + 1) & 0xf);
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
     }
 }
 

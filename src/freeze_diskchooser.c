@@ -22,6 +22,7 @@
 #include "freezer.h"
 #include "freezer_common.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -155,7 +156,7 @@ void display_error() {
     unsigned char i;
     char* errstr;
 
-    POKE(0xD020U, 2);
+    VICIV.bordercol = 2;
     errstr = hyppoerror_to_screen(mega65_geterrorcode());
     for (i = 0; i < 19 && errstr[i]; i++) {
         POKE(SCREEN_ADDRESS + (21 * 2) + (i * 2), petscii_to_screen(errstr[i]));
@@ -276,13 +277,13 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         disk_name_return[x] = 0;
 
     // Try to mount it, with border black while working
-    POKE(0xD020U, 0);
+    VICIV.bordercol = 0;
     if (mega65_dos_attach(disk_name_return, drive_id)) {
         // Mounting the image failed
         display_error();
         return 1;
     }
-    POKE(0xD020U, 6);
+    VICIV.bordercol = 6;
 
     // Exit if a key has been pressed
     if (PEEK(0xD610U))
@@ -509,7 +510,7 @@ void draw_disk_image_list(void) {
         lcopy(COLOUR_RAM_ADDRESS + (i * 80), COLOUR_RAM_ADDRESS + (i * 80) + 4, 76);
         addr += (40 * 2);
     }
-    POKE(0xD020U, 6);
+    VICIV.bordercol = 6;
 }
 
 void scan_directory(unsigned char drive_id) {
@@ -683,7 +684,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                     }
 
                 // Try to mount it, with border black while working
-                POKE(0xD020U, 0);
+                VICIV.bordercol = 0;
                 if (disk_name_return[0] == '/') {
                     // Its a directory
                     mega65_dos_chdir((unsigned char*)&disk_name_return[1]);
@@ -693,7 +694,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                     scan_directory(drive_id);
                     draw_disk_image_list();
                 } else {
-                    // POKE(0xD020U, 6);
+                    // VICIV.bordercol = 6;
                     if (selection_number == 0 || selection_number == 1) {
                         // internal or no disk
                         if (!hdos_new_attach) {
@@ -758,7 +759,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                             POKE(0xD081, 0x18);
                             while (PEEK(0xD082) & 0x80)
                                 if (hal_border_flicker > 1)
-                                    POKE(0xD020, (PEEK(0xD020) + 1) & 0xf);
+                                    VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
                             x--;
                         }
                         POKE(0xD080U, 0); // motor and led off

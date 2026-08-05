@@ -15,6 +15,7 @@
 #include "fdisk_screen_monitor.h"
 #include "freezer.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -137,7 +138,7 @@ void set_memory() {
 
         // Now accept various forms of input for setting memory.
         while (screen_line_offset < screen_line_length) {
-            POKE(0xD020U, i);
+            VICIV.bordercol = i;
             switch (screen_line_buffer[screen_line_offset]) {
                 case ' ':
                     // Skip spaces
@@ -428,11 +429,11 @@ void freeze_monitor(void) {
             case 'X':
                 // Exit monitor
                 // Return screen to normal
-                POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
-                POKE(0xD018U, 0x15); // VIC-II hot register, resets display settings
-                POKE(0xD016U, 0xC8);
-                POKE(0xDD00U, PEEK(0xDD00U) | 3);    // video bank 0
-                POKE(0xD031U, PEEK(0xD031U) & 0x7f); // 40 columns
+                VICIV.ctrlc = (VICIV.ctrlc & 0xa8) | 0x00;
+                VICIV.addr = 0x15; // VIC-II hot register, resets display settings
+                VICIV.ctrl2 = 0xC8;
+                CIA2.pra = CIA2.pra | 3;          // video bank 0
+                VICIV.ctrlb = VICIV.ctrlb & 0x7f; // 40 columns
                 return;
             case 'm':
             case 'M':

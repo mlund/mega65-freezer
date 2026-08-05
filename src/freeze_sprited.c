@@ -68,6 +68,7 @@
 #include "cc65compat.h"
 #include "freezer.h"
 
+#include <mega65.h>
 #include <mega65/conio.h>
 #include <mega65/hal.h>
 #include <mega65/memory.h>
@@ -892,9 +893,9 @@ static void Initialize() {
     POKE(0xD077, 0); // Y-MSBs off
     POKE(0xD078, 0); // Y-MSBs off
 
-    POKE(0xD015, 7); // Enable #0, #1, #2
-    POKE(0xD01D, 0); // H-expand off for editor sprites.
-    POKE(0xD017, 0); // V-expand off for editor sprites.
+    VICIV.spr_ena = 7; // Enable #0, #1, #2
+    POKE(0xD01D, 0);   // H-expand off for editor sprites.
+    POKE(0xD017, 0);   // V-expand off for editor sprites.
     POKE(0xD000, 100);
     POKE(0xD001, 100);
 
@@ -1621,7 +1622,7 @@ static void ShowHelp() {
   };
     // clang-format on
 
-    POKE(0xD015, 0);
+    VICIV.spr_ena = 0;
 
     flushkeybuf();
     clrscr();
@@ -1649,7 +1650,7 @@ static void ShowHelp() {
 
     cgetc();
     clrscr();
-    POKE(0xD015, 7);
+    VICIV.spr_ena = 7;
 }
 
 static void DoExit() {

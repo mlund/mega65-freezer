@@ -3,6 +3,7 @@
 #include "fdisk_memory.h"
 #include "freezer.h"
 
+#include <mega65.h>
 #include <string.h>
 
 uint8_t sector_buffer[512];
@@ -239,25 +240,25 @@ void screen_of_death(const char* msg) {
     // TODO: This is broken, obviously...
 #if 0
   POKE(0,0x41);
-  POKE(0xD02FU,0x47); POKE(0xD02FU,0x53);
+  VICIV.key = 0x47; VICIV.key = 0x53;
 
   // Reset video mode
-  POKE(0xD05DU,0x01); POKE(0xD011U,0x1b); POKE(0xD016U,0xc8);
-  POKE(0xD018U,0x17); // lower case
-  POKE(0xD06FU,0x80); // NTSC 60Hz mode for monitor compatibility?
+  POKE(0xD05DU,0x01); VICIV.ctrl1 = 0x1b; VICIV.ctrl2 = 0xc8;
+  VICIV.addr = 0x17; // lower case
+  VICIV.rasline0 = 0x80; // NTSC 60Hz mode for monitor compatibility?
   POKE(0xD06AU,0x00); // Charset from bank 0
 
   // No sprites
-  POKE(0xD015U,0x00);
+  VICIV.spr_ena = 0x00;
 
   // Normal video mode (but preserve CRT emulation etc)
-  POKE(0xD054U,PEEK(0xD054)&0xA8);
+  VICIV.ctrlc = VICIV.ctrlc&0xA8;
 
   // Reset colour palette to normal for black and white
   POKE(0xD100U,0x00);  POKE(0xD200U,0x00);  POKE(0xD300U,0x00);
   POKE(0xD101U,0xFF);  POKE(0xD201U,0xFF);  POKE(0xD301U,0xFF);
 
-  POKE(0xD020U,0); POKE(0xD021U,0);
+  VICIV.bordercol = 0; VICIV.screencol = 0;
 
   // Reset CPU IO ports
   POKE(1,0x3f); POKE(0,0x3F);

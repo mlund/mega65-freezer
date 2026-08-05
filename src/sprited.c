@@ -10,6 +10,7 @@
 #include "freezer.h"
 #include "freezer_common.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -21,9 +22,9 @@ int main(void) {
 
     // Disable interrupts and interrupt sources
     __asm__ volatile("sei" ::: "memory");
-    POKE(0xDC0DU, 0x7F);
-    POKE(0xDD0DU, 0x7F);
-    POKE(0xD01AU, 0x00);
+    CIA1.icr = 0x7F;
+    CIA2.icr = 0x7F;
+    VICIV.imr = 0x00;
     // XXX add missing C65 AND M65 peripherals
     // C65 UART, ethernet etc
 
@@ -35,10 +36,10 @@ int main(void) {
     __asm__ volatile("cld");
 
     // Enable extended attributes so we can use reverse
-    POKE(0xD031U, PEEK(0xD031U) | 0x20);
+    VICIV.ctrlb = VICIV.ctrlb | 0x20;
 
     // Correct horizontal scaling
-    POKE(0xD05AU, 0x78);
+    VICIV.chrxscl = 0x78;
 
     // Silence SIDs
     POKE(0xD418U, 0);
@@ -62,15 +63,15 @@ int main(void) {
     // request_freeze_region_list();
 
     // Back to 40 column, 8-bit text mode
-    POKE(0xD031U, 0x00);
-    POKE(0xD054U, (PEEK(0xD054) & 0xa8) | 0x00);
+    VICIV.ctrlb = 0x00;
+    VICIV.ctrlc = (VICIV.ctrlc & 0xa8) | 0x00;
     // Lower case
-    POKE(0xD018U, 0x16);
+    VICIV.addr = 0x16;
 
     do_sprite_editor();
 
     // Back to 40 column mode
-    POKE(0xD031U, 0x00);
+    VICIV.ctrlb = 0x00;
     // 256-colour char data from chip RAM, not expansion RAM
     POKE(0xD063U, 0x00);
 

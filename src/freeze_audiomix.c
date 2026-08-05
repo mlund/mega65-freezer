@@ -5,6 +5,7 @@
 #include "freezer.h"
 #include "freezer_common.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -72,9 +73,9 @@ void audioxbar_setcoefficient(uint8_t n, uint8_t value) {
     POKE(0xD6F4, n);
 
     // Now wait at least 16 cycles for it to settle
-    POKE(0xD020U, PEEK(0xD020U));
-    POKE(0xD020U, PEEK(0xD020U));
-    POKE(0xD020U, PEEK(0xD020U));
+    VICIV.bordercol = VICIV.bordercol;
+    VICIV.bordercol = VICIV.bordercol;
+    VICIV.bordercol = VICIV.bordercol;
 
     POKE(0xD6F5U, value);
 }
@@ -84,9 +85,9 @@ uint8_t audioxbar_getcoefficient(uint8_t n) {
     POKE(0xD6F4, n);
 
     // Now wait at least 16 cycles for it to settle
-    POKE(0xD020U, PEEK(0xD020U));
-    POKE(0xD020U, PEEK(0xD020U));
-    POKE(0xD020U, PEEK(0xD020U));
+    VICIV.bordercol = VICIV.bordercol;
+    VICIV.bordercol = VICIV.bordercol;
+    VICIV.bordercol = VICIV.bordercol;
 
     return PEEK(0xD6F5U);
 }
@@ -321,11 +322,11 @@ void set_amplifier(unsigned char leftRight, unsigned short v) {
     break;
   }
   if (c == 99) {
-    POKE(0xD020U, 2);
-    POKE(0xD021U, 2);
+    VICIV.bordercol = 2;
+    VICIV.screencol = 2;
     usleep(100000L);
-    POKE(0xD020U, 6);
-    POKE(0xD021U, 6);
+    VICIV.bordercol = 6;
+    VICIV.screencol = 6;
   }
 #endif
 }
@@ -638,12 +639,12 @@ void test_audio(unsigned char advanced_view) {
         for (frames = 0; frames < 35; frames++) {
             // Make sure all 4 SIDs remain active
             // by proding while waiting
-            while (PEEK(0xD012U) != 0x80) {
+            while (VICIV.rasterline != 0x80) {
                 POKE(0xD438U, 0x0f);
                 POKE(0xD478U, 0x0f);
             }
 
-            while (PEEK(0xD012U) == 0x80)
+            while (VICIV.rasterline == 0x80)
                 continue;
         }
     }
@@ -661,14 +662,14 @@ void test_audio(unsigned char advanced_view) {
     // Silence SIDs gradually to avoid pops
     /*
     for (frames = 15; frames < 16; frames--) {
-      while (PEEK(0xD012U) != 0x80); // wait for raster
+      while (VICIV.rasterline != 0x80); // wait for raster
       POKE(0xD418U, frames);
       POKE(0xD438U, frames);
       POKE(0xD458U, frames);
       POKE(0xD478U, frames);
     }
     */
-    while (PEEK(0xD012U) != 0x80)
+    while (VICIV.rasterline != 0x80)
         ;
     POKE(0xD418U, 0x0);
     POKE(0xD438U, 0x0);
@@ -773,11 +774,11 @@ void do_advanced_mixer(void) {
                     break;
                 default:
                     // For invalid or unimplemented functions flash the border and screen
-                    POKE(0xD020U, 1);
-                    POKE(0xD021U, 1);
+                    VICIV.bordercol = 1;
+                    VICIV.screencol = 1;
                     usleep(150000L);
-                    POKE(0xD020U, 6);
-                    POKE(0xD021U, 6);
+                    VICIV.bordercol = 6;
+                    VICIV.screencol = 6;
                     cin = 0;
                     break;
             }
@@ -899,11 +900,11 @@ void do_audio_mixer(void) {
                     break;
                 default:
                     // For invalid or unimplemented functions flash the border and screen
-                    POKE(0xD020U, 1);
-                    POKE(0xD021U, 1);
+                    VICIV.bordercol = 1;
+                    VICIV.screencol = 1;
                     usleep(150000L);
-                    POKE(0xD020U, 6);
-                    POKE(0xD021U, 6);
+                    VICIV.bordercol = 6;
+                    VICIV.screencol = 6;
                     cin = 0;
                     break;
             }

@@ -7,6 +7,8 @@
 
 #include "fdisk_screen.h"
 
+#include <mega65.h>
+
 struct dmagic_dmalist {
     // Enhanced DMA options
     unsigned char option_0b;
@@ -100,8 +102,8 @@ __attribute__((noinline)) void lfill(
 
 void m65_io_enable(void) {
     // Gate C65 IO enable
-    POKE(0xd02fU, 0x47);
-    POKE(0xd02fU, 0x53);
+    VICIV.key = 0x47;
+    VICIV.key = 0x53;
     // Force to full speed
     POKE(0, 65);
 }

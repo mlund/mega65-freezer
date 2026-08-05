@@ -28,7 +28,18 @@ add_compile_options(
 )
 # include_directories() also feeds the ASM rule, so helper.S finds mega65.inc
 # here too -- no separate CMAKE_ASM_FLAGS entry needed.
-include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
+# The SDK's MEGA65 register structs (VICIV, CIA, SID, PALETTE).  Headers only:
+# the platform stays c64, because the mega65 platform emits a BASIC 65 stub
+# this loader cannot enter.  Derived from the SDK package location rather than
+# an absolute path, so it follows wherever llvm-mos is installed.
+cmake_path(GET llvm-mos-sdk_DIR PARENT_PATH _sdk_cmake)   # .../lib/cmake
+cmake_path(GET _sdk_cmake PARENT_PATH _sdk_lib)           # .../lib
+cmake_path(GET _sdk_lib PARENT_PATH LLVM_MOS_ROOT)        # install prefix
+set(MEGA65_INCLUDE ${LLVM_MOS_ROOT}/mos-platform/mega65/include)
+if(NOT EXISTS ${MEGA65_INCLUDE}/mega65.h)
+    message(FATAL_ERROR "MEGA65 register headers not found at ${MEGA65_INCLUDE}")
+endif()
+include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR} ${MEGA65_INCLUDE})
 
 # Must be a link option: -mlto-zp governs LTO codegen, and is silently ignored
 # at compile time.  Moves together with freezemenu.ld's __basic_zp_end; the

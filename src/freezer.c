@@ -11,6 +11,7 @@
 #include "fdisk_screen.h"
 #include "freezer_common.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -125,9 +126,9 @@ unsigned char viciv_regs[0x80] = {
 void setup_menu_screen(void) {
     // Reset all VIC-IV registers
     // EXCEPT preserve $D054 CRT emulation mode...
-    viciv_regs[0x54] = (viciv_regs[0x54] & (0xff - 0x20)) | (PEEK(0xD054) & 0x20);
+    viciv_regs[0x54] = (viciv_regs[0x54] & (0xff - 0x20)) | (VICIV.ctrlc & 0x20);
     // EXCEPT preserve PAL/NTSC
-    viciv_regs[0x6F] = PEEK(0xD06F);
+    viciv_regs[0x6F] = VICIV.rasline0;
     // fix position for PAL/NTSC
     if (viciv_regs[0x6f] & 0x80) {
         viciv_regs[0x48] = 0x2A;
@@ -283,8 +284,8 @@ void predraw_freeze_menu(void)
 {
   unsigned short i;
   // Clear screen, blue background, white text, like Action Replay
-  POKE(0xD020U, 6);
-  POKE(0xD021U, 6);
+  VICIV.bordercol = 6;
+  VICIV.screencol = 6;
 
   lfill(0xFF80000L, 1, 2000);
   // Make disk image names different colour to avoid confusion
@@ -528,7 +529,7 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     // wait till raster leaves screen
-    while (PEEK(0xD012U) < 0xf8)
+    while (VICIV.rasterline < 0xf8)
         continue;
 
     // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
@@ -626,7 +627,7 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     // restore border colour (fdisk/sd stuff still twiddles with it)
-    POKE(0xD020U, 6);
+    VICIV.bordercol = 6;
 }
 
 void topetsciiupper(char* str, int len) {
@@ -847,7 +848,7 @@ void debug_region_list()
   while (!PEEK(0xD610U))
     usleep(1000);
   POKE(0xD610U, 0);
-  POKE(0xD020U, 6);
+  VICIV.bordercol = 6;
 }
 #endif
 
@@ -893,11 +894,11 @@ void fix_chargen_area(unsigned char flags) {
                 }
         } else {
             // failed to load font, flash screen
-            POKE(0xD020U, 2);
-            POKE(0xD021U, 2);
+            VICIV.bordercol = 2;
+            VICIV.screencol = 2;
             usleep(150000L);
-            POKE(0xD020U, 6);
-            POKE(0xD021U, 6);
+            VICIV.bordercol = 6;
+            VICIV.screencol = 6;
         }
     }
 }
@@ -939,14 +940,14 @@ int main(void) {
 
     // Disable interrupts and interrupt sources
     init_nmi(); // this also does SEI
-    POKE(0xDC0DU, 0x7F);
-    POKE(0xDD0DU, 0x7F);
-    POKE(0xD01AU, 0x00);
+    CIA1.icr = 0x7F;
+    CIA2.icr = 0x7F;
+    VICIV.imr = 0x00;
     // XXX add missing C65 AND M65 peripherals
     // C65 UART, ethernet etc
 
     // check border for return codes from other helpers
-    if (PEEK(0xD020U) == 0x83)
+    if (VICIV.bordercol == 0x83)
         rom_changed = 1;
 
     // Bank out BASIC ROM, leave KERNAL and IO in
@@ -966,10 +967,10 @@ int main(void) {
     POKE(0xDD02, 0xFF);
 
     // Enable extended attributes so we can use reverse
-    POKE(0xD031U, PEEK(0xD031U) | 0x20);
+    VICIV.ctrlb = VICIV.ctrlb | 0x20;
 
     // Correct horizontal scaling
-    POKE(0xD05AU, 0x78);
+    VICIV.chrxscl = 0x78;
 
     // Reset character set address
     POKE(0xD068, 0x00);
@@ -1269,11 +1270,11 @@ int main(void) {
 
                     // can't save to slot 0
                     if (slot_number == 0) {
-                        POKE(0xD020U, 2);
-                        POKE(0xD021U, 2);
+                        VICIV.bordercol = 2;
+                        VICIV.screencol = 2;
                         usleep(150000L);
-                        POKE(0xD020U, 6);
-                        POKE(0xD021U, 6);
+                        VICIV.bordercol = 6;
+                        VICIV.screencol = 6;
                         continue;
                     }
 
@@ -1288,12 +1289,12 @@ int main(void) {
                     // Process in 64KB blocks, so that we can do multi-sector writes
                     // and generally be about 10x faster than otherwise.
                     for (i = 0; i < 1024; i += 128) {
-                        POKE(0xD020U, 0x0e);
+                        VICIV.bordercol = 0x0e;
                         for (j = 0; j < 128; j++) {
                             sdcard_readsector(freeze_slot_start_sector + i + j);
                             lcopy((unsigned long)sector_buffer, 0x40000U + (j << 9), 512);
                         }
-                        POKE(0xD020U, 0x00);
+                        VICIV.bordercol = 0x00;
                         for (j = 0; j < 128; j++) {
                             lcopy(0x40000U + (j << 9), (unsigned long)sector_buffer, 512);
 #ifdef USE_MULTIBLOCK_WRITE
@@ -1313,7 +1314,7 @@ int main(void) {
                     // stop giving visual feedback
                     sdcard_visual_feedback(0);
 
-                    POKE(0xD020U, 6);
+                    VICIV.bordercol = 6;
 
                     draw_freeze_menu(UPDATE_TOP | UPDATE_PROCESS | UPDATE_THUMB);
                 } break;
@@ -1359,11 +1360,11 @@ int main(void) {
                 default:
                 invalid_function:
                     // For invalid or unimplemented functions flash the border and screen
-                    POKE(0xD020U, 1);
-                    POKE(0xD021U, 1);
+                    VICIV.bordercol = 1;
+                    VICIV.screencol = 1;
                     usleep(150000L);
-                    POKE(0xD020U, 6);
-                    POKE(0xD021U, 6);
+                    VICIV.bordercol = 6;
+                    VICIV.screencol = 6;
                     break;
             }
     }
