@@ -115,7 +115,7 @@ void screen_colour_line(unsigned char line, unsigned char colour) {
     lfill(0x1f800 + (line << 6) + (line << 4), colour, 80);
 }
 
-void fatal_error(unsigned char* filename, unsigned int line_number) {
+void fatal_error(const unsigned char* filename, unsigned int line_number) {
     unsigned char i;
     display_footer(FOOTER_FATAL);
     for (i = 0; filename[i]; i++)

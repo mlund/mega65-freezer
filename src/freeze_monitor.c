@@ -440,13 +440,11 @@ void freeze_monitor(void) {
                     break;
                 show_memory();
                 break;
-            case 'd':
+            case 'd': // disassemble
             case 'D':
-                // Disassemble memory
-                break;
-            case 'a':
+            case 'a': // assemble
             case 'A':
-                // Assemble memory
+                // Not implemented.
                 break;
             case 'r':
             case 'R':

@@ -268,7 +268,7 @@ void draw_thumbnail(void) {
 struct process_descriptor_t process_descriptor;
 
 // clang-format off
-char last_thumb_frame = -1;
+int8_t last_thumb_frame = -1;
 unsigned char thumb_xoff = 5, thumb_yoff = 1;
 #define F_M65 0
 #define F_C65 1
@@ -319,7 +319,7 @@ void predraw_freeze_menu(void)
 #define UPDATE_CHGSLOT 0x80
 // clang-format on
 
-void copy_convert_to_screen(unsigned char* data, short offset) {
+void copy_convert_to_screen(const unsigned char* data, short offset) {
     unsigned short i;
     offset <<= 1;
 
@@ -1326,7 +1326,7 @@ int main(void) {
                     fix_chargen_area(CHARGEN_NOCHECK | CHARGEN_FIXMEM);
                     // we need to redraw everything, because loading the ROM
                     // will mess things up (thumbnail for example)
-                    last_thumb_frame = 255; // invalidate thumbnail
+                    last_thumb_frame = -1; // invalidate thumbnail
                     draw_freeze_menu(UPDATE_ALL);
                 } break;
 

@@ -563,7 +563,7 @@ void scan_directory(unsigned char drive_id) {
                 // Put / at the start of directory names to make them obviously different
                 lpoke(0x40000L + (file_count * 64), '/');
                 // Don't list "." directory pointer
-                if (strcmp(".", dirent->d_name))
+                if (strcmp(".", dirent->d_name) != 0)
                     file_count++;
             } else if (x > 4) {
                 ptr = &dirent->d_name[x - 4];

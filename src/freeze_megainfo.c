@@ -39,7 +39,7 @@ static unsigned char code_buffer[512], ymd[3];
 static void write_text_mapped(unsigned char x,
     unsigned char y,
     unsigned short colour,
-    char* text,
+    const char* text,
     unsigned char mask,
     unsigned char lower_offset) {
     unsigned char i, c;
@@ -298,7 +298,7 @@ char* format_hyppo_version(void) {
  * starting with 'v:20' and returns the next characters until a zero byte
  * compares to date (which should by artix ymd) and returns 0 if equal or newer
  */
-unsigned char format_util_version(long addr, unsigned char* date) {
+unsigned char format_util_version(long addr, const unsigned char* date) {
     unsigned short i, j = 0;
     unsigned char temp, result = 0, p;
 
@@ -362,7 +362,7 @@ unsigned char format_util_version(long addr, unsigned char* date) {
  * search for GIT: in 40000 upwards
  * tries to parse date and compare to date[3]
  */
-unsigned char format_hickup_version(long addr, unsigned char* date) {
+unsigned char format_hickup_version(long addr, const unsigned char* date) {
     unsigned short p, i, j = 0;
     char* needle = "GIT: ";
     char* needle2 = ",20";

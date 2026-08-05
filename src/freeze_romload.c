@@ -231,7 +231,7 @@ void scan_directory(void) {
         if (dirent->d_type & 0x10) {
             // File is a directory
             // limit filename length and skip '.' directory
-            if (strcmp(dirent->d_name, ".")) {
+            if (strcmp(dirent->d_name, ".") != 0) {
                 // keep directories at the top, and
                 // always put ROMS dir at the very top
                 if (!strcmp(dirent->d_name, "ROMS"))

@@ -89,7 +89,7 @@ void draw_box(unsigned char x1,
     lpoke(SCREEN_ADDRESS + y2 * 80 + x2 * 2 + 1, 0);
 }
 
-void write_text(unsigned char x1, unsigned char y1, unsigned char colour, char* t) {
+void write_text(unsigned char x1, unsigned char y1, unsigned char colour, const char* t) {
     unsigned char ofs = 0, x, c;
     for (x = x1; t[x - x1]; x++) {
         c = t[x - x1];

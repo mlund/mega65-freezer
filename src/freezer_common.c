@@ -235,7 +235,7 @@ unsigned char petscii_to_screen(unsigned char petscii) {
 // static char* deadly_haiku[3] = { "Error consumes all", "As sand erodes rock and stone", "Now also
 // your mind" };
 
-void screen_of_death(char* msg) {
+void screen_of_death(const char* msg) {
     // TODO: This is broken, obviously...
 #if 0
   POKE(0,0x41);

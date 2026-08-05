@@ -122,9 +122,9 @@
 #define SPRITE_SIZE_BYTES(n) ((IS_SPR_XWIDTH((n)) | IS_SPR_16COL((n))) ? 168 : 64)
 #define SPRITE_DATA_ADDR(n)                                                                        \
     (REG_SPRPTR16 ? 64 *                                                                           \
-                (((long)FREEZE_PEEK(SPRITE_POINTER_ADDR + 1 + n * 2) << 8) +                       \
-                    ((long)FREEZE_PEEK(SPRITE_POINTER_ADDR + n * 2)))                              \
-                  : (long)(64 * FREEZE_PEEK(SPRITE_POINTER_ADDR + n)) |                            \
+                (((long)FREEZE_PEEK(SPRITE_POINTER_ADDR + 1 + (n) * 2) << 8) +                     \
+                    ((long)FREEZE_PEEK(SPRITE_POINTER_ADDR + (n) * 2)))                            \
+                  : (long)(64 * FREEZE_PEEK(SPRITE_POINTER_ADDR + (n))) |                          \
                 (((long)(~FREEZE_PEEK(CIA2_PORT_A) & 0x3)) << 14))
 // #define REG_SPRBPMEN_0_3            (vic_registers[0x49] >> 4)
 // #define REG_SPRBPMEN_4_7            (vic_registers[0x4B] >> 4)
@@ -177,9 +177,18 @@
 #define REDRAW_SB_TOOLS 8
 #define REDRAW_TOOL_PREVIEW 16
 #define REDRAW_TOOL_HEADER 32
-#define REDRAW_SB_ALL 1 + 2 + 4 + 8 + 16 + 32
+#define REDRAW_SB_ALL 0x3f
 
 typedef unsigned char BYTE;
+
+/* mega65-libc types screen text as uint8_t*, while C string literals are
+ * char[].  These convert once so call sites stay free of casts. */
+static inline void screen_puts(const char* s) {
+    cputs((const uint8_t*)s);
+}
+static inline void screen_putsxy(uint8_t x, uint8_t y, const char* s) {
+    cputsxy(x, y, (const uint8_t*)s);
+}
 typedef unsigned char BOOL;
 
 #define SPR_COLOR_MODE_MONOCHROME 0
@@ -1148,7 +1157,7 @@ static void PaintPixelMulti(BYTE x, BYTE y) {
     const BYTE p0 = b & (0x80 >> bitsel);
     const BYTE p1 = b & (0x40 >> bitsel);
     const BYTE mask = ((0x80 >> bitsel) | (0x40 >> bitsel));
-    if ((g_state.currentColorIdx == COLOR_BACK)) {
+    if (g_state.currentColorIdx == COLOR_BACK) {
         lpoke(byteAddr, lpeek(byteAddr) & ~mask);
     } else {
         if (g_state.currentColorIdx == COLOR_FORE) {
@@ -1365,8 +1374,9 @@ static void DrawHeader() {
         /* Escape names stay lowercase -- libc matches them by hash -- but the
          * text must be uppercase, because cprintf runs petsciitoscreencode()
          * over it. */
-        cprintf("{home}{rvson}{lgrn}                            THE MEGA65 SPRITE EDITOR           "
-                "                 {rvsoff}");
+        cprintf((const uint8_t*)"{home}{rvson}{lgrn}                            THE MEGA65 SPRITE "
+                                "EDITOR           "
+                                "                 {rvsoff}");
 }
 
 static void DrawColorSelector() {
@@ -1379,59 +1389,59 @@ static void DrawColorSelector() {
             case SPR_COLOR_MODE_MONOCHROME:
 
                 textcolor(g_state.color[COLOR_BACK]);
-                cputsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
+                screen_putsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
                 textcolor(g_state.color[COLOR_FORE]);
-                cputsxy(SIDEBAR_COLUMN + 8, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
+                screen_putsxy(SIDEBAR_COLUMN + 8, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
 
                 textcolor(g_state.currentColorIdx == COLOR_BACK ? 1 : COLOUR_DARKGREY);
-                cputsxy(SIDEBAR_COLUMN + 2, 6, "BK");
+                screen_putsxy(SIDEBAR_COLUMN + 2, 6, "BK");
 
                 textcolor(g_state.currentColorIdx == COLOR_FORE ? 1 : COLOUR_DARKGREY);
-                cputsxy(SIDEBAR_COLUMN + 8 + 2, 6, "FG");
+                screen_putsxy(SIDEBAR_COLUMN + 8 + 2, 6, "FG");
 
                 break;
 
             case SPR_COLOR_MODE_16COLOR:
                 textcolor(g_state.color[COLOR_FORE]);
-                cputsxy(SIDEBAR_COLUMN,
+                screen_putsxy(SIDEBAR_COLUMN,
                     5,
                     "\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0");
 
                 textcolor(1);
-                cputsxy(SIDEBAR_COLUMN + 2,
+                screen_putsxy(SIDEBAR_COLUMN + 2,
                     6,
                     g_state.color[COLOR_FORE] == 0 ? "BACKGROUND" : "FOREGROUND");
                 break;
 
             case SPR_COLOR_MODE_MULTICOLOR:
                 textcolor(g_state.color[COLOR_BACK]);
-                cputsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0");
+                screen_putsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0");
                 textcolor(g_state.color[COLOR_FORE]);
-                cputsxy(SIDEBAR_COLUMN + 4, 5, "\xe0\xe0\xe0");
+                screen_putsxy(SIDEBAR_COLUMN + 4, 5, "\xe0\xe0\xe0");
                 textcolor(g_state.color[COLOR_MC1]);
-                cputsxy(SIDEBAR_COLUMN + 4 * 2, 5, "\xe0\xe0\xe0");
+                screen_putsxy(SIDEBAR_COLUMN + 4 * 2, 5, "\xe0\xe0\xe0");
                 textcolor(g_state.color[COLOR_MC2]);
-                cputsxy(SIDEBAR_COLUMN + 4 * 3, 5, "\xe0\xe0\xe0");
+                screen_putsxy(SIDEBAR_COLUMN + 4 * 3, 5, "\xe0\xe0\xe0");
 
                 textcolor(COLOUR_DARKGREY);
-                cputsxy(SIDEBAR_COLUMN + 1, 6, "BK");
-                cputsxy(SIDEBAR_COLUMN + 5, 6, "FG");
-                cputsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
-                cputsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
+                screen_putsxy(SIDEBAR_COLUMN + 1, 6, "BK");
+                screen_putsxy(SIDEBAR_COLUMN + 5, 6, "FG");
+                screen_putsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
+                screen_putsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
 
                 textcolor(1);
                 switch (g_state.currentColorIdx) {
                     case COLOR_BACK:
-                        cputsxy(SIDEBAR_COLUMN + 1, 6, "BK");
+                        screen_putsxy(SIDEBAR_COLUMN + 1, 6, "BK");
                         break;
                     case COLOR_FORE:
-                        cputsxy(SIDEBAR_COLUMN + 5, 6, "FG");
+                        screen_putsxy(SIDEBAR_COLUMN + 5, 6, "FG");
                         break;
                     case COLOR_MC1:
-                        cputsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
+                        screen_putsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
                         break;
                     case COLOR_MC2:
-                        cputsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
+                        screen_putsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
                         break;
                 }
 
@@ -1470,9 +1480,9 @@ static void DrawSideBarSpriteInfo() {
     if (g_state.redrawFlags & REDRAW_SB_INFO) {
         textcolor(1);
         gotoxy(SIDEBAR_COLUMN, 2);
-        cputs("SPRITE ");
+        screen_puts("SPRITE ");
         cputdec(g_state.spriteNumber, 0, 0);
-        cputs(g_state.spriteColorMode == SPR_COLOR_MODE_MONOCHROME
+        screen_puts(g_state.spriteColorMode == SPR_COLOR_MODE_MONOCHROME
                 ? " MONO    "
                 : (g_state.spriteColorMode == SPR_COLOR_MODE_MULTICOLOR ? " MULTI   " : " 16-COL"));
         gotoxy(SIDEBAR_COLUMN, 3);
@@ -1482,11 +1492,11 @@ static void DrawSideBarSpriteInfo() {
         textcolor(IS_SPR_XWIDTH(g_state.spriteNumber) | IS_SPR_16COL(g_state.spriteNumber)
                 ? COLOUR_LIGHTBLUE
                 : COLOUR_DARKGREY);
-        cputs("XWIDE");
+        screen_puts("XWIDE");
         textcolor(IS_SPR_HEXPAND(g_state.spriteNumber) ? COLOUR_LIGHTBLUE : COLOUR_DARKGREY);
-        cputs(" HEXP");
+        screen_puts(" HEXP");
         textcolor(IS_SPR_VEXPAND(g_state.spriteNumber) ? COLOUR_LIGHTBLUE : COLOUR_DARKGREY);
-        cputs(" VEXP");
+        screen_puts(" VEXP");
     }
 }
 
@@ -1521,12 +1531,12 @@ static void DrawSidebar() {
     g_state.redrawFlags = REDRAW_SB_NONE;
 }
 
-static void Ask(const char* question, char* outbuffer, unsigned char maxlen) {
+static void Ask(const char* question, uint8_t* outbuffer, uint8_t maxlen) {
     gotoy(SCREEN_ROWS - 1);
     revers(1);
     textcolor(COLOUR_PINK);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
-    cputsxy(0, SCREEN_ROWS - 1, question);
+    screen_putsxy(0, SCREEN_ROWS - 1, question);
     cinput(outbuffer, maxlen + 1, CINPUT_ACCEPT_ALL);
     revers(0);
     textcolor(COLOUR_BLUE);
@@ -1539,13 +1549,13 @@ static void PrintKeyGroup(const char* list[], BYTE count, BYTE x, BYTE y) {
     gotoxy(x, y);
     revers(1);
     textcolor(COLOUR_PINK);
-    cputs(list[0]);
+    screen_puts(list[0]);
     revers(0);
     textcolor(COLOUR_WHITE);
 
     for (i = 1; i < count; ++i) {
         gotoxy(x, y + i);
-        cputs(list[i]);
+        screen_puts(list[i]);
     }
 }
 
@@ -1630,8 +1640,10 @@ static void ShowHelp() {
     textcolor(COLOUR_CYAN);
     revers(1);
     cputncxy(22, SCREEN_ROWS - 4, SCREEN_COLS - 22, 32);
-    cputsxy(22, SCREEN_ROWS - 3, " MEGA65 SPRITE EDITOR  V0.10 (C) 2021 HERNAN DI PIETRO    ");
-    cputsxy(22, SCREEN_ROWS - 2, " MOUSE/JOY CODE BY PAUL GARDNER-STEPHEN.                  ");
+    screen_putsxy(
+        22, SCREEN_ROWS - 3, " MEGA65 SPRITE EDITOR  V0.10 (C) 2021 HERNAN DI PIETRO    ");
+    screen_putsxy(
+        22, SCREEN_ROWS - 2, " MOUSE/JOY CODE BY PAUL GARDNER-STEPHEN.                  ");
     cputncxy(22, SCREEN_ROWS - 1, SCREEN_COLS - 22, 32);
     revers(0);
 
