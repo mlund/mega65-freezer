@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* Implemented in helper.s.  leaf promises the callee does not re-enter C, so
+/* Implemented in helper.S.  leaf promises the callee does not re-enter C, so
  * callers keep their statically allocated frames instead of the soft stack.
  * It holds here: helper.s only ever transfers to LOADER_STUB and
  * PROGRAM_ENTRY, neither of which is C. */

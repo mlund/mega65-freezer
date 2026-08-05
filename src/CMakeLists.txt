@@ -26,7 +26,7 @@ add_compile_options(
     # store through a null pointer rather than undefined behaviour.
     -fno-delete-null-pointer-checks
 )
-# include_directories() also feeds the ASM rule, so helper.s finds mega65.inc
+# include_directories() also feeds the ASM rule, so helper.S finds mega65.inc
 # here too -- no separate CMAKE_ASM_FLAGS entry needed.
 include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
 
@@ -41,7 +41,7 @@ add_link_options(-mlto-zp=${LTO_ZP})
 set(COMMON
     frozen_memory.c fdisk_memory.c fdisk_screen.c
     fdisk_hal_mega65.c freezer_common.c
-    helper.s version.c
+    helper.S version.c
 )
 
 function(add_m65 name)

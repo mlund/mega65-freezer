@@ -1,81 +1,89 @@
-;;; MEGA65 hypervisor and hardware constants shared by the assembly sources.
+// MEGA65 hypervisor and hardware constants.
+//
+// Preprocessor defines rather than .equ, so this is one source of truth for
+// both helper.S and C.  That is why helper.S is .S: the uppercase extension
+// makes the driver run the C preprocessor before assembling.
+//
+// Do not parenthesise the expressions below.  In 6502 assembly "(expr)" is
+// indirect addressing, so "sta (0x0140)" would assemble to something else
+// entirely.
 
-;;; Trap registers.  The value written selects the function; the two registers
-;;; reach different trap handlers.
-	.equ HTRAP_DOS,			$D640
-	.equ HTRAP_SYSPART,		$D642
+// Trap registers.  The value written selects the function; the two registers
+// reach different trap handlers.
+#define HTRAP_DOS                0xD640
+#define HTRAP_SYSPART            0xD642
 
-;;; HTRAP_DOS functions.
-	.equ HYPPO_GETVERSION,		$00
-	.equ HYPPO_GETCURRENTDRIVE,	$04
-	.equ HYPPO_CHDIR,		$0C
-	.equ HYPPO_OPENDIR,		$12
-	.equ HYPPO_READDIR,		$14
-	.equ HYPPO_CLOSEDIR,		$16
-	.equ HYPPO_CLOSEALL,		$22
-	.equ HYPPO_SETNAME,		$2E
-	.equ HYPPO_FINDFILE,		$34
-	.equ HYPPO_LOADFILE,		$36
-	.equ HYPPO_CDROOTDIR,		$3C
-	.equ HYPPO_GETPROCDESC,		$48
-	.equ HYPPO_ATTACH,		$4A
+// HTRAP_DOS functions.
+#define HYPPO_GETVERSION         0x00
+#define HYPPO_GETCURRENTDRIVE    0x04
+#define HYPPO_CHDIR              0x0C
+#define HYPPO_OPENDIR            0x12
+#define HYPPO_READDIR            0x14
+#define HYPPO_CLOSEDIR           0x16
+#define HYPPO_CLOSEALL           0x22
+#define HYPPO_SETNAME            0x2E
+#define HYPPO_FINDFILE           0x34
+#define HYPPO_LOADFILE           0x36
+#define HYPPO_CDROOTDIR          0x3C
+#define HYPPO_GETPROCDESC        0x48
+#define HYPPO_ATTACH             0x4A
 
-;;; HTRAP_SYSPART functions.
-	.equ SYSPART_SLOT_SECTOR,	$10
-	.equ SYSPART_UNFREEZE,		$12
-	.equ SYSPART_REGION_LIST,	$14
-	.equ SYSPART_SLOT_COUNT,	$16
-	.equ SYSPART_GETERRORCODE,	$38
+// HTRAP_SYSPART functions.
+#define SYSPART_SLOT_SECTOR      0x10
+#define SYSPART_UNFREEZE         0x12
+#define SYSPART_REGION_LIST      0x14
+#define SYSPART_SLOT_COUNT       0x16
+#define SYSPART_GETERRORCODE     0x38
 
-;;; Hyppo needs its filename buffer page-aligned and in the bottom 32KB.  Two
-;;; are used so a pending attach name is not clobbered by an exec.
-	.equ NAME_BUF_EXEC,		$0100
-	.equ NAME_BUF_DOS,		$0400
+// Hyppo needs its filename buffer page-aligned and in the bottom 32KB.  Two
+// are used so a pending attach name is not clobbered by an exec.
+#define NAME_BUF_EXEC            0x0100
+#define NAME_BUF_DOS             0x0400
 
-;;; Scratch page for the loader stub, which must survive the load it performs.
-	.equ LOADER_STUB,		$0340
-	.equ LOADER_STUB_SIZE,		$80
+// Scratch page for the loader stub, which must survive the load it performs.
+#define LOADER_STUB              0x0340
+#define LOADER_STUB_SIZE         0x80
 
-;;; PRG conventions: files load at $07FF and are entered via the BASIC stub.
-	.equ LOAD_ADDR_LO,		$FF
-	.equ LOAD_ADDR_HI,		$07
-	.equ PROGRAM_ENTRY,		$080D
+// PRG conventions: files load at $07FF and are entered via the BASIC stub.
+#define LOAD_ADDR_LO             0xFF
+#define LOAD_ADDR_HI             0x07
+#define PROGRAM_ENTRY            0x080D
 
-	.equ NMI_VECTOR,		$0318
-	.equ BORDER_COLOUR,		$D020
+#define NMI_VECTOR               0x0318
+#define BORDER_COLOUR            0xD020
 
-;;; Drive selection bits for attach/detach.
-	.equ DRIVE_MASK,		$01
-	.equ DETACH_DRIVE_MASK,		$41	; drive bits plus bit 6 (nodrive)
-	.equ DETACH_FLAG,		$80
-	.equ ATTACH_LEGACY_BASE,	$40	; pre-1.2 hyppo: $40 or $46
-	.equ ATTACH_LEGACY_DRIVE1,	$06
+// Drive selection bits for attach/detach.
+#define DRIVE_MASK               0x01
+#define DETACH_DRIVE_MASK        0x41  // drive bits plus bit 6 (nodrive)
+#define DETACH_FLAG              0x80
+#define ATTACH_LEGACY_BASE       0x40  // pre-1.2 hyppo: $40 or $46
+#define ATTACH_LEGACY_DRIVE1     0x06
 
-;;; Offsets into hyppo's dirent, written to NAME_BUF_DOS.
-	.equ HDIRENT_NAME,		0
-	.equ HDIRENT_NAME_LEN,		64	; name is 64 bytes
-	.equ HDIRENT_CLUSTER,		77	; 64 + 1 + 12
-	.equ HDIRENT_SIZE,		81	; HDIRENT_CLUSTER + 4
-	.equ HDIRENT_ATTR,		86	; HDIRENT_SIZE + 1 + 4
+// Offsets into hyppo's dirent, written to NAME_BUF_DOS.
+#define HDIRENT_NAME             0
+#define HDIRENT_NAME_LEN         64  // name is 64 bytes
+#define HDIRENT_CLUSTER          77  // 64 + 1 + 12
+#define HDIRENT_SIZE             81  // HDIRENT_CLUSTER + 4
+#define HDIRENT_ATTR             86  // HDIRENT_SIZE + 1 + 4
 
-;;; Offsets into the C struct m65_dirent.
-	.equ DIRENT_INO,		0	; d_ino,    4 bytes
-	.equ DIRENT_OFF,		4	; d_off,    2 bytes
-	.equ DIRENT_RECLEN,		6	; d_reclen, 4 bytes
-	.equ DIRENT_TYPE,		10	; d_type,   2 bytes
-	.equ DIRENT_NAME,		12	; d_name
-	.equ DIRENT_NAME_MAX,		256
+// Offsets into the C struct m65_dirent.
+#define DIRENT_INO               0  // d_ino,    4 bytes
+#define DIRENT_OFF               4  // d_off,    2 bytes
+#define DIRENT_RECLEN            6  // d_reclen, 4 bytes
+#define DIRENT_TYPE              10  // d_type,   2 bytes
+#define DIRENT_NAME              12  // d_name
+#define DIRENT_NAME_MAX          256
 
-;;; The filename pointer is stashed alongside each buffer for post-mortem
-;;; inspection from the monitor.
-	.equ NAME_PTR_STASH_EXEC,	NAME_BUF_EXEC + $40
-	.equ NAME_PTR_STASH_DOS,	NAME_BUF_DOS + $40
+// The filename pointer is stashed alongside each buffer for post-mortem
+// inspection from the monitor.
+#define NAME_PTR_STASH_EXEC      NAME_BUF_EXEC + 0x40
+#define NAME_PTR_STASH_DOS       NAME_BUF_DOS + 0x40
 
-;;; dos_attach gained its current calling convention in hyppo DOS 1.3.
-	.equ HDOS_MAJOR_MIN,		1
-	.equ HDOS_MINOR_MIN,		3
+// dos_attach gained its current calling convention in hyppo DOS 1.3.
+#define HDOS_MAJOR_MIN           1
+#define HDOS_MINOR_MIN           3
 
-;;; Border flashes while retrying a failed load, before falling back.
-	.equ RETRY_FLASH_COUNT,		60
+// Border flashes while retrying a failed load, before falling back.
+#define RETRY_FLASH_COUNT        60
 
-	.equ ATTACH_ERROR,		$EF
+#define ATTACH_ERROR             0xEF
