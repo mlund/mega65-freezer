@@ -128,6 +128,26 @@ compiler's own code disagrees with it.
 - **Mark assembly-implemented functions `__attribute__((leaf))`** unless they
   really can re-enter C. Otherwise an opaque `jsr` forces every caller off its
   statically allocated frame onto the soft stack.
+- **Rename `.s` to `.S`.** Only the uppercase extension is run through the C
+  preprocessor. ca65 has none, so cc65 projects keep shared constants in an
+  `.inc` of `.equ`s and pull it in with `.include`; keeping the lowercase name
+  keeps that limitation, and the C side needs its own hand-maintained mirror of
+  every constant. Under `.S` one header of `#define`s serves both, and the
+  mirror can be deleted. Convert the header but forget the extension and the
+  build still succeeds: the assembler reads `#define` as a comment, every
+  constant becomes an undefined external, and the first complaint is
+  `undefined symbol` from the linker. Constants shared with assembly must stay
+  unparenthesised — `(expr)` is indirect addressing, so `#define BUF (0x400 +
+  0x40)` assembles `sta BUF` to something else entirely.
+- **Split the file's sections.** ca65 encourages one segment per file, and
+  `.section .text` at the top of a ported `.s` reproduces it: the unit is
+  indivisible, so every target that calls one routine links all of them. Give
+  each entry point `.section .text.<name>,"ax",@progbits` and each datum
+  `.bss.<name>` / `.zp.bss.<name>` / `.data.<name>`; the linker's collection
+  patterns already match the suffixes. Then confirm `--gc-sections` is on the
+  link line — it is not implied by the optimisation level. Compiled C is
+  unaffected: per-function sections are the default there. This is granularity
+  for the linker, not a hint to the compiler; it has no bearing on inlining.
 - **Assert struct layout rather than trusting it.** cc65 packs everything at
   alignment 1; confirm the new toolchain agrees before blaming anything else:
 
@@ -207,10 +227,33 @@ Out of line, correctness cost **23 bytes** across seven binaries, and the
 result was smaller than the buggy build. A `jsr`/`rts` is nothing against a
 DMA transfer.
 
+The same trade decides how to package inline assembly. Inline asm states
+exactly what it clobbers, where a C prototype can only promise the ABI's whole
+clobber set — but pasted at N call sites it costs N copies of the body against
+one `jsr` each. Take both: put the asm in a `static` function and choose the
+inlining yourself, keyed to the optimisation mode.
+
+```c
+#if defined(__OPTIMIZE_SIZE__)          /* -Os and -Oz, not -O2 */
+#define ASM_FN static inline __attribute__((noinline))
+#else
+#define ASM_FN static inline __attribute__((always_inline))
+#endif
+```
+
+Do not leave it to LTO: measured on a three-call-site wrapper, explicit
+`noinline` beat both forced inlining and the LTO inliner's own choice. The gain
+is in the body — constraints let the compiler deliver arguments in whichever
+registers the routine wants, so the `phx/tay/pla/tax` shuffle a hand-written
+version needs to get them out of the C ABI collapses, and a constant argument
+can fold into immediate loads. A `.s` file can never do that: it is machine
+code by the time LTO runs.
+
 Related levers, usually worth taking: `-fnonreentrant` when function pointers
-defeat the call-graph analysis, and `leaf` per §5. `-Oz` is byte-identical to
-`-Os` on this backend and the machine outliner is not plumbed through — don't
-expect either to help.
+defeat the call-graph analysis, and `leaf` per §5. **Measure `-Oz` rather than
+assuming it matches `-Os`** — on one seven-binary project it was worth 7871
+bytes, 7.3%, with no other change. The machine outliner is not plumbed through,
+so don't expect help there.
 
 ## 9. Character encoding
 
