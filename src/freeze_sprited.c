@@ -1946,11 +1946,8 @@ static void MainLoop() {
                 g_state.redrawFlags = REDRAW_SB_INFO;
                 break;
 
-            case 8: // CTRL-H  (Horz flip)
-                // TODO: implement; issue #78
-                break;
-
-            case 22: // CTRL-V  (Vert flip)
+            case 8:  // CTRL-H, horizontal flip
+            case 22: // CTRL-V, vertical flip
                 // TODO: implement; issue #78
                 break;
 
@@ -2012,14 +2009,9 @@ static void MainLoop() {
                 }
                 break;
 
-            case 0xF5: // F5 LOAD
+            case 0xF5: // F5, load
+            case 0xF7: // F7, save
                 // TODO: implement
-                // Ask("enter file name to load: ", buf, 19);
-                break;
-
-            case 0xF7: // F7 SAVE
-                // TODO: implement
-                // Ask("enter file name to save: ", buf, 19);
                 break;
 
             case 0xF9: // F9 Fetch from slot

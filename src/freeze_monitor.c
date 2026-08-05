@@ -98,7 +98,8 @@ void show_memory_line(uint32_t addr) {
         }
     }
     // Convert hex back to C64 screen codes
-    for (i = 0; i < 8 + 16 * 3; i++) {
+    constexpr uint8_t hex_field_end = 8 + 16 * 3;
+    for (i = 0; i < hex_field_end; i++) {
         if (output_buffer[i] >= 'A' && output_buffer[i] <= 'F')
             output_buffer[i] &= 0x0f;
     }
@@ -451,13 +452,11 @@ void freeze_monitor(void) {
                 // Display register values
                 show_registers();
                 break;
-            case 'f':
+            case 'f': // fill memory
             case 'F':
-                // Fill memory
-                break;
-            case 'h':
+            case 'h': // search (hunt) memory
             case 'H':
-                // Search (hunt) memory
+                // Not implemented.
                 break;
             case 's':
             case 'S':
