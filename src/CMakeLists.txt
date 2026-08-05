@@ -1,18 +1,18 @@
-# version.c carries the git describe string, and is regenerated on every
+# version.h carries the git describe string, and is regenerated on every
 # build: .git/HEAD is a symref, so committing on a branch never touches it,
 # and no single path tracks a commit across packed refs, detached HEAD and
 # worktrees.  copy_if_different limits the relink to builds where the stamp
 # actually moved.
-set(VERSION_C ${CMAKE_CURRENT_BINARY_DIR}/version.c)
+set(VERSION_H ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 add_custom_target(version_stamp
-    COMMAND ${CMAKE_COMMAND} -DOUT=${VERSION_C}.tmp -DREPO=${CMAKE_SOURCE_DIR}
+    COMMAND ${CMAKE_COMMAND} -DOUT=${VERSION_H}.tmp -DREPO=${CMAKE_SOURCE_DIR}
             -P ${CMAKE_SOURCE_DIR}/cmake/version.cmake
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VERSION_C}.tmp ${VERSION_C}
-    COMMAND ${CMAKE_COMMAND} -E rm -f ${VERSION_C}.tmp
-    BYPRODUCTS ${VERSION_C}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VERSION_H}.tmp ${VERSION_H}
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${VERSION_H}.tmp
+    BYPRODUCTS ${VERSION_H}
     COMMENT "Stamping version"
 )
-set_source_files_properties(${VERSION_C} PROPERTIES GENERATED TRUE)
+set_source_files_properties(${VERSION_H} PROPERTIES GENERATED TRUE)
 
 # Targets are defined here; the parent CMakeLists handles project setup and
 # the mega65-libc dependency.
@@ -29,7 +29,7 @@ add_compile_options(
 )
 # include_directories() also feeds the ASM rule, so helper.s finds mega65.inc
 # here too -- no separate CMAKE_ASM_FLAGS entry needed.
-include_directories(${SRC})
+include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
 
 # Must be a link option: -mlto-zp governs LTO codegen, and is silently ignored
 # at compile time.  Moves together with freezemenu.ld's __basic_zp_end -- six
@@ -42,7 +42,7 @@ add_link_options(-mlto-zp=${LTO_ZP})
 set(COMMON
     frozen_memory.c fdisk_memory.c fdisk_screen.c
     fdisk_hal_mega65.c freezer_common.c
-    helper.s ${VERSION_C}
+    helper.s version.c
 )
 
 function(add_m65 name)
