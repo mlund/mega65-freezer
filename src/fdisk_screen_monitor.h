@@ -10,6 +10,8 @@ void recolour_last_line_segment(unsigned char column, unsigned char width, unsig
 void screen_colour_line(unsigned char line, unsigned char colour);
 #define screen_colour_line_segment(LA, W, C) lfill((LA) + (0x1f800 - SCREEN_ADDRESS), C, W)
 void set_screen_attributes(long p, unsigned char count, unsigned char attr);
-char read_line(char* buffer, unsigned char maxlen);
+char read_line(char* buffer, unsigned char maxlen, unsigned char column);
+void write_prompt(const char* s, char length);
+void next_line(void);
 void fatal_error(const unsigned char* filename, unsigned int line_number);
 #define FATAL_ERROR fatal_error(__FILE__, __LINE__)

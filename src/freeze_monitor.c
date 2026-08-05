@@ -711,11 +711,17 @@ void assemble_memory(void) {
          * fail: the bytes were just written there. */
         (void)show_disassembly_line();
 
+        /* The prompt stays on its line so the instruction is typed after it,
+         * as it is on the A command that opened the loop. */
+        constexpr unsigned char PROMPT_WIDTH = 10;
         lfill((long)output_buffer, ' ', 80);
         output_buffer[0] = 'A';
         format_hex(&output_buffer[2], mon_address, 7);
-        write_line_len(output_buffer, 0, 9);
-        if (!read_line((char*)screen_line_buffer, 80)) {
+        write_prompt(output_buffer, PROMPT_WIDTH);
+
+        char typed = read_line((char*)screen_line_buffer, 80 - PROMPT_WIDTH, PROMPT_WIDTH);
+        next_line();
+        if (!typed) {
             return;
         }
         screen_line_buffer[79] = 0;
@@ -741,7 +747,7 @@ void freeze_monitor(void) {
     }
 
     while (1) {
-        read_line((char*)screen_line_buffer, 80);
+        read_line((char*)screen_line_buffer, 80, 0);
         screen_line_buffer[79] = 0;
         write_line((char*)screen_line_buffer, 0);
 

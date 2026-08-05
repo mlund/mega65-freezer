@@ -36,8 +36,8 @@ void write_line_len(const char* s, char col, char length) {
     write_line_raw(stemp, col, length);
 }
 
-void write_line_raw(char* s, char col, char length) {
-    lcopy((long)&s[0], screen_line_address + col, length);
+/* Step to the next line, scrolling when the last one is used up. */
+void next_line(void) {
     screen_line_address += SCREEN_ROW_BYTES;
     if ((screen_line_address - SCREEN_ADDRESS) >= (24 * SCREEN_ROW_BYTES)) {
         screen_line_address -= SCREEN_ROW_BYTES;
@@ -46,6 +46,18 @@ void write_line_raw(char* s, char col, char length) {
         lfill(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES, ' ', SCREEN_ROW_BYTES);
         lfill(COLOUR_RAM_ADDRESS + 23 * SCREEN_ROW_BYTES, 1, SCREEN_ROW_BYTES);
     }
+}
+
+void write_line_raw(char* s, char col, char length) {
+    lcopy((long)&s[0], screen_line_address + col, length);
+    next_line();
+}
+
+/* Text on the current line without advancing, so the caller can read input
+ * starting after it. */
+void write_prompt(const char* s, char length) {
+    to_stemp(s, length);
+    lcopy((long)stemp, screen_line_address, length);
 }
 
 void write_line(const char* s, char col) {
@@ -156,7 +168,7 @@ static void set_attr(unsigned char col, unsigned char keep, unsigned char set) {
     lpoke(a, (lpeek(a) & keep) | set);
 }
 
-char read_line(char* buffer, unsigned char maxlen) {
+char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
     char len = 0;
     char c;
     char reverse = 0x90;
@@ -171,7 +183,7 @@ char read_line(char* buffer, unsigned char maxlen) {
         c = ASCIIKEY;
 
         // Show cursor
-        set_attr(len, 0xf, reverse);
+        set_attr(column + len, 0xf, reverse);
 
         if ((PEEK(0xD611U) & 0x0b) >= 0x09) {
             // C= + shift, so toggle case
@@ -192,21 +204,21 @@ char read_line(char* buffer, unsigned char maxlen) {
                 // DELETE
                 if (len) {
                     // Remove blink attribute from this char
-                    set_attr(len, 0xf, 0);
+                    set_attr(column + len, 0xf, 0);
 
                     // Go back one and erase
                     len--;
-                    lpoke(screen_line_address + len, ' ');
+                    lpoke(screen_line_address + column + len, ' ');
 
                     // Re-enable blink for cursor
-                    set_attr(len, 0xff, reverse);
+                    set_attr(column + len, 0xff, reverse);
                     buffer[len] = 0;
                 }
             } else if (c == 0x0d) {
                 buffer[len] = 0;
 
                 // Hide cursor
-                set_attr(len, 0xf, 0);
+                set_attr(column + len, 0xf, 0);
 
                 /* Acknowledge RETURN as the character branch below does: a
                  * caller that reads again promptly would otherwise see it still
@@ -218,13 +230,13 @@ char read_line(char* buffer, unsigned char maxlen) {
             } else {
 
                 // Remove blink attribute from this char
-                set_attr(len, 0xf, 0);
+                set_attr(column + len, 0xf, 0);
                 buffer[len++] = c;
 
                 // Mask char so that it looks right using screen codes instead of ASCII codes
                 if (c > 0x40)
                     c &= 0x1f;
-                lpoke(screen_line_address + len - 1, c);
+                lpoke(screen_line_address + column + len - 1, c);
             }
 
             // Clear keys from hardware keyboard scanner
@@ -238,7 +250,7 @@ char read_line(char* buffer, unsigned char maxlen) {
     }
 
     // Hide cursor
-    set_attr(len, 0xf, 0);
+    set_attr(column + len, 0xf, 0);
 
     // clear char from queue
     while (c && (ASCIIKEY == c))

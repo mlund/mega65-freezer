@@ -56,7 +56,7 @@ enum AssembleStatus : uint8_t {
     AssembleBranchTooFar,
 };
 
-/* Longest instruction the assembler can produce -- a far JSR. */
+/* Longest 45GS02 instruction: a far JSR.  Bounds both directions. */
 constexpr uint8_t ASM_BYTES_MAX = 7;
 
 /* Assemble one instruction written as `MNEMONIC [operand]` into `bytes`, with

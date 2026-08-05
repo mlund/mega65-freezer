@@ -3,8 +3,9 @@
  * The opcode map is generated from llvm-mos; the three prefixes are hand-written
  * here, two of them being absent from every published table.
  *
- * One translation unit, because the tables below are 971 bytes and both
- * directions need all of them.
+ * One translation unit for both directions: a separate assembler measured 66
+ * bytes larger.  Not because the tables would be duplicated -- LTO merges
+ * identical statics, so including them twice costs nothing.
  */
 
 #include "disasm.h"
@@ -25,7 +26,6 @@ constexpr uint8_t OPCODE_LDA_INDIRECT_Z = 0xB2;
  * why the caller is told the columns rather than assuming them. */
 constexpr uint8_t ADDRESS_DIGITS = 7;
 constexpr uint8_t BYTE_FIELD_SLOTS = 5;
-constexpr uint8_t MAX_INSTRUCTION_BYTES = 7;
 static_assert(DISASM_BYTE_COLUMN == 1 + ADDRESS_DIGITS + 1, "byte column follows the address");
 /* Three characters plus at most one suffix -- a Q, an F, or a bit digit -- so
  * the pad below is never zero and the operand column is always derivable. */
@@ -115,7 +115,7 @@ static uint8_t fetch_through(uint32_t address, uint8_t* bytes, uint8_t fetched, 
 }
 
 bool disassemble_instruction(uint32_t address, char* text, DisassemblyLayout* layout) {
-    uint8_t bytes[MAX_INSTRUCTION_BYTES];
+    uint8_t bytes[ASM_BYTES_MAX];
     uint8_t fetched = 0;
     uint8_t prefix_length = 0;
     bool is_quad = false;
