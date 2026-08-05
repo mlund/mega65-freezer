@@ -19,16 +19,22 @@ add_compile_options(
     # a null pointer.  Without this, clang treats it as undefined behaviour and
     # deletes the rest of the enclosing function; main() disappears entirely.
     -fno-delete-null-pointer-checks
-    -Wno-return-mismatch
 )
+# include_directories() also feeds the ASM rule, so helper.s finds mega65.inc
+# here too -- no separate CMAKE_ASM_FLAGS entry needed.
 include_directories(${SRC})
 
 # -mlto-zp governs LTO codegen, which happens at link time; as a compile option
 # it is silently ignored and the zero-page region overflows.
-add_link_options(-mlto-zp=106)
-
-# helper.s includes mega65.inc from the same directory.
-set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -I${SRC}")
+#
+# The cap and freezemenu.ld's __basic_zp_end are two halves of one fact and
+# must move together: measured occupancy is 108 bytes on six of the seven
+# targets, against a 0x90 ceiling in the script.  Raising one alone either does
+# nothing or fails the link.  Cached so that -DLTO_ZP=<n> on the command line
+# actually takes effect -- add_link_options() appends after
+# CMAKE_EXE_LINKER_FLAGS, so a flag passed there is silently overridden.
+set(LTO_ZP 106 CACHE STRING "Zero-page bytes the LTO allocator may use")
+add_link_options(-mlto-zp=${LTO_ZP})
 
 set(COMMON
     frozen_memory.c fdisk_memory.c fdisk_screen.c

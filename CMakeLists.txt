@@ -52,8 +52,11 @@ if(GIT_HEAD AND NOT IS_ABSOLUTE ${GIT_HEAD})
     set(GIT_HEAD ${CMAKE_CURRENT_SOURCE_DIR}/${GIT_HEAD})
 endif()
 
-# Nothing calls into mega65-libc yet; the linkage is here so the migration of
-# fdisk_hal_mega65.c onto it can proceed one function at a time.
+# Two targets depend on mega65-libc today, so OFF does not link: FREEZER uses
+# the hyppo dirent layer (opendir/readdir/closedir/closeall in
+# freeze_diskchooser.c) and SPRITED uses conio and mouse.  The other five pull
+# in headers only.  The option is per-project but the dependency is per-target;
+# either make it one, or drop the option and link unconditionally.
 option(LINK_LIBC "Link mega65-libc" ON)
 
 add_subdirectory(src)

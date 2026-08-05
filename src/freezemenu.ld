@@ -22,6 +22,14 @@ SECTIONS {
     .version : { KEEP(*(.version)) }
 } INSERT AFTER .basic_header
 
+/* The loader jumps to a fixed address, so .entrytramp landing anywhere else
+ * means the loader executes whatever data took its place -- silently, and with
+ * no crash at the point of the fault.  Anything inserted ahead of .entrytramp,
+ * or a change to .basic_header's size, does exactly that.  Keep in step with
+ * PROGRAM_ENTRY in mega65.inc, which hard-codes the same address. */
+ASSERT(ADDR(.entrytramp) == 0x080d,
+    "entry trampoline moved: loader entry is fixed, see PROGRAM_ENTRY in mega65.inc")
+
 __stack = 0xd000;
 
 OUTPUT_FORMAT {

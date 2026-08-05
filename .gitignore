@@ -5,3 +5,4 @@ build/
 version.c
 !ascii8x8.bin
 !ascii.h
+TODO.md
