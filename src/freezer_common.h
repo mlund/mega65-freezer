@@ -2,6 +2,7 @@
 #define __FREEZER_COMMON_H__
 
 #include "ascii.h"
+#include "fdisk_hal.h"
 
 #include <stdint.h>
 
@@ -12,9 +13,6 @@
         if (((PEEK(0xD610U) & 0x7f) == 0x11) || ((PEEK(0xD610U) & 0x7f) == 0x1D))                  \
             return;                                                                                \
     }
-
-extern uint8_t sector_buffer[512];
-#define clear_sector_buffer() lfill((uint32_t)sector_buffer, 0, 512)
 
 extern unsigned short slot_number;
 

@@ -34,7 +34,7 @@ HELPER_ASM uint8_t mega65_dos_getprocdesc(uint8_t pagemsb);
 
 HELPER_ASM unsigned short get_freeze_slot_count(void);
 HELPER_ASM void fetch_freeze_region_list_from_hypervisor(unsigned short);
-HELPER_ASM unsigned char find_freeze_slot_start_sector(unsigned short);
+HELPER_ASM void find_freeze_slot_start_sector(unsigned short);
 HELPER_ASM void unfreeze_slot(unsigned short);
 
 HELPER_ASM char read_file_from_sdcard(char* filename, uint32_t load_address);

@@ -14,12 +14,12 @@ char* footer_messages[FOOTER_MAX + 1] = {
 
 char stemp[80];
 
-/* Converts into stemp rather than in place: callers pass string literals, and
- * modifying those is undefined behaviour. */
-void write_line_len(const char* s, char col, char length) {
+/* Folds `length` ASCII characters into stemp as screen codes.  Converting via
+ * stemp rather than in place matters twice over: callers pass string literals,
+ * and modifying those is undefined behaviour; and the screen itself cannot be
+ * read back reliably (see display_footer). */
+static void to_stemp(const char* s, char length) {
     char i;
-    if (length > (char)sizeof(stemp))
-        length = (char)sizeof(stemp);
     for (i = 0; i < length; i++) {
         char c = s[i];
         if (c >= 'a' && c <= 'z')
@@ -28,6 +28,12 @@ void write_line_len(const char* s, char col, char length) {
             c -= 0x40;
         stemp[i] = c;
     }
+}
+
+void write_line_len(const char* s, char col, char length) {
+    if (length > (char)sizeof(stemp))
+        length = (char)sizeof(stemp);
+    to_stemp(s, length);
     write_line_raw(stemp, col, length);
 }
 
@@ -56,21 +62,12 @@ void recolour_last_line(char colour) {
     return;
 }
 
-long addr;
 void display_footer(unsigned char index) {
-    char i;
     /* Convert into a buffer, then copy once.  Converting in place at
      * FOOTER_ADDRESS meant reading $BF80 back, and that read returns BASIC ROM
      * rather than screen RAM whenever BASIC is banked in, so nothing matched
      * 'A'-'Z' and the line stayed in ASCII. */
-    for (i = 0; i < 80; i++) {
-        char c = footer_messages[index][i];
-        if (c >= 'a' && c <= 'z')
-            c -= 0x60;
-        else if (c >= 'A' && c <= 'Z')
-            c -= 0x40;
-        stemp[i] = c;
-    }
+    to_stemp(footer_messages[index], 80);
     lcopy((long)stemp, FOOTER_ADDRESS, 80);
     set_screen_attributes(FOOTER_ADDRESS, 80, ATTRIB_REVERSE);
 }
@@ -129,9 +126,8 @@ void screen_colour_line(unsigned char line, unsigned char colour) {
     lfill(0x1f800 + (line << 6) + (line << 4), colour, 80);
 }
 
-static unsigned char i;
-
 void fatal_error(unsigned char* filename, unsigned int line_number) {
+    unsigned char i;
     display_footer(FOOTER_FATAL);
     for (i = 0; filename[i]; i++)
         POKE(FOOTER_ADDRESS + 44 + i, filename[i]);
@@ -148,10 +144,18 @@ void set_screen_attributes(long p, unsigned char count, unsigned char attr) {
     // map the 2KB colour RAM in at $D800 and work with it there.
     // XXX - For now we are LPOKING
     long addr = COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + p;
+    unsigned char i;
     for (i = 0; i < count; i++) {
         lpoke(addr, lpeek(addr) | attr);
         addr++;
     }
+}
+
+/* Read-modify-write the colour-RAM attribute byte of column `col` on the line
+ * being edited: keep the `keep` bits of the current value and OR in `set`. */
+static void set_attr(unsigned char col, unsigned char keep, unsigned char set) {
+    long a = col + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS;
+    lpoke(a, (lpeek(a) & keep) | set);
 }
 
 char read_line(char* buffer, unsigned char maxlen) {
@@ -168,14 +172,8 @@ char read_line(char* buffer, unsigned char maxlen) {
     while (len < maxlen) {
         c = PEEK(0xD610U); // read char
 
-#if 0
-    reverse ^=0x20;
-#endif
-
         // Show cursor
-        lpoke(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS,
-            reverse |
-                (lpeek(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS) & 0xf));
+        set_attr(len, 0xf, reverse);
 
         if ((PEEK(0xD611U) & 0x0b) >= 0x09) {
             // C= + shift, so toggle case
@@ -196,35 +194,27 @@ char read_line(char* buffer, unsigned char maxlen) {
                 // DELETE
                 if (len) {
                     // Remove blink attribute from this char
-                    lpoke(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS,
-                        lpeek(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS) &
-                            0xf);
+                    set_attr(len, 0xf, 0);
 
                     // Go back one and erase
                     len--;
                     lpoke(screen_line_address + len, ' ');
 
                     // Re-enable blink for cursor
-                    lpoke(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS,
-                        lpeek(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS) |
-                            reverse);
+                    set_attr(len, 0xff, reverse);
                     buffer[len] = 0;
                 }
             } else if (c == 0x0d) {
                 buffer[len] = 0;
 
                 // Hide cursor
-                lpoke(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS,
-                    0x00 |
-                        (lpeek(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS) &
-                            0xf));
+                set_attr(len, 0xf, 0);
 
                 return len;
             } else {
 
                 // Remove blink attribute from this char
-                lpoke(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS,
-                    lpeek(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS) & 0xf);
+                set_attr(len, 0xf, 0);
                 buffer[len++] = c;
 
                 // Mask char so that it looks right using screen codes instead of ASCII codes
@@ -244,8 +234,7 @@ char read_line(char* buffer, unsigned char maxlen) {
     }
 
     // Hide cursor
-    lpoke(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS,
-        0x00 | (lpeek(len + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS) & 0xf));
+    set_attr(len, 0xf, 0);
 
     // clear char from queue
     while (c && (PEEK(0xD610U) == c))

@@ -68,7 +68,7 @@ void show_memory_line(uint32_t addr) {
 
     lfill((long)output_buffer, 0, 80);
     output_buffer[0] = ':';
-    format_hex((long)&output_buffer[1], addr, 7);
+    format_hex(&output_buffer[1], addr, 7);
     output_buffer[8] = ' ';
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
@@ -85,21 +85,17 @@ void show_memory_line(uint32_t addr) {
             sdcard_readsector(freeze_slot_start_sector + mon_sector_num);
             lcopy((long)sector_buffer, (long)mon_sector, 512);
         }
-        for (i = 0; i < 16; i++) {
-            // Space before hex
-            output_buffer[8 + i * 3] = ' ';
-            // hex digits
-            format_hex((long)&output_buffer[8 + 1 + i * 3],
-                mon_sector[(i + freeze_slot_offset) & 0x1ff],
-                2);
-        }
         // Two spaces before character rendering of block
         output_buffer[8 + 16 * 3 + 0] = ' ';
         output_buffer[8 + 16 * 3 + 1] = ' ';
-        // C64 character rendering of each byte
         for (i = 0; i < 16; i++) {
-            hex_value = mon_sector[(i + freeze_slot_offset) & 0x1ff];
-            output_buffer[8 + 16 * 3 + 2 + i] = hex_value;
+            unsigned char b = mon_sector[(i + freeze_slot_offset) & 0x1ff];
+            // Space before hex
+            output_buffer[8 + i * 3] = ' ';
+            // hex digits
+            format_hex(&output_buffer[8 + 1 + i * 3], b, 2);
+            // C64 character rendering of the same byte
+            output_buffer[8 + 16 * 3 + 2 + i] = b;
         }
     }
     // Convert hex back to C64 screen codes
@@ -273,38 +269,38 @@ void show_registers(void) {
 
         // PC
         value = sector_buffer[0x08] + (sector_buffer[0x09] << 8);
-        format_hex((long)&output_buffer[REGLINE_PC], value, 4);
+        format_hex(&output_buffer[REGLINE_PC], value, 4);
 
         // A
         value = sector_buffer[0x00];
-        format_hex((long)&output_buffer[REGLINE_A], value, 2);
+        format_hex(&output_buffer[REGLINE_A], value, 2);
 
         // X
         value = sector_buffer[0x01];
-        format_hex((long)&output_buffer[REGLINE_X], value, 2);
+        format_hex(&output_buffer[REGLINE_X], value, 2);
 
         // Y
         value = sector_buffer[0x02];
-        format_hex((long)&output_buffer[REGLINE_Y], value, 2);
+        format_hex(&output_buffer[REGLINE_Y], value, 2);
 
         // Z
         value = sector_buffer[0x03];
-        format_hex((long)&output_buffer[REGLINE_Z], value, 2);
+        format_hex(&output_buffer[REGLINE_Z], value, 2);
 
         // B
         value = sector_buffer[0x04];
-        format_hex((long)&output_buffer[REGLINE_B], value, 2);
+        format_hex(&output_buffer[REGLINE_B], value, 2);
 
         // SP
         value = sector_buffer[0x05] + (sector_buffer[0x06] << 8);
-        format_hex((long)&output_buffer[REGLINE_SP], value, 4);
+        format_hex(&output_buffer[REGLINE_SP], value, 4);
 
         // $00/$01 CPU port
         value = sector_buffer[0x10];
-        format_hex((long)&output_buffer[REGLINE_01], value, 2);
+        format_hex(&output_buffer[REGLINE_01], value, 2);
         value = sector_buffer[0x11];
         output_buffer[REGLINE_01 + 2] = '/';
-        format_hex((long)&output_buffer[REGLINE_01 + 3], value, 2);
+        format_hex(&output_buffer[REGLINE_01 + 3], value, 2);
 
         // FLAGS
         value = sector_buffer[0x07];
@@ -319,17 +315,17 @@ void show_registers(void) {
 
         // MAPLO
         value = sector_buffer[0x0A] + (sector_buffer[0x0B] << 8);
-        format_hex((long)&output_buffer[REGLINE_MAPLO], value, 4);
+        format_hex(&output_buffer[REGLINE_MAPLO], value, 4);
         value = sector_buffer[0x0E];
         output_buffer[REGLINE_MAPLO + 4] = '/';
-        format_hex((long)&output_buffer[REGLINE_MAPLO + 5], value, 2);
+        format_hex(&output_buffer[REGLINE_MAPLO + 5], value, 2);
 
         // MAPHI
         value = sector_buffer[0x0C] + (sector_buffer[0x0D] << 8);
-        format_hex((long)&output_buffer[REGLINE_MAPHI], value, 4);
+        format_hex(&output_buffer[REGLINE_MAPHI], value, 4);
         value = sector_buffer[0x0F];
         output_buffer[REGLINE_MAPHI + 4] = '/';
-        format_hex((long)&output_buffer[REGLINE_MAPHI + 5], value, 2);
+        format_hex(&output_buffer[REGLINE_MAPHI + 5], value, 2);
 
         write_line(output_buffer, 0);
     }

@@ -2,66 +2,45 @@
 
 #include "ascii.h"
 #include "fdisk_memory.h"
+#include "freezer_common.h"
 
 long screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
 
-unsigned char screen_hex_buffer[6];
-
-unsigned char screen_hex_digits[16] = {
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
-unsigned char to_screen_hex(unsigned char c) {
-    return screen_hex_digits[c & 0xf];
-}
-
-void screen_hex_byte(unsigned int addr, long value) {
-    POKE(addr + 0, to_screen_hex(value >> 4));
-    POKE(addr + 1, to_screen_hex(value >> 0));
+/* Writes eight hex digits to a buffer. */
+static void hex_to_buf(char* out, const long value) {
+    out[0] = nybl_to_screen(value >> 28);
+    out[1] = nybl_to_screen(value >> 24);
+    out[2] = nybl_to_screen(value >> 20);
+    out[3] = nybl_to_screen(value >> 16);
+    out[4] = nybl_to_screen(value >> 12);
+    out[5] = nybl_to_screen(value >> 8);
+    out[6] = nybl_to_screen(value >> 4);
+    out[7] = nybl_to_screen(value >> 0);
 }
 
 void screen_hex(unsigned int addr, long value) {
-    POKE(addr + 0, to_screen_hex(value >> 28));
-    POKE(addr + 1, to_screen_hex(value >> 24));
-    POKE(addr + 2, to_screen_hex(value >> 20));
-    POKE(addr + 3, to_screen_hex(value >> 16));
-    POKE(addr + 4, to_screen_hex(value >> 12));
-    POKE(addr + 5, to_screen_hex(value >> 8));
-    POKE(addr + 6, to_screen_hex(value >> 4));
-    POKE(addr + 7, to_screen_hex(value >> 0));
+    char i;
+    char dec[8];
+    hex_to_buf(dec, value);
+    for (i = 0; i < 8; i++)
+        POKE(addr + i, dec[i]);
 }
 
-/* Writes eight hex digits to a buffer.  format_hex() used to reach its local
- * array by passing (int)&dec[0] to screen_hex(), which stores through a
- * pointer rebuilt from that integer -- the compiler cannot connect those
- * stores to the local, so the reads below are undefined behaviour. */
-static void hex_to_buf(char* out, const long value) {
-    out[0] = to_screen_hex(value >> 28);
-    out[1] = to_screen_hex(value >> 24);
-    out[2] = to_screen_hex(value >> 20);
-    out[3] = to_screen_hex(value >> 16);
-    out[4] = to_screen_hex(value >> 12);
-    out[5] = to_screen_hex(value >> 8);
-    out[6] = to_screen_hex(value >> 4);
-    out[7] = to_screen_hex(value >> 0);
-}
-
-void format_hex(const int addr, const long value, const char columns) {
-    char i, c;
-    char dec[9];
+/* Writes the low `columns` hex digits of value to out; the higher digits are
+ * dropped.  out is a plain buffer, so store through the pointer -- passing an
+ * address as an integer and rebuilding a pointer from it inside the callee
+ * leaves the compiler unable to connect the stores to the caller's object. */
+void format_hex(char* out, const long value, const char columns) {
+    char i;
+    char dec[8];
     hex_to_buf(dec, value);
 
-    c = 8 - columns;
-    while (c) {
-        for (i = 0; i < 7; i++)
-            dec[i] = dec[i + 1];
-        dec[7] = ' ';
-        c--;
-    }
     for (i = 0; i < columns; i++)
-        lpoke(addr + i, dec[i]);
+        out[i] = dec[i + 8 - columns];
 }
 
-unsigned char screen_decimal_digits[16][5] = {{0, 0, 0, 0, 1},
+static const unsigned char screen_decimal_digits[16][5] = {{0, 0, 0, 0, 1},
     {0, 0, 0, 0, 2},
     {0, 0, 0, 0, 4},
     {0, 0, 0, 0, 8},
@@ -78,61 +57,50 @@ unsigned char screen_decimal_digits[16][5] = {{0, 0, 0, 0, 1},
     {1, 6, 3, 8, 4},
     {3, 2, 7, 6, 8}};
 
-unsigned char ii, j, carry, temp;
-static unsigned int value;
 void screen_decimal(unsigned int addr, unsigned int v) {
     // XXX - We should do this off-screen and copy into place later, to avoid glitching
     // on display.
-
-    value = v;
+    unsigned char digits[5];
+    unsigned char ii, j, carry, temp;
 
     // Start with all zeros
     for (ii = 0; ii < 5; ii++)
-        screen_hex_buffer[ii] = 0;
+        digits[ii] = 0;
 
     // Add power of two strings for all non-zero bits in value.
     // XXX - We should use BCD mode to do this more efficiently
     for (ii = 0; ii < 16; ii++) {
-        if (value & 1) {
+        if (v & 1) {
             carry = 0;
             for (j = 4; j < 128; j--) {
-                temp = screen_hex_buffer[j] + screen_decimal_digits[ii][j] + carry;
+                temp = digits[j] + screen_decimal_digits[ii][j] + carry;
                 if (temp > 9) {
                     temp -= 10;
                     carry = 1;
                 } else
                     carry = 0;
-                screen_hex_buffer[j] = temp;
+                digits[j] = temp;
             }
         }
-        value = value >> 1;
+        v = v >> 1;
     }
 
     // Now convert to ascii digits
     for (j = 0; j < 5; j++)
-        screen_hex_buffer[j] = screen_hex_buffer[j] | '0';
+        digits[j] = digits[j] | '0';
 
     // and shift out leading zeros
     for (j = 0; j < 4; j++) {
-        if (screen_hex_buffer[0] != '0')
+        if (digits[0] != '0')
             break;
-        screen_hex_buffer[0] = screen_hex_buffer[1];
-        screen_hex_buffer[1] = screen_hex_buffer[2];
-        screen_hex_buffer[2] = screen_hex_buffer[3];
-        screen_hex_buffer[3] = screen_hex_buffer[4];
-        screen_hex_buffer[4] = ' ';
+        digits[0] = digits[1];
+        digits[1] = digits[2];
+        digits[2] = digits[3];
+        digits[3] = digits[4];
+        digits[4] = ' ';
     }
 
     // Copy to screen
     for (j = 0; j < 5; j++)
-        POKE(addr + j, screen_hex_buffer[j]);
-}
-
-void format_decimal(const int addr, const int value, const char columns) {
-    char i;
-    char dec[6];
-    screen_decimal((int)&dec[0], value);
-
-    for (i = 0; i < columns; i++)
-        lpoke(addr + i, dec[i]);
+        POKE(addr + j, digits[j]);
 }

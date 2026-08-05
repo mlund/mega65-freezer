@@ -76,8 +76,7 @@ int main(void) {
 
     // Now find the start sector of the slot, and make a copy for safe keeping
     slot_number = 0;
-    find_freeze_slot_start_sector(slot_number);
-    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+    freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
     if (PEEK(0xD680U) & 0x10)

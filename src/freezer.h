@@ -57,6 +57,9 @@ extern unsigned char freeze_region_count;
 extern unsigned char freeze_region_flags;
 
 extern unsigned long freeze_slot_start_sector;
+/* Runs the SYSPART_SLOT_SECTOR trap and returns the slot's start sector, which
+ * the hypervisor leaves in $D681-$D684 rather than in a return value. */
+uint32_t read_freeze_slot_start_sector(unsigned short slot);
 
 struct file_descriptor_t {
 #define FD_DISK_ID_FILE_CLOSED 0xFF

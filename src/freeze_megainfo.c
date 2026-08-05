@@ -46,14 +46,19 @@ static unsigned char code_buffer[512], ymd[3];
  *
  * writes text to the screen using colour. converts to screencode (upper)
  */
-void write_text(unsigned char x, unsigned char y, unsigned short colour, char* text) {
+static void write_text_mapped(unsigned char x,
+    unsigned char y,
+    unsigned short colour,
+    char* text,
+    unsigned char mask,
+    unsigned char lower_offset) {
     unsigned char i, c;
     for (i = 0; text[i]; i++) {
-        c = text[i];
+        c = text[i] & mask;
         if ((c >= 'A') && (c <= 'Z'))
             c -= 0x40;
         else if ((c >= 'a') && (c <= 'z'))
-            c -= 0x20;
+            c -= lower_offset;
         else if (c == '~') // ~ become pi
             c = 94;
         if (colour & 0x100 && c < 128)
@@ -61,6 +66,10 @@ void write_text(unsigned char x, unsigned char y, unsigned short colour, char* t
         lpoke(SCREEN_ADDRESS + y * 80 + x + i, c);
         lpoke(COLOUR_RAM_ADDRESS + y * 80 + x + i, (unsigned char)(colour & 0xff));
     }
+}
+
+void write_text(unsigned char x, unsigned char y, unsigned short colour, char* text) {
+    write_text_mapped(x, y, colour, text, 0xff, 0x20);
 }
 
 /*
@@ -74,20 +83,7 @@ void write_text(unsigned char x, unsigned char y, unsigned short colour, char* t
  * and all lower is displayed as upper
  */
 void write_text_upper(unsigned char x, unsigned char y, unsigned short colour, char* text) {
-    unsigned char i, c;
-    for (i = 0; text[i]; i++) {
-        c = text[i] & 0x7f;
-        if ((c >= 'A') && (c <= 'Z'))
-            c -= 0x40;
-        else if ((c >= 'a') && (c <= 'z'))
-            c -= 0x60;
-        else if (c == '~') // ~ become pi
-            c = 94;
-        if (colour & 0x100 && c < 128)
-            c |= 0x80;
-        lpoke(SCREEN_ADDRESS + y * 80 + x + i, c);
-        lpoke(COLOUR_RAM_ADDRESS + y * 80 + x + i, (unsigned char)(colour & 0xff));
-    }
+    write_text_mapped(x, y, colour, text, 0x7f, 0x60);
 }
 
 /*
@@ -269,8 +265,7 @@ char* format_fpga_hash(unsigned char offset, unsigned char reverse) {
  */
 char* format_rom_version(void) {
     // we want to display the version in freeze slot 0!
-    find_freeze_slot_start_sector(0);
-    freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+    freeze_slot_start_sector = read_freeze_slot_start_sector(0);
     request_freeze_region_list();
 
     return detect_rom();

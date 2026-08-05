@@ -115,6 +115,11 @@ uint32_t address_to_freeze_slot_offset(uint32_t address) {
     return 0xFFFFFFFFUL;
 }
 
+uint32_t read_freeze_slot_start_sector(unsigned short slot) {
+    find_freeze_slot_start_sector(slot);
+    return *(volatile uint32_t*)0xD681U;
+}
+
 unsigned char freeze_peek(uint32_t addr) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);

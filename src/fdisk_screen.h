@@ -40,11 +40,9 @@
 #define COLOUR_LIGHTGREY 15
 
 void screen_hex(unsigned int addr, long value);
-void screen_hex_byte(unsigned int addr, long value);
 void screen_decimal(unsigned int addr, unsigned int value);
 
-void format_decimal(const int addr, const int value, const char columns);
-void format_hex(const int addr, const long value, const char columns);
+void format_hex(char* out, const long value, const char columns);
 
 extern long screen_line_address;
 extern char screen_column;
