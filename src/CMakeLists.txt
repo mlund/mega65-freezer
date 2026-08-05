@@ -1,16 +1,18 @@
-# version.c carries the git describe string.  Regenerated on every build:
-# .git/HEAD is a symref, so committing on a branch never touches it, and no
-# other single path tracks a commit across packed refs, detached HEAD and
-# worktrees.  version.cmake rewrites the file only when the stamp changes, so
-# this costs a relink only when it actually moved.
+# version.c carries the git describe string, and is regenerated on every
+# build: .git/HEAD is a symref, so committing on a branch never touches it,
+# and no single path tracks a commit across packed refs, detached HEAD and
+# worktrees.  copy_if_different limits the relink to builds where the stamp
+# actually moved.
+set(VERSION_C ${CMAKE_CURRENT_BINARY_DIR}/version.c)
 add_custom_target(version_stamp
-    COMMAND ${CMAKE_COMMAND} -DOUT=${CMAKE_CURRENT_SOURCE_DIR}/version.c
-            -DREPO=${CMAKE_SOURCE_DIR}
+    COMMAND ${CMAKE_COMMAND} -DOUT=${VERSION_C}.tmp -DREPO=${CMAKE_SOURCE_DIR}
             -P ${CMAKE_SOURCE_DIR}/cmake/version.cmake
-    BYPRODUCTS ${CMAKE_CURRENT_SOURCE_DIR}/version.c
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${VERSION_C}.tmp ${VERSION_C}
+    COMMAND ${CMAKE_COMMAND} -E rm -f ${VERSION_C}.tmp
+    BYPRODUCTS ${VERSION_C}
     COMMENT "Stamping version"
 )
-set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/version.c PROPERTIES GENERATED TRUE)
+set_source_files_properties(${VERSION_C} PROPERTIES GENERATED TRUE)
 
 # Targets are defined here; the parent CMakeLists handles project setup and
 # the mega65-libc dependency.
@@ -40,7 +42,7 @@ add_link_options(-mlto-zp=${LTO_ZP})
 set(COMMON
     frozen_memory.c fdisk_memory.c fdisk_screen.c
     fdisk_hal_mega65.c freezer_common.c
-    helper.s version.c
+    helper.s ${VERSION_C}
 )
 
 function(add_m65 name)

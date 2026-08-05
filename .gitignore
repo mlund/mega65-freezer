@@ -2,7 +2,6 @@ build/
 *.M65
 *.M65.elf
 *.map
-version.c
 !ascii8x8.bin
 TODO.md
 *.swp
