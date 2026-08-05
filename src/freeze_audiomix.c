@@ -549,7 +549,7 @@ unsigned char frames;
 unsigned char note;
 unsigned char sid_num;
 unsigned int sid_addr;
-unsigned int notes[5] = {5001, 5613, 4455, 2227, 3338};
+static const unsigned int notes[5] = {5001, 5613, 4455, 2227, 3338};
 
 void test_audio(unsigned char advanced_view) {
     /*

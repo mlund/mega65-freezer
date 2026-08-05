@@ -270,7 +270,6 @@ struct process_descriptor_t process_descriptor;
 // clang-format off
 char last_thumb_frame = -1;
 unsigned char thumb_xoff = 5, thumb_yoff = 1;
-unsigned short tile_offset;
 #define F_M65 0
 #define F_C65 1
 #define F_C64 2
@@ -584,7 +583,7 @@ void draw_freeze_menu(unsigned char part) {
             unsigned short* tile_num;
 
             screen_data_start = 0x52000L + 0x300L + 0x40L;
-            tile_offset = (screen_data_start >> 6);
+            unsigned short tile_offset = (screen_data_start >> 6);
             // Work out where the screen data begins
             screen_data_start = lpeek(0x5203dL) + (lpeek(0x5203eL) << 8);
             screen_data_start += 0x52000L + 0x40L;
