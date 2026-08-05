@@ -8,6 +8,11 @@ set(LLVM_MOS_PLATFORM c64)
 find_package(llvm-mos-sdk REQUIRED)
 project(freezemenu LANGUAGES C ASM)
 
+# charset.c uses #embed, which is C23; without this the build warns on every
+# translation unit that includes it.
+set(CMAKE_C_STANDARD 23)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
 # Standalone llvm-mos build of the MEGA65 freezemenu.  Nothing is shared with
 # the cc65 build in the parent directory; src/ holds its own copy of every
 # source.
