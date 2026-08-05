@@ -71,14 +71,6 @@ mega65_dos_init:
 	ldz #0
 	rts
 
-;;; unsigned char mega65_geterrorcode(void)   -> A
-	.section .text.mega65_geterrorcode,"ax",@progbits
-	.global mega65_geterrorcode
-mega65_geterrorcode:
-	lda #SYSPART_GETERRORCODE		; hyppo_geterrorcode - returns errorcode in A
-	sta HTRAP_SYSPART		; trigger hypervisor trap
-	clv			; dead slot after hypervisor call (CPU bug workaround)
-	rts
 
 ;;; char mega65_dos_exechelper(char *image_name)
 ;;; image_name in __rc2/__rc3.  Effectively exec(); only returns on error.
@@ -326,65 +318,9 @@ mega65_dos_getprocdesc:
 	lda #$01
 	rts
 
-;;; void unfreeze_slot(unsigned short slot)   A=lo, X=hi
-	.section .text.unfreeze_slot,"ax",@progbits
-	.global unfreeze_slot
-unfreeze_slot:
-	;; Move 16-bit address from A/X to X/Y
-	phx
-	tay
-	pla
-	tax
 
-	lda #SYSPART_UNFREEZE
-	sta HTRAP_SYSPART
-	clv			; dead slot after hypervisor call (CPU bug workaround)
-	rts
 
-;;; unsigned short get_freeze_slot_count(void)   -> A=lo, X=hi
-	.section .text.get_freeze_slot_count,"ax",@progbits
-	.global get_freeze_slot_count
-get_freeze_slot_count:
-	lda #SYSPART_SLOT_COUNT
-	sta HTRAP_SYSPART
-	clv			; dead slot after hypervisor call (CPU bug workaround)
 
-	txa
-	phy
-	plx
-
-	rts
-
-;;; void fetch_freeze_region_list_from_hypervisor(unsigned short addr)  A=lo, X=hi
-	.section .text.fetch_freeze_region_list_from_hypervisor,"ax",@progbits
-	.global fetch_freeze_region_list_from_hypervisor
-fetch_freeze_region_list_from_hypervisor:
-	;; Move 16-bit address from A/X to X/Y
-	phx
-	tax
-	pla
-	tay
-
-	lda #SYSPART_REGION_LIST
-	sta HTRAP_SYSPART
-	clv			; dead slot after hypervisor call (CPU bug workaround)
-	rts
-
-;;; unsigned char find_freeze_slot_start_sector(unsigned short slot)  A=lo, X=hi -> A
-	.section .text.find_freeze_slot_start_sector,"ax",@progbits
-	.global find_freeze_slot_start_sector
-find_freeze_slot_start_sector:
-	;; Move 16-bit address from A/X to X/Y
-	;; XXX - We had to swap the X/Y byte order around for this to work: Why???
-	phx
-	tay
-	pla
-	tax
-
-	lda #SYSPART_SLOT_SECTOR	; start sector lands in $D681-$D684
-	sta HTRAP_SYSPART
-	clv			; dead slot after hypervisor call (CPU bug workaround)
-	rts
 
 ;;; char read_file_from_sdcard(char *filename, uint32_t load_address)
 ;;; filename in __rc2/__rc3; load_address b0=A, b1=X, b2=__rc4, b3=__rc5.

@@ -229,7 +229,8 @@ void set_memory() {
     }
 }
 
-static const char reg_desc_line[] = "PC   IRQ  NMI  A  X  Y  Z  B  SP   FLAGS    $01   MAPLO   MAPHI";
+static const char reg_desc_line[] =
+    "PC   IRQ  NMI  A  X  Y  Z  B  SP   FLAGS    $01   MAPLO   MAPHI";
 #define REGLINE_PC 0
 #define REGLINE_IRQ 5
 #define REGLINE_NMI 10
