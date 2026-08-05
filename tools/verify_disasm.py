@@ -2,7 +2,7 @@
 """Check the disassembler against llvm-mos, and against the core for what
 llvm-mos does not know.
 
-Two passes:
+Four passes:
 
 1. **Round trip.**  All 1024 opcode/prefix combinations -- 256 bare, 256 behind
    $EA, 256 behind $42 $42, 256 behind $42 $42 $EA -- decoded by both this
@@ -10,15 +10,24 @@ Two passes:
    intended divergences are normalised away rather than ignored, so a new one
    shows up as a failure.
 
-2. **Undocumented forms.**  NEGQ and the $D8 $D8 far JMP/JSR/RTS prefix appear
+2. **Branch targets.**  llvm-mc prints the raw offset where we resolve the
+   target, so the round trip cannot compare those operands at all.
+
+3. **Undocumented forms.**  NEGQ and the $D8 $D8 far JMP/JSR/RTS prefix appear
    in neither llvm-mos nor the User Guide's tables, so there is no oracle to
    diff against.  These are hand-written vectors read off gs4510.vhdl; the
    far-JSR length is the one that matters, since getting it wrong desynchronises
    every following line.
 
+4. **A real ROM**, when one is supplied.  The synthetic sweep hands llvm-mc the
+   bytes of one instruction at a time; walking a ROM makes our own decoder
+   choose the boundaries, so a wrong length lands the next decode
+   mid-instruction and cascades -- the failure a listing actually shows.
+
 Run via CTest, or directly:
 
-    python3 tools/verify_disasm.py --llvm-mc ~/llvm-mos-patched/bin/llvm-mc
+    python3 tools/verify_disasm.py --llvm-mc ~/llvm-mos-patched/bin/llvm-mc \
+        --rom /path/to/MEGA65.ROM
 """
 
 from __future__ import annotations
@@ -39,6 +48,12 @@ sys.path.insert(0, str(TOOLS))
 # for.  The *expectations* below are deliberately restated rather than imported:
 # an oracle that takes its answers from the thing under test proves nothing.
 from gen_disasm_tables import disassemble  # noqa: E402
+
+
+def strip_zeros(operand: str) -> str:
+    """llvm-mc prints $344 where we pad to $0344 to keep the columns aligned."""
+    return re.sub(r"\$0*([0-9A-F])", r"$\1", operand)
+
 
 # Branch mnemonics.  llvm-mc prints the raw offset while we resolve the target
 # to a real address, so for these only the mnemonic is comparable.
@@ -102,11 +117,12 @@ def run_harness(binary: Path, cases: list[list[int]]) -> list[tuple[int, str]]:
     result = subprocess.run(
         [str(binary)], input=payload, capture_output=True, text=True, check=True
     )
-    out = []
-    for line in result.stdout.splitlines():
-        length, _, text = line.partition("|")
-        out.append((int(length), text))
-    return out
+    return [parse_harness_line(line) for line in result.stdout.splitlines()]
+
+
+def parse_harness_line(line: str) -> tuple[int, str]:
+    length, _, text = line.partition(" ")
+    return int(length), text
 
 
 def split_ours(text: str) -> tuple[str, str]:
@@ -251,10 +267,90 @@ def check_undocumented(binary: Path) -> list[str]:
     return failures
 
 
+# CLE: one byte, no operands, not a prefix.  Appending it to an instruction lets
+# one llvm-mc invocation carry thousands of them -- without a delimiter the
+# results could not be mapped back, and per-instruction invocation would take
+# hours over a whole ROM.
+SENTINEL = 0x02
+
+
+def check_rom(llvm_mc: str, binary: Path, rom: Path, base: int) -> list[str]:
+    """Walk a real ROM image and diff every instruction against llvm-mc.
+
+    Stronger than the synthetic sweep: our decoder chooses the instruction
+    boundaries here, so a wrong length puts the next decode mid-instruction and
+    the disagreement cascades -- which is exactly how a wrong length ruins a
+    listing on screen.
+    """
+    image = rom.read_bytes()
+    walked = subprocess.run(
+        [str(binary), "--walk", str(rom), f"{base:X}", f"{base:X}", str(len(image))],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+
+    ours, lines, address = [], [], base
+    for row in walked:
+        length, text = parse_harness_line(row)
+        if length == 0:
+            break
+        raw = image[address - base : address - base + length]
+        ours.append((address, raw, text))
+        lines.append(" ".join(f"0x{byte:02x}" for byte in [*raw, SENTINEL]))
+        address += length
+
+    reference = disassemble(llvm_mc, [], hex_operands=True, stdin_text="\n".join(lines))
+
+    failures, undocumented, index = [], 0, 0
+    for addr, raw, text in ours:
+        if index >= len(reference):
+            break
+        decoded = [reference[index]]
+        index += 1
+        # Anything before the sentinel beyond the first is llvm-mc splitting
+        # what we call one instruction, i.e. a form it has no entry for.
+        while index < len(reference) and reference[index] != "cle":
+            decoded.append(reference[index])
+            index += 1
+        if index < len(reference) and reference[index] == "cle":
+            index += 1
+        if len(decoded) > 1:
+            undocumented += 1
+            continue
+
+        our_mnemonic, our_operand = split_ours(text)
+        ref_mnemonic, ref_operand = normalise_llvm(decoded[0])
+        encoding = " ".join(f"{byte:02X}" for byte in raw)
+        if our_mnemonic != ref_mnemonic:
+            failures.append(f"${addr:05X} {encoding}: mnemonic {our_mnemonic} != {ref_mnemonic}")
+        elif our_mnemonic not in BRANCHES and strip_zeros(our_operand) != strip_zeros(ref_operand):
+            failures.append(f"${addr:05X} {encoding}: operand {our_operand} != {ref_operand}")
+
+    quad = sum(1 for _, raw, _ in ours if raw[:2] == b"\x42\x42")
+    flat = sum(1 for _, _, text in ours if "[$" in text)
+    print(
+        f"rom walk: {len(ours)} instructions from ${base:05X} ({quad} quad, {flat} flat, "
+        f"{undocumented} undocumented), {len(failures)} disagreements"
+    )
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--llvm-mc", required=True, help="path to the patched SDK's llvm-mc")
     parser.add_argument("--cc", default="cc", help="host compiler for the test harness")
+    parser.add_argument(
+        "--rom",
+        type=Path,
+        help="MEGA65 ROM image to walk as real-code coverage; skipped if absent",
+    )
+    parser.add_argument(
+        "--rom-base",
+        type=lambda text: int(text, 16),
+        default=0x20000,
+        help="physical address the ROM image loads at (hex, default 20000)",
+    )
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as workdir:
@@ -264,6 +360,11 @@ def main() -> int:
             + check_branch_targets(binary)
             + check_undocumented(binary)
         )
+        if args.rom is not None:
+            if args.rom.is_file():
+                failures += check_rom(args.llvm_mc, binary, args.rom, args.rom_base)
+            else:
+                print(f"rom walk: skipped, no image at {args.rom}")
 
     for failure in failures:
         print(f"  {failure}", file=sys.stderr)

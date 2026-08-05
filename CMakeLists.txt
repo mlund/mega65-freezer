@@ -148,5 +148,20 @@ if(Python3_FOUND AND LLVM_MC_EXE)
         add_test(NAME disasm
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_disasm.py
                     --llvm-mc ${LLVM_MC_EXE} --cc ${HOST_C_COMPILER})
+
+        # Walking a real ROM covers what synthetic opcodes cannot: our decoder
+        # picks the instruction boundaries, so a wrong length lands the next
+        # decode mid-instruction and the disagreement cascades.  The image is
+        # not ours to redistribute, so point at your own copy with
+        # -DMEGA65_ROM=/path/to/MEGA65.ROM or the MEGA65_ROM environment
+        # variable; without one the test simply does not exist.
+        set(MEGA65_ROM "$ENV{MEGA65_ROM}" CACHE FILEPATH
+            "MEGA65.ROM image for the disassembler's real-code test")
+        if(MEGA65_ROM AND EXISTS ${MEGA65_ROM})
+            add_test(NAME disasm_rom
+                COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_disasm.py
+                        --llvm-mc ${LLVM_MC_EXE} --cc ${HOST_C_COMPILER}
+                        --rom ${MEGA65_ROM})
+        endif()
     endif()
 endif()
