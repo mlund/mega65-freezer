@@ -26,7 +26,9 @@ if [[ -z ${branch} || "${branch}" =~ ^HEAD ]]; then
   branch=`git rev-parse --abbrev-ref HEAD`
 fi
 branch2=$(shorten_name $branch)
-version=`git describe --always --abbrev=7 | sed -e 's/(//g' -e 's/)//g' -e's/ /_/g'`
+# --exclude='*' so local checkpoint tags do not crowd out the date, branch
+# and hash: format_util_version() displays only the rightmost 25 characters.
+version=`git describe --always --abbrev=7 --exclude='*' | sed -e 's/(//g' -e 's/)//g' -e's/ /_/g'`
 
 datetime=`date +%Y%m%d.%H`
 stringout="${datetime}-${branch2}-${version}"

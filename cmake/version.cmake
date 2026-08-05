@@ -2,8 +2,9 @@
 #
 # The format is load-bearing: freeze_megainfo.c's format_util_version() scans
 # memory for "v:20", skips those four bytes and parses the remainder as
-# YYMMDD.HH-branch-commit.  gitversion.sh produces it, and the cc65 build uses
-# the same script, so the two stay comparable.
+# YYMMDD.HH-branch-commit, and displays only the rightmost 25 characters.
+# Produced by this directory's gitversion.sh -- a copy of the cc65 build's, so
+# the two can diverge.
 execute_process(COMMAND ./gitversion.sh WORKING_DIRECTORY "${REPO}"
                 OUTPUT_VARIABLE BUILD_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE
                 RESULT_VARIABLE status ERROR_QUIET)
