@@ -47,52 +47,6 @@ __attribute__((noinline)) void do_dma(void) {
     POKE(0xd705U, ((unsigned int)&dmalist) & 0xff); // triggers enhanced DMA
 }
 
-__attribute__((noinline)) unsigned char lpeek(long address) {
-    // Read the byte at <address> in 28-bit address space
-    // XXX - Optimise out repeated setup etc
-    // (separate DMA lists for peek, poke and copy should
-    // save space, since most fields can stay initialised).
-
-    dmalist.option_0b = 0x0b;
-    dmalist.option_80 = 0x80;
-    dmalist.source_mb = (address >> 20);
-    dmalist.option_81 = 0x81;
-    dmalist.dest_mb = 0x00; // dma_byte lives in 1st MB
-    dmalist.end_of_options = 0x00;
-
-    dmalist.command = 0x00; // copy
-    dmalist.count = 1;
-    dmalist.source_addr = address & 0xffff;
-    dmalist.source_bank = (address >> 16) & 0x0f;
-    dmalist.dest_addr = (unsigned int)&dma_byte;
-    dmalist.dest_bank = 0;
-
-    do_dma();
-
-    return dma_byte;
-}
-
-__attribute__((noinline)) void lpoke(long address, unsigned char value) {
-
-    dmalist.option_0b = 0x0b;
-    dmalist.option_80 = 0x80;
-    dmalist.source_mb = 0x00; // dma_byte lives in 1st MB
-    dmalist.option_81 = 0x81;
-    dmalist.dest_mb = (address >> 20);
-    dmalist.end_of_options = 0x00;
-
-    dma_byte = value;
-    dmalist.command = 0x00; // copy
-    dmalist.count = 1;
-    dmalist.source_addr = (unsigned int)&dma_byte;
-    dmalist.source_bank = 0;
-    dmalist.dest_addr = address & 0xffff;
-    dmalist.dest_bank = (address >> 16) & 0x0f;
-
-    do_dma();
-    return;
-}
-
 __attribute__((noinline)) void lcopy(
     long source_address, long destination_address, unsigned int count) {
     if (!count)
