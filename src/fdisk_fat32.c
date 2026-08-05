@@ -289,8 +289,16 @@ long fat32_create_contiguous_file(
 
     char message[40] = "Found file: ????????.???";
 
-    clusters = size / (512 * sectors_per_cluster);
-    if (size % (512 * sectors_per_cluster))
+    // The MEGA65's hardware divider gives whole and fractional parts at once,
+    // so the round-up needs no second division.  DIVBUSY must be polled --
+    // unlike the multiplier, the divider takes up to 20 cycles.
+    MATH.multina32 = size;
+    MATH.multinb32 = (uint32_t)sectors_per_cluster << 9;
+    __asm__ volatile("" ::: "memory");
+    while (MATHBUSY & 0x80)
+        continue;
+    clusters = MATH.divout_whole32;
+    if (MATH.divout_fract32)
         clusters++;
 
     // Look for a free directory slot.

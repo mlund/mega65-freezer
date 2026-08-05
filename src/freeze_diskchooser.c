@@ -22,6 +22,15 @@
 #include "freezer.h"
 #include "freezer_common.h"
 
+// The directory listing is built at $40000, one 64-byte name per entry.
+// DIR_ENTRY_INDEX widens before shifting, so an index past 511 cannot overflow
+// 16-bit int; the shift is what the rest of this file already uses for x64.
+#define DIR_NAME_BUF 0x40000L
+// The listing holds at most 0xffff/64 = 1023 entries, and 1023 << 6 = 65472
+// fits an unsigned 16-bit value.  The old code overflowed only because short
+// promotes to *signed* int, which stops at 32767 -- i.e. entry 512.
+#define DIR_ENTRY_INDEX(n) ((uint16_t)(n) << 6)
+
 #include <mega65.h>
 #include <stdio.h>
 #include <string.h>
@@ -269,7 +278,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     if (drive_id > 1)
         return 0;
 
-    lcopy(0x40000L + (selection_number * 64), (unsigned long)disk_name_return, 32);
+    lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number), (unsigned long)disk_name_return, 32);
 
     // Don't draw directories
     if (disk_name_return[0] == '/')
@@ -532,20 +541,20 @@ void scan_directory(unsigned char drive_id) {
 
     lfill(0x40000UL, ' ', 0xffffU);
     // Add the pseudo disks
-    lcopy((unsigned long)NO_DISK_DRIVE, 0x40000UL + (file_count * 64), 11);
+    lcopy((unsigned long)NO_DISK_DRIVE, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 11);
     file_count++;
     if (drive_id == 0) {
-        lcopy((unsigned long)INTERNAL_DRIVE_0, 0x40000UL + (file_count * 64), 17);
+        lcopy((unsigned long)INTERNAL_DRIVE_0, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 17);
         file_count++;
     } else if (drive_id == 1) {
-        lcopy((unsigned long)INTERNAL_DRIVE_1, 0x40000UL + (file_count * 64), 16);
+        lcopy((unsigned long)INTERNAL_DRIVE_1, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 16);
         file_count++;
     }
-    lcopy((unsigned long)"- NEW D81 DD IMAGE -", 0x40000UL + (file_count * 64), 20);
+    lcopy((unsigned long)"- NEW D81 DD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
     file_count++;
 
 #if 0
-  lcopy((unsigned long)"- NEW D65 HD IMAGE -", 0x40000L + (file_count * 64), 20);
+  lcopy((unsigned long)"- NEW D65 HD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
   file_count++;
 #endif
 
@@ -566,11 +575,11 @@ void scan_directory(unsigned char drive_id) {
                     not_in_root = 1;
                     // overwrite makedisk
                     file_count--;
-                    lfill(0x40000L + (file_count * 64), ' ', 64);
+                    lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), ' ', 64);
                 }
-                lcopy((long)&dirent->d_name[0], 0x40000L + 1 + (file_count * 64), x);
+                lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + 1 + DIR_ENTRY_INDEX(file_count), x);
                 // Put / at the start of directory names to make them obviously different
-                lpoke(0x40000L + (file_count * 64), '/');
+                lpoke(DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), '/');
                 // Don't list "." directory pointer
                 if (strcmp(".", dirent->d_name) != 0)
                     file_count++;
@@ -579,7 +588,7 @@ void scan_directory(unsigned char drive_id) {
                 if ((!strcmp(ptr, ".D81")) || (!strcmp(ptr, ".d81")) || (!strcmp(ptr, ".D64")) ||
                     (!strcmp(ptr, ".d64")) || (!strcmp(ptr, ".D65")) || (!strcmp(ptr, ".d65"))) {
                     // File is a disk image
-                    lcopy((long)&dirent->d_name[0], 0x40000L + (file_count * 64), x);
+                    lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), x);
                     file_count++;
                 }
             }
@@ -682,7 +691,9 @@ char* freeze_select_disk_image(unsigned char drive_id) {
             case 0x0d:
             case 0x21: // Return = select this disk.
                 // Copy name out
-                lcopy(0x40000L + (selection_number * 64), (unsigned long)disk_name_return, 32);
+                lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number),
+                    (unsigned long)disk_name_return,
+                    32);
                 // Then null terminate it
                 for (x = 31; x; x--)
                     if (disk_name_return[x] == ' ') {
