@@ -14,7 +14,8 @@ add_custom_command(
 set(MAX_SIZE 34817)
 
 add_compile_options(
-    -Os
+    # -Oz over -Os: smaller on every target, and nothing here is speed-critical.
+    -Oz
     # $0000/$0001 are the CPU port registers, so POKE(0,..) is a legitimate
     # store through a null pointer rather than undefined behaviour.
     -fno-delete-null-pointer-checks
