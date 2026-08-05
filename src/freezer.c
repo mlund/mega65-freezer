@@ -72,7 +72,7 @@ unsigned char freeze_root_warn[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
 #define DEFAULT_CHARSET "CHARSET.M65"
 #define MAIN_ROM_FILE "MEGA65.ROM"
 
-unsigned char rom_changed = 0;
+static unsigned char rom_changed = 0;
 unsigned char not_in_root = 0;
 #ifdef WITH_TOUCH
 signed char swipe_dir = 0;
@@ -80,7 +80,7 @@ signed char swipe_dir = 0;
 
 void topetsciiupper(char* str, int len);
 
-unsigned char colour_table[256];
+static unsigned char colour_table[256];
 
 void make_colour_lookup(void) {
     unsigned char c;
@@ -112,7 +112,7 @@ void make_colour_lookup(void) {
 }
 
 // clang-format off
-unsigned char viciv_regs[0x80] = {
+static unsigned char viciv_regs[0x80] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x9B, 0x37, 0x00, 0x00, 0x00, 0xC9, 0x00, 0x14, 0x71, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x0E, 0x06, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x00,
@@ -197,7 +197,7 @@ unsigned char next_cpu_speed(void) {
     return 0;
 }
 
-unsigned char thumbnail_buffer[4096];
+static unsigned char thumbnail_buffer[4096];
 
 void draw_thumbnail(void) {
     // Take the 4K of thumbnail data and render it to the display
@@ -269,12 +269,12 @@ void draw_thumbnail(void) {
 struct process_descriptor_t process_descriptor;
 
 // clang-format off
-int8_t last_thumb_frame = -1;
-unsigned char thumb_xoff = 5, thumb_yoff = 1;
+static int8_t last_thumb_frame = -1;
+static unsigned char thumb_xoff = 5, thumb_yoff = 1;
 #define F_M65 0
 #define F_C65 1
 #define F_C64 2
-char thumb_frame_name[][13] = {
+static char thumb_frame_name[][13] = {
   "M65THUMB.M65",
   "C65THUMB.M65",
   "C64THUMB.M65"
@@ -640,15 +640,13 @@ void topetsciiupper(char* str, int len) {
     }
 }
 
-unsigned char origD689 = 0;
-
 #ifdef WITH_JOYSTICK
 // TODO: this is very old and generates keystrokes we don't have anymore
 // Left/right do left/right
 // fire = F3
 // down = disk menu
 // up = toggle PAL/NTSC ?
-unsigned char joy_to_key[32] = {
+static unsigned char joy_to_key[32] = {
     0,
     0,
     0,
@@ -697,21 +695,19 @@ unsigned char read_joystick() {
 
 #ifdef WITH_TOUCH
 // clang-format off
-unsigned char touch_keys[2][9] = {
+static unsigned char touch_keys[2][9] = {
   { 0xF3, 0x00, 'c', 'r', 'f', 0x00, 'm', 'a', 'd' },
   { 0xF7, 0x00, 'j', 't', 'v', 0x00, 'e', 'k', 'x' } };
 // clang-format on
 
-unsigned short x;
-unsigned short y;
+static unsigned char last_touch = 0;
+static unsigned char last_x;
 
-unsigned char last_touch = 0;
-unsigned char last_x;
-
-void poll_touch_panel(void) {
+unsigned char poll_touch_panel(void) {
     unsigned char c = 0;
+    unsigned short x, y;
 
-    if (TOUCH_EVENT & 1) {
+    if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
         x = PEEK(0xD6B9) + ((PEEK(0xD6BB) & 0x03) << 8);
         y = PEEK(0xD6BA) + ((PEEK(0xD6BB) & 0x30) << 4);
         x = x >> 4;
@@ -721,7 +717,7 @@ void poll_touch_panel(void) {
         y = 0;
     }
 
-    if ((last_touch & 1) && (!(TOUCH_EVENT & 1))) {
+    if ((last_touch & TOUCH_STATUS_EV1_VALID) && (!(TOUCH_STATUS & TOUCH_STATUS_EV1_VALID))) {
         if (y > 8 && y < 17) {
             if (x < 26)
                 x = 0;
@@ -730,7 +726,7 @@ void poll_touch_panel(void) {
             c = touch_keys[x][y - 9];
             // Wait for touch to be released
             // XXX - Records touch event as where your finger was when you touched, not released.
-            while (TOUCH_EVENT & 1)
+            while (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID)
                 continue;
         }
     }
@@ -740,7 +736,7 @@ void poll_touch_panel(void) {
     // including setting the gain for stereo speakers.  This little hack below
     // will likely disappear when we add touch support to the audio mixer)
     if (y > 0 && y < 7) {
-        if (TOUCH_EVENT & 1) {
+        if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
             if (x > 5)
                 x -= 5;
             else
@@ -761,7 +757,7 @@ void poll_touch_panel(void) {
     // so we will just infer them.  Move sideways more than 3 characters within a short
     // period of time will be deemed to be a side swipe).
     if (y > 17) {
-        if (TOUCH_EVENT & 1) {
+        if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
             if (x > last_x && swipe_dir < 0)
                 swipe_dir = 1;
             if (x > last_x && swipe_dir >= 0)
@@ -799,11 +795,11 @@ void poll_touch_panel(void) {
 
             last_x = x;
         } else {
-            if (last_touch & 1) {
+            if (last_touch & TOUCH_STATUS_EV1_VALID) {
             }
         }
     }
-    last_touch = TOUCH_EVENT;
+    last_touch = TOUCH_STATUS;
 
     return c;
 }
@@ -994,7 +990,7 @@ int main(void) {
     make_colour_lookup();
 
     // assure we're viewing the sdcard's sector buffer (and not the floppy disk buffer)
-    origD689 = PEEK(0xD689);
+    unsigned char orig_d689 = PEEK(0xD689);
     POKE(0xD689, PEEK(0xD689) | 128);
 
     // Now find the start sector of the slot, and make a copy for safe keeping
@@ -1257,7 +1253,7 @@ int main(void) {
                         goto invalid_function;
                     // Doesn't seem to really help (probably needs to be done by the hypervisor
                     // unfreezing routine?)
-                    POKE(0xD689, origD689);
+                    POKE(0xD689, orig_d689);
 
                     // workaround for old freeze slots that have an empty chargen area
                     fix_chargen_area(CHARGEN_FIXMEM | CHARGEN_FIXSLOT);
