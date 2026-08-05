@@ -107,15 +107,41 @@ uint32_t resolve_cpu_address(uint16_t cpu_address) {
     return cpu_address;
 }
 
+/* Set when mon_sector holds changes the card does not, so that a fill spanning
+ * sectors writes each one back before the next displaces it. */
+static bool mon_sector_dirty = false;
+
+static void flush_sector(void) {
+    if (mon_sector_dirty) {
+        lcopy((long)mon_sector, (long)sector_buffer, 512);
+        sdcard_writesector(freeze_slot_start_sector + mon_sector_num, 0);
+        mon_sector_dirty = false;
+    }
+}
+
 /* Bring the sector holding `freeze_slot_offset` into mon_sector.  SD reads
- * dominate the cost of every command here, so the tag check guards all three
- * callers rather than each keeping its own copy of the same test. */
+ * dominate the cost of every command here, so the tag check guards all callers
+ * rather than each keeping its own copy of the same test. */
 static void cache_sector(uint32_t freeze_slot_offset) {
     if (mon_sector_num != (freeze_slot_offset >> 9)) {
+        flush_sector();
         mon_sector_num = (freeze_slot_offset >> 9);
         sdcard_readsector(freeze_slot_start_sector + mon_sector_num);
         lcopy((long)sector_buffer, (long)mon_sector, 512);
     }
+}
+
+/* Change one byte of frozen memory, leaving the write for flush_sector(): a
+ * fill would otherwise write the same sector once per byte. */
+static bool write_frozen_byte(uint32_t address, unsigned char value) {
+    uint32_t freeze_slot_offset = address_to_freeze_slot_offset(address);
+    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+        return false;
+    }
+    cache_sector(freeze_slot_offset);
+    mon_sector[freeze_slot_offset & 0x1ff] = value;
+    mon_sector_dirty = true;
+    return true;
 }
 
 /* Fetch one byte of frozen memory.  The check is per byte because an
@@ -516,6 +542,109 @@ unsigned char parse_hex(void) {
     }
 }
 
+static void report_error(const char* message) {
+    write_line(message, 0);
+    recolour_last_line(2);
+}
+
+/* Read the "start end" both F and H open with.  The documented monitor takes
+ * end as one beyond the last address, which is what the callers loop on. */
+static bool parse_range(uint32_t* start, uint32_t* end) {
+    if (!parse_hex()) {
+        report_error("? SYNTAX  ERROR");
+        return false;
+    }
+    *start = hex_value;
+    if (!parse_hex()) {
+        report_error("? SYNTAX  ERROR");
+        return false;
+    }
+    *end = hex_value;
+    if (*end <= *start) {
+        report_error("? SYNTAX  ERROR");
+        return false;
+    }
+    return true;
+}
+
+/* F start end value */
+void fill_memory(void) {
+    uint32_t start;
+    uint32_t end;
+    uint32_t address;
+
+    if (!parse_range(&start, &end)) {
+        return;
+    }
+    if (!parse_hex()) {
+        report_error("? SYNTAX  ERROR");
+        return;
+    }
+
+    for (address = start; address < end; address++) {
+        if (!write_frozen_byte(address, (unsigned char)hex_value)) {
+            flush_sector();
+            report_error("? UNMAPPED OR UNFROZEN ADDRESS  ERROR");
+            return;
+        }
+    }
+    flush_sector();
+
+    /* Show the result rather than announce it, as S does after writing. */
+    mon_address = start;
+    show_memory();
+}
+
+/* H start end byte [byte...] */
+constexpr uint8_t HUNT_PATTERN_MAX = 8;
+constexpr uint8_t HUNT_HITS_MAX = 16;
+
+void hunt_memory(void) {
+    unsigned char pattern[HUNT_PATTERN_MAX];
+    unsigned char pattern_length = 0;
+    unsigned char hits = 0;
+    uint32_t start;
+    uint32_t end;
+    uint32_t address;
+
+    if (!parse_range(&start, &end)) {
+        return;
+    }
+    while (pattern_length < HUNT_PATTERN_MAX && parse_hex()) {
+        pattern[pattern_length++] = (unsigned char)hex_value;
+    }
+    if (pattern_length == 0) {
+        report_error("? SYNTAX  ERROR");
+        return;
+    }
+
+    for (address = start; address < end && hits < HUNT_HITS_MAX; address++) {
+        unsigned char matched = 0;
+        while (matched < pattern_length) {
+            unsigned char byte;
+            if (!disasm_read_byte(address + matched, &byte) || byte != pattern[matched]) {
+                break;
+            }
+            matched++;
+        }
+        if (matched == pattern_length) {
+            lfill((long)output_buffer, ' ', 80);
+            output_buffer[0] = ':';
+            format_hex(&output_buffer[1], address, 7);
+            write_line_len(output_buffer, 0, 8);
+            hits++;
+        }
+    }
+
+    if (hits == 0) {
+        write_line("NOT FOUND.", 0);
+    } else if (hits == HUNT_HITS_MAX) {
+        /* Stopping is what keeps a wide range from scrolling the hits away. */
+        write_line("MORE MATCHES FOLLOW.", 0);
+        recolour_last_line(7);
+    }
+}
+
 unsigned char parse_address(void) {
     // Try to read hex digits from screen_line_buffer[screen_line_offset].
     unsigned char digits = parse_hex();
@@ -563,8 +692,47 @@ void freeze_monitor(void) {
         // Command syntax purposely matches that of the Matrix Mode / UART monitor to avoid
         // confusion
         switch (screen_line_buffer[0]) {
-            case 0:
-                // empty line - nothing to do
+            /* Alphabetical, matching the order the footer lists them in. */
+            case 'a': // assemble
+            case 'A':
+                // Not implemented.
+                break;
+            case 'd':
+            case 'D':
+                // Disassemble; a bare D continues from where the last one
+                // stopped, as M does.
+                if (parse_address())
+                    break;
+                show_disassembly();
+                break;
+            case 'f':
+            case 'F':
+                // Fill memory: F start end value
+                fill_memory();
+                break;
+            case 'h':
+            case 'H':
+                // Hunt memory: H start end byte [byte...]
+                hunt_memory();
+                break;
+            case 'm':
+            case 'M':
+                // Display memory
+                if (parse_address())
+                    break;
+                show_memory();
+                break;
+            case 'r':
+            case 'R':
+                // Display register values
+                show_registers();
+                break;
+            case 's':
+            case 'S':
+                // Set memory values
+                if (parse_address())
+                    break;
+                set_memory();
                 break;
             case 'x':
             case 'X':
@@ -576,42 +744,10 @@ void freeze_monitor(void) {
                 CIA2.pra = CIA2.pra | 3;          // video bank 0
                 VICIV.ctrlb = VICIV.ctrlb & 0x7f; // 40 columns
                 return;
-            case 'm':
-            case 'M':
-                // Display memory
-                if (parse_address())
-                    break;
-                show_memory();
-                break;
-            case 'd':
-            case 'D':
-                // Disassemble; a bare D continues from where the last one
-                // stopped, as M does.
-                if (parse_address())
-                    break;
-                show_disassembly();
-                break;
-            case 'a': // assemble
-            case 'A':
-                // Not implemented.
-                break;
-            case 'r':
-            case 'R':
-                // Display register values
-                show_registers();
-                break;
-            case 'f': // fill memory
-            case 'F':
-            case 'h': // search (hunt) memory
-            case 'H':
-                // Not implemented.
-                break;
-            case 's':
-            case 'S':
-                // Set memory values
-                if (parse_address())
-                    break;
-                set_memory();
+            case 0:
+                // Empty line.  Listed after the commands because it is not one,
+                // and because sitting beside the assemble stub made the two
+                // identical branches.
                 break;
             default:
                 write_line("Unknown command.", 0);
