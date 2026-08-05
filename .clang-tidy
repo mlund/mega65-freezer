@@ -1,8 +1,12 @@
-# Static analysis for the helper. Run with `make tidy`; read the exit status.
+# Static analysis for the llvm-mos freezemenu. Run with `cmake --build build --target tidy`;
+# it is expected to be clean, so read the exit status.
 #
 # The check list is deliberately narrow at the edges, because a 6502 target trips several checks
 # that are sound advice on a hosted system and wrong here. Each exclusion below says why, so that
 # nobody has to re-derive it — and so that adding one requires the same.
+#
+# The high-volume arithmetic advisories live in the separate `tidy-arithmetic` target rather than
+# here: they are worth reading, but there are 187 of them and they would bury everything else.
 
 Checks: >
   bugprone-*,
@@ -16,20 +20,28 @@ Checks: >
   readability-redundant-control-flow,
   misc-*,
 
-  -clang-analyzer-core.FixedAddressDereference,
+  -clang-analyzer-optin.core.FixedAddressDereference,
+  -clang-analyzer-core.NullDereference,
+  -clang-analyzer-security.insecureAPI.strcpy,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
   -performance-no-int-to-ptr,
   -bugprone-easily-swappable-parameters,
+  -bugprone-signed-bitwise,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-narrowing-conversions,
   -misc-no-recursion,
   -misc-use-anonymous-namespace,
   -misc-include-cleaner,
+  -misc-use-internal-linkage,
   -portability-avoid-pragma-once,
+  -portability-no-assembler,
 
 WarningsAsErrors: '*'
 
-# Everything of substance is in common.hpp, so a filter that does not name it checks almost
-# nothing. The old '.*remotesd_eth.*' matched only the stub, and silently suppressed every
-# diagnostic in the file that holds the whole program.
-HeaderFilterRegex: '(common|remotesd_eth)\.hpp$'
+# This project's own headers, and only those. Without a filter clang-tidy reports through the SDK
+# and mega65-libc headers, which are not ours to fix and which drown everything else; the earlier
+# value named files from a different project, so it matched nothing and checked no header at all.
+HeaderFilterRegex: 'llvm/src/[^/]+\.h$'
 
 # Rust's naming, because that is what the rest of this repository is written in and there is no
 # reason for the helper to read differently: types UpperCamelCase, functions and variables
@@ -65,9 +77,43 @@ CheckOptions:
 
 # Why each exclusion:
 #
-#   clang-analyzer-core.FixedAddressDereference
+#   clang-analyzer-optin.core.FixedAddressDereference
 #       Dereferencing a fixed address is the entire job. $D020 is the border colour, not a wild
 #       pointer. The SDK's own dma.hpp trips this too.
+#
+#       Note the name: clang-tidy 23 moved this check from `core.` to `optin.core.`, which made
+#       the old exclusion match nothing and the finding reappear. A renamed check fails silently
+#       — an unknown name in this list is ignored, not diagnosed — so an exclusion that suddenly
+#       has findings again is the symptom to look for after a toolchain bump.
+#
+#   clang-analyzer-core.NullDereference
+#       `POKE(0, 65)` and `POKE(0x01, 0x36)` are the 6510 port register at $00/$01 — the CPU port
+#       that sets speed and banks ROM in and out. Address zero is a real, essential register here,
+#       not a null pointer.
+#
+#   clang-analyzer-security.insecureAPI.strcpy
+#   clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+#       Both want the Annex K `_s` functions, which this freestanding libc does not provide. There
+#       is nothing to migrate to.
+#
+#   bugprone-signed-bitwise
+#       752 findings, none actionable. C's integer promotions turn every `uint8_t` operand into a
+#       signed `int` before any bitwise operator, so `CIA2.pra & 0xfc` — the ordinary shape of
+#       hardware register code — fires. Suppressing it would mean a `U` suffix or a cast on every
+#       mask in the program. The genuinely dangerous signed cases are shifts that overflow, and
+#       those are what bugprone-implicit-widening-of-multiplication-result catches.
+#
+#   bugprone-implicit-widening-of-multiplication-result
+#   bugprone-narrowing-conversions
+#       Real and worth reading, but 187 findings between them, almost all provably-safe screen
+#       arithmetic. They have their own target, `tidy-arithmetic`, so that `tidy` can stay clean
+#       and therefore enforceable.
+#
+#   misc-use-internal-linkage
+#       Wrong answers here, and no upside. It sees one translation unit, so it proposes `static`
+#       for `charset` and `root_dir_sector`, which other files reach through their own `extern`
+#       declarations — taking the advice would break the link. And there is nothing to gain:
+#       llvm-nm shows LTO already giving these symbols local binding.
 #
 #   performance-no-int-to-ptr
 #       Casting an integer to a pointer is how a memory-mapped register is reached. $D020 is the
@@ -93,3 +139,8 @@ CheckOptions:
 #       Only ever visible once the header filter above was fixed. There is one compiler here and
 #       it supports `#pragma once`; include guards would trade a working line for a name to keep
 #       unique. This was the only thing the broken filter had been hiding.
+#
+#   portability-no-assembler
+#       A safety-critical coding-standard rule (no assembler at all). Inline asm is how this
+#       program reaches the hypervisor and the 45GS02's own instructions; there is no C spelling
+#       of them.
