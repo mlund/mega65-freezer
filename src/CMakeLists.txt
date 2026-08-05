@@ -31,11 +31,11 @@ add_compile_options(
 include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
 
 # Must be a link option: -mlto-zp governs LTO codegen, and is silently ignored
-# at compile time.  Moves together with freezemenu.ld's __basic_zp_end -- six
-# of seven targets already use 108 of the 110 bytes that pair allows.  Cached
-# because add_link_options() appends after CMAKE_EXE_LINKER_FLAGS and would
-# otherwise override -DLTO_ZP from the command line.
-set(LTO_ZP 106 CACHE STRING "Zero-page bytes the LTO allocator may use")
+# at compile time.  Moves together with freezemenu.ld's __basic_zp_end; the
+# allocator saturates whatever the pair allows, so the two are one setting.
+# Cached because add_link_options() appends after CMAKE_EXE_LINKER_FLAGS and
+# would otherwise override -DLTO_ZP from the command line.
+set(LTO_ZP 210 CACHE STRING "Zero-page bytes the LTO allocator may use")
 add_link_options(-mlto-zp=${LTO_ZP})
 
 set(COMMON

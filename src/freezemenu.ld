@@ -2,8 +2,15 @@
  * $080d via the BASIC SYS stub, and required to end before $9000 (the
  * screen). */
 
+/* The SDK defaults this window to $0090, which is where the C64's BASIC zero
+ * page ends and the C64 KERNAL's begins.  The MEGA65 has no such split: its
+ * KERNAL reserves all of base page $0000 (0.0002-0.15FF per the user guide),
+ * and this program already runs inside that region with interrupts masked,
+ * reaching storage through hypervisor traps and DMA rather than KERNAL calls.
+ * Widening it gives the register allocator room it measurably wants.
+ * $FB-$FE stays free as the conventional user scratch area. */
 __basic_zp_start = 0x0002;
-__basic_zp_end = 0x0090;
+__basic_zp_end = 0x00FB;
 
 MEMORY {
     ram (rw) : ORIGIN = 0x0801, LENGTH = 0x87ff
