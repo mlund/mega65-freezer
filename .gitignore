@@ -5,3 +5,5 @@ build/
 version.c
 !ascii8x8.bin
 TODO.md
+*.swp
+*.swo
