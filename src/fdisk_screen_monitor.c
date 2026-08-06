@@ -10,7 +10,7 @@ extern unsigned char* charset;
 
 char* footer_messages[FOOTER_MAX + 1] = {
     /* Exactly 80 columns: display_footer() copies the whole row unconditionally. */
-    "FMON: (A)SM (D)ASM (F)ILL (H)UNT (M)EM (R)EG (S)ET E(X)IT SETREG(;)             ",
+    "(A)SM (B)IT (C)MP (D)ASM (F)ILL (H)UNT (M)EM (R)EG (S)ET (T)RA E(X)IT SETREG(;) ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};
 
 char stemp[80];

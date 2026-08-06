@@ -211,6 +211,11 @@ static void report_error(const char* message) {
     recolour_last_line(2);
 }
 
+/* The failure every command that walks frozen memory can reach. */
+static void report_unmapped(void) {
+    report_unmapped();
+}
+
 /* A screenful, matching show_memory()'s sixteen lines. */
 constexpr uint8_t DISASSEMBLY_LINES = 16;
 
@@ -266,7 +271,7 @@ static bool show_disassembly_line(void) {
 void show_disassembly(void) {
     for (unsigned char line = 0; line < DISASSEMBLY_LINES; line++) {
         if (!show_disassembly_line()) {
-            report_error("? UNMAPPED OR UNFROZEN ADDRESS  ERROR");
+            report_unmapped();
             /* Step past the hole so a repeated D can walk out of it, as M does.
              * One byte, because without a decode there is no boundary to trust. */
             mon_address++;
@@ -517,19 +522,21 @@ unsigned char parse_hex(void) {
     return digits;
 }
 
-/* Read the "start end" both F and H open with.  The documented monitor takes
- * end as one beyond the last address, which is what the callers loop on. */
+/* A hex value the command cannot do without. */
+static bool parse_required_hex(uint32_t* value) {
+    if (!parse_hex()) {
+        report_error("? SYNTAX  ERROR");
+        return false;
+    }
+    *value = hex_value;
+    return true;
+}
+
+/* The "start end" F, H, C and T open with; end is one past the last address. */
 static bool parse_range(uint32_t* start, uint32_t* end) {
-    if (!parse_hex()) {
-        report_error("? SYNTAX  ERROR");
+    if (!parse_required_hex(start) || !parse_required_hex(end)) {
         return false;
     }
-    *start = hex_value;
-    if (!parse_hex()) {
-        report_error("? SYNTAX  ERROR");
-        return false;
-    }
-    *end = hex_value;
     if (*end <= *start) {
         report_error("? SYNTAX  ERROR");
         return false;
@@ -554,7 +561,7 @@ void fill_memory(void) {
     for (address = start; address < end; address++) {
         if (!write_frozen_byte(address, (unsigned char)hex_value)) {
             flush_sector();
-            report_error("? UNMAPPED OR UNFROZEN ADDRESS  ERROR");
+            report_unmapped();
             return;
         }
     }
@@ -563,6 +570,31 @@ void fill_memory(void) {
     /* Show the result rather than announce it, as S does after writing. */
     mon_address = start;
     show_memory();
+}
+
+/* Blank output_buffer and open it with the marker and address a listing line
+ * starts with. */
+static void begin_address_line(char marker, uint32_t address) {
+    lfill((long)output_buffer, ' ', 80);
+    output_buffer[0] = marker;
+    format_hex(&output_buffer[1], address, 7);
+}
+
+/* One listed address, as H and C both report them. */
+static void write_address_line(uint32_t address) {
+    begin_address_line(':', address);
+    write_line_len(output_buffer, 0, 8);
+}
+
+/* The trailer H and C share: nothing found, or the cap cut the list short. */
+static void report_hit_count(
+    unsigned char hits, bool truncated, const char* none, const char* more) {
+    if (hits == 0) {
+        write_line(none, 0);
+    } else if (truncated) {
+        write_line(more, 0);
+        recolour_last_line(7);
+    }
 }
 
 /* H start end byte [byte...] */
@@ -598,20 +630,145 @@ void hunt_memory(void) {
             matched++;
         }
         if (matched == pattern_length) {
-            lfill((long)output_buffer, ' ', 80);
-            output_buffer[0] = ':';
-            format_hex(&output_buffer[1], address, 7);
-            write_line_len(output_buffer, 0, 8);
+            write_address_line(address);
             hits++;
         }
     }
 
-    if (hits == 0) {
-        write_line("NOT FOUND.", 0);
-    } else if (hits == HUNT_HITS_MAX) {
-        /* Stopping is what keeps a wide range from scrolling the hits away. */
-        write_line("MORE MATCHES FOLLOW.", 0);
-        recolour_last_line(7);
+    /* Stopping at the cap keeps a wide range from scrolling its own hits away. */
+    report_hit_count(hits, address < end, "NOT FOUND.", "MORE MATCHES FOLLOW.");
+}
+
+/* T and C walk two regions at once, and the sector cache holds one sector, so
+ * a byte at a time would evict the far end on every byte -- an SD access per
+ * byte rather than per chunk.  .bss costs nothing in the image. */
+constexpr uint16_t CHUNK_MAX = 256;
+static unsigned char chunk_buffer[CHUNK_MAX];
+
+/* Read up to CHUNK_MAX bytes into chunk_buffer, returning how many. */
+static uint16_t read_chunk(uint32_t address, uint32_t wanted) {
+    uint16_t take = (wanted > CHUNK_MAX) ? CHUNK_MAX : (uint16_t)wanted;
+    uint16_t got = 0;
+
+    while (got < take && disasm_read_byte(address + got, &chunk_buffer[got])) {
+        got++;
+    }
+    return got;
+}
+
+/* C start end other */
+void compare_memory(void) {
+    unsigned char differences = 0;
+    uint32_t start;
+    uint32_t end;
+    uint32_t other;
+
+    if (!parse_range(&start, &end) || !parse_required_hex(&other)) {
+        return;
+    }
+
+    uint32_t remaining = end - start;
+    while (remaining > 0 && differences < HUNT_HITS_MAX) {
+        uint16_t got = read_chunk(start, remaining);
+        if (got == 0) {
+            report_unmapped();
+            return;
+        }
+        for (uint16_t i = 0; i < got && differences < HUNT_HITS_MAX; i++) {
+            unsigned char there;
+            if (!disasm_read_byte(other + i, &there)) {
+                report_unmapped();
+                return;
+            }
+            if (chunk_buffer[i] != there) {
+                write_address_line(start + i);
+                differences++;
+            }
+        }
+        start += got;
+        other += got;
+        remaining -= got;
+    }
+
+    report_hit_count(differences, remaining > 0, "NO DIFFERENCES.", "MORE DIFFERENCES FOLLOW.");
+}
+
+/* True if the whole chunk moved. */
+static bool move_chunk(uint32_t from, uint32_t to, uint16_t wanted) {
+    if (read_chunk(from, wanted) < wanted) {
+        return false;
+    }
+    for (uint16_t i = 0; i < wanted; i++) {
+        if (!write_frozen_byte(to + i, chunk_buffer[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* T start end destination */
+void transfer_memory(void) {
+    uint32_t start;
+    uint32_t end;
+    uint32_t destination;
+
+    if (!parse_range(&start, &end) || !parse_required_hex(&destination)) {
+        return;
+    }
+
+    /* Move the chunk nearest the overlap last: forwards into a destination
+     * inside the range would overwrite source bytes still unread. */
+    bool backwards = destination > start;
+    uint32_t remaining = end - start;
+    uint32_t done = 0;
+
+    while (remaining > 0) {
+        uint16_t chunk = (remaining > CHUNK_MAX) ? CHUNK_MAX : (uint16_t)remaining;
+        remaining -= chunk;
+        /* The two countdowns are the two offsets: remaining is the trailing
+         * chunk's, done the leading one's. */
+        uint32_t offset = backwards ? remaining : done;
+        if (!move_chunk(start + offset, destination + offset, chunk)) {
+            flush_sector();
+            report_unmapped();
+            return;
+        }
+        done += chunk;
+    }
+    flush_sector();
+
+    mon_address = destination;
+    show_memory();
+}
+
+/* B start -- eight bytes to a character cell, eight cells across. */
+constexpr uint8_t BITMAP_CELLS = 8;
+constexpr uint8_t BITMAP_ROWS = 2;
+constexpr uint8_t BITMAP_COLUMN = 9;
+constexpr uint8_t BITMAP_CELL_STRIDE = 9; /* eight pixels and a gap */
+
+void show_bitmaps(void) {
+    for (unsigned char cell_row = 0; cell_row < BITMAP_ROWS; cell_row++) {
+        for (unsigned char pixel_row = 0; pixel_row < 8; pixel_row++) {
+            if (pixel_row == 0) {
+                begin_address_line(',', mon_address);
+            } else {
+                lfill((long)output_buffer, ' ', 80);
+            }
+            for (unsigned char cell = 0; cell < BITMAP_CELLS; cell++) {
+                unsigned char bits;
+                if (!disasm_read_byte(mon_address + (uint32_t)cell * 8 + pixel_row, &bits)) {
+                    report_unmapped();
+                    return;
+                }
+                for (unsigned char bit = 0; bit < 8; bit++) {
+                    output_buffer[BITMAP_COLUMN + cell * BITMAP_CELL_STRIDE + bit] =
+                        (bits & (0x80 >> bit)) ? '#' : '.';
+                }
+            }
+            write_line_len(output_buffer, 0, 80);
+        }
+        mon_address += (uint32_t)BITMAP_CELLS * 8;
     }
 }
 
@@ -704,7 +861,7 @@ void assemble_memory(void) {
         }
         flush_sector();
         if (written < length) {
-            report_error("? UNMAPPED OR UNFROZEN ADDRESS  ERROR");
+            report_unmapped();
             return;
         }
         /* Show what landed, which also steps to the next address.  It cannot
@@ -764,6 +921,18 @@ void freeze_monitor(void) {
             case '.': // the KERNAL monitor's alias, so a listing can be retyped
                 assemble_memory();
                 break;
+            case 'b':
+            case 'B':
+                // Bitmaps: B start
+                if (parse_address())
+                    break;
+                show_bitmaps();
+                break;
+            case 'c':
+            case 'C':
+                // Compare: C start end other
+                compare_memory();
+                break;
             case 'd':
             case 'D':
                 // Disassemble; a bare D continues from where the last one
@@ -800,6 +969,11 @@ void freeze_monitor(void) {
                 if (parse_address())
                     break;
                 set_memory();
+                break;
+            case 't':
+            case 'T':
+                // Transfer: T start end destination
+                transfer_memory();
                 break;
             case 'x':
             case 'X':
