@@ -159,7 +159,7 @@
 #define ABS16(x) (((x) ^ ((x) >> 15)) - ((x) >> 15))
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-// Screen RAM for our area. We do not use 16-bit character mode
+// Screen RAM for our area. Werror do not use 16-bit character mode
 // so we need 80x25 = 2K area.
 #define SCREEN_RAM_ADDRESS 0x12000UL
 #define CHARSET_ADDRESS 0x15000UL
@@ -752,7 +752,7 @@ void load_slot_sprite_palette() {
 void setup_text_palette(void) {
     // To properly display color in the editor, we set the main palette bank to 0,
     // the sprite palette bank, and use the alt palette to display text and UI.
-    // We do this because ALTPAL is selected by VIC-III HIGHLIGHT+UNDERLINE
+    // Werror do this because ALTPAL is selected by VIC-III HIGHLIGHT+UNDERLINE
     // combination and  Foreground colors in alt-palette are used from the 16th index,
     // so we avoid fiddling with this.
 
@@ -761,9 +761,9 @@ void setup_text_palette(void) {
 }
 
 void update_cursor_x() {
-    uint8_t cvw = g_state.canvas_left_x * 4;
-    uint8_t xc = g_state.cursor_x * g_state.cells_per_pixel * 4;
-    POKE(0xD002, SPRITE_OFFSET_X + cvw + xc);
+    uint8_t canvas_left_pixels = g_state.canvas_left_x * 4;
+    uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * 4;
+    POKE(0xD002, SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels);
 }
 
 void update_cursor_y() {
@@ -772,9 +772,9 @@ void update_cursor_y() {
 }
 
 void update_cursor_xmsb() {
-    uint8_t cvw = g_state.canvas_left_x * 4;
-    uint8_t xc = g_state.cursor_x * g_state.cells_per_pixel * 4;
-    const unsigned short sx = SPRITE_OFFSET_X + cvw + xc;
+    uint8_t canvas_left_pixels = g_state.canvas_left_x * 4;
+    uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * 4;
+    const unsigned short sx = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
     if (sx < 256) {
         POKE(0xD010, PEEK(0xD010) & ~(1 << EDIT_CURSOR_NUM));
     } else {
@@ -790,43 +790,43 @@ static void draw_shape_char(uint8_t x, uint8_t y) {
         SHAPE_PREVIEW_CHARACTER);
 }
 
-static void draw_line(PaintFunc pfun) {
+static void draw_line(PaintFunc plot) {
     RECT rc;
     set_effective_tool_rect(&rc);
     if (g_state.tool_org_y == g_state.cursor_y) // Horizontal
     {
         register uint8_t x = rc.left;
         while (x <= rc.right) {
-            pfun(x++, g_state.cursor_y);
+            plot(x++, g_state.cursor_y);
         }
     } else if (g_state.tool_org_x == g_state.cursor_x) // Vertical
     {
         register uint8_t y = rc.top;
         while (y <= rc.bottom) {
-            pfun(g_state.cursor_x, y++);
+            plot(g_state.cursor_x, y++);
         }
     } else // Bresenham- algorithm.
     {
         const signed char dx = rc.right - rc.left;
         const signed char dy = (signed char)-(rc.bottom - rc.top);
         uint8_t x = g_state.tool_org_x, y = g_state.tool_org_y;
-        signed char e = dx + dy;
-        signed char e2 = 0;
+        signed char error = dx + dy;
+        signed char doubled_error = 0;
         signed char sx = g_state.cursor_x > g_state.tool_org_x ? 1 : -1;
         signed char sy = g_state.cursor_y > g_state.tool_org_y ? 1 : -1;
 
         for (;;) {
-            pfun(x, y);
+            plot(x, y);
             if (x == g_state.cursor_x && y == g_state.cursor_y) {
                 break;
             }
-            e2 = e * 2;
-            if (e2 >= dy) {
-                e += dy;
+            doubled_error = error * 2;
+            if (doubled_error >= dy) {
+                error += dy;
                 x += sx;
             }
-            if (e2 <= dx) {
-                e += dx;
+            if (doubled_error <= dx) {
+                error += dx;
                 y += sy;
             }
         }
@@ -835,73 +835,73 @@ static void draw_line(PaintFunc pfun) {
 }
 
 /*
-static void DrawCircle(PaintFunc pfun)
+static void DrawCircle(PaintFunc plot)
 {
   RECT rc;
   SetEffectiveToolRect(&rc);
 
   // RECT rc;
-  // void (*pfun)(uint8_t, uint8_t) = bPreview ? DrawShapeChar : g_state.paintCellFn;
+  // void (*plot)(uint8_t, uint8_t) = bPreview ? DrawShapeChar : g_state.paintCellFn;
   // SetEffectiveToolRect(&rc);
 
   // const signed char dx = rc.right - rc.left;
   // const signed char dy = -(rc.bottom - rc.top);
   // uint8_t x = g_state.toolOrgX, y = g_state.toolOrgY;
-  // signed char e = dx + dy;
-  // signed char e2 = 0;
+  // signed char error = dx + dy;
+  // signed char doubled_error = 0;
   // signed char sx = g_state.cursorX > g_state.toolOrgX ? 1 : -1;
   // signed char sy = g_state.cursorY > g_state.toolOrgY ? 1 : -1;
 
   // for (;;)
   // {
-  //     pfun(x, y);
+  //     plot(x, y);
   //     if (x == g_state.cursorX && y == g_state.cursorY)
   //         break;
-  //     e2 = e * 2;
-  //     if (e2 >= dy)
+  //     doubled_error = error * 2;
+  //     if (doubled_error >= dy)
   //     {
-  //         e += dy;
+  //         error += dy;
   //         x += sx;
   //     }
-  //     if (e2 <= dx)
+  //     if (doubled_error <= dx)
   //     {
-  //         e += dx;
+  //         error += dx;
   //         y += sy;
   //     }
   // }
 }
 */
 
-static void draw_box(PaintFunc pfun) {
+static void draw_box(PaintFunc plot) {
     RECT rc;
     register uint8_t x, y, i;
     set_effective_tool_rect(&rc);
     x = rc.left;
     while (x <= rc.right) {
-        pfun(x, g_state.cursor_y);
+        plot(x, g_state.cursor_y);
         if (g_state.fill_shape) {
             for (i = rc.top + 1; i < rc.bottom; ++i) {
-                pfun(x, i);
+                plot(x, i);
             }
         }
-        pfun(x++, g_state.tool_org_y);
+        plot(x++, g_state.tool_org_y);
     }
 
     y = rc.top;
     while (y <= rc.bottom) {
-        pfun(g_state.cursor_x, y);
-        pfun(g_state.tool_org_x, y++);
+        plot(g_state.cursor_x, y);
+        plot(g_state.tool_org_x, y++);
     }
     clearattr();
 }
 
-static void draw_nothing(PaintFunc pfun) {
-    (void)pfun;
+static void draw_nothing(PaintFunc plot) {
+    (void)plot;
 }
 
-void set_draw_tool(uint8_t dt) {
-    g_state.drawing_tool = dt;
-    switch (dt) {
+void set_draw_tool(uint8_t tool) {
+    g_state.drawing_tool = tool;
+    switch (tool) {
         case DRAWING_TOOL_BOX:
             g_state.fill_shape = 0;
             g_state.draw_shape_fn = draw_box;
@@ -921,27 +921,27 @@ void set_draw_tool(uint8_t dt) {
 
 static void draw_mono_cell(uint8_t x, uint8_t y) {
     register uint8_t cell = 0;
-    const uint8_t bufoff = y * g_state.sprite_width / 8;
-    const long byte_addr = (SPRITE_BUFFER + bufoff) + (x / 8);
-    const uint8_t p = lpeek(byte_addr) & (0x80 >> (x % 8));
+    const uint8_t row_offset = y * g_state.sprite_width / 8;
+    const long byte_addr = (SPRITE_BUFFER + row_offset) + (x / 8);
+    const uint8_t pixel = lpeek(byte_addr) & (0x80 >> (x % 8));
 
     gotoxy(g_state.canvas_left_x + (x * g_state.cells_per_pixel), y + 2);
     for (cell = 0; cell < g_state.cells_per_pixel; ++cell) {
-        textcolor(p ? g_state.color[COLOR_FORE] : g_state.color[COLOR_BACK]);
-        cputc(p ? SOLID_BLOCK_CHARACTER : TRANS_CHARACTER);
+        textcolor(pixel ? g_state.color[COLOR_FORE] : g_state.color[COLOR_BACK]);
+        cputc(pixel ? SOLID_BLOCK_CHARACTER : TRANS_CHARACTER);
     }
 }
 
 static void draw16_color_cell(uint8_t x, uint8_t y) {
     register uint8_t cell = 0;
     const long byte_addr = (SPRITE_BUFFER + (y * 8)) + (x / 2);
-    const uint8_t p = 0xF & (lpeek(byte_addr) >> (((x + 1) % 2) * 4));
-    // const uint8_t col = (g_state.spriteNumber * 16) + p;
+    const uint8_t pixel = 0xF & (lpeek(byte_addr) >> (((x + 1) % 2) * 4));
+    // const uint8_t col = (g_state.spriteNumber * 16) + pixel;
 
     gotoxy(g_state.canvas_left_x + (x * g_state.cells_per_pixel), y + 2);
     for (cell = 0; cell < g_state.cells_per_pixel; ++cell) {
-        textcolor(p);
-        cputc(p ? SOLID_BLOCK_CHARACTER : TRANS_CHARACTER);
+        textcolor(pixel);
+        cputc(pixel ? SOLID_BLOCK_CHARACTER : TRANS_CHARACTER);
     }
 }
 
@@ -1731,7 +1731,7 @@ static void main_loop() {
                 update_and_full_redraw(false);
                 break;
 
-            case '@': // 94: // Up-arrow
+            case '@': // 94: // Upixel-arrow
                 // TODO: Disabled until we can fix it; issue #77
                 // POKE(LOCAL_REG_SPRX64EN, PEEK(LOCAL_REG_SPRX64EN) ^ (1 << PREVIEW_SPRITE_NUM));
                 // FREEZE_POKE(REG_SPRX64EN, FREEZE_PEEK(REG_SPRX64EN) ^ (1 <<
@@ -1879,7 +1879,7 @@ static void main_loop() {
                   break;
                 */
 
-            case 112: // p=pixel tool
+            case 112: // pixel=pixel tool
                 set_draw_tool(DRAWING_TOOL_PIXEL);
                 g_state.redraw_flags = REDRAW_SB_TOOLS | REDRAW_TOOL_PREVIEW;
                 set_redraw_full_canvas();
