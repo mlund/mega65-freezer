@@ -124,20 +124,33 @@ constexpr uint8_t SD_MISC_BUFSEL_SDCARD = 0x80;
 #define AUDIOMIX_REGSEL MMIO8(0xD6F4)
 #define AUDIOMIX_REGDATA MMIO8(0xD6F5)
 
-// VIC-IV video setup.  $D05C holds the side border width LSB and $D05D bits
-// 0-5 its MSB, but bit 7 of $D05D is HOTREG: the switch that makes legacy
-// VIC-II/III register writes propagate to their VIC-IV equivalents.  Bit 6 is
-// set here and is not documented in the user guide.
-// $D018 in its C64 form: charset at $1000, i.e. the uppercase ROM set.
+// VIC-IV video setup.  Each of these is a value for one named register, so
+// they stay separate constants rather than becoming an enum: nothing ever
+// holds "one of these", and the border width is a pixel count, not a bit
+// pattern.
+
+// VICIV.addr ($D018) in its C64 form: charset at $1000, the uppercase ROM set.
 constexpr uint8_t VIC4_ADDR_UPPERCASE = 0x15;
-constexpr uint8_t VIC4_CTRLC_LEGACY_MASK = 0xF8;
-constexpr uint8_t VIC4_CTRLB_80_COLUMN = 0xE0;
+
+// VICIV.sdbdrwd_lsb/_msb ($D05C/$D05D).  The width is 12 bits across the pair,
+// but bit 7 of the MSB is HOTREG, the switch that makes legacy VIC-II/III
+// register writes propagate to their VIC-IV equivalents.  Bit 6 is set here
+// and is not documented in the user guide.
 constexpr uint8_t VIC4_SIDE_BORDER_WIDTH = 80;
 constexpr uint8_t VIC4_BORDER_MSB_HOTREG = 0xC0;
+
+// VICIV.ctrlb ($D031).
+constexpr uint8_t VIC4_CTRLB_80_COLUMN = 0xE0;
 constexpr uint8_t VIC4_CTRLB_EXTENDED_ATTRIBUTES = 0x20;
-constexpr uint8_t VIC4_CHRXSCL_80_COLUMN = 0x78;
+
+// VICIV.ctrlc ($D054).  The masks keep the bits a caller must not disturb --
+// CRT emulation among them -- while setting the mode in the low bits.
+constexpr uint8_t VIC4_CTRLC_LEGACY_MASK = 0xF8;
 constexpr uint8_t VIC4_CTRLC_MODE_MASK = 0xA8;
 constexpr uint8_t VIC4_CTRLC_16BIT_FULL_COLOUR = 0x05;
+
+// VICIV.chrxscl ($D05A), the horizontal character scale.
+constexpr uint8_t VIC4_CHRXSCL_80_COLUMN = 0x78;
 
 // $00/$01 CPU port: all lines driven, BASIC banked out, KERNAL and I/O kept.
 constexpr uint8_t CPU_PORT_DDR_ALL_OUTPUTS = 0x3F;
