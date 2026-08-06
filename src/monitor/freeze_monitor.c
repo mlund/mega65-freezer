@@ -372,7 +372,7 @@ void set_memory() {
                         char_to_hex(screen_line_buffer[screen_line_offset++]);
                     if (screen_line_buffer[screen_line_offset] != ' ') {
                         mon_sector[(freeze_slot_offset + i) & 0x1ff] =
-                            mon_sector[(freeze_slot_offset + i) & 0x1ff] << 4;
+                            (unsigned char)(mon_sector[(freeze_slot_offset + i) & 0x1ff] << 4);
                         mon_sector[(freeze_slot_offset + i) & 0x1ff] |=
                             char_to_hex(screen_line_buffer[screen_line_offset++]);
                     }
@@ -850,7 +850,7 @@ void assemble_memory(void) {
         }
         screen_line_buffer[79] = 0;
         screen_line_offset = 0;
-        screen_line_length = strlen((char*)screen_line_buffer);
+        screen_line_length = (unsigned char)strlen((char*)screen_line_buffer);
     }
 }
 
@@ -878,7 +878,7 @@ void freeze_monitor(void) {
 
         // Skip initial char for parsing routines
         screen_line_offset = 1;
-        screen_line_length = strlen((char*)screen_line_buffer);
+        screen_line_length = (unsigned char)strlen((char*)screen_line_buffer);
 
         // Command syntax purposely matches that of the Matrix Mode / UART monitor to avoid
         // confusion

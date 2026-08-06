@@ -366,7 +366,7 @@ void draw_freeze_menu(unsigned char part) {
                 (unsigned long)&freeze_menu[FREEZE_SLOT_OFFSET],
                 19);
             // Display slot ID as decimal
-            screen_decimal((unsigned long)&freeze_menu[SLOT_NUMBER_OFFSET], slot_number);
+            screen_decimal((unsigned int)&freeze_menu[SLOT_NUMBER_OFFSET], slot_number);
         } else {
             lcopy((unsigned long)freeze_menu_bar,
                 (unsigned long)&freeze_menu[LOAD_RESUME_OFFSET],
@@ -463,7 +463,7 @@ void draw_freeze_menu(unsigned char part) {
 
     if (part & UPDATE_PROCESS) {
         // Display process ID as decimal
-        screen_decimal((unsigned long)&freeze_menu[PROCESS_ID_OFFSET], process_descriptor.task_id);
+        screen_decimal((unsigned int)&freeze_menu[PROCESS_ID_OFFSET], process_descriptor.task_id);
 
         // Process name: only display if no unprintable PETSCII chars
         for (i = 0; i < 16; i++) {
@@ -488,8 +488,8 @@ void draw_freeze_menu(unsigned char part) {
         // Draw drive numbers for internal drive
         lfill((unsigned long)&freeze_menu[DRIVE0_NUM_OFFSET], 0, 2);
         lfill((unsigned long)&freeze_menu[DRIVE1_NUM_OFFSET], 0, 2);
-        screen_decimal((unsigned long)&freeze_menu[DRIVE0_NUM_OFFSET], freeze_peek(0x10113L));
-        screen_decimal((unsigned long)&freeze_menu[DRIVE1_NUM_OFFSET], freeze_peek(0x10114L));
+        screen_decimal((unsigned int)&freeze_menu[DRIVE0_NUM_OFFSET], freeze_peek(0x10113L));
+        screen_decimal((unsigned int)&freeze_menu[DRIVE1_NUM_OFFSET], freeze_peek(0x10114L));
 
         lfill((unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET], ' ', 18);
         lfill((unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET], ' ', 18);
@@ -605,7 +605,7 @@ void draw_freeze_menu(unsigned char part) {
             unsigned short* tile_num;
 
             screen_data_start = 0x52000L + 0x300L + 0x40L;
-            unsigned short tile_offset = (screen_data_start >> 6);
+            unsigned short tile_offset = (unsigned short)(screen_data_start >> 6);
             // Work out where the screen data begins
             screen_data_start = lpeek(0x5203dL) + (lpeek(0x5203eL) << 8);
             screen_data_start += 0x52000L + 0x40L;
@@ -829,7 +829,7 @@ unsigned char poll_touch_panel(void) {
 }
 #endif
 
-void change_mounted_disk_image(int diskid) {
+void change_mounted_disk_image(uint8_t diskid) {
     char* ret;
     ret = freeze_select_disk_image(diskid);
     if (ret) {

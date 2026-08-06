@@ -45,7 +45,7 @@ void hexout2(char* m, unsigned long v, int n) {
         return;
     }
     do {
-        m[n - 1] = hexchar2(v);
+        m[n - 1] = hexchar2((unsigned char)(v & 0xf));
         v = v >> 4L;
 
     } while (--n);
@@ -478,9 +478,9 @@ long fat32_create_contiguous_file(
     // Modify date 0x18 -- 0x19
     // *(unsigned short *)&sector_buffer[free_dir_sector_ofs + 0x18]=j;
     // Start cluster
-    sector_buffer[free_dir_sector_ofs + 0x1A] = start_cluster;
-    sector_buffer[free_dir_sector_ofs + 0x1B] = start_cluster >> 8;
-    sector_buffer[free_dir_sector_ofs + 0x14] = start_cluster >> 16;
+    sector_buffer[free_dir_sector_ofs + 0x1A] = (uint8_t)start_cluster;
+    sector_buffer[free_dir_sector_ofs + 0x1B] = (uint8_t)(start_cluster >> 8);
+    sector_buffer[free_dir_sector_ofs + 0x14] = (uint8_t)(start_cluster >> 16);
     sector_buffer[free_dir_sector_ofs + 0x15] = start_cluster >> 24;
     // File length
     sector_buffer[free_dir_sector_ofs + 0x1C] = (size >> 0) & 0xff;

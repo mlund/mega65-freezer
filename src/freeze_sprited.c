@@ -780,7 +780,7 @@ void update_cursor_xmsb() {
     } else {
         POKE(0xD010, PEEK(0xD010) | (1 << EDIT_CURSOR_NUM));
     }
-    POKE(0xD002, sx);
+    POKE(0xD002, (unsigned char)sx);
 }
 
 static void draw_shape_char(uint8_t x, uint8_t y) {
@@ -808,7 +808,7 @@ static void draw_line(PaintFunc pfun) {
     } else // Bresenham- algorithm.
     {
         const signed char dx = rc.right - rc.left;
-        const signed char dy = -(rc.bottom - rc.top);
+        const signed char dy = (signed char)-(rc.bottom - rc.top);
         uint8_t x = g_state.tool_org_x, y = g_state.tool_org_y;
         signed char e = dx + dy;
         signed char e2 = 0;
@@ -995,8 +995,8 @@ static void paint_pixel16_color(uint8_t x, uint8_t y) {
     const long byte_addr = (SPRITE_BUFFER + (y * 8)) + (x / 2);
     const uint8_t bitsel = (((x + 1) % 2) * 4);
     lpoke(byte_addr,
-        (lpeek(byte_addr) & (0xF0 >> bitsel)) |
-            (g_state.color[g_state.current_color_idx] << bitsel));
+        (uint8_t)((lpeek(byte_addr) & (0xF0 >> bitsel)) |
+            (g_state.color[g_state.current_color_idx] << bitsel)));
 }
 
 static void clear_sprite() {
@@ -1068,7 +1068,7 @@ void update_sprite_parameters(bool f_fetch_slot) {
 
     g_state.sprite_height = 21;
     g_state.sprite_size_bytes = SPRITE_SIZE_BYTES(g_state.sprite_number);
-    g_state.bytes_per_row = g_state.sprite_size_bytes / g_state.sprite_height;
+    g_state.bytes_per_row = (uint8_t)(g_state.sprite_size_bytes / g_state.sprite_height);
     g_state.sprite_data_addr = SPRITE_DATA_ADDR(g_state.sprite_number);
 
     if (f_fetch_slot) {
@@ -1525,8 +1525,8 @@ static void main_loop() {
         if ((my >= 66 && my <= 233) && (mx >= 55 && mx <= 235)) {
             if ((((mx - 55) / 8) != g_state.cursor_x) || (((my - 66) / 8) != g_state.cursor_y)) {
                 g_state.draw_cell_fn(g_state.cursor_x, g_state.cursor_y);
-                g_state.cursor_x = (mx - 55) / 8;
-                g_state.cursor_y = (my - 66) / 8;
+                g_state.cursor_x = (uint8_t)((mx - 55) / 8);
+                g_state.cursor_y = (uint8_t)((my - 66) / 8);
                 g_state.update_cursor_x_fn();
                 g_state.update_cursor_y_fn();
                 fire_lock = 0;
@@ -1704,23 +1704,26 @@ static void main_loop() {
                     case SPR_COLOR_MODE_16COLOR:
                         // Switch to Hi-Res
                         FREEZE_POKE(REG_SPR_16COL,
-                            FREEZE_PEEK(REG_SPR_16COL) & ~(1 << g_state.sprite_number));
+                            (uint8_t)(FREEZE_PEEK(REG_SPR_16COL) & ~(1 << g_state.sprite_number)));
                         FREEZE_POKE(REG_SPR_MULTICOLOR,
-                            FREEZE_PEEK(REG_SPR_MULTICOLOR) & ~(1 << g_state.sprite_number));
+                            (uint8_t)(FREEZE_PEEK(REG_SPR_MULTICOLOR) &
+                                ~(1 << g_state.sprite_number)));
                         break;
                     case SPR_COLOR_MODE_MULTICOLOR:
                         // Switch to 16-col
                         FREEZE_POKE(REG_SPR_16COL,
-                            FREEZE_PEEK(REG_SPR_16COL) | (1 << g_state.sprite_number));
+                            (uint8_t)(FREEZE_PEEK(REG_SPR_16COL) | (1 << g_state.sprite_number)));
                         FREEZE_POKE(REG_SPR_MULTICOLOR,
-                            FREEZE_PEEK(REG_SPR_MULTICOLOR) & ~(1 << g_state.sprite_number));
+                            (uint8_t)(FREEZE_PEEK(REG_SPR_MULTICOLOR) &
+                                ~(1 << g_state.sprite_number)));
                         break;
                     case SPR_COLOR_MODE_MONOCHROME:
                         // Switch to Multicol
                         FREEZE_POKE(REG_SPR_16COL,
-                            FREEZE_PEEK(REG_SPR_16COL) & ~(1 << g_state.sprite_number));
+                            (uint8_t)(FREEZE_PEEK(REG_SPR_16COL) & ~(1 << g_state.sprite_number)));
                         FREEZE_POKE(REG_SPR_MULTICOLOR,
-                            FREEZE_PEEK(REG_SPR_MULTICOLOR) | (1 << g_state.sprite_number));
+                            (uint8_t)(FREEZE_PEEK(REG_SPR_MULTICOLOR) |
+                                (1 << g_state.sprite_number)));
                         break;
                     default:
                         break;
@@ -1755,8 +1758,8 @@ static void main_loop() {
 
             case 118: // "V"-expand
                 POKE(0xD017, PEEK(0xD017) ^ (1 << PREVIEW_SPRITE_NUM));
-                FREEZE_POKE(
-                    VIC_BASE + 0x17, FREEZE_PEEK(VIC_BASE + 0x17) ^ (1 << g_state.sprite_number));
+                FREEZE_POKE(VIC_BASE + 0x17,
+                    (uint8_t)(FREEZE_PEEK(VIC_BASE + 0x17) ^ (1 << g_state.sprite_number)));
                 bordercolor(DEFAULT_BORDER_COLOR);
                 update_sprite_preview();
                 g_state.redraw_flags = REDRAW_SB_INFO;
@@ -1764,8 +1767,8 @@ static void main_loop() {
 
             case 104: // "H"-expand
                 POKE(0xD01D, PEEK(0xD01D) ^ (1 << PREVIEW_SPRITE_NUM));
-                FREEZE_POKE(
-                    VIC_BASE + 0x1D, FREEZE_PEEK(VIC_BASE + 0x1D) ^ (1 << g_state.sprite_number));
+                FREEZE_POKE(VIC_BASE + 0x1D,
+                    (uint8_t)(FREEZE_PEEK(VIC_BASE + 0x1D) ^ (1 << g_state.sprite_number)));
                 bordercolor(DEFAULT_BORDER_COLOR);
                 update_sprite_preview();
                 g_state.redraw_flags = REDRAW_SB_INFO;
@@ -1806,7 +1809,8 @@ static void main_loop() {
                 const unsigned char c_spr_pal_bank = (c_bank_reg & 0xC) >> 2;
                 gotoxy(1, 1);
                 cputdec(c_spr_pal_bank, 0, 4);
-                FREEZE_POKE(REG_SPRPALSEL, (c_bank_reg & ~0xC) | (((c_spr_pal_bank + 1) % 4) << 2));
+                FREEZE_POKE(REG_SPRPALSEL,
+                    (uint8_t)((c_bank_reg & ~0xC) | (((c_spr_pal_bank + 1) % 4) << 2)));
                 bordercolor(DEFAULT_BORDER_COLOR);
                 setup_text_palette();
             } break;

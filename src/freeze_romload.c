@@ -245,7 +245,7 @@ void scan_directory(void) {
     dirent = readdir(dir);
     while (dirent && ((unsigned short)dirent != 0xffffU)) {
 
-        x = strlen(dirent->d_name);
+        x = (unsigned char)strlen(dirent->d_name);
         // only accept 32 characters max!
         if (x > 32) {
             goto next_entry;

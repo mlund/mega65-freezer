@@ -602,7 +602,7 @@ void scan_directory(unsigned char drive_id) {
     dirent = readdir(dir);
     while (dirent && ((unsigned short)dirent != 0xffffU)) {
 
-        x = strlen(dirent->d_name);
+        x = (unsigned char)strlen(dirent->d_name);
 
         // check DIR attribute of dirent
         if (x < 32) {

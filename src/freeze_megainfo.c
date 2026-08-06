@@ -207,7 +207,7 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     // save date for external use
     ymd[0] = (unsigned char)(y - RTC_YEAR_EPOCH);
     ymd[1] = m;
-    ymd[2] = ds;
+    ymd[2] = (unsigned char)ds;
 
     return buffer;
 }
@@ -580,9 +580,9 @@ unsigned char get_rtc_stats(unsigned char reinit) {
         }
 
         if (rtc_ticks > tod_ticks) {
-            rtc_diff = rtc_ticks - tod_ticks;
+            rtc_diff = (unsigned char)(rtc_ticks - tod_ticks);
         } else {
-            rtc_diff = tod_ticks - rtc_ticks;
+            rtc_diff = (unsigned char)(tod_ticks - rtc_ticks);
         }
     }
 
@@ -718,9 +718,9 @@ void display_rtc_debug(unsigned char x, unsigned char y, unsigned char colour, u
     write_text(x, y, colour, buffer);
     if (mode > 0) {
         if (is_ntsc) {
-            write_text(strlen(buffer) + 1, y, colour, "NTSC");
+            write_text((unsigned char)(strlen(buffer) + 1), y, colour, "NTSC");
         } else {
-            write_text(strlen(buffer) + 1, y, colour, "PAL ");
+            write_text((unsigned char)(strlen(buffer) + 1), y, colour, "PAL ");
         }
     }
 }

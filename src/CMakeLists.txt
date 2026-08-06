@@ -33,6 +33,11 @@ add_compile_options(
     -Wall
     -Wextra
     -Wconditional-uninitialized
+    # The narrowing half only.  -Wsign-conversion is the other 226 findings and
+    # is the same promotion noise as bugprone-signed-bitwise: C promotes every
+    # uint8_t operand to signed int, so ordinary register code fires.
+    -Wconversion
+    -Wno-sign-conversion
     # char is unsigned on llvm-mos -- verified with a _Static_assert -- so a
     # char subscript is 0..255 and cannot go negative.  The warning guards
     # against a signed-char platform this one is not.

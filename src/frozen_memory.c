@@ -31,7 +31,7 @@ void request_freeze_region_list(void) {
             break;
         }
     }
-    freeze_region_count = i;
+    freeze_region_count = (unsigned char)i;
 }
 
 uint32_t find_thumbnail_offset(void) {

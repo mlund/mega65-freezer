@@ -205,7 +205,7 @@ void format_disk_image(unsigned long file_sector, char* diskname, unsigned char 
     // Diskname
     lcopy((long)diskname, (long)&sector_buffer[4], 16);
     if (strlen(diskname) < 16) {
-        for (i = strlen(diskname); i < 16; i++) {
+        for (i = (unsigned char)strlen(diskname); i < 16; i++) {
             sector_buffer[4 + i] = 0xa0;
         }
     }
