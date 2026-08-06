@@ -19,6 +19,13 @@ set_source_files_properties(${VERSION_H} PROPERTIES GENERATED TRUE)
 # $9000 (charset destination) - $07ff (load address)
 set(MAX_SIZE 34817)
 
+# Hypervisor serial tracing on the failure paths.  Off by default: a shipping
+# build carries no strings for failures that do not happen.  See src/trace.h.
+option(FREEZER_TRACE "Trace failure paths over the hypervisor serial channel" OFF)
+if(FREEZER_TRACE)
+    add_compile_definitions(FREEZER_TRACE)
+endif()
+
 add_compile_options(
     # -Oz over -Os: smaller on every target, and nothing here is speed-critical.
     -Oz

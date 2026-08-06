@@ -5,6 +5,7 @@
 #include "fdisk_screen.h"
 #include "freezer.h"
 #include "freezer_common.h"
+#include "trace.h"
 
 #include <stdio.h>
 
@@ -134,6 +135,7 @@ unsigned char freeze_peek(uint32_t addr) {
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         /* FreezerNotFrozen's value, but this function returns data, so a real
          * byte of $55 is indistinguishable from the failure. */
+        TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
 
@@ -156,6 +158,7 @@ enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
+        TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
 
@@ -182,11 +185,13 @@ enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
+        TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
 
     if (count > 512) {
         // sector size exceeded
+        TRACE("count exceeds one sector");
         return FreezerCountTooLarge;
     }
     offset = freeze_slot_offset & 0x1ff;
@@ -210,6 +215,7 @@ enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
+        TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
 
@@ -242,11 +248,13 @@ enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint1
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
+        TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
 
     if (count > 512) {
         // sector size exceeded
+        TRACE("count exceeds one sector");
         return FreezerCountTooLarge;
     }
     offset = freeze_slot_offset & 0x1ff;

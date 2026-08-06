@@ -4,6 +4,7 @@
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
 #include "mega65_regs.h"
+#include "trace.h"
 
 #include <mega65.h>
 #include <stdio.h>
@@ -214,6 +215,7 @@ void getrtc(struct M65Tm* tm) {
 enum FreezerError fat32_open_file_system(void) {
     sdcard_readsector(0);
     if ((sector_buffer[0x1fe] != 0x55) || (sector_buffer[0x1ff] != 0xAA)) {
+        TRACE("no $55AA signature on sector 0");
         return FreezerBadFilesystem;
     } else {
         for (unsigned char i = 0; i < 4; i++) {
