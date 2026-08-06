@@ -821,35 +821,55 @@ static const char* const ASSEMBLE_ERROR[] = {
     [AssembleBranchTooFar] = "? BRANCH OUT OF RANGE  ERROR",
 };
 
-/* A <address> <mnemonic> [operand], then a fresh prompt at the next address
- * until an empty line ends it. */
+/* `A <address> <mnemonic> [operand]` assembles straight away; `A <address>`
+ * on its own prompts for the instruction, as the older monitors do.  Either
+ * way a fresh prompt follows at the next address until an empty line ends it. */
 void assemble_memory(void) {
     uint8_t bytes[ASM_BYTES_MAX];
     uint8_t length;
 
-    if (parse_address()) {
-        return;
+    /* Not parse_address(): that rejects anything after the address, which is
+     * right for the commands taking only one and wrong here, because the
+     * instruction may follow on the same line.  No digits continues from the
+     * previous address, as a bare A should. */
+    if (parse_hex()) {
+        mon_address = hex_value;
     }
-    for (;;) {
-        enum AssembleStatus status = assemble_instruction(
-            mon_address, (const char*)&screen_line_buffer[screen_line_offset], bytes, &length);
-        if (status != AssembleOk) {
-            report_error(ASSEMBLE_ERROR[status]);
-            return;
-        }
 
-        unsigned char written = 0;
-        while (written < length && block_write_byte(mon_address + written, bytes[written])) {
-            written++;
+    /* Whether the current line still carries an instruction.  `A 2000` is an
+     * address and nothing else, so it prompts instead of reporting the blank
+     * remainder as an unknown mnemonic.  Every line read afterwards is one. */
+    bool pending = false;
+    for (unsigned char i = screen_line_offset; i < screen_line_length; i++) {
+        if (screen_line_buffer[i] != ' ') {
+            pending = true;
+            break;
         }
-        flush_sector();
-        if (written < length) {
-            report_unmapped();
-            return;
+    }
+
+    for (;;) {
+        if (pending) {
+            enum AssembleStatus status = assemble_instruction(
+                mon_address, (const char*)&screen_line_buffer[screen_line_offset], bytes, &length);
+            if (status != AssembleOk) {
+                report_error(ASSEMBLE_ERROR[status]);
+                return;
+            }
+
+            unsigned char written = 0;
+            while (written < length && block_write_byte(mon_address + written, bytes[written])) {
+                written++;
+            }
+            flush_sector();
+            if (written < length) {
+                report_unmapped();
+                return;
+            }
+            /* Show what landed, which also steps to the next address.  It
+             * cannot fail: the bytes were just written there. */
+            (void)show_disassembly_line();
         }
-        /* Show what landed, which also steps to the next address.  It cannot
-         * fail: the bytes were just written there. */
-        (void)show_disassembly_line();
+        pending = true;
 
         /* The prompt stays on its line so the instruction is typed after it,
          * as it is on the A command that opened the loop. */
