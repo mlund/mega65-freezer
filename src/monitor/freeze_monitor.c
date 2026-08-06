@@ -160,6 +160,15 @@ bool disasm_read_byte(uint32_t address, uint8_t* value) {
     return true;
 }
 
+/* format_hex() emits ASCII, but write_line_raw() bypasses the letter shift that
+ * write_line_len() applies, so A-F have to be folded to screen codes here. */
+static void hex_to_screen_codes(unsigned char count) {
+    for (unsigned char i = 0; i < count; i++) {
+        if (output_buffer[i] >= 'A' && output_buffer[i] <= 'F')
+            output_buffer[i] &= 0x0f;
+    }
+}
+
 void show_memory_line(uint32_t addr) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     unsigned char i;
@@ -191,12 +200,7 @@ void show_memory_line(uint32_t addr) {
             output_buffer[8 + 16 * 3 + 2 + i] = b;
         }
     }
-    // Convert hex back to C64 screen codes
-    constexpr uint8_t HEX_FIELD_END = 8 + 16 * 3;
-    for (i = 0; i < HEX_FIELD_END; i++) {
-        if (output_buffer[i] >= 'A' && output_buffer[i] <= 'F')
-            output_buffer[i] &= 0x0f;
-    }
+    hex_to_screen_codes(8 + 16 * 3);
 
     write_line_raw(output_buffer, 0, 8 + 16 * 3 + 2 + 16);
 }
@@ -721,9 +725,9 @@ constexpr uint8_t BITMAP_ROWS = 2;
 constexpr uint8_t BITMAP_COLUMN = 9;
 constexpr uint8_t BITMAP_CELL_STRIDE = 9; /* eight pixels and a gap */
 
-/* A screen code, not ASCII: the reverse bank at +$80 holds a solid block, and
- * to_stemp() shifts only letters, so it survives the write. */
-constexpr uint8_t BITMAP_SET = 0xE0;
+/* A screen code, not ASCII: the filled circle keeps a clear column each side,
+ * so neighbouring set pixels stay countable where a solid block merges. */
+constexpr uint8_t BITMAP_SET = 0x51;
 
 void show_bitmaps(void) {
     for (unsigned char cell_row = 0; cell_row < BITMAP_ROWS; cell_row++) {
@@ -744,7 +748,8 @@ void show_bitmaps(void) {
                         (bits & (0x80 >> bit)) ? BITMAP_SET : '.';
                 }
             }
-            write_line_len(output_buffer, 0, 80);
+            hex_to_screen_codes(8);
+            write_line_raw(output_buffer, 0, 80);
         }
         mon_address += (uint32_t)BITMAP_CELLS * 8;
     }
