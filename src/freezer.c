@@ -1003,7 +1003,7 @@ int main(void) {
     __asm__ volatile("cld");
 
     // Put $DD00 DDR back to default
-    POKE(0xDD02, 0xFF);
+    CIA2.ddra = 0xFF;
 
     // Enable extended attributes so we can use reverse
     VICIV.ctrlb = VICIV.ctrlb | 0x20;
@@ -1012,9 +1012,9 @@ int main(void) {
     VICIV.chrxscl = 0x78;
 
     // Reset character set address
-    POKE(0xD068, 0x00);
-    POKE(0xD069, 0x10);
-    POKE(0xD06A, 0x00);
+    VICIV.charptr_lsb = 0x00;
+    VICIV.charptr_msb = 0x10;
+    VICIV.charptr_bnk = 0x00;
 
     // Silence SIDs
     SID1.amp = 0;
@@ -1081,7 +1081,7 @@ int main(void) {
 
     // Ensure correct keyboard DDR etc
     CIA1.pra = 0xFF;
-    POKE(0xDC02U, 0x00);
+    CIA1.ddra = 0x00;
 
     // Main keyboard input loop
     while (1) {

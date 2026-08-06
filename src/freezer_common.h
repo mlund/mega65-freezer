@@ -8,7 +8,7 @@
 // (used to avoid delays when navigating through the list of freeze slots
 #define NAVIGATION_KEY_CHECK()                                                                     \
     {                                                                                              \
-        if (((PEEK(0xD610U) & 0x7f) == 0x11) || ((PEEK(0xD610U) & 0x7f) == 0x1D))                  \
+        if (((ASCIIKEY & 0x7f) == 0x11) || ((ASCIIKEY & 0x7f) == 0x1D))                            \
             return;                                                                                \
     }
 

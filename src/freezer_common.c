@@ -40,23 +40,23 @@ void set_palette(void) {
     unsigned char c;
 
     // set palette selector
-    POKE(0xD070U, 0xFF);
+    VICIV.palsel = 0xFF;
 
     // First set the 16 C64 colours
     for (c = 0; c < 16; c++) {
-        POKE(0xD100U + c, c64_palette[c * 4 + 0]);
-        POKE(0xD200U + c, c64_palette[c * 4 + 1]);
-        POKE(0xD300U + c, c64_palette[c * 4 + 2]);
+        PALETTE.red[c] = c64_palette[c * 4 + 0];
+        PALETTE.green[c] = c64_palette[c * 4 + 1];
+        PALETTE.blue[c] = c64_palette[c * 4 + 2];
     }
 
     // Then prepare a colour cube in the rest of the palette
     for (c = 16; c; c++) {
         // 3 bits for red
-        POKE(0xD100U + c, (c >> 4) & 0xe);
+        PALETTE.red[c] = (c >> 4) & 0xe;
         // 3 bits for green
-        POKE(0xD200U + c, (c >> 1) & 0xe);
+        PALETTE.green[c] = (c >> 1) & 0xe;
         // 2 bits for blue
-        POKE(0xD300U + c, (c << 2) & 0xf);
+        PALETTE.blue[c] = (c << 2) & 0xf;
     }
 }
 

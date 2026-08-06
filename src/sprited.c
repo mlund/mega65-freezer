@@ -75,7 +75,7 @@ int main(void) {
     // Back to 40 column mode
     VICIV.ctrlb = 0x00;
     // 256-colour char data from chip RAM, not expansion RAM
-    POKE(0xD063U, 0x00);
+    VICIV.scrnptr_mb = 0x00;
 
     mega65_dos_exechelper("FREEZER.M65");
 
