@@ -145,7 +145,7 @@ void setup_menu_screen(void) {
 
     lcopy((long)viciv_regs, 0xffd3000L, 47);
     // don't write D02f, or we switch back to vic-ii
-    lcopy((uint32_t)(viciv_regs + 48), 0xffd3030L, 80);
+    lcopy((Addr28)(viciv_regs + 48), 0xffd3030L, 80);
 
     // Reset border widths
     // No sprites
@@ -230,7 +230,7 @@ void draw_thumbnail(void) {
     // Copy thumbnail memory to buffer
     for (i = 0; i < 8; i++) {
         sdcard_readsector(freeze_slot_start_sector + thumbnail_sector + i);
-        lcopy((uint32_t)sector_buffer, (uint32_t)(thumbnail_buffer + (i * 0x200)), 0x200);
+        lcopy((Addr28)sector_buffer, (Addr28)(thumbnail_buffer + (i * 0x200)), 0x200);
         NAVIGATION_KEY_CHECK();
     }
 

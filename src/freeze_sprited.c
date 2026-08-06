@@ -66,12 +66,12 @@
     * Consider SPRBPMEN for 16-color sprites
  */
 #include "cc65compat.h"
+#include "fdisk_memory.h"
 #include "freezer.h"
 
 #include <mega65.h>
 #include <mega65/conio.h>
 #include <mega65/hal.h>
-#include <mega65/memory.h>
 #include <mega65/mouse.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -783,7 +783,7 @@ static void initialize() {
     // --- Charset setup ----
 
     lcopy(ROM_CHARSET_SOURCE, CHARSET_ADDRESS, CHARSET_BYTES);
-    lcopy((uint32_t)CHSET_TOOLBOX,
+    lcopy((Addr28)CHSET_TOOLBOX,
         CHARSET_ADDRESS + TOOLBOX_CHARSET_BASE_IDX * GLYPH_BYTES,
         sizeof(CHSET_TOOLBOX));
     setcharsetaddr(CHARSET_ADDRESS);
@@ -794,7 +794,7 @@ static void initialize() {
     VICIV.spr_ptradr_msb = (uint8_t)(SPRITE_POINTER_TABLE >> 8);
     VICIV.spr_ptradr_bnk = (uint8_t)(SPRITE_POINTER_TABLE >> 16) | SPRITE_POINTERS_16BIT;
 
-    lcopy((uint32_t)SPRITE_POINTER, MOUSE_POINTER_DATA, SPRITE_FRAME_BYTES);
+    lcopy((Addr28)SPRITE_POINTER, MOUSE_POINTER_DATA, SPRITE_FRAME_BYTES);
     set_sprite_pointer(MOUSE_POINTER_NUM, MOUSE_POINTER_DATA);
     set_sprite_pointer(EDIT_CURSOR_NUM, EDIT_CURSOR_DATA);
     /* The preview shows the sprite being edited, straight out of the buffer. */
@@ -1225,7 +1225,7 @@ void update_sprite_parameters(bool f_fetch_slot) {
     /* One frame per cell width.  Widening after the arithmetic rather than
      * before keeps this a 16-bit add: both the array and the offset are. */
     const uint8_t* cursor_frame = EDIT_CURSORS + SPRITE_FRAME_BYTES * (g_state.cells_per_pixel - 1);
-    lcopy((uint32_t)cursor_frame, EDIT_CURSOR_DATA, SPRITE_FRAME_BYTES);
+    lcopy((Addr28)cursor_frame, EDIT_CURSOR_DATA, SPRITE_FRAME_BYTES);
 
     // The edit cursor maybe off-bounds if a different sprite type was switched,
     // so force to recalculate

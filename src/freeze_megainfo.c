@@ -531,8 +531,8 @@ unsigned char get_rtc_stats(unsigned char reinit) {
         rtc_check = 1;
         rtc_diff = 0;
     }
-    lcopy(0xffd7110l, (uint32_t)(rtc_buf + 6), 6);
-    lcopy(0xffd3c08l, (uint32_t)(tod_buf + 4), 4);
+    lcopy(0xffd7110l, (Addr28)(rtc_buf + 6), 6);
+    lcopy(0xffd3c08l, (Addr28)(tod_buf + 4), 4);
 
     // only looking at seconds here, derived from minutes + seconds
     pa = ((tod_buf[1] >> 4) & 0x7) * 10 + (tod_buf[1] & 0xf) +
