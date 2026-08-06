@@ -78,17 +78,14 @@
 
 // #define SPRITED_STANDALONE
 
-/* $D000 as the running editor sees it.  Its own display -- the preview sprite,
- * the edit cursor -- is poked here, live, whatever is being edited. */
-constexpr uint16_t LOCAL_VIC_BASE = 0xD000;
-
 /* The sprite registers being edited, and the pair that reaches them.  Built
  * into the freezer they are the frozen program's registers, which live in the
  * freeze slot on the SD card rather than in memory: reg_peek() goes out
  * through freeze_peek()'s sector I/O, which is why VIC_BASE cannot be the
- * address of an MMIO struct however much it looks like one. */
+ * address of an MMIO struct however much it looks like one.  The editor's own
+ * display is a different thing entirely and goes through VICIV. */
 #ifdef SPRITED_STANDALONE
-constexpr uint32_t VIC_BASE = LOCAL_VIC_BASE;
+constexpr uint32_t VIC_BASE = 0xD000UL;
 constexpr uint32_t CIA2_PORT_A = 0xDD00UL;
 
 static inline uint8_t reg_peek(uint32_t address) {
@@ -121,17 +118,6 @@ constexpr uint32_t REG_SPRPALSEL = VIC_BASE + 0x70;
 
 static inline uint32_t reg_sprite_color(uint8_t sprite) {
     return VIC_BASE + 0x27 + sprite;
-}
-
-constexpr uint16_t LOCAL_REG_SPR_16COL = LOCAL_VIC_BASE + 0x6B;
-constexpr uint16_t LOCAL_REG_SPR_MULTICOLOR = LOCAL_VIC_BASE + 0x1C;
-constexpr uint16_t LOCAL_REG_SPRITE_MULTICOL1 = LOCAL_VIC_BASE + 0x25;
-constexpr uint16_t LOCAL_REG_SPRITE_MULTICOL2 = LOCAL_VIC_BASE + 0x26;
-/* Only the disabled X-width path uses this one; see issue #77. */
-[[maybe_unused]] constexpr uint16_t LOCAL_REG_SPRX64EN = LOCAL_VIC_BASE + 0x57;
-
-static inline uint16_t local_reg_sprite_color(uint8_t sprite) {
-    return LOCAL_VIC_BASE + 0x27 + sprite;
 }
 
 [[maybe_unused]] static inline uint8_t sprite_palette(void) {
@@ -203,6 +189,28 @@ constexpr uint8_t SIDEBAR_PREVIEW_AREA_HEIGHT =
 constexpr uint8_t SPRITE_OFFSET_X = 24;
 constexpr uint8_t SPRITE_OFFSET_Y = 50;
 
+/* The canvas starts below the banner and the sprite-info row. */
+constexpr uint8_t CANVAS_TOP_ROW = 2;
+
+/* H320/V200, the space the mouse and the sprites share. */
+constexpr uint16_t SCREEN_MAX_X = 319;
+constexpr uint16_t SCREEN_MAX_Y = 199;
+constexpr uint8_t POINTER_WIDTH = 8;
+constexpr uint8_t POINTER_START_X = 100;
+constexpr uint8_t POINTER_START_Y = 100;
+
+/* The canvas in mouse coordinates, which are sprite pixels rather than screen
+ * columns and rows. */
+constexpr uint16_t CANVAS_MOUSE_LEFT = 55;
+constexpr uint16_t CANVAS_MOUSE_RIGHT = 235;
+constexpr uint16_t CANVAS_MOUSE_TOP = 66;
+constexpr uint16_t CANVAS_MOUSE_BOTTOM = 233;
+constexpr uint8_t MOUSE_CELL_PIXELS = 8;
+/* A character cell measured in sprite pixels: the text is H640 and the sprites
+ * are H320, so a column is four sprite pixels wide, and a row eight high. */
+constexpr uint8_t CELL_PIXELS_X = 4;
+constexpr uint8_t CELL_PIXELS_Y = 8;
+
 constexpr uint16_t JOY_DELAY = 10000U;
 
 /* These stay macros: they are type-generic, and C has no other spelling of
@@ -217,8 +225,38 @@ constexpr uint32_t SCREEN_RAM_ADDRESS = 0x12000UL;
 constexpr uint32_t CHARSET_ADDRESS = 0x15000UL;
 constexpr uint32_t SPRITE_POINTER_TABLE = 0x16000UL;
 constexpr uint32_t SPRITE_BUFFER = 0x40000UL;
-constexpr uint8_t PREVIEW_SPRITE_NUM = 2;
+
+/* The editor's own three sprites, in the live VIC.  These index VICIV's
+ * spr_pos[], spr_color[] and the pointer table, so they name the sprite
+ * everywhere rather than hiding it in a register address. */
+constexpr uint8_t MOUSE_POINTER_NUM = 0;
 constexpr uint8_t EDIT_CURSOR_NUM = 1;
+constexpr uint8_t PREVIEW_SPRITE_NUM = 2;
+constexpr uint8_t EDITOR_SPRITES =
+    (1 << MOUSE_POINTER_NUM) | (1 << EDIT_CURSOR_NUM) | (1 << PREVIEW_SPRITE_NUM);
+
+/* Where the first two live.  $0380 overlaps the tail of the freezer's loader
+ * stub at $0340, which has finished by the time this runs and which helper.S
+ * copies there afresh on every load. */
+constexpr uint32_t MOUSE_POINTER_DATA = 0x0380;
+constexpr uint32_t EDIT_CURSOR_DATA = 0x03C0;
+
+/* A hires sprite is 24x21 pixels, three bytes to the row. */
+constexpr uint8_t SPRITE_ROWS = 21;
+constexpr uint8_t SPRITE_FRAME_BYTES = 63;
+/* Sprite data addresses are stored divided by this, in the pointer table and
+ * in the pointers the frozen program keeps. */
+constexpr uint8_t SPRITE_BLOCK_BYTES = 64;
+/* Bit 7 of SPRPTR2: pointers are 16-bit words rather than single bytes. */
+constexpr uint8_t SPRITE_POINTERS_16BIT = 0x80;
+
+/* $00 is the CPU port: 40MHz, VIC-IV I/O and 80 columns in one write. */
+constexpr uint8_t CPU_PORT_FAST = 65;
+
+/* The ROM character set, as the VIC-IV sees it in the upper memory map. */
+constexpr uint32_t ROM_CHARSET_SOURCE = 0x2D800;
+constexpr uint16_t CHARSET_BYTES = 2048;
+constexpr uint8_t GLYPH_BYTES = 8;
 
 /* What still needs drawing, OR-ed together into redraw_flags.  Anonymous
  * because the bits combine, so they never name a type of their own. */
@@ -713,9 +751,16 @@ static void set_rect(RECT* rc, uint8_t left, uint8_t top, uint8_t right, uint8_t
     rc->bottom = bottom;
 }
 
+/* SPRPTR16 is enabled below, so a table entry is a 16-bit word holding the
+ * data address divided by 64. */
+static void set_sprite_pointer(uint8_t sprite, uint32_t data_address) {
+    const uint16_t block = (uint16_t)(data_address / SPRITE_BLOCK_BYTES);
+    lpoke(SPRITE_POINTER_TABLE + sprite * 2, (uint8_t)block);
+    lpoke(SPRITE_POINTER_TABLE + sprite * 2 + 1, (uint8_t)(block >> 8));
+}
+
 static void initialize() {
-    // Set 40MHz, VIC-IV I/O, 80 column, screen RAM @ $8000
-    POKE(0, 65);
+    POKE(0, CPU_PORT_FAST);
 
     // --- Freezer slot setup
 
@@ -737,59 +782,46 @@ static void initialize() {
 
     // --- Charset setup ----
 
-    lcopy(0x2D800, CHARSET_ADDRESS, 2048);
-    lcopy(
-        (long)CHSET_TOOLBOX, CHARSET_ADDRESS + TOOLBOX_CHARSET_BASE_IDX * 8, sizeof(CHSET_TOOLBOX));
+    lcopy(ROM_CHARSET_SOURCE, CHARSET_ADDRESS, CHARSET_BYTES);
+    lcopy((uint32_t)CHSET_TOOLBOX,
+        CHARSET_ADDRESS + TOOLBOX_CHARSET_BASE_IDX * GLYPH_BYTES,
+        sizeof(CHSET_TOOLBOX));
     setcharsetaddr(CHARSET_ADDRESS);
 
     // --- Sprite setup ----
 
-    // Set pointer table to SPRITE_POINTER_TABLE
-    // Set sprite 0 to our cursor. Address = $380.
-    // Set sprite 1 to editing cursor #1   Address = $3C0
-    // Set sprite 2 to current sprite placeholder.   Address = SPRITE_BUFFER
+    VICIV.spr_ptradr_lsb = (uint8_t)SPRITE_POINTER_TABLE;
+    VICIV.spr_ptradr_msb = (uint8_t)(SPRITE_POINTER_TABLE >> 8);
+    VICIV.spr_ptradr_bnk = (uint8_t)(SPRITE_POINTER_TABLE >> 16) | SPRITE_POINTERS_16BIT;
 
-    // Set local sprite pointer table
-
-    POKE(0xD06C, (uint8_t)SPRITE_POINTER_TABLE);
-    POKE(0xD06D, (uint8_t)(SPRITE_POINTER_TABLE >> 8));
-    POKE(0xD06E, (uint8_t)(SPRITE_POINTER_TABLE >> 16) | 128); // Enable SPRPTR16
-
-    // #0: Mouse Pointer sprite at 0x380
-
-    lcopy((long)SPRITE_POINTER, 0x380, 63);
-    lpoke(SPRITE_POINTER_TABLE, 0x0E);
-    lpoke(SPRITE_POINTER_TABLE + 1, 0x00);
-
-    // Address of edit cursor
-    lpoke(SPRITE_POINTER_TABLE + 2, 0x0F); // 64 * 0xF = 0x3C0
-    lpoke(SPRITE_POINTER_TABLE + 3, 0x00);
-
-    // Address of current sprite image preview
-    lpoke(SPRITE_POINTER_TABLE + 4, SPRITE_BUFFER / 64 % 256);
-    lpoke(SPRITE_POINTER_TABLE + 5, SPRITE_BUFFER / 64 / 256);
+    lcopy((uint32_t)SPRITE_POINTER, MOUSE_POINTER_DATA, SPRITE_FRAME_BYTES);
+    set_sprite_pointer(MOUSE_POINTER_NUM, MOUSE_POINTER_DATA);
+    set_sprite_pointer(EDIT_CURSOR_NUM, EDIT_CURSOR_DATA);
+    /* The preview shows the sprite being edited, straight out of the buffer. */
+    set_sprite_pointer(PREVIEW_SPRITE_NUM, SPRITE_BUFFER);
 
     // Sprite properties (color, initial pos, etc.)
 
-    POKE(0xD074, 0); // Alpha OFF
-    POKE(0xD076, 0); // V400 mode off for editor sprites.
-    POKE(0xD077, 0); // Y-MSBs off
-    POKE(0xD078, 0); // Y-MSBs off
+    VICIV.spr_enalpha = 0; // Alpha OFF
+    VICIV.spr_env400 = 0;  // V400 mode off for editor sprites.
+    VICIV.spr_ymsbs = 0;   // Y-MSBs off
+    VICIV.spr_ysmsbs = 0;  // Y-MSBs off
 
-    VICIV.spr_ena = 7; // Enable #0, #1, #2
-    POKE(0xD01D, 0);   // H-expand off for editor sprites.
-    POKE(0xD017, 0);   // V-expand off for editor sprites.
-    POKE(0xD000, 100);
-    POKE(0xD001, 100);
+    VICIV.spr_ena = EDITOR_SPRITES;
+    VICIV.spr_exp_x = 0; // H-expand off for editor sprites.
+    VICIV.spr_exp_y = 0; // V-expand off for editor sprites.
+    VICIV.spr_pos[MOUSE_POINTER_NUM].x = POINTER_START_X;
+    VICIV.spr_pos[MOUSE_POINTER_NUM].y = POINTER_START_Y;
 
-    POKE(0xD002, 0);
-    POKE(0xD003, 0);
+    VICIV.spr_pos[EDIT_CURSOR_NUM].x = 0;
+    VICIV.spr_pos[EDIT_CURSOR_NUM].y = 0;
 
-    POKE(0xD027, 7);
-    POKE(0xD028, 1);
-    POKE(0xD010, 1 << PREVIEW_SPRITE_NUM); // 8th bit for Sprite#2
-    POKE(0xD01C, 0);                       // All mono/hires sprites
-    POKE(0xD06B, 0);                       // 16-color mode OFF
+    VICIV.spr_color[MOUSE_POINTER_NUM] = COLOUR_YELLOW;
+    VICIV.spr_color[EDIT_CURSOR_NUM] = COLOUR_WHITE;
+    /* The preview sits in the sidebar, past X=255. */
+    VICIV.spr_hi_x = 1 << PREVIEW_SPRITE_NUM;
+    VICIV.spr_mcolor = 0; // All mono/hires sprites
+    VICIV.spr_16en = 0;   // 16-color mode OFF
 
     g_state.redraw_flags = RedrawAll;
     g_state.sprite_number = 0;
@@ -825,26 +857,26 @@ void setup_text_palette(void) {
 }
 
 void update_cursor_x() {
-    uint8_t canvas_left_pixels = g_state.canvas_left_x * 4;
-    uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * 4;
-    POKE(0xD002, SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels);
+    uint8_t canvas_left_pixels = g_state.canvas_left_x * CELL_PIXELS_X;
+    uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * CELL_PIXELS_X;
+    VICIV.spr_pos[EDIT_CURSOR_NUM].x = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
 }
 
 void update_cursor_y() {
-    uint8_t yc = g_state.cursor_y * 8;
-    POKE(0xD003, SPRITE_OFFSET_Y + (2 * 8) + yc);
+    uint8_t yc = g_state.cursor_y * CELL_PIXELS_Y;
+    VICIV.spr_pos[EDIT_CURSOR_NUM].y = SPRITE_OFFSET_Y + (CANVAS_TOP_ROW * CELL_PIXELS_Y) + yc;
 }
 
 void update_cursor_xmsb() {
-    uint8_t canvas_left_pixels = g_state.canvas_left_x * 4;
-    uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * 4;
+    uint8_t canvas_left_pixels = g_state.canvas_left_x * CELL_PIXELS_X;
+    uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * CELL_PIXELS_X;
     const unsigned short sx = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
     if (sx < 256) {
-        POKE(0xD010, PEEK(0xD010) & ~(1 << EDIT_CURSOR_NUM));
+        VICIV.spr_hi_x &= (uint8_t)~(1 << EDIT_CURSOR_NUM);
     } else {
-        POKE(0xD010, PEEK(0xD010) | (1 << EDIT_CURSOR_NUM));
+        VICIV.spr_hi_x |= 1 << EDIT_CURSOR_NUM;
     }
-    POKE(0xD002, (unsigned char)sx);
+    VICIV.spr_pos[EDIT_CURSOR_NUM].x = (unsigned char)sx;
 }
 
 static void draw_shape_char(uint8_t x, uint8_t y) {
@@ -986,7 +1018,7 @@ void set_draw_tool(enum DrawingTool tool) {
 static void draw_mono_cell(uint8_t x, uint8_t y) {
     register uint8_t cell = 0;
     const uint8_t row_offset = y * g_state.sprite_width / 8;
-    const long byte_addr = (SPRITE_BUFFER + row_offset) + (x / 8);
+    const uint32_t byte_addr = (SPRITE_BUFFER + row_offset) + (x / 8);
     const uint8_t pixel = lpeek(byte_addr) & (0x80 >> (x % 8));
 
     gotoxy(g_state.canvas_left_x + (x * g_state.cells_per_pixel), y + 2);
@@ -998,7 +1030,7 @@ static void draw_mono_cell(uint8_t x, uint8_t y) {
 
 static void draw16_color_cell(uint8_t x, uint8_t y) {
     register uint8_t cell = 0;
-    const long byte_addr = (SPRITE_BUFFER + (y * 8)) + (x / 2);
+    const uint32_t byte_addr = (SPRITE_BUFFER + (y * 8)) + (x / 2);
     const uint8_t pixel = 0xF & (lpeek(byte_addr) >> (((x + 1) % 2) * 4));
     // const uint8_t col = (g_state.spriteNumber * 16) + pixel;
 
@@ -1011,7 +1043,7 @@ static void draw16_color_cell(uint8_t x, uint8_t y) {
 
 static void draw_multicolor_cell(uint8_t x, uint8_t y) {
     register uint8_t cell = 0;
-    const long byte_addr = (SPRITE_BUFFER + (y * g_state.sprite_width / 4)) + (x / 4);
+    const uint32_t byte_addr = (SPRITE_BUFFER + (y * g_state.sprite_width / 4)) + (x / 4);
     const uint8_t b = lpeek(byte_addr);
     const uint8_t p0 = b & (0x80 >> (2 * (x % 4)));
     const uint8_t p1 = b & (0x40 >> (2 * (x % 4)));
@@ -1032,14 +1064,14 @@ static void draw_multicolor_cell(uint8_t x, uint8_t y) {
 }
 
 static void paint_pixel_mono(uint8_t x, uint8_t y) {
-    const long byte_addr = (SPRITE_BUFFER + (y * g_state.sprite_width / 8)) + (x / 8);
+    const uint32_t byte_addr = (SPRITE_BUFFER + (y * g_state.sprite_width / 8)) + (x / 8);
     const uint8_t bitsel = 0x80 >> (x % 8);
     const uint8_t b = lpeek(byte_addr);
     lpoke(byte_addr, g_state.current_color_idx == ColorBack ? (b & ~bitsel) : (b | bitsel));
 }
 
 static void paint_pixel_multi(uint8_t x, uint8_t y) {
-    const long byte_addr = (SPRITE_BUFFER + (y * g_state.sprite_width / 4)) + (x / 4);
+    const uint32_t byte_addr = (SPRITE_BUFFER + (y * g_state.sprite_width / 4)) + (x / 4);
     const uint8_t bitsel = (2 * (x % 4));
     const uint8_t mask = ((0x80 >> bitsel) | (0x40 >> bitsel));
     if (g_state.current_color_idx == ColorBack) {
@@ -1056,7 +1088,7 @@ static void paint_pixel_multi(uint8_t x, uint8_t y) {
 }
 
 static void paint_pixel16_color(uint8_t x, uint8_t y) {
-    const long byte_addr = (SPRITE_BUFFER + (y * 8)) + (x / 2);
+    const uint32_t byte_addr = (SPRITE_BUFFER + (y * 8)) + (x / 2);
     const uint8_t bitsel = (((x + 1) % 2) * 4);
     lpoke(byte_addr,
         (uint8_t)((lpeek(byte_addr) & (0xF0 >> bitsel)) |
@@ -1073,19 +1105,19 @@ static void fetch_vic2_regs_from_slot() {
 
     const uint8_t spr_bit = 1 << PREVIEW_SPRITE_NUM;
     if (is_sprite_hexpand(g_state.sprite_number)) {
-        POKE(0xD01D, PEEK(0xD01D) | spr_bit);
+        VICIV.spr_exp_x |= spr_bit;
     } else {
-        POKE(0xD01D, PEEK(0xD01D) & ~spr_bit);
+        VICIV.spr_exp_x &= (uint8_t)~spr_bit;
     }
     if (is_sprite_vexpand(g_state.sprite_number)) {
-        POKE(0xD017, PEEK(0xD017) | spr_bit);
+        VICIV.spr_exp_y |= spr_bit;
     } else {
-        POKE(0xD017, PEEK(0xD017) & ~spr_bit);
+        VICIV.spr_exp_y &= (uint8_t)~spr_bit;
     }
     if (is_sprite_xwidth(g_state.sprite_number)) {
-        POKE(0xD057, PEEK(0xD057) | spr_bit);
+        VICIV.spr_x64en |= spr_bit;
     } else {
-        POKE(0xD057, PEEK(0xD057) & ~spr_bit);
+        VICIV.spr_x64en &= (uint8_t)~spr_bit;
     }
 }
 
@@ -1116,28 +1148,26 @@ static inline uint8_t vexpand_factor(uint8_t sprite) {
 static void update_sprite_preview(void) {
     // Setup Preview Area sprite. (we divide by 2 for H320 sprites, should divide by 1 if H640 mode)
 
-    POKE(local_reg_sprite_color(PREVIEW_SPRITE_NUM), g_state.color[ColorFore]);
-    POKE(LOCAL_REG_SPRITE_MULTICOL1, g_state.color[ColorMc1]);
-    POKE(LOCAL_REG_SPRITE_MULTICOL2, g_state.color[ColorMc2]);
+    VICIV.spr_color[PREVIEW_SPRITE_NUM] = g_state.color[ColorFore];
+    VICIV.spr_mcolors[0] = g_state.color[ColorMc1];
+    VICIV.spr_mcolors[1] = g_state.color[ColorMc2];
 
-    POKE(0xD004,
-        (SPRITE_OFFSET_X +
-            ((SIDEBAR_COLUMN * 8 / 2) +
-                (((SIDEBAR_WIDTH * 8 / 2) / 2) -
-                    (g_state.sprite_width * hexpand_factor(g_state.sprite_number) /
-                        (is_sprite_multicolor(g_state.sprite_number) ? 1 : 2))))) &
-            0xFF);
+    VICIV.spr_pos[PREVIEW_SPRITE_NUM].x = (uint8_t)(SPRITE_OFFSET_X +
+        ((SIDEBAR_COLUMN * CELL_PIXELS_X) +
+            ((SIDEBAR_WIDTH * CELL_PIXELS_X / 2) -
+                (g_state.sprite_width * hexpand_factor(g_state.sprite_number) /
+                    (is_sprite_multicolor(g_state.sprite_number) ? 1 : 2)))));
 
-    POKE(0xD005,
-        (SPRITE_OFFSET_Y + (SIDEBAR_PREVIEW_AREA_TOP * 8) +
-            (((SIDEBAR_PREVIEW_AREA_HEIGHT * 8) / 2) -
-                (g_state.sprite_height * vexpand_factor(g_state.sprite_number) / 2))));
+    VICIV.spr_pos[PREVIEW_SPRITE_NUM].y =
+        (uint8_t)(SPRITE_OFFSET_Y + (SIDEBAR_PREVIEW_AREA_TOP * CELL_PIXELS_Y) +
+            ((SIDEBAR_PREVIEW_AREA_HEIGHT * CELL_PIXELS_Y / 2) -
+                (g_state.sprite_height * vexpand_factor(g_state.sprite_number) / 2)));
 }
 
 void update_sprite_parameters(bool f_fetch_slot) {
     const bool is_x_width = is_sprite_xwidth(g_state.sprite_number);
 
-    g_state.sprite_height = 21;
+    g_state.sprite_height = SPRITE_ROWS;
     g_state.sprite_size_bytes = sprite_size_bytes(g_state.sprite_number);
     g_state.bytes_per_row = (uint8_t)(g_state.sprite_size_bytes / g_state.sprite_height);
     g_state.sprite_data_addr = sprite_data_addr(g_state.sprite_number);
@@ -1155,8 +1185,8 @@ void update_sprite_parameters(bool f_fetch_slot) {
         g_state.cells_per_pixel = 3;
         g_state.pixels_per_byte = 2;
         g_state.current_color_idx = ColorFore;
-        POKE(LOCAL_REG_SPR_16COL, PEEK(LOCAL_REG_SPR_16COL) | (1 << PREVIEW_SPRITE_NUM));
-        POKE(LOCAL_REG_SPR_MULTICOLOR, PEEK(LOCAL_REG_SPR_MULTICOLOR) & ~(1 << PREVIEW_SPRITE_NUM));
+        VICIV.spr_16en |= 1 << PREVIEW_SPRITE_NUM;
+        VICIV.spr_mcolor &= (uint8_t)~(1 << PREVIEW_SPRITE_NUM);
     } else if (is_sprite_multicolor(g_state.sprite_number)) {
         g_state.draw_cell_fn = draw_multicolor_cell;
         g_state.paint_cell_fn = paint_pixel_multi;
@@ -1167,8 +1197,8 @@ void update_sprite_parameters(bool f_fetch_slot) {
         g_state.color[ColorFore] = reg_peek(reg_sprite_color(g_state.sprite_number));
         g_state.color[ColorMc1] = reg_peek(REG_SPRITE_MULTICOL1);
         g_state.color[ColorMc2] = reg_peek(REG_SPRITE_MULTICOL2);
-        POKE(LOCAL_REG_SPR_16COL, PEEK(LOCAL_REG_SPR_16COL) & ~(1 << PREVIEW_SPRITE_NUM));
-        POKE(LOCAL_REG_SPR_MULTICOLOR, PEEK(LOCAL_REG_SPR_MULTICOLOR) | (1 << PREVIEW_SPRITE_NUM));
+        VICIV.spr_16en &= (uint8_t)~(1 << PREVIEW_SPRITE_NUM);
+        VICIV.spr_mcolor |= 1 << PREVIEW_SPRITE_NUM;
     } else {
         g_state.draw_cell_fn = draw_mono_cell;
         g_state.paint_cell_fn = paint_pixel_mono;
@@ -1177,8 +1207,8 @@ void update_sprite_parameters(bool f_fetch_slot) {
         g_state.cells_per_pixel = is_x_width ? 1 : 2;
         g_state.pixels_per_byte = 8;
         g_state.color[ColorFore] = reg_peek(reg_sprite_color(g_state.sprite_number));
-        POKE(LOCAL_REG_SPR_16COL, PEEK(LOCAL_REG_SPR_16COL) & ~(1 << PREVIEW_SPRITE_NUM));
-        POKE(LOCAL_REG_SPR_MULTICOLOR, PEEK(LOCAL_REG_SPR_MULTICOLOR) & ~(1 << PREVIEW_SPRITE_NUM));
+        VICIV.spr_16en &= (uint8_t)~(1 << PREVIEW_SPRITE_NUM);
+        VICIV.spr_mcolor &= (uint8_t)~(1 << PREVIEW_SPRITE_NUM);
     }
 
     g_state.cells_per_pixel >>= g_state.wide_screen_mode;
@@ -1192,7 +1222,10 @@ void update_sprite_parameters(bool f_fetch_slot) {
 
     // Setup Edit cursor
 
-    lcopy((long)EDIT_CURSORS + 63 * (g_state.cells_per_pixel - 1), 0x3C0, 63);
+    /* One frame per cell width.  Widening after the arithmetic rather than
+     * before keeps this a 16-bit add: both the array and the offset are. */
+    const uint8_t* cursor_frame = EDIT_CURSORS + SPRITE_FRAME_BYTES * (g_state.cells_per_pixel - 1);
+    lcopy((uint32_t)cursor_frame, EDIT_CURSOR_DATA, SPRITE_FRAME_BYTES);
 
     // The edit cursor maybe off-bounds if a different sprite type was switched,
     // so force to recalculate
@@ -1208,9 +1241,9 @@ static void update_color_regs() {
     reg_poke(REG_SPRITE_MULTICOL2, g_state.color[ColorMc2]);
     bordercolor(COLOUR_BLUE);
 
-    POKE(local_reg_sprite_color(PREVIEW_SPRITE_NUM), g_state.color[ColorFore]);
-    POKE(LOCAL_REG_SPRITE_MULTICOL1, g_state.color[ColorMc1]);
-    POKE(LOCAL_REG_SPRITE_MULTICOL2, g_state.color[ColorMc2]);
+    VICIV.spr_color[PREVIEW_SPRITE_NUM] = g_state.color[ColorFore];
+    VICIV.spr_mcolors[0] = g_state.color[ColorMc1];
+    VICIV.spr_mcolors[1] = g_state.color[ColorMc2];
 }
 
 static void erase_canvas_space() {
@@ -1612,9 +1645,12 @@ static void main_loop() {
     unsigned char buf[64];
     unsigned char key = 0;
 
-    mouse_set_bounding_box(0 + 24, 0 + 50, 319 + 24 - 8, 199 + 50);
-    mouse_warp_to(24, 100);
-    mouse_bind_to_sprite(0);
+    mouse_set_bounding_box(SPRITE_OFFSET_X,
+        SPRITE_OFFSET_Y,
+        SCREEN_MAX_X + SPRITE_OFFSET_X - POINTER_WIDTH,
+        SCREEN_MAX_Y + SPRITE_OFFSET_Y);
+    mouse_warp_to(SPRITE_OFFSET_X, POINTER_START_Y);
+    mouse_bind_to_sprite(MOUSE_POINTER_NUM);
 
     while (1) {
         const uint8_t raster = VICIV.rasterline;
@@ -1625,11 +1661,14 @@ static void main_loop() {
         previous_raster = raster;
 
         mouse_update_position(&mx, &my);
-        if ((my >= 66 && my <= 233) && (mx >= 55 && mx <= 235)) {
-            if ((((mx - 55) / 8) != g_state.cursor_x) || (((my - 66) / 8) != g_state.cursor_y)) {
+        if ((my >= CANVAS_MOUSE_TOP && my <= CANVAS_MOUSE_BOTTOM) &&
+            (mx >= CANVAS_MOUSE_LEFT && mx <= CANVAS_MOUSE_RIGHT)) {
+            const uint16_t cell_x = (mx - CANVAS_MOUSE_LEFT) / MOUSE_CELL_PIXELS;
+            const uint16_t cell_y = (my - CANVAS_MOUSE_TOP) / MOUSE_CELL_PIXELS;
+            if (cell_x != g_state.cursor_x || cell_y != g_state.cursor_y) {
                 g_state.draw_cell_fn(g_state.cursor_x, g_state.cursor_y);
-                g_state.cursor_x = (uint8_t)((mx - 55) / 8);
-                g_state.cursor_y = (uint8_t)((my - 66) / 8);
+                g_state.cursor_x = (uint8_t)cell_x;
+                g_state.cursor_y = (uint8_t)cell_y;
                 g_state.update_cursor_x_fn();
                 g_state.update_cursor_y_fn();
                 fire_lock = 0;
@@ -1835,12 +1874,12 @@ static void main_loop() {
 
             case '@': // 94: // Upixel-arrow
                 // TODO: Disabled until we can fix it; issue #77
-                // POKE(LOCAL_REG_SPRX64EN, PEEK(LOCAL_REG_SPRX64EN) ^ (1 << PREVIEW_SPRITE_NUM));
+                // VICIV.spr_x64en ^= 1 << PREVIEW_SPRITE_NUM;
                 // reg_poke(REG_SPRX64EN, reg_peek(REG_SPRX64EN) ^ (1 <<
-                // g_state.spriteNumber)); g_state.redrawFlags = RedrawAll;
-                // g_state.updateCursorXFn = PEEK(LOCAL_REG_SPRX64EN) & (1 << PREVIEW_SPRITE_NUM) ?
-                // UpdateCursorXMSB : UpdateCursorX; UpdateAndFullRedraw(false);
-                // UpdateSpritePreview();
+                // g_state.sprite_number)); g_state.redraw_flags = RedrawAll;
+                // g_state.update_cursor_x_fn = VICIV.spr_x64en & (1 << PREVIEW_SPRITE_NUM) ?
+                // update_cursor_xmsb : update_cursor_x; update_and_full_redraw(false);
+                // update_sprite_preview();
                 break;
 
             case 3: // CTRL-C
@@ -1859,7 +1898,7 @@ static void main_loop() {
                 break;
 
             case 118: // "V"-expand
-                POKE(0xD017, PEEK(0xD017) ^ (1 << PREVIEW_SPRITE_NUM));
+                VICIV.spr_exp_y ^= 1 << PREVIEW_SPRITE_NUM;
                 reg_poke(REG_SPR_VEXPAND,
                     (uint8_t)(reg_peek(REG_SPR_VEXPAND) ^ (1 << g_state.sprite_number)));
                 bordercolor(DEFAULT_BORDER_COLOR);
@@ -1868,7 +1907,7 @@ static void main_loop() {
                 break;
 
             case 104: // "H"-expand
-                POKE(0xD01D, PEEK(0xD01D) ^ (1 << PREVIEW_SPRITE_NUM));
+                VICIV.spr_exp_x ^= 1 << PREVIEW_SPRITE_NUM;
                 reg_poke(REG_SPR_HEXPAND,
                     (uint8_t)(reg_peek(REG_SPR_HEXPAND) ^ (1 << g_state.sprite_number)));
                 bordercolor(DEFAULT_BORDER_COLOR);
