@@ -160,7 +160,7 @@ char draw_directory_entry(unsigned char screen_row) {
             POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (i * 2), ' ');
         }
     } else {
-        lcopy((unsigned long)dir_line_colour,
+        lcopy((uint32_t)dir_line_colour,
             COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
             19 * 2);
     }
@@ -181,9 +181,9 @@ void clear_screen(unsigned char lines) {
     lcopy(COLOUR_RAM_ADDRESS, COLOUR_RAM_ADDRESS + 4, 40 * 2 * lines - 4);
 }
 
-void copy_line_to_screen(long dest, char* src, unsigned int length) {
+void copy_line_to_screen(long dest, char* src, uint16_t length) {
 
-    for (unsigned int i = 0; i < length && src[i] != 0; i++) {
+    for (uint16_t i = 0; i < length && src[i] != 0; i++) {
         POKE(dest + (i << 1) + 0, petscii_to_screen(src[i]));
         POKE(dest + (i << 1) + 1, 0);
     }
@@ -207,7 +207,7 @@ void draw_file_list(void) {
     for (i = 0; i < 23; i++) {
         if ((display_offset + i) < file_count) {
             // Real line
-            lcopy(0x40000U + ((display_offset + i) << 6), (unsigned long)name, 64);
+            lcopy(0x40000U + ((display_offset + i) << 6), (uint32_t)name, 64);
 
             for (x = 0; x < 32; x++) {
                 if ((name[x] >= 'A' && name[x] <= 'Z') || (name[x] >= 'a' && name[x] <= 'z')) {
@@ -247,7 +247,7 @@ void scan_directory(void) {
 
     dir = opendir();
     dirent = readdir(dir);
-    while (dirent && ((unsigned short)dirent != 0xffffU)) {
+    while (dirent && ((uint16_t)dirent != 0xffffU)) {
 
         x = (unsigned char)strlen(dirent->d_name);
         // only accept 32 characters max!
@@ -376,7 +376,7 @@ unsigned char freeze_load_romarea(void) {
             case 0x21: // Return = select this file.
                 // Copy name out
                 lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number),
-                    (unsigned long)rom_name_return,
+                    (uint32_t)rom_name_return,
                     32);
                 // Then null terminate it
                 for (x = 31; x; x--) {
@@ -444,7 +444,7 @@ unsigned char freeze_load_romarea(void) {
 
                         if (freeze_region_flags & FreezeRegionHasChargen) {
                             // only put that into the slot, if HYPPO supports it!
-                            for (unsigned short i = 0; i < 8; i++) {
+                            for (uint16_t i = 0; i < 8; i++) {
                                 lcopy(0x40000L + 512L * i, (long)sector_buffer, 512);
                                 freeze_store_sector(CHARGEN_ADDRESS + 512L * i, NULL);
                             }

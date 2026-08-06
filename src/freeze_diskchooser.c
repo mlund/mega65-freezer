@@ -36,7 +36,7 @@
 #include <stdio.h>
 #include <string.h>
 
-extern unsigned short slot_number;
+extern uint16_t slot_number;
 
 short file_count = 0, min_dir_entry = 0;
 short selection_number = 0;
@@ -189,7 +189,7 @@ void draw_directory_entry(unsigned char screen_row) {
             SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2) + (i * 2), entry_buffer[i]);
     }
 
-    lcopy((unsigned long)dir_line_colour,
+    lcopy((uint32_t)dir_line_colour,
         COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
         4);
     lcopy(COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
@@ -299,7 +299,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         return 0;
     }
 
-    lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number), (unsigned long)disk_name_return, 32);
+    lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number), (uint32_t)disk_name_return, 32);
 
     // Don't draw directories
     if (disk_name_return[0] == '/') {
@@ -539,7 +539,7 @@ void draw_disk_image_list(void) {
     for (i = 0; i < 23; i++) {
         if ((display_offset + i) < file_count) {
             // Real line
-            lcopy(0x40000U + ((display_offset + i) << 6), (unsigned long)name, 33);
+            lcopy(0x40000U + ((display_offset + i) << 6), (uint32_t)name, 33);
 
             for (x = 0; x < 33; x++) {
                 if ((name[x] >= 'A' && name[x] <= 'Z') || (name[x] >= 'a' && name[x] <= 'z')) {
@@ -585,20 +585,20 @@ void scan_directory(unsigned char drive_id) {
 
     lfill(0x40000UL, ' ', 0xffffU);
     // Add the pseudo disks
-    lcopy((unsigned long)NO_DISK_DRIVE, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 11);
+    lcopy((uint32_t)NO_DISK_DRIVE, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 11);
     file_count++;
     if (drive_id == 0) {
-        lcopy((unsigned long)INTERNAL_DRIVE_0, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 17);
+        lcopy((uint32_t)INTERNAL_DRIVE_0, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 17);
         file_count++;
     } else if (drive_id == 1) {
-        lcopy((unsigned long)INTERNAL_DRIVE_1, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 16);
+        lcopy((uint32_t)INTERNAL_DRIVE_1, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 16);
         file_count++;
     }
-    lcopy((unsigned long)"- NEW D81 DD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
+    lcopy((uint32_t)"- NEW D81 DD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
     file_count++;
 
 #if 0
-  lcopy((unsigned long)"- NEW D65 HD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
+  lcopy((uint32_t)"- NEW D65 HD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
   file_count++;
 #endif
 
@@ -607,7 +607,7 @@ void scan_directory(unsigned char drive_id) {
     not_in_root = 0;
     dir = opendir();
     dirent = readdir(dir);
-    while (dirent && ((unsigned short)dirent != 0xffffU)) {
+    while (dirent && ((uint16_t)dirent != 0xffffU)) {
 
         x = (unsigned char)strlen(dirent->d_name);
 
@@ -743,7 +743,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
             case 0x21: // Return = select this disk.
                 // Copy name out
                 lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number),
-                    (unsigned long)disk_name_return,
+                    (uint32_t)disk_name_return,
                     32);
                 // Then null terminate it
                 for (x = 31; x; x--) {

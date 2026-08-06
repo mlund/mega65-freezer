@@ -25,9 +25,9 @@ uint32_t find_thumbnail_offset(void);
 unsigned char freeze_peek(uint32_t addr);
 void freeze_poke(uint32_t addr, unsigned char v);
 unsigned char freeze_fetch_sector(uint32_t addr, unsigned char* buffer);
-unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, unsigned int count);
+unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count);
 unsigned char freeze_store_sector(uint32_t addr, unsigned char* buffer);
-unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, unsigned int count);
+unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count);
 void do_audio_mixer(void);
 void do_sprite_editor(void);
 unsigned char do_rom_loader(void);
@@ -37,10 +37,10 @@ void do_megainfo(void);
 constexpr uint32_t REGION_LENGTH_MASK = 0x7FFFFF;
 
 struct FreezeRegion {
-    unsigned long address_base;
+    uint32_t address_base;
     union {
-        unsigned long region_length; // only lower 24 bits are valid, space occupied rounded up to
-                                     // next 512 bytes
+        uint32_t region_length; // only lower 24 bits are valid, space occupied rounded up to
+                                // next 512 bytes
         struct {
             unsigned char skip[3];
             unsigned char freeze_prep;
@@ -60,25 +60,25 @@ enum : uint8_t {
 };
 extern unsigned char freeze_region_flags;
 
-extern unsigned long freeze_slot_start_sector;
+extern uint32_t freeze_slot_start_sector;
 /* Runs the SYSPART_SLOT_SECTOR trap and returns the slot's start sector, which
  * the hypervisor leaves in $D681-$D684 rather than in a return value. */
-uint32_t read_freeze_slot_start_sector(unsigned short slot);
+uint32_t read_freeze_slot_start_sector(uint16_t slot);
 
 constexpr uint8_t FD_DISK_ID_FILE_CLOSED = 0xFF;
 
 struct FileDescriptor {
     unsigned char disk_id;
-    unsigned long start_cluster;
-    unsigned long current_cluster;
+    uint32_t start_cluster;
+    uint32_t current_cluster;
     unsigned char sector_in_cluster;
-    unsigned long file_length;
-    unsigned long buffer_position;
-    unsigned long directory_cluster;
-    unsigned short entry_in_directory;
-    unsigned long buffer_address;
-    unsigned short bytes_in_buffer;
-    unsigned short offset_in_buffer;
+    uint32_t file_length;
+    uint32_t buffer_position;
+    uint32_t directory_cluster;
+    uint16_t entry_in_directory;
+    uint32_t buffer_address;
+    uint16_t bytes_in_buffer;
+    uint16_t offset_in_buffer;
 };
 
 /* Bits of ProcessDescriptor::d81_imageN_flags. */

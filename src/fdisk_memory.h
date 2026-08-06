@@ -16,8 +16,8 @@ __attribute__((leaf)) void lpoke(uint32_t address, uint8_t value);
  * mega65-libc but costs 694 for a sign bit these addresses never reach. */
 typedef long Addr28;
 
-void lcopy(Addr28 source_address, Addr28 destination_address, unsigned int count);
-void lfill(Addr28 destination_address, unsigned char value, unsigned int count);
+void lcopy(Addr28 source_address, Addr28 destination_address, uint16_t count);
+void lfill(Addr28 destination_address, unsigned char value, uint16_t count);
 
 /* The SDK's PEEK/POKE are volatile, which hardware access requires. */
 #include <peekpoke.h>

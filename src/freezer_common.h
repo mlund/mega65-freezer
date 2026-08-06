@@ -12,7 +12,7 @@
             return;                                                                                \
     }
 
-extern unsigned short slot_number;
+extern uint16_t slot_number;
 
 #define CHARGEN_ADDRESS 0xFF7E000L
 

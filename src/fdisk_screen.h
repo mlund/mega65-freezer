@@ -21,12 +21,12 @@ constexpr uint8_t SCREEN_ROWS = 25;
  * reachable -- and display_footer() indexes the table at runtime, so an unused
  * entry costs its full 80 columns that --gc-sections cannot reclaim. */
 
-void screen_hex(unsigned int addr, long value);
-void screen_decimal(unsigned int addr, unsigned int value);
+void screen_hex(uint16_t addr, long value);
+void screen_decimal(uint16_t addr, uint16_t value);
 
 void format_hex(char* out, const long value, const char columns);
 
-extern unsigned int screen_line_address;
+extern uint16_t screen_line_address;
 extern char screen_column;
 
 /* The VIC-IV setup every menu target shares: border, sprites off, screen and

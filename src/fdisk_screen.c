@@ -4,7 +4,7 @@
 #include "freezer_common.h"
 #include "mega65_regs.h"
 
-unsigned int screen_line_address = SCREEN_ADDRESS;
+uint16_t screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
 
 /* Writes eight hex digits to a buffer. */
@@ -19,7 +19,7 @@ static void hex_to_buf(char* out, const long value) {
     out[7] = nybl_to_screen((uint8_t)(value >> 0));
 }
 
-void screen_hex(unsigned int addr, long value) {
+void screen_hex(uint16_t addr, long value) {
     char dec[8];
     hex_to_buf(dec, value);
     for (char i = 0; i < 8; i++) {
@@ -55,7 +55,7 @@ static const unsigned char SCREEN_DECIMAL_DIGITS[16][5] = {{0, 0, 0, 0, 1},
     {1, 6, 3, 8, 4},
     {3, 2, 7, 6, 8}};
 
-void screen_decimal(unsigned int addr, unsigned int v) {
+void screen_decimal(uint16_t addr, uint16_t v) {
     // XXX - We should do this off-screen and copy into place later, to avoid glitching
     // on display.
     unsigned char digits[5];

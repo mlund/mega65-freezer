@@ -184,7 +184,7 @@ static const char* const DB_TEXT[80] = {
   "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
   "70", "71", "72", "73", "74", "75", "76", "77", "78", "79" };
 
-static const unsigned int MINUS_DB_TABLE[256] = {
+static const uint16_t MINUS_DB_TABLE[256] = {
   65535L, 52026L, 41303L, 32789L, 26031, 20665, 16406, 13024,
   10339, 8208, 6516, 5173, 4107, 3260, 2588, 2054, 
   1631, 1295, 1028, 816, 648, 514, 408, 324,
@@ -221,7 +221,7 @@ static const unsigned int MINUS_DB_TABLE[256] = {
 
 unsigned char db_index = 0;
 
-void level_to_db_index(unsigned int level) {
+void level_to_db_index(uint16_t level) {
     db_index = 0;
     while (level < MINUS_DB_TABLE[db_index]) {
         db_index++;
@@ -229,8 +229,8 @@ void level_to_db_index(unsigned int level) {
 }
 
 unsigned char db_text[11];
-void draw_db_bar(unsigned char line, unsigned int level) {
-    unsigned int bar_addr = (unsigned int)audio_menu_simple + line * 40 + 11;
+void draw_db_bar(unsigned char line, uint16_t level) {
+    uint16_t bar_addr = (uint16_t)audio_menu_simple + line * 40 + 11;
     // Work out the approximate db_index value of the signal
     level_to_db_index(level);
 
@@ -286,7 +286,7 @@ void draw_db_bar(unsigned char line, unsigned int level) {
 
 uint16_t first_coefficient, second_coefficient;
 
-void set_amplifier(unsigned char left_right, unsigned short first_coefficient) {
+void set_amplifier(unsigned char left_right, uint16_t first_coefficient) {
     /*
       Map 16-bit unsigned volume level to amplifier level.
       This is not super simple, as amplifier value $00 = +24dB,
@@ -576,8 +576,8 @@ void draw_simple_mixer(void) {
 unsigned char frames;
 unsigned char note;
 unsigned char sid_num;
-unsigned int sid_addr;
-static const unsigned int NOTES[5] = {5001, 5613, 4455, 2227, 3338};
+uint16_t sid_addr;
+static const uint16_t NOTES[5] = {5001, 5613, 4455, 2227, 3338};
 
 void test_audio(unsigned char advanced_view) {
     /*

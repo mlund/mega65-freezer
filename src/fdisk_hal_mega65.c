@@ -62,7 +62,7 @@ uint32_t write_count = 0;
 
 void sdcard_readsector(const uint32_t sector_number) {
     char tries = 0;
-    unsigned short timeout;
+    uint16_t timeout;
 
     uint32_t sector_address = sector_number * 512;
     if (sdhc_card) {

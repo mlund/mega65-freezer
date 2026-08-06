@@ -221,10 +221,10 @@ void draw_thumbnail(void) {
     unsigned char x;
     unsigned char y;
     unsigned char i;
-    unsigned short yoffset;
-    unsigned short yoffset_out;
-    unsigned short xoffset;
-    unsigned short j;
+    uint16_t yoffset;
+    uint16_t yoffset_out;
+    uint16_t xoffset;
+    uint16_t j;
     uint32_t thumbnail_sector = find_thumbnail_offset();
 
     // Can't find thumbnail area?  Then show no thumbnail
@@ -264,9 +264,7 @@ void draw_thumbnail(void) {
                 j = 2;
             }
 
-            lcopy((unsigned long)&thumbnail_buffer[x + yoffset],
-                0x50000L + (xoffset + yoffset_out),
-                j);
+            lcopy((uint32_t)&thumbnail_buffer[x + yoffset], 0x50000L + (xoffset + yoffset_out), j);
 
             xoffset += 64 * 6;
         }
@@ -300,7 +298,7 @@ void predraw_freeze_menu(void)
 
   lfill(0xFF80000L, 1, SCREEN_BYTES);
   // Make disk image names different colour to avoid confusion
-  for (unsigned short i = 40; i < 80; i += 2) {
+  for (uint16_t i = 40; i < 80; i += 2) {
     lpoke(0xff80000 + 21 * SCREEN_ROW_BYTES + 1 + i, 0xe);
     lpoke(0xff80000 + 24 * SCREEN_ROW_BYTES + 1 + i, 0xe);
     if (i > 50) { // ROM VERSION
@@ -338,7 +336,7 @@ enum : uint8_t {
 void copy_convert_to_screen(const unsigned char* data, short offset) {
     offset <<= 1;
 
-    for (unsigned short i = 0; data[i]; i++) {
+    for (uint16_t i = 0; data[i]; i++) {
         if (data[i] != '~') { // skip thumb area
             if ((data[i] >= 'A') && (data[i] <= 'Z')) {
                 POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i] - 0x40);
@@ -353,7 +351,7 @@ void copy_convert_to_screen(const unsigned char* data, short offset) {
 }
 
 void draw_freeze_menu(unsigned char part) {
-    unsigned short i;
+    uint16_t i;
     unsigned char x;
     unsigned char y;
 
@@ -370,81 +368,73 @@ void draw_freeze_menu(unsigned char part) {
     if (part & UpdateTop) {
 
         if (slot_number) {
-            lcopy((unsigned long)freeze_menu_bar + 40,
-                (unsigned long)&freeze_menu[LOAD_RESUME_OFFSET],
-                40);
-            lcopy((unsigned long)" FREEZE SLOT:      ",
-                (unsigned long)&freeze_menu[FREEZE_SLOT_OFFSET],
-                19);
+            lcopy((uint32_t)freeze_menu_bar + 40, (uint32_t)&freeze_menu[LOAD_RESUME_OFFSET], 40);
+            lcopy((uint32_t)" FREEZE SLOT:      ", (uint32_t)&freeze_menu[FREEZE_SLOT_OFFSET], 19);
             // Display slot ID as decimal
-            screen_decimal((unsigned int)&freeze_menu[SLOT_NUMBER_OFFSET], slot_number);
+            screen_decimal((uint16_t)&freeze_menu[SLOT_NUMBER_OFFSET], slot_number);
         } else {
-            lcopy((unsigned long)freeze_menu_bar,
-                (unsigned long)&freeze_menu[LOAD_RESUME_OFFSET],
-                40);
+            lcopy((uint32_t)freeze_menu_bar, (uint32_t)&freeze_menu[LOAD_RESUME_OFFSET], 40);
             if (rom_changed) {
-                lfill((unsigned long)&freeze_menu[LOAD_RESUME_OFFSET], ' ', 9);
+                lfill((uint32_t)&freeze_menu[LOAD_RESUME_OFFSET], ' ', 9);
             }
 
             // Display "- PAUSED STATE -"
-            lcopy((unsigned long)" - PAUSED STATE -   ",
-                (unsigned long)&freeze_menu[FREEZE_SLOT_OFFSET],
-                19);
+            lcopy((uint32_t)" - PAUSED STATE -   ", (uint32_t)&freeze_menu[FREEZE_SLOT_OFFSET], 19);
         }
 
         // CPU MODE
         if (freeze_peek(0xffd367dL) & 0x20) {
-            lcopy((unsigned long)"  4502", (unsigned long)&freeze_menu[CPU_MODE_OFFSET], 6);
+            lcopy((uint32_t)"  4502", (uint32_t)&freeze_menu[CPU_MODE_OFFSET], 6);
         } else {
-            lcopy((unsigned long)"  AUTO", (unsigned long)&freeze_menu[CPU_MODE_OFFSET], 6);
+            lcopy((uint32_t)"  AUTO", (uint32_t)&freeze_menu[CPU_MODE_OFFSET], 6);
         }
 
         // Joystick 1/2 swap
-        lcopy((unsigned long)((PEEK(0xd612L) & 0x20) ? "YES" : " NO"),
-            (unsigned long)&freeze_menu[JOY_SWAP_OFFSET],
+        lcopy((uint32_t)((PEEK(0xd612L) & 0x20) ? "YES" : " NO"),
+            (uint32_t)&freeze_menu[JOY_SWAP_OFFSET],
             3);
 
         // Cartridge enable
-        lcopy((unsigned long)((freeze_peek(0xffd367dL) & 0x01) ? "YES" : " NO"),
-            (unsigned long)&freeze_menu[CART_ENABLE_OFFSET],
+        lcopy((uint32_t)((freeze_peek(0xffd367dL) & 0x01) ? "YES" : " NO"),
+            (uint32_t)&freeze_menu[CART_ENABLE_OFFSET],
             3);
 
         if (freeze_peek(0xFFD3054L) & 0x20) { // PALEMU
-            lcopy((unsigned long)" ON", (unsigned long)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
+            lcopy((uint32_t)" ON", (uint32_t)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
         } else { // PAL50
-            lcopy((unsigned long)"OFF", (unsigned long)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
+            lcopy((uint32_t)"OFF", (uint32_t)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
         }
 
         if (freeze_peek(0xffd306fL) & 0x80) { // NTSC60
-            lcopy((unsigned long)"NTSC60", (unsigned long)&freeze_menu[VIDEO_MODE_OFFSET], 6);
+            lcopy((uint32_t)"NTSC60", (uint32_t)&freeze_menu[VIDEO_MODE_OFFSET], 6);
         } else { // PAL50
-            lcopy((unsigned long)" PAL50", (unsigned long)&freeze_menu[VIDEO_MODE_OFFSET], 6);
+            lcopy((uint32_t)" PAL50", (uint32_t)&freeze_menu[VIDEO_MODE_OFFSET], 6);
         }
     }
 
     // ROM version
     /*
     if (part & UpdateRom)
-      lcopy((long)detect_rom(), (unsigned long)&freeze_menu[ROM_NAME_OFFSET], 11);
+      lcopy((long)detect_rom(), (uint32_t)&freeze_menu[ROM_NAME_OFFSET], 11);
     */
 
     // CPU frequency
     if (part & UpdateFreq) {
         switch (detect_cpu_speed()) {
             case 1:
-                lcopy((unsigned long)"  1", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                lcopy((uint32_t)"  1", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
                 break;
             case 2:
-                lcopy((unsigned long)"  2", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                lcopy((uint32_t)"  2", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
                 break;
             case 3:
-                lcopy((unsigned long)"3.5", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                lcopy((uint32_t)"3.5", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
                 break;
             case 40:
-                lcopy((unsigned long)" 40", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                lcopy((uint32_t)" 40", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
                 break;
             default:
-                lcopy((unsigned long)"???", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                lcopy((uint32_t)"???", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
                 break;
         }
     }
@@ -474,7 +464,7 @@ void draw_freeze_menu(unsigned char part) {
 
     if (part & UpdateProcess) {
         // Display process ID as decimal
-        screen_decimal((unsigned int)&freeze_menu[PROCESS_ID_OFFSET], process_descriptor.task_id);
+        screen_decimal((uint16_t)&freeze_menu[PROCESS_ID_OFFSET], process_descriptor.task_id);
 
         // Process name: only display if no unprintable PETSCII chars
         for (i = 0; i < 16; i++) {
@@ -483,27 +473,25 @@ void draw_freeze_menu(unsigned char part) {
             }
         }
         if (i == 16) {
-            lcopy((unsigned long)process_descriptor.process_name,
-                (unsigned long)&freeze_menu[PROCESS_NAME_OFFSET],
+            lcopy((uint32_t)process_descriptor.process_name,
+                (uint32_t)&freeze_menu[PROCESS_NAME_OFFSET],
                 16);
         } else {
-            lcopy((unsigned long)"UNNAMED TASK    ",
-                (unsigned long)&freeze_menu[PROCESS_NAME_OFFSET],
-                16);
+            lcopy((uint32_t)"UNNAMED TASK    ", (uint32_t)&freeze_menu[PROCESS_NAME_OFFSET], 16);
         }
 
-        lcopy((unsigned long)mega65_rom_name, (unsigned long)&freeze_menu[PROCESS_ROM_OFFSET], 11);
+        lcopy((uint32_t)mega65_rom_name, (uint32_t)&freeze_menu[PROCESS_ROM_OFFSET], 11);
     }
 
     if (part & UpdateDisk) {
         // Draw drive numbers for internal drive
-        lfill((unsigned long)&freeze_menu[DRIVE0_NUM_OFFSET], 0, 2);
-        lfill((unsigned long)&freeze_menu[DRIVE1_NUM_OFFSET], 0, 2);
-        screen_decimal((unsigned int)&freeze_menu[DRIVE0_NUM_OFFSET], freeze_peek(0x10113L));
-        screen_decimal((unsigned int)&freeze_menu[DRIVE1_NUM_OFFSET], freeze_peek(0x10114L));
+        lfill((uint32_t)&freeze_menu[DRIVE0_NUM_OFFSET], 0, 2);
+        lfill((uint32_t)&freeze_menu[DRIVE1_NUM_OFFSET], 0, 2);
+        screen_decimal((uint16_t)&freeze_menu[DRIVE0_NUM_OFFSET], freeze_peek(0x10113L));
+        screen_decimal((uint16_t)&freeze_menu[DRIVE1_NUM_OFFSET], freeze_peek(0x10114L));
 
-        lfill((unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET], ' ', 18);
-        lfill((unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET], ' ', 18);
+        lfill((uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET], ' ', 18);
+        lfill((uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET], ' ', 18);
 
         if ((process_descriptor.d81_image0_flags & PdImgFlagsMounted) &&
             process_descriptor.d81_image0_namelen) {
@@ -515,19 +503,19 @@ void draw_freeze_menu(unsigned char part) {
             if (i == process_descriptor.d81_image0_namelen) {
                 to_petscii_upper(
                     process_descriptor.d81_image0_name, process_descriptor.d81_image0_namelen);
-                lcopy((unsigned long)process_descriptor.d81_image0_name,
-                    (unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
+                lcopy((uint32_t)process_descriptor.d81_image0_name,
+                    (uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
                     process_descriptor.d81_image0_namelen < 18
                         ? process_descriptor.d81_image0_namelen
                         : 18);
             }
         } else if (process_descriptor.d81_image0_flags & PdImgFlagsNoReal) {
-            lcopy((unsigned long)NO_DISK_DRIVE,
-                (unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
+            lcopy((uint32_t)NO_DISK_DRIVE,
+                (uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
                 sizeof(NO_DISK_DRIVE) - 1);
         } else {
-            lcopy((unsigned long)INTERNAL_DRIVE_0,
-                (unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
+            lcopy((uint32_t)INTERNAL_DRIVE_0,
+                (uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
                 sizeof(INTERNAL_DRIVE_0) - 1);
         }
 
@@ -541,19 +529,19 @@ void draw_freeze_menu(unsigned char part) {
             if (i == process_descriptor.d81_image1_namelen) {
                 to_petscii_upper(
                     process_descriptor.d81_image1_name, process_descriptor.d81_image1_namelen);
-                lcopy((unsigned long)process_descriptor.d81_image1_name,
-                    (unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
+                lcopy((uint32_t)process_descriptor.d81_image1_name,
+                    (uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
                     process_descriptor.d81_image1_namelen < 18
                         ? process_descriptor.d81_image1_namelen
                         : 18);
             }
         } else if (process_descriptor.d81_image1_flags & PdImgFlagsNoReal) {
-            lcopy((unsigned long)NO_DISK_DRIVE,
-                (unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
+            lcopy((uint32_t)NO_DISK_DRIVE,
+                (uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
                 sizeof(NO_DISK_DRIVE) - 1);
         } else {
-            lcopy((unsigned long)INTERNAL_DRIVE_1,
-                (unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
+            lcopy((uint32_t)INTERNAL_DRIVE_1,
+                (uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
                 sizeof(INTERNAL_DRIVE_1) - 1);
         }
     }
@@ -613,10 +601,10 @@ void draw_freeze_menu(unsigned char part) {
         // Work out where the tile data begins
         if (thumb_frame > -1 && thumb_frame != last_thumb_frame) {
             uint32_t screen_data_start;
-            unsigned short* tile_num;
+            uint16_t* tile_num;
 
             screen_data_start = 0x52000L + 0x300L + 0x40L;
-            unsigned short tile_offset = (unsigned short)(screen_data_start >> 6);
+            uint16_t tile_offset = (uint16_t)(screen_data_start >> 6);
             // Work out where the screen data begins
             screen_data_start = lpeek(0x5203dL) + (lpeek(0x5203eL) << 8);
             screen_data_start += 0x52000L + 0x40L;
@@ -627,7 +615,7 @@ void draw_freeze_menu(unsigned char part) {
                     (19 * 2));
                 // Add tile number based on data starting at $52040 = $1481
                 for (x = 0; x < 19; x++) {
-                    tile_num = (unsigned short*)(SCREEN_ADDRESS + (13 * SCREEN_ROW_BYTES) +
+                    tile_num = (uint16_t*)(SCREEN_ADDRESS + (13 * SCREEN_ROW_BYTES) +
                         (y * SCREEN_ROW_BYTES) + (x << 1));
                     if (*tile_num) {
                         (*tile_num) += tile_offset;
@@ -739,7 +727,7 @@ static unsigned char last_x;
 
 unsigned char poll_touch_panel(void) {
     unsigned char key = 0;
-    unsigned short x, y;
+    uint16_t x, y;
 
     if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
         x = PEEK(0xD6B9) + ((PEEK(0xD6BB) & 0x03) << 8);
@@ -858,8 +846,8 @@ void change_mounted_disk_image(uint8_t diskid) {
 void debug_region_list(void)
 {
   // display region list on screen
-  unsigned long test;
-  for (unsigned short j = 0; j < freeze_region_count; j++) {
+  uint32_t test;
+  for (uint16_t j = 0; j < freeze_region_count; j++) {
     test = freeze_region_list[j].address_base;
     POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 60 - 16, 32);
     for (i = 0; i < 8; i++) {
@@ -897,7 +885,7 @@ enum : uint8_t {
     ChargenNoCheck = 0x80, // don't execute check, always fix
 };
 void fix_chargen_area(unsigned char flags) {
-    unsigned short i = 512; // needs to be 512 for nocheck to trigger!
+    uint16_t i = 512; // needs to be 512 for nocheck to trigger!
     long charset_start;
 
     // debug_region_list();
@@ -1351,11 +1339,11 @@ int main(void) {
                         VICIV.bordercol = 0x0e;
                         for (uint32_t j = 0; j < 128; j++) {
                             sdcard_readsector(freeze_slot_start_sector + i + j);
-                            lcopy((unsigned long)sector_buffer, 0x40000U + (j << 9), 512);
+                            lcopy((uint32_t)sector_buffer, 0x40000U + (j << 9), 512);
                         }
                         VICIV.bordercol = 0x00;
                         for (uint32_t j = 0; j < 128; j++) {
-                            lcopy(0x40000U + (j << 9), (unsigned long)sector_buffer, 512);
+                            lcopy(0x40000U + (j << 9), (uint32_t)sector_buffer, 512);
 #ifdef USE_MULTIBLOCK_WRITE
                             if (!j)
                                 sdcard_writesector(dest_freeze_slot_start_sector + i + j, 1);

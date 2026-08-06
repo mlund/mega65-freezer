@@ -119,7 +119,7 @@ constexpr uint16_t DIRENT_NAME_MAX = 256;
 #endif
 
 /* Slot number: low byte in Y, high in X. */
-HELPER_INLINE void find_freeze_slot_start_sector(unsigned short slot) {
+HELPER_INLINE void find_freeze_slot_start_sector(uint16_t slot) {
     __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
         :
         : "y"((unsigned char)slot),
@@ -130,7 +130,7 @@ HELPER_INLINE void find_freeze_slot_start_sector(unsigned short slot) {
 }
 
 /* Slot number: low byte in Y, high in X. */
-HELPER_INLINE void unfreeze_slot(unsigned short slot) {
+HELPER_INLINE void unfreeze_slot(uint16_t slot) {
     __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
         :
         : "y"((unsigned char)slot),
@@ -141,7 +141,7 @@ HELPER_INLINE void unfreeze_slot(unsigned short slot) {
 }
 
 /* Buffer address: low byte in X, high in Y -- the opposite of the two above. */
-HELPER_INLINE void fetch_freeze_region_list_from_hypervisor(unsigned short addr) {
+HELPER_INLINE void fetch_freeze_region_list_from_hypervisor(uint16_t addr) {
     __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
         :
         : "x"((unsigned char)addr),
@@ -152,14 +152,14 @@ HELPER_INLINE void fetch_freeze_region_list_from_hypervisor(unsigned short addr)
 }
 
 /* Count returns in X(low)/Y(high). */
-HELPER_INLINE unsigned short get_freeze_slot_count(void) {
+HELPER_INLINE uint16_t get_freeze_slot_count(void) {
     unsigned char lo;
     unsigned char hi;
     __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
         : "=x"(lo), "=y"(hi)
         : [fn] "i"(SYSPART_SLOT_COUNT), [trap] "i"(HTRAP_SYSPART)
         : "a", "p", "memory");
-    return lo | ((unsigned short)hi << 8);
+    return lo | ((uint16_t)hi << 8);
 }
 
 HELPER_INLINE unsigned char mega65_geterrorcode(void) {

@@ -194,10 +194,10 @@ unsigned char to_hex(unsigned char i) {
     return 0x41 + i - 10;
 }
 
-void format_disk_image(unsigned long file_sector, char* diskname, unsigned char is_d65) {
+void format_disk_image(uint32_t file_sector, char* diskname, unsigned char is_d65) {
     unsigned char i;
-    unsigned short s;
-    unsigned short sect_count = D81_TRACKS * D81_SECTORS_PER_TRACK;
+    uint16_t s;
+    uint16_t sect_count = D81_TRACKS * D81_SECTORS_PER_TRACK;
     if (is_d65) {
         sect_count = 85 * 64;
     }
@@ -278,7 +278,7 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
     char diskname[16 + 1];
     char filename[16 + 1];
     unsigned char filename_len;
-    unsigned long file_sector;
+    uint32_t file_sector;
 
     fat32_open_file_system();
     if (!fat1_sector) {

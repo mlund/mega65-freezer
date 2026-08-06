@@ -49,7 +49,7 @@ static uint8_t ymd[3];
 /* Bit 8 of colour requests the reverse-video attribute. */
 static void write_text_mapped(unsigned char x,
     unsigned char y,
-    unsigned short colour,
+    uint16_t colour,
     const char* text,
     unsigned char mask,
     unsigned char lower_offset) {
@@ -72,12 +72,12 @@ static void write_text_mapped(unsigned char x,
     }
 }
 
-void write_text(unsigned char x, unsigned char y, unsigned short colour, char* text) {
+void write_text(unsigned char x, unsigned char y, uint16_t colour, char* text) {
     write_text_mapped(x, y, colour, text, 0xff, 0x20);
 }
 
 /* As write_text(), but folds lower case to upper. */
-void write_text_upper(unsigned char x, unsigned char y, unsigned short colour, char* text) {
+void write_text_upper(unsigned char x, unsigned char y, uint16_t colour, char* text) {
     write_text_mapped(x, y, colour, text, 0x7f, 0x60);
 }
 
@@ -167,11 +167,10 @@ char* format_mega_model(void) {
  */
 char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     unsigned char m = 1;
-    unsigned short y = 2020;
-    unsigned short ds;
+    uint16_t y = 2020;
+    uint16_t ds;
 
-    ds = (((unsigned short)(code_buffer[offset + 1] & msbmask)) << 8) +
-        (unsigned short)code_buffer[offset];
+    ds = (((uint16_t)(code_buffer[offset + 1] & msbmask)) << 8) + (uint16_t)code_buffer[offset];
 
     // first remove years. years are always full 366 days!
     while (ds > 366) {
@@ -317,8 +316,8 @@ char* format_hyppo_version(void) {
  * compares to date (which should by artix ymd) and returns 0 if equal or newer
  */
 unsigned char format_util_version(long addr, const unsigned char* date) {
-    unsigned short i;
-    unsigned short j = 0;
+    uint16_t i;
+    uint16_t j = 0;
     unsigned char temp;
     unsigned char result = 0;
     unsigned char p;
@@ -387,9 +386,9 @@ unsigned char format_util_version(long addr, const unsigned char* date) {
  * tries to parse date and compare to date[3]
  */
 unsigned char format_hickup_version(long addr, const unsigned char* date) {
-    unsigned short p;
-    unsigned short i;
-    unsigned short j = 0;
+    uint16_t p;
+    uint16_t i;
+    uint16_t j = 0;
     char* needle = "GIT: ";
     char* needle2 = ",20";
     constexpr uint8_t NEEDLE_LEN = 5;
@@ -474,7 +473,7 @@ static unsigned char rtc_state = 0, rtc_last_state = 0, rtc_settle = 0, no_extrt
 static unsigned char rtc_check = 1, rtc_diff = 0,
                      rtc_buf[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static unsigned char rtc_pmu = 0xff;
-static unsigned short tod_ov = 0, rtc_ov = 0;
+static uint16_t tod_ov = 0, rtc_ov = 0;
 static short tod_last = -1, tod_ticks = 0, rtc_ticks = 0;
 
 /*

@@ -4,13 +4,13 @@
 
 char* itoa(int value, char* s, int radix) {
     char* p = s;
-    unsigned int u;
+    uint16_t u;
 
     if (radix == 10 && value < 0) {
         *p++ = '-';
-        u = (unsigned int)-value;
+        u = (uint16_t)-value;
     } else {
-        u = (unsigned int)value;
+        u = (uint16_t)value;
     }
 
     utoa(u, p, radix);

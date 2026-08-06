@@ -870,7 +870,7 @@ void update_cursor_y(void) {
 void update_cursor_xmsb(void) {
     uint8_t canvas_left_pixels = g_state.canvas_left_x * CELL_PIXELS_X;
     uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * CELL_PIXELS_X;
-    const unsigned short sx = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
+    const uint16_t sx = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
     if (sx < 256) {
         VICIV.spr_hi_x &= (uint8_t)~(1 << EDIT_CURSOR_NUM);
     } else {
@@ -1619,10 +1619,13 @@ static void update_and_full_redraw(bool f_fetch_slot) {
     set_redraw_full_canvas();
 }
 
-unsigned short joy_delay_countdown = 0;
+uint16_t joy_delay_countdown = 0;
 unsigned char fire_lock = 0;
 
-unsigned short mx, my;
+/* unsigned short, not uint16_t: uint16_t is unsigned int on this target, and
+ * mouse_update_position() takes unsigned short*, a distinct pointer type. */
+unsigned short mx;
+unsigned short my;
 
 static void set_background(void) {
     g_state.redraw_flags = RedrawSidebarColor;

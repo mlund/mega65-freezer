@@ -417,7 +417,7 @@ constexpr uint8_t REGLINE_PC28 = 66;
 void show_registers(void) {
     // Get hypervisor register backup area
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(0xFFD3640U);
-    unsigned short value;
+    uint16_t value;
 
     lfill((long)output_buffer, ' ', 80);
 

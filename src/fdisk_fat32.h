@@ -1,8 +1,10 @@
 #pragma once
 
-extern unsigned long root_dir_sector;
-extern unsigned long fat1_sector;
-extern unsigned long fat2_sector;
+#include <stdint.h>
+
+extern uint32_t root_dir_sector;
+extern uint32_t fat1_sector;
+extern uint32_t fat2_sector;
 
 long fat32_create_contiguous_file(
     char* name, long size, long root_dir_sector, long fat1_sector, long fat2_sector);

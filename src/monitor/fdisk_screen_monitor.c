@@ -136,7 +136,7 @@ void setup_screen(void) {
     display_footer(FooterCopyright);
 }
 
-void fatal_error(const unsigned char* filename, unsigned int line_number) {
+void fatal_error(const unsigned char* filename, uint16_t line_number) {
     unsigned char i;
     display_footer(FooterFatal);
     for (i = 0; filename[i]; i++) {

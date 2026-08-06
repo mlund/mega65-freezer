@@ -11,16 +11,16 @@ struct FreezeRegion freeze_region_list[MAX_REGIONS];
 unsigned char freeze_region_count = 0;
 unsigned char freeze_region_flags = 0;
 
-unsigned long freeze_slot_start_sector = 0;
+uint32_t freeze_slot_start_sector = 0;
 
 void request_freeze_region_list(void) {
     // Ask hypervisor to copy out freeze region list, so we know where to look
     // in the slot for different parts of memory.
     // The transfer region MUST be in the lower 32KB of RAM, so we will copy it
     // to the screen in the first instance, and then DMA copy it where we want it
-    unsigned short i;
+    uint16_t i;
     fetch_freeze_region_list_from_hypervisor(0x0400U);
-    lcopy(0x0400U, (unsigned long)&freeze_region_list, 256);
+    lcopy(0x0400U, (uint32_t)&freeze_region_list, 256);
 
     freeze_region_flags = 0;
     for (i = 0; i < MAX_REGIONS; i++) {
@@ -120,7 +120,7 @@ uint32_t address_to_freeze_slot_offset(uint32_t address) {
     return 0xFFFFFFFFUL;
 }
 
-uint32_t read_freeze_slot_start_sector(unsigned short slot) {
+uint32_t read_freeze_slot_start_sector(uint16_t slot) {
     find_freeze_slot_start_sector(slot);
     return *(volatile uint32_t*)0xD681U;
 }
@@ -128,7 +128,7 @@ uint32_t read_freeze_slot_start_sector(unsigned short slot) {
 unsigned char freeze_peek(uint32_t addr) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
-    unsigned short offset;
+    uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
@@ -150,7 +150,7 @@ unsigned char freeze_peek(uint32_t addr) {
 unsigned char freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
-    unsigned short offset;
+    uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
@@ -173,10 +173,10 @@ unsigned char freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
     return 0;
 }
 
-unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, unsigned int count) {
+unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
-    unsigned short offset;
+    uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
@@ -204,7 +204,7 @@ unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, unsigned
 unsigned char freeze_store_sector(uint32_t addr, unsigned char* buffer) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
-    unsigned short offset;
+    uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
@@ -232,11 +232,11 @@ unsigned char freeze_store_sector(uint32_t addr, unsigned char* buffer) {
     return 0;
 }
 
-unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, unsigned int count) {
+unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count) {
 
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
-    unsigned short offset;
+    uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
@@ -267,7 +267,7 @@ unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, unsigned 
 void freeze_poke(uint32_t addr, unsigned char v) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
-    unsigned short offset;
+    uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory

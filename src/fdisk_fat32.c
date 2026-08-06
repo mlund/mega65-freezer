@@ -7,14 +7,14 @@
 #include <stdio.h>
 #include <string.h>
 
-unsigned long root_dir_sector = 0;
-unsigned long fat1_sector = 0;
-unsigned long fat2_sector = 0;
-unsigned short reserved_sectors = 0;
+uint32_t root_dir_sector = 0;
+uint32_t fat1_sector = 0;
+uint32_t fat2_sector = 0;
+uint16_t reserved_sectors = 0;
 unsigned char sectors_per_cluster = 0;
 unsigned char fat_copies = 0;
-unsigned long sectors_per_fat = 0;
-unsigned long root_dir_cluster = 0;
+uint32_t sectors_per_fat = 0;
+uint32_t root_dir_cluster = 0;
 
 void mega65_serial_monitor_write(char* s) {
     while (*s) {
@@ -40,7 +40,7 @@ char nybble_to_hex_char(unsigned char nybble) {
     return 0x41 + nybble - 10;
 }
 
-void hexout2(char* m, unsigned long v, int n) {
+void hexout2(char* m, uint32_t v, int n) {
     if (!n) {
         return;
     }
@@ -52,7 +52,7 @@ void hexout2(char* m, unsigned long v, int n) {
 }
 
 char shbuf[11];
-void serial_hex(unsigned long v) {
+void serial_hex(uint32_t v) {
     hexout2(shbuf, v, 8);
     shbuf[8] = 0x0d;
     shbuf[9] = 0x0a;
@@ -134,7 +134,7 @@ struct M65Tm {
     unsigned char tm_hour;  /* Hours (0-23) */
     unsigned char tm_mday;  /* Day of the month (1-31) */
     unsigned char tm_mon;   /* Month (0-11) */
-    unsigned short tm_year; /* Year - 1900 (in practice, never < 2000) */
+    uint16_t tm_year;       /* Year - 1900 (in practice, never < 2000) */
     unsigned char tm_wday;  /* Day of the week (0-6, Sunday = 0) */
     int tm_yday;            /* Day in the year (0-365, 1 Jan = 0) */
     unsigned char tm_isdst; /* Daylight saving time */
@@ -221,38 +221,38 @@ unsigned char fat32_open_file_system(void) {
     return 0;
 }
 
-unsigned long fat32_follow_cluster(unsigned long cluster) {
-    unsigned long r;
+uint32_t fat32_follow_cluster(uint32_t cluster) {
+    uint32_t r;
     // Read out the cluster number from the FAT
     sdcard_readsector(fat1_sector + (cluster / 128));
-    r = *(unsigned long*)&sector_buffer[(cluster & 127) << 2];
+    r = *(uint32_t*)&sector_buffer[(cluster & 127) << 2];
     return r;
 }
 
-unsigned long fat32_allocate_cluster(unsigned long cluster) {
-    unsigned long new_cluster;
-    unsigned long fat_sector_num;
-    unsigned short i;
+uint32_t fat32_allocate_cluster(uint32_t cluster) {
+    uint32_t new_cluster;
+    uint32_t fat_sector_num;
+    uint16_t i;
 
     // Find free cluster
     for (fat_sector_num = 0; fat_sector_num < (fat2_sector - fat1_sector); fat_sector_num++) {
         sdcard_readsector(fat1_sector + fat_sector_num);
         for (i = 0; i < 512; i += 4) {
-            if (*(unsigned long*)&sector_buffer[i] == 0) {
+            if (*(uint32_t*)&sector_buffer[i] == 0) {
                 break;
             }
         }
         if (i < 512) {
             // Found new free cluster, so place end-of-chain marker on it
             new_cluster = fat_sector_num * 128 + (i >> 2);
-            *(unsigned long*)&sector_buffer[i] = 0x0fffffff;
+            *(uint32_t*)&sector_buffer[i] = 0x0fffffff;
             sdcard_writesector(fat1_sector + fat_sector_num, 0);
             sdcard_writesector(fat2_sector + fat_sector_num, 0);
 
             // chain old cluster to new cluster
             fat_sector_num = cluster / 128;
             sdcard_readsector(fat1_sector + fat_sector_num);
-            *(unsigned long*)&sector_buffer[(cluster & 127) << 2] = new_cluster;
+            *(uint32_t*)&sector_buffer[(cluster & 127) << 2] = new_cluster;
             sdcard_writesector(fat1_sector + fat_sector_num, 0);
             sdcard_writesector(fat2_sector + fat_sector_num, 0);
             return new_cluster;
@@ -280,20 +280,20 @@ long fat32_create_contiguous_file(
     unsigned char i;
     unsigned char sn;
     unsigned char len;
-    unsigned short offset;
-    unsigned short j;
-    unsigned short clusters;
-    unsigned long k;
-    unsigned long start_cluster = 0;
-    unsigned long dir_cluster = 2;
-    unsigned long last_dir_cluster = 2;
-    unsigned long contiguous_clusters = 0;
-    unsigned long fat_sector_num = 0;
-    unsigned long fat_sector_count = 0;
+    uint16_t offset;
+    uint16_t j;
+    uint16_t clusters;
+    uint32_t k;
+    uint32_t start_cluster = 0;
+    uint32_t dir_cluster = 2;
+    uint32_t last_dir_cluster = 2;
+    uint32_t contiguous_clusters = 0;
+    uint32_t fat_sector_num = 0;
+    uint32_t fat_sector_count = 0;
 
     unsigned char have_dir_slot = 0;
-    unsigned long free_dir_sector_num = 0;
-    unsigned short free_dir_sector_ofs = 0;
+    uint32_t free_dir_sector_num = 0;
+    uint16_t free_dir_sector_ofs = 0;
     struct M65Tm tm;
 
     char message[40] = "Found file: ????????.???";
@@ -434,12 +434,11 @@ long fat32_create_contiguous_file(
         for (offset = 0; offset < 512; offset += 4) {
             if (((k << 7) + (offset >> 2)) < clusters) {
                 // Write chain
-                *(unsigned long*)&sector_buffer[offset] =
-                    start_cluster + (k << 7) + (offset >> 2) + 1;
+                *(uint32_t*)&sector_buffer[offset] = start_cluster + (k << 7) + (offset >> 2) + 1;
             }
             if (((k << 7) + (offset >> 2)) == (clusters - 1)) {
                 // Mark end of chain
-                *(unsigned long*)&sector_buffer[offset] = 0x0FFFFFF8;
+                *(uint32_t*)&sector_buffer[offset] = 0x0FFFFFF8;
             }
         }
         // Write FAT sector to both FATs
@@ -477,16 +476,16 @@ long fat32_create_contiguous_file(
     j |= (tm.tm_min << 5);
     j |= (tm.tm_sec >> 1);
     // Create time 0x0e -- 0x0f
-    *(unsigned short*)&sector_buffer[free_dir_sector_ofs + 0x0e] = j;
+    *(uint16_t*)&sector_buffer[free_dir_sector_ofs + 0x0e] = j;
     // Modify time 0x16 -- 0x17
-    //  *(unsigned short *)&sector_buffer[free_dir_sector_ofs + 0x16]=j;
+    //  *(uint16_t *)&sector_buffer[free_dir_sector_ofs + 0x16]=j;
     j = ((tm.tm_year - 80) << 9); // DOS is based on 1980, tm struct on 1900
     j |= (tm.tm_mon << 5);
     j |= tm.tm_mday;
     // Create date 0x10 -- 0x11
-    *(unsigned short*)&sector_buffer[free_dir_sector_ofs + 0x10] = j;
+    *(uint16_t*)&sector_buffer[free_dir_sector_ofs + 0x10] = j;
     // Modify date 0x18 -- 0x19
-    // *(unsigned short *)&sector_buffer[free_dir_sector_ofs + 0x18]=j;
+    // *(uint16_t *)&sector_buffer[free_dir_sector_ofs + 0x18]=j;
     // Start cluster
     sector_buffer[free_dir_sector_ofs + 0x1A] = (uint8_t)start_cluster;
     sector_buffer[free_dir_sector_ofs + 0x1B] = (uint8_t)(start_cluster >> 8);

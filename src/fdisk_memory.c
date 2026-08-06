@@ -21,13 +21,13 @@ struct DmagicDmalist {
 
     // F018B format DMA request
     unsigned char command;
-    unsigned int count;
-    unsigned int source_addr;
+    uint16_t count;
+    uint16_t source_addr;
     unsigned char source_bank;
-    unsigned int dest_addr;
+    uint16_t dest_addr;
     unsigned char dest_bank;
     unsigned char sub_cmd; // F018B subcmd
-    unsigned int modulo;
+    uint16_t modulo;
 };
 
 /* The DMAgic is the only reader of dmalist, so without volatile the compiler
@@ -46,12 +46,12 @@ __attribute__((noinline)) void do_dma(void) {
     // Now run DMA job (to and from anywhere, and list is in low 1MB)
     POKE(0xd702U, 0);
     POKE(0xd704U, 0x00); // List is in $00xxxxx
-    POKE(0xd701U, ((unsigned int)&dmalist) >> 8);
-    POKE(0xd705U, ((unsigned int)&dmalist) & 0xff); // triggers enhanced DMA
+    POKE(0xd701U, ((uint16_t)&dmalist) >> 8);
+    POKE(0xd705U, ((uint16_t)&dmalist) & 0xff); // triggers enhanced DMA
 }
 
 __attribute__((noinline)) void lcopy(
-    Addr28 source_address, Addr28 destination_address, unsigned int count) {
+    Addr28 source_address, Addr28 destination_address, uint16_t count) {
     if (!count) {
         return;
     }
@@ -80,7 +80,7 @@ __attribute__((noinline)) void lcopy(
 }
 
 __attribute__((noinline)) void lfill(
-    Addr28 destination_address, unsigned char value, unsigned int count) {
+    Addr28 destination_address, unsigned char value, uint16_t count) {
     if (!count) {
         return;
     }

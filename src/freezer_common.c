@@ -8,7 +8,7 @@
 #include <string.h>
 
 uint8_t sector_buffer[512];
-unsigned short slot_number = 0;
+uint16_t slot_number = 0;
 enum Mega65Rom mega65_rom_type = Mega65RomUnknown;
 /* 20, not 12: the OpenROM probe below does memcpy(name + 4, ..., 16), which
  * needs offsets 4..19.  At 12 it wrote eight bytes past the end and then read
