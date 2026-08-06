@@ -48,14 +48,29 @@ NAMED = {"return": 0x01, "f3": 0x05, "f5": 0x06, "f7": 0x03,
          "down": 0x07, "right": 0x02, "delete": 0x00, "stop": 0x3F}
 
 
-def press(sock, code, modifier=NO_KEY, hold=0.08):
+# 20ms, the interval matrix65 uses to drive real hardware.  Longer is not
+# safer: the keys are released once at the end of a run rather than between
+# presses, so an over-long hold just delays the release the scanner waits for.
+DELAY = 0.02
+
+
+def hold_key(sock, code, modifier=NO_KEY):
+    """Put a key down.  Nothing is released until release_keys()."""
     sock.sendall(f"sffd3615 {code:02x} {modifier:02x}\n".encode())
-    time.sleep(hold)
+    time.sleep(DELAY)
+
+
+def release_keys(sock):
     sock.sendall(f"sffd3615 {NO_KEY:02x} {NO_KEY:02x} {NO_KEY:02x}\n".encode())
-    time.sleep(hold)
+    time.sleep(DELAY)
 
 
-def type_text(sock, text, hold=0.08):
+def press(sock, code, modifier=NO_KEY):
+    hold_key(sock, code, modifier)
+    release_keys(sock)
+
+
+def type_text(sock, text):
     for char in text:
         modifier = NO_KEY
         if char in SHIFTED:
@@ -65,7 +80,10 @@ def type_text(sock, text, hold=0.08):
             modifier = SHIFT
         if lowered not in MATRIX:
             sys.exit(f"no matrix code for {char!r}")
-        press(sock, MATRIX[lowered], modifier, hold)
+        # Released between every key, not just at the end of the string: two of
+        # the same character in a row are otherwise one continuous press, and
+        # the second is dropped.  "d2000" arrives as "D20".
+        press(sock, MATRIX[lowered], modifier)
 
 
 def main():
