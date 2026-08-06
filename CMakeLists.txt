@@ -151,6 +151,14 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_disasm.py
                     --llvm-mc ${LLVM_MC_EXE} --cc ${HOST_C_COMPILER})
 
+        # blockmove.c takes its two memory accesses from the caller, so the
+        # host build drives it against a flat array.  The overlap cases are
+        # the point: a forward copy into a destination inside the source range
+        # corrupts only the tail, which reads as working on hardware.
+        add_test(NAME blockmove
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_blockmove.py
+                    --cc ${HOST_C_COMPILER})
+
         # Walking a real ROM covers what synthetic opcodes cannot: our decoder
         # picks the instruction boundaries, so a wrong length lands the next
         # decode mid-instruction and the disagreement cascades.  The image is
