@@ -787,11 +787,19 @@ unsigned char parse_address(void) {
         recolour_last_line(7);
         return 1;
     }
-    if (!digits) {
-        // No digits, so use previous address
-    } else {
-        // Use the supplied address
+    if (digits) {
         mon_address = hex_value;
+    }
+    // No digits means continue from the previous address -- but only if the
+    // rest of the line is blank.  These four commands take one address and
+    // nothing after it, so leftovers are a typo: `M ZZZZ` used to parse as a
+    // bare `M` and silently show the next block.
+    while (screen_line_buffer[screen_line_offset] == ' ') {
+        screen_line_offset++;
+    }
+    if (screen_line_offset < screen_line_length) {
+        report_error("? SYNTAX  ERROR");
+        return 1;
     }
     return 0;
 }
