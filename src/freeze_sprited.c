@@ -1432,6 +1432,15 @@ static void draw_sidebar() {
     g_state.redraw_flags = RedrawNothing;
 }
 
+/* Fold the case rather than trust it.  mega65-libc's cinput() upper-cases
+ * what it stores on two conditions that do not survive reading: `PEEK(0x0D18)`
+ * is a byte of our own program image rather than the $D018 it means, and
+ * `flags & ~CINPUT_NO_AUTOTRANSLATE` is true for every flag value rather than
+ * false for that one.  So the stored case is a property of the build. */
+static bool answered_yes(const uint8_t* answer) {
+    return (answer[0] | 0x20) == 'y' && (answer[1] | 0x20) == 'e' && (answer[2] | 0x20) == 's';
+}
+
 static void ask(const char* question, uint8_t* into, uint8_t max_length) {
     gotoy(SCREEN_ROWS - 1);
     revers(1);
@@ -1912,7 +1921,7 @@ static void main_loop() {
 
             case 0xF3: // F3
                 ask("EXIT SPRITE EDITOR: ARE YOU SURE (YES/NO)? ", buf, 3);
-                if (buf[0] == 'y' && buf[1] == 'e' && buf[2] == 's') {
+                if (answered_yes(buf)) {
                     return;
                 }
                 break;
@@ -1933,7 +1942,7 @@ static void main_loop() {
 
             case 14: // CTRL-N
                 ask("CLEAR SPRITE (YES/NO)? ", buf, 3);
-                if (buf[0] == 'y' && buf[1] == 'e' && buf[2] == 's') {
+                if (answered_yes(buf)) {
                     clear_sprite();
                 }
                 break;
