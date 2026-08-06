@@ -27,125 +27,136 @@ void setup_menu_screen(void) {
     /* Colour RAM deliberately left alone here. */
 }
 
-void draw_box(unsigned char x1,
-    unsigned char y1,
-    unsigned char x2,
-    unsigned char y2,
+void draw_box(unsigned char left,
+    unsigned char top,
+    unsigned char right,
+    unsigned char bottom,
     unsigned char colour,
     unsigned char erase) {
-    unsigned char x, y;
+    unsigned char column, row;
 
     // Clear colour RAM
-    for (x = x1; x <= x2; x++) {
-        for (y = y1; y <= y2; y++) {
-            lpoke(COLOUR_RAM_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 1, colour);
-            lpoke(COLOUR_RAM_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 0, 0);
+    for (column = left; column <= right; column++) {
+        for (row = top; row <= bottom; row++) {
+            lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 1, colour);
+            lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 0, 0);
         }
     }
 
     if (erase) {
-        for (x = x1 + 1; x < x2; x++) {
-            for (y = y1 + 1; y < y2; y++) {
-                lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 0, 0x20);
-                lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x * 2 + 1, 0);
+        for (column = left + 1; column < right; column++) {
+            for (row = top + 1; row < bottom; row++) {
+                lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 0, 0x20);
+                lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 1, 0);
             }
         }
     }
 
-    for (x = x1; x < x2; x++) {
-        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2, 0x40); // horizontal line, centred
-        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 1, 0);
-        lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x * 2, 0x40); // horizontal line, centred
-        lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x * 2 + 1, 0);
+    for (column = left; column < right; column++) {
+        lpoke(
+            SCREEN_ADDRESS + top * SCREEN_ROW_BYTES + column * 2, 0x40); // horizontal line, centred
+        lpoke(SCREEN_ADDRESS + top * SCREEN_ROW_BYTES + column * 2 + 1, 0);
+        lpoke(SCREEN_ADDRESS + bottom * SCREEN_ROW_BYTES + column * 2,
+            0x40); // horizontal line, centred
+        lpoke(SCREEN_ADDRESS + bottom * SCREEN_ROW_BYTES + column * 2 + 1, 0);
     }
 
-    for (y = y1; y < y2; y++) {
-        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x1 * 2, 0x42); // vertical line, centred
-        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
-        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x2 * 2, 0x42); // vertical line, centred
-        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x2 * 2 + 1, 0);
+    for (row = top; row < bottom; row++) {
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + left * 2, 0x42); // vertical line, centred
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + left * 2 + 1, 0);
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + right * 2, 0x42); // vertical line, centred
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + right * 2 + 1, 0);
     }
-    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2, 0x55); // top left corner
-    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x2 * 2, 73);   // top right corner
-    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x1 * 2, 74);   // bottom left corner
-    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x2 * 2, 75);   // bottom right corner
-    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
-    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x2 * 2 + 1, 0);
-    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
-    lpoke(SCREEN_ADDRESS + y2 * SCREEN_ROW_BYTES + x2 * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + top * SCREEN_ROW_BYTES + left * 2, 0x55);   // top left corner
+    lpoke(SCREEN_ADDRESS + top * SCREEN_ROW_BYTES + right * 2, 73);    // top right corner
+    lpoke(SCREEN_ADDRESS + bottom * SCREEN_ROW_BYTES + left * 2, 74);  // bottom left corner
+    lpoke(SCREEN_ADDRESS + bottom * SCREEN_ROW_BYTES + right * 2, 75); // bottom right corner
+    lpoke(SCREEN_ADDRESS + top * SCREEN_ROW_BYTES + left * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + top * SCREEN_ROW_BYTES + right * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + bottom * SCREEN_ROW_BYTES + left * 2 + 1, 0);
+    lpoke(SCREEN_ADDRESS + bottom * SCREEN_ROW_BYTES + right * 2 + 1, 0);
 }
 
-void write_text(unsigned char x1, unsigned char y1, unsigned char colour, const char* t) {
-    unsigned char x, c;
-    for (x = x1; t[x - x1]; x++) {
-        c = t[x - x1];
-        if (c > 0x60) {
-            c -= 0x60;
+void write_text(unsigned char column, unsigned char row, unsigned char colour, const char* text) {
+    unsigned char screen_column, character;
+    for (screen_column = column; text[screen_column - column]; screen_column++) {
+        character = text[screen_column - column];
+        if (character > 0x60) {
+            character -= 0x60;
         }
-        if (c > 0x40) {
-            c -= 0x40;
+        if (character > 0x40) {
+            character -= 0x40;
         }
-        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 0, c);
-        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 1, 0);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 0, 0x00);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 1, colour);
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 0, character);
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 1, 0);
+        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 0, 0x00);
+        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 1, colour);
     }
 }
 
-void input_text(
-    unsigned char x1, unsigned char y1, unsigned char len, unsigned char colour, char* out) {
-    unsigned char ofs = 0, x, c;
-    for (x = x1; x < (x1 + len); x++) {
-        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 0, ' ');
-        lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 1, 0);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 0, 0x00);
-        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x1 * 2 + 1, colour);
+void input_text(unsigned char column,
+    unsigned char row,
+    unsigned char width,
+    unsigned char colour,
+    char* into) {
+    unsigned char offset = 0, screen_column, character;
+    for (screen_column = column; screen_column < (column + width); screen_column++) {
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 0, ' ');
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 1, 0);
+        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 0, 0x00);
+        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 1, colour);
     }
 
-    out[0] = 0;
+    into[0] = 0;
 
     while (1) {
         // Enable cursor on current char
-        lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour | 0x30);
+        lpoke(
+            COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 1, colour | 0x30);
 
-        c = ASCIIKEY;
-        if ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) || (c >= 0x30 && c <= 0x39)) {
-            if (ofs < len) {
-                out[ofs] = c;
+        character = ASCIIKEY;
+        if ((character >= 0x41 && character <= 0x5a) || (character >= 0x61 && character <= 0x7a) ||
+            (character >= 0x30 && character <= 0x39)) {
+            if (offset < width) {
+                into[offset] = character;
                 // ASCII to screen code conversion
-                if (c > 0x60) {
-                    c -= 0x60;
+                if (character > 0x60) {
+                    character -= 0x60;
                 }
-                lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, c);
-                lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
-                ofs++;
+                lpoke(
+                    SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 0, character);
+                lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 1,
+                    colour);
+                offset++;
             }
         } else {
-            switch (c) {
+            switch (character) {
                 case 0x14: // delete
                     // XXX actually copy chars down, instead of just erasing from
                     // end of line, and allow cursor left and right
-                    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, ' ');
-                    lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
-                    if (ofs) {
-                        ofs--;
+                    lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 0, ' ');
+                    lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 1,
+                        colour);
+                    if (offset) {
+                        offset--;
                     }
-                    lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, ' ');
-                    lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
+                    lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 0, ' ');
+                    lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 1,
+                        colour);
                     break;
                 case 0x03:
-                    out[0] = 0;
+                    into[0] = 0;
                     ASCIIKEY = 0;
                     return;
                 case 0x0d:
-                    out[ofs] = 0;
+                    into[offset] = 0;
                     ASCIIKEY = 0;
                     return;
                 default:
                     break;
             }
         }
-        if (c) {
+        if (character) {
             ASCIIKEY = 0;
         }
     }

@@ -219,35 +219,35 @@ static const unsigned int MINUS_DB_TABLE[256] = {
   1, 1, 1, 1, 1, 1, 1, 0 };
 // clang-format on
 
-unsigned char db = 0;
+unsigned char db_index = 0;
 
-void val_to_db(unsigned int val) {
-    db = 0;
-    while (val < MINUS_DB_TABLE[db]) {
-        db++;
+void level_to_db_index(unsigned int level) {
+    db_index = 0;
+    while (level < MINUS_DB_TABLE[db_index]) {
+        db_index++;
     }
 }
 
-unsigned char msg[11];
-void draw_db_bar(unsigned char line, unsigned int val) {
+unsigned char db_text[11];
+void draw_db_bar(unsigned char line, unsigned int level) {
     unsigned int bar_addr = (unsigned int)audio_menu_simple + line * 40 + 11;
-    // Work out the approximate db value of the signal
-    val_to_db(val);
+    // Work out the approximate db_index value of the signal
+    level_to_db_index(level);
 
-    // Now draw the db bar.  We allow upto 20 chars wide
+    // Now draw the db_index bar.  We allow upto 20 chars wide
     // for the range 0 -- -79db = 1/4 char per dB.
     for (i = 0; i < 20; i++) {
-        if (db >= 39) {
+        if (db_index >= 39) {
             POKE(bar_addr + i, 0x20);
         } else {
             // Filled bar
-            if ((39 - db) > ((i * 2))) {
+            if ((39 - db_index) > ((i * 2))) {
                 POKE(bar_addr + i, 0xa0);
                 // Empty cell
-            } else if ((39 - db) < (i * 2)) {
+            } else if ((39 - db_index) < (i * 2)) {
                 POKE(bar_addr + i, 0x20);
                 // 1/2
-            } else if ((39 - db) == ((i * 2) + 0)) {
+            } else if ((39 - db_index) == ((i * 2) + 0)) {
                 POKE(bar_addr + i, 117);
             }
         }
@@ -255,24 +255,24 @@ void draw_db_bar(unsigned char line, unsigned int val) {
 
     // And the annotation to the right
     bar_addr += 23;
-    if (!db) {
-        snprintf((char*)msg, 10, "  0DB");
-        for (i = 0; msg[i]; i++) {
-            POKE(bar_addr + i, msg[i]);
+    if (!db_index) {
+        snprintf((char*)db_text, 10, "  0DB");
+        for (i = 0; db_text[i]; i++) {
+            POKE(bar_addr + i, db_text[i]);
         }
     } else {
         i = 0;
-        if (db > 79) {
-            db = 79;
+        if (db_index > 79) {
+            db_index = 79;
         }
-        if (db < 10) {
+        if (db_index < 10) {
             POKE(bar_addr, ' ');
             bar_addr++;
         }
         POKE(bar_addr, '-');
         i++;
-        for (; DB_TEXT[db][i - 1]; i++) {
-            POKE(bar_addr + i, DB_TEXT[db][i - 1]);
+        for (; DB_TEXT[db_index][i - 1]; i++) {
+            POKE(bar_addr + i, DB_TEXT[db_index][i - 1]);
         }
         POKE(bar_addr + i, 'D');
         i++;
@@ -284,9 +284,9 @@ void draw_db_bar(unsigned char line, unsigned int val) {
     }
 }
 
-uint16_t v, v2;
+uint16_t first_coefficient, second_coefficient;
 
-void set_amplifier(unsigned char left_right, unsigned short v) {
+void set_amplifier(unsigned char left_right, unsigned short first_coefficient) {
     /*
       Map 16-bit unsigned volume level to amplifier level.
       This is not super simple, as amplifier value $00 = +24dB,
@@ -306,12 +306,12 @@ void set_amplifier(unsigned char left_right, unsigned short v) {
     // This does not work, disabled!
 
     // avoid compiler warning because of disabled code
-    if (left_right == v) {
+    if (left_right == first_coefficient) {
         return;
     }
 
 #if 0
-  unsigned char amp_value = 0x20 + (v / 293);
+  unsigned char amp_value = 0x20 + (first_coefficient / 293);
 
   // Do we have an amplifier, and if so, where is it?
   switch (PEEK(0xD629)) {
@@ -365,42 +365,42 @@ void change_db(unsigned char row, unsigned char change) {
   }
     // clang-format on
 
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    val_to_db(v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    level_to_db_index(first_coefficient);
     if (change == 0) { // minus 1
-        if (db < 39) {
-            db++;
+        if (db_index < 39) {
+            db_index++;
         }
     } else { // plus 1
-        if (db) {
-            db--;
+        if (db_index) {
+            db_index--;
         }
     }
-    v = MINUS_DB_TABLE[db];
-    audioxbar_setcoefficient(c + 0, (uint8_t)(v & 0xff));
-    audioxbar_setcoefficient(c + 1, (uint8_t)(v >> 8));
+    first_coefficient = MINUS_DB_TABLE[db_index];
+    audioxbar_setcoefficient(c + 0, (uint8_t)(first_coefficient & 0xff));
+    audioxbar_setcoefficient(c + 1, (uint8_t)(first_coefficient >> 8));
     // change LFT/RGT (audio jack) to the same value in simple mixer!
-    audioxbar_setcoefficient(c - 0xc0, (uint8_t)(v & 0xff));
-    audioxbar_setcoefficient(c - 0xc0 + 1, (uint8_t)(v >> 8));
+    audioxbar_setcoefficient(c - 0xc0, (uint8_t)(first_coefficient & 0xff));
+    audioxbar_setcoefficient(c - 0xc0 + 1, (uint8_t)(first_coefficient >> 8));
 
     if (row == 0) {
-        set_amplifier(0, v);
+        set_amplifier(0, first_coefficient);
     }
     if (row == 6) {
-        set_amplifier(1, v);
+        set_amplifier(1, first_coefficient);
     }
 }
 
-void swap_coefficients(unsigned char a, unsigned char b) {
-    v = audioxbar_getcoefficient(a);
-    v |= audioxbar_getcoefficient(a + 1) << 8;
-    v2 = audioxbar_getcoefficient(b);
-    v2 |= audioxbar_getcoefficient(b + 1) << 8;
-    audioxbar_setcoefficient(a, (uint8_t)(v2 & 0xff));
-    audioxbar_setcoefficient(b, (uint8_t)(v & 0xff));
-    audioxbar_setcoefficient(a + 1, (uint8_t)(v2 >> 8));
-    audioxbar_setcoefficient(b + 1, (uint8_t)(v >> 8));
+void swap_coefficients(unsigned char first, unsigned char second) {
+    first_coefficient = audioxbar_getcoefficient(first);
+    first_coefficient |= audioxbar_getcoefficient(first + 1) << 8;
+    second_coefficient = audioxbar_getcoefficient(second);
+    second_coefficient |= audioxbar_getcoefficient(second + 1) << 8;
+    audioxbar_setcoefficient(first, (uint8_t)(second_coefficient & 0xff));
+    audioxbar_setcoefficient(second, (uint8_t)(first_coefficient & 0xff));
+    audioxbar_setcoefficient(first + 1, (uint8_t)(second_coefficient >> 8));
+    audioxbar_setcoefficient(second + 1, (uint8_t)(first_coefficient >> 8));
 }
 
 void stereo_swap(void) {
@@ -421,13 +421,13 @@ void stereo_swap(void) {
 
 void stereo_toggle(void) {
     // very simple check if the values of HDL for the sids are the same
-    v = audioxbar_getcoefficient(0xc0);
-    v2 = audioxbar_getcoefficient(0xc2);
-    if (v == v2) {
-        v = MINUS_DB_TABLE[4];
-        v2 = MINUS_DB_TABLE[8];
+    first_coefficient = audioxbar_getcoefficient(0xc0);
+    second_coefficient = audioxbar_getcoefficient(0xc2);
+    if (first_coefficient == second_coefficient) {
+        first_coefficient = MINUS_DB_TABLE[4];
+        second_coefficient = MINUS_DB_TABLE[8];
     } else {
-        v = v2 = MINUS_DB_TABLE[6];
+        first_coefficient = second_coefficient = MINUS_DB_TABLE[6];
     }
 
     // Make stereo with 12dB difference between left and right
@@ -440,38 +440,38 @@ void stereo_toggle(void) {
             // Left side output
 
             // Left SID
-            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(v & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(v >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(first_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(first_coefficient >> 8));
             // Right SID
-            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(v2 & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(v2 >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(second_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(second_coefficient >> 8));
             // Left Digi
-            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(v & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(v >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(first_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(first_coefficient >> 8));
             // Right Digi
-            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(v2 & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(v2 >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(second_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(second_coefficient >> 8));
             // OPL SFX FM
-            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(v & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(v >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(first_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(first_coefficient >> 8));
         } else {
             // Right side output
 
             // Left SID
-            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(v2 & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(v2 >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(second_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(second_coefficient >> 8));
             // Right SID
-            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(v & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(v >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(first_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(first_coefficient >> 8));
             // Left Digi
-            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(v2 & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(v2 >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(second_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(second_coefficient >> 8));
             // Right Digi
-            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(v & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(v >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(first_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(first_coefficient >> 8));
             // OPL SFX FM
-            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(v & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(v >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(first_coefficient & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(first_coefficient >> 8));
         }
     }
 }
@@ -485,55 +485,55 @@ void draw_simple_mixer(void) {
 
     // Left output channel
     c = 0xde; // Master volume control
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(6, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(6, first_coefficient);
     c = 0xc0; // Left SIDs
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(7, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(7, first_coefficient);
     c = 0xc2; // Right SIDs
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(8, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(8, first_coefficient);
     c = 0xd0; // Left DIGI
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(9, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(9, first_coefficient);
     c = 0xd2; // Right DIGI
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(10, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(10, first_coefficient);
     c = 0xdc; // OPL2 / FM
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(11, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(11, first_coefficient);
 
     // Right output channel
     c = 0xfe; // Master volume control
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(15, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(15, first_coefficient);
     c = 0xe0; // Left SIDs
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(16, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(16, first_coefficient);
     c = 0xe2; // Right SIDs
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(17, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(17, first_coefficient);
     c = 0xf0; // Left DIGI
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(18, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(18, first_coefficient);
     c = 0xf2; // Right DIGI
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(19, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(19, first_coefficient);
     c = 0xfc; // OPL2 / FM
-    v = audioxbar_getcoefficient(c);
-    v |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(20, v);
+    first_coefficient = audioxbar_getcoefficient(c);
+    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
+    draw_db_bar(20, first_coefficient);
 
     // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
     // (in fact, most of memory contains what the frozen program had. Only our freezer program
@@ -724,7 +724,7 @@ void test_audio(unsigned char advanced_view) {
     lfill(0xffd3400, 0, 0x80);
 }
 
-unsigned char cin;
+unsigned char key;
 
 void do_advanced_mixer(void) {
     select_row = 0;
@@ -736,13 +736,13 @@ void do_advanced_mixer(void) {
     draw_advanced_mixer();
 
     // clear keybuffer
-    while ((cin = ASCIIKEY)) {
+    while ((key = ASCIIKEY)) {
         ASCIIKEY = 0;
     }
 
     while (1) {
-        cin = ASCIIKEY;
-        if (cin) {
+        key = ASCIIKEY;
+        if (key) {
             // Flush char from input buffer
             ASCIIKEY = 0;
 
@@ -751,7 +751,7 @@ void do_advanced_mixer(void) {
             value = audioxbar_getcoefficient(coefficient);
 
             // Process char
-            switch (cin) {
+            switch (key) {
                 case 0x03:
                 case 0xf3: // RUN/STOP or F3 to exit
                     // reset colour ram
@@ -822,10 +822,10 @@ void do_advanced_mixer(void) {
                     usleep(150000L);
                     VICIV.bordercol = 6;
                     VICIV.screencol = 6;
-                    cin = 0;
+                    key = 0;
                     break;
             }
-            if (cin) {
+            if (key) {
                 draw_advanced_mixer();
             }
         }
@@ -856,17 +856,17 @@ void do_audio_mixer(void) {
     draw_simple_mixer();
 
     // clear keybuffer
-    while ((cin = ASCIIKEY)) {
-        ASCIIKEY = cin;
+    while ((key = ASCIIKEY)) {
+        ASCIIKEY = key;
     }
 
     while (1) {
-        cin = ASCIIKEY;
-        if (cin) {
+        key = ASCIIKEY;
+        if (key) {
             // Flush char from input buffer
             ASCIIKEY = 0;
 
-            switch (cin) {
+            switch (key) {
                 case 0x03:
                 case 0xF3: // RUN/STOP / F3 = Exit
                     return;
@@ -952,11 +952,11 @@ void do_audio_mixer(void) {
                     usleep(150000L);
                     VICIV.bordercol = 6;
                     VICIV.screencol = 6;
-                    cin = 0;
+                    key = 0;
                     break;
             }
             // only draw menu if there was a keypress to handle
-            if (cin) {
+            if (key) {
                 draw_simple_mixer();
             }
         }
