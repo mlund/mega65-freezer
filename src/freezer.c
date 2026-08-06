@@ -259,8 +259,9 @@ void draw_thumbnail(void) {
                 j = 2;
             }
 
-            lcopy(
-                (unsigned long)&thumbnail_buffer[x + yoffset], 0x50000L + xoffset + yoffset_out, j);
+            lcopy((unsigned long)&thumbnail_buffer[x + yoffset],
+                0x50000L + (xoffset + yoffset_out),
+                j);
 
             xoffset += 64 * 6;
         }

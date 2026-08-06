@@ -160,7 +160,7 @@ char draw_directory_entry(unsigned char screen_row) {
         }
     } else {
         lcopy((unsigned long)dir_line_colour,
-            COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2),
+            COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
             19 * 2);
     }
 

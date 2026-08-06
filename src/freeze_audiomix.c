@@ -149,8 +149,8 @@ void draw_advanced_mixer(void) {
             audio_menu[3 * 40 + 6] = nybl_to_screen(c);
         }
 
-        lpoke(COLOUR_RAM_ADDRESS + offset + offset + 1, colour);
-        lpoke(COLOUR_RAM_ADDRESS + offset + offset + 3, colour);
+        lpoke(COLOUR_RAM_ADDRESS + (offset + offset + 1), colour);
+        lpoke(COLOUR_RAM_ADDRESS + (offset + offset + 3), colour);
 
     } while (++c);
 

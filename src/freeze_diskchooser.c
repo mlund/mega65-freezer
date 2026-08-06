@@ -187,10 +187,10 @@ void draw_directory_entry(unsigned char screen_row) {
     }
 
     lcopy((unsigned long)dir_line_colour,
-        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2),
+        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
         4);
-    lcopy(COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2),
-        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2) + 4,
+    lcopy(COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
+        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2) + 4),
         (19 * 2 - 4));
 }
 
@@ -557,7 +557,7 @@ void draw_disk_image_list(void) {
             lcopy((long)normal_row, COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES), 4);
         }
         lcopy(COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES),
-            COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES) + 4,
+            COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES + 4),
             76);
         addr += (40 * 2);
     }

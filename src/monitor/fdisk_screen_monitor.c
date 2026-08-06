@@ -75,8 +75,10 @@ void write_line(const char* text, char column) {
  * piecewise rather than in one shade.  `colour` is a whole colour-RAM byte, so
  * an attribute such as AttribReverse can be OR'd into it. */
 void recolour_last_line_segment(unsigned char column, unsigned char width, unsigned char colour) {
+    /* Group the narrow terms: COLOUR_RAM_ADDRESS - SCREEN_ADDRESS folds at
+     * compile time, leaving one 32-bit add rather than three. */
     long colour_address =
-        COLOUR_RAM_ADDRESS + (screen_line_address - SCREEN_ADDRESS) - SCREEN_ROW_BYTES + column;
+        COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + (screen_line_address - SCREEN_ROW_BYTES + column);
     lfill(colour_address, colour, width);
 }
 
@@ -162,7 +164,7 @@ void set_screen_attributes(long screen_address, unsigned char count, unsigned ch
 /* Read-modify-write the colour-RAM attribute byte of column `col` on the line
  * being edited: keep the `keep` bits of the current value and OR in `set`. */
 static void set_attr(unsigned char column, unsigned char keep_mask, unsigned char set_mask) {
-    long colour_address = column + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS;
+    long colour_address = COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + (column + screen_line_address);
     lpoke(colour_address, (lpeek(colour_address) & keep_mask) | set_mask);
 }
 
