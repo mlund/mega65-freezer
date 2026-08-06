@@ -73,7 +73,8 @@ uint32_t address_to_freeze_slot_offset(uint32_t address) {
         1; // Skip the initial saved SD sector at the beginning of each slot
     uint32_t relative_address = 0;
     uint32_t region_length = 0;
-    char skip, i;
+    char skip;
+    char i;
 
     for (i = 0; i < freeze_region_count; i++) {
         skip = 0;

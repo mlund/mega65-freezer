@@ -218,8 +218,13 @@ void draw_thumbnail(void) {
     // the freeze slots and see what is there.
     // But there isn't currently a good solution to this, short of having
     // a second buffer into which to render it.
-    unsigned char x, y, i;
-    unsigned short yoffset, yoffset_out, xoffset, j;
+    unsigned char x;
+    unsigned char y;
+    unsigned char i;
+    unsigned short yoffset;
+    unsigned short yoffset_out;
+    unsigned short xoffset;
+    unsigned short j;
     uint32_t thumbnail_sector = find_thumbnail_offset();
 
     // Can't find thumbnail area?  Then show no thumbnail
@@ -349,7 +354,8 @@ void copy_convert_to_screen(const unsigned char* data, short offset) {
 
 void draw_freeze_menu(unsigned char part) {
     unsigned short i;
-    unsigned char x, y;
+    unsigned char x;
+    unsigned char y;
 
 #if 0
   // DEBUG
@@ -943,7 +949,8 @@ void fix_chargen_area(unsigned char flags) {
 }
 
 void start_freezer_tool(char* toolfile) {
-    char x = 0, start_tool = 0;
+    char x = 0;
+    char start_tool = 0;
 
     if (not_in_root) {
         copy_convert_to_screen(freeze_root_warn, TOOLS_MENU_OFFSET);
@@ -974,7 +981,8 @@ void start_freezer_tool(char* toolfile) {
 }
 
 int main(void) {
-    unsigned char drive_state, image_state;
+    unsigned char drive_state;
+    unsigned char image_state;
     /* Performs the $D02F knock; without it every later write to a VIC-IV
      * register such as $D054 is silently ignored and the screen mode is
      * never established. */

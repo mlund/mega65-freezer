@@ -905,7 +905,8 @@ static void draw_line(PaintFunc plot) {
     {
         const signed char dx = rc.right - rc.left;
         const signed char dy = (signed char)-(rc.bottom - rc.top);
-        uint8_t x = g_state.tool_org_x, y = g_state.tool_org_y;
+        uint8_t x = g_state.tool_org_x;
+        uint8_t y = g_state.tool_org_y;
         signed char error = dx + dy;
         signed char doubled_error = 0;
         signed char sx = g_state.cursor_x > g_state.tool_org_x ? 1 : -1;
@@ -970,7 +971,9 @@ static void DrawCircle(PaintFunc plot)
 
 static void draw_box(PaintFunc plot) {
     RECT rc;
-    register uint8_t x, y, i;
+    register uint8_t x;
+    register uint8_t y;
+    register uint8_t i;
     set_effective_tool_rect(&rc);
     x = rc.left;
     while (x <= rc.right) {

@@ -33,7 +33,8 @@ void draw_box(unsigned char left,
     unsigned char bottom,
     unsigned char colour,
     unsigned char erase) {
-    unsigned char column, row;
+    unsigned char column;
+    unsigned char row;
 
     // Clear colour RAM
     for (column = left; column <= right; column++) {
@@ -78,7 +79,8 @@ void draw_box(unsigned char left,
 }
 
 void write_text(unsigned char column, unsigned char row, unsigned char colour, const char* text) {
-    unsigned char screen_column, character;
+    unsigned char screen_column;
+    unsigned char character;
     for (screen_column = column; text[screen_column - column]; screen_column++) {
         character = text[screen_column - column];
         if (character > 0x60) {
@@ -99,7 +101,9 @@ void input_text(unsigned char column,
     unsigned char width,
     unsigned char colour,
     char* into) {
-    unsigned char offset = 0, screen_column, character;
+    unsigned char offset = 0;
+    unsigned char screen_column;
+    unsigned char character;
     for (screen_column = column; screen_column < (column + width); screen_column++) {
         lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 0, ' ');
         lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 1, 0);

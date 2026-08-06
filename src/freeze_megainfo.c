@@ -35,9 +35,14 @@ static char s_dessentials[][13] = {
 constexpr uint16_t RTC_YEAR_EPOCH = 2000;
 
 constexpr uint8_t BUFFER_LENGTH = 254;
-static char buffer[BUFFER_LENGTH + 2], tempstr32[32], is_ntsc = 0, has_rtc = 0, m65model,
-                                                      m65submodel;
-static unsigned char code_buffer[512], ymd[3];
+static char buffer[BUFFER_LENGTH + 2];
+static char tempstr32[32];
+static char is_ntsc = 0;
+static char has_rtc = 0;
+static char m65model;
+static char m65submodel;
+static unsigned char code_buffer[512];
+static unsigned char ymd[3];
 
 /* Bit 8 of colour requests the reverse-video attribute. */
 static void write_text_mapped(unsigned char x,
@@ -46,7 +51,8 @@ static void write_text_mapped(unsigned char x,
     const char* text,
     unsigned char mask,
     unsigned char lower_offset) {
-    unsigned char i, c;
+    unsigned char i;
+    unsigned char c;
     for (i = 0; text[i]; i++) {
         c = text[i] & mask;
         if ((c >= 'A') && (c <= 'Z')) {
@@ -159,7 +165,8 @@ char* format_mega_model() {
  */
 char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     unsigned char m = 1;
-    unsigned short y = 2020, ds;
+    unsigned short y = 2020;
+    unsigned short ds;
 
     ds = (((unsigned short)(code_buffer[offset + 1] & msbmask)) << 8) +
         (unsigned short)code_buffer[offset];
@@ -308,8 +315,11 @@ char* format_hyppo_version(void) {
  * compares to date (which should by artix ymd) and returns 0 if equal or newer
  */
 unsigned char format_util_version(long addr, const unsigned char* date) {
-    unsigned short i, j = 0;
-    unsigned char temp, result = 0, p;
+    unsigned short i;
+    unsigned short j = 0;
+    unsigned char temp;
+    unsigned char result = 0;
+    unsigned char p;
 
     lcopy(addr, (long)code_buffer, 512);
 
@@ -375,12 +385,16 @@ unsigned char format_util_version(long addr, const unsigned char* date) {
  * tries to parse date and compare to date[3]
  */
 unsigned char format_hickup_version(long addr, const unsigned char* date) {
-    unsigned short p, i, j = 0;
+    unsigned short p;
+    unsigned short i;
+    unsigned short j = 0;
     char* needle = "GIT: ";
     char* needle2 = ",20";
     constexpr uint8_t NEEDLE_LEN = 5;
     constexpr uint8_t NEEDLE2_LEN = 3;
-    unsigned char finished = 0, cmp_idx = 0, temp;
+    unsigned char finished = 0;
+    unsigned char cmp_idx = 0;
+    unsigned char temp;
 
     for (p = 0; p < 64 && !finished; p++) {
         lcopy(addr + 512l * p, (long)code_buffer, 512);
@@ -475,7 +489,8 @@ static short tod_last = -1, tod_ticks = 0, rtc_ticks = 0;
  * returns 0 if tod seconds have not changed, otherwise 1
  */
 unsigned char get_rtc_stats(unsigned char reinit) {
-    short pa, pb;
+    short pa;
+    short pb;
 
     // fetch external RTC state
     if (no_extrtc || lpeek(0xffd7400) == 0xff) { // external not installed
@@ -628,7 +643,8 @@ void format_extrtc_status(unsigned char status) {
  * write rtc status to screen
  */
 void display_rtc_status(unsigned char x, unsigned char y) {
-    unsigned char colour, offs = 0xff;
+    unsigned char colour;
+    unsigned char offs = 0xff;
 
     // write out rtc state
     format_extrtc_status(rtc_state);
@@ -731,7 +747,11 @@ void display_rtc_debug(unsigned char x, unsigned char y, unsigned char colour, u
  * update the whole screen (except RTC tick stuff)
  */
 void draw_screen(void) {
-    unsigned char row, col, i, fail, artix_ymd[3];
+    unsigned char row;
+    unsigned char col;
+    unsigned char i;
+    unsigned char fail;
+    unsigned char artix_ymd[3];
 
     // clear screen
     lfill(SCREEN_ADDRESS, 0x20, SCREEN_BYTES);
@@ -850,7 +870,8 @@ void init_megainfo() {
  * do_megainfo
  */
 void do_megainfo() {
-    unsigned char x, rtc_debug = 0;
+    unsigned char x;
+    unsigned char rtc_debug = 0;
 
     init_megainfo();
 

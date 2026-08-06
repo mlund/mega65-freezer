@@ -59,7 +59,10 @@ void screen_decimal(unsigned int addr, unsigned int v) {
     // XXX - We should do this off-screen and copy into place later, to avoid glitching
     // on display.
     unsigned char digits[5];
-    unsigned char ii, j, carry, temp;
+    unsigned char ii;
+    unsigned char j;
+    unsigned char carry;
+    unsigned char temp;
 
     // Start with all zeros
     for (ii = 0; ii < 5; ii++) {

@@ -153,7 +153,8 @@ HELPER_INLINE void fetch_freeze_region_list_from_hypervisor(unsigned short addr)
 
 /* Count returns in X(low)/Y(high). */
 HELPER_INLINE unsigned short get_freeze_slot_count(void) {
-    unsigned char lo, hi;
+    unsigned char lo;
+    unsigned char hi;
     __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
         : "=x"(lo), "=y"(hi)
         : [fn] "i"(SYSPART_SLOT_COUNT), [trap] "i"(HTRAP_SYSPART)

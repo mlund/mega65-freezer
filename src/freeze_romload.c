@@ -103,7 +103,8 @@ char draw_directory_entry(unsigned char screen_row) {
     char type;
     char firsta0 = 1;
     char invalid = 0;
-    unsigned char i, c;
+    unsigned char i;
+    unsigned char c;
     // Skip first 5 bytes
     for (i = 0; i < 2; i++) {
         (void)F011_DATA;
@@ -190,7 +191,8 @@ void copy_line_to_screen(long dest, char* src, unsigned int length) {
 
 void draw_file_list(void) {
     unsigned addr = SCREEN_ADDRESS + 4;
-    unsigned char i, x;
+    unsigned char i;
+    unsigned char x;
     unsigned char name[64];
     // First, clear the screen
     clear_screen(23);
@@ -232,8 +234,11 @@ void draw_file_list(void) {
 }
 
 void scan_directory(void) {
-    unsigned char x, dir;
-    short last_dir = -1, dir_pos, i;
+    unsigned char x;
+    unsigned char dir;
+    short last_dir = -1;
+    short dir_pos;
+    short i;
     struct m65_dirent* dirent;
 
     file_count = 0;
@@ -424,8 +429,10 @@ unsigned char freeze_load_romarea(void) {
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".TCR") ||
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".chr") ||
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".tcr")) {
-                        unsigned char cg_7a_set = 0, cg_7a_mask = 0xff;
-                        unsigned char cg_54_set = 0, cg_54_mask = 0xff;
+                        unsigned char cg_7a_set = 0;
+                        unsigned char cg_7a_mask = 0xff;
+                        unsigned char cg_54_set = 0;
+                        unsigned char cg_54_mask = 0xff;
 
                         // Load CHARSET to chargen WOM
                         read_file_from_sdcard(rom_name_return, 0x40000L);

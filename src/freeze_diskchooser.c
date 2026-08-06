@@ -198,7 +198,9 @@ void draw_directory_entry(unsigned char screen_row) {
 }
 
 unsigned char next_directory_entry(void) {
-    unsigned char c, i, type = 0;
+    unsigned char c;
+    unsigned char i;
+    unsigned char type = 0;
 
     if (disk_type == DiskTypeD81 || disk_type == DiskTypeD64) {
         // D81 || D64
@@ -286,8 +288,11 @@ int read_sector_with_cancel(void) {
 }
 
 unsigned char draw_directory_contents(unsigned char drive_id) {
-    unsigned char c, i, x;
-    short skip_bytes = 0, j;
+    unsigned char c;
+    unsigned char i;
+    unsigned char x;
+    short skip_bytes = 0;
+    short j;
 
     // only work on drive 0 and 1
     if (drive_id > 1) {
@@ -505,7 +510,8 @@ exit_with_motor_off:
 
 void draw_disk_image_list(void) {
     unsigned addr = SCREEN_ADDRESS;
-    unsigned char i, x;
+    unsigned char i;
+    unsigned char x;
     unsigned char name[64];
     // First, clear the screen
     POKE(SCREEN_ADDRESS + 0, ' ');
@@ -568,7 +574,8 @@ void draw_disk_image_list(void) {
 }
 
 void scan_directory(unsigned char drive_id) {
-    unsigned char x, dir;
+    unsigned char x;
+    unsigned char dir;
     char* ptr;
     struct m65_dirent* dirent;
 

@@ -18,6 +18,7 @@ Checks: >
   readability-braces-around-statements,
   readability-misleading-indentation,
   readability-non-const-parameter,
+  readability-isolate-declaration,
   readability-redundant-control-flow,
   misc-*,
 

@@ -67,7 +67,8 @@ void parse_partition_entry(const char i) {
     // Only the partition type and the LBA fields are used.  The CHS geometry at
     // offsets 1-3 and 5-7 is what a BIOS needed; nothing here reads it.
     char partition_type = sector_buffer[offset + 4];
-    uint32_t lba_start = 0, lba_size = 0;
+    uint32_t lba_start = 0;
+    uint32_t lba_size = 0;
 
     for (char j = 0; j < 4; j++) {
         ((char*)&lba_start)[j] = sector_buffer[offset + 8 + j];
@@ -276,10 +277,14 @@ unsigned long fat32_allocate_cluster(unsigned long cluster) {
 */
 long fat32_create_contiguous_file(
     char* name, long size, long root_dir_sector, long fat1_sector, long fat2_sector) {
-    unsigned char i, sn, len;
-    unsigned short offset, j;
+    unsigned char i;
+    unsigned char sn;
+    unsigned char len;
+    unsigned short offset;
+    unsigned short j;
     unsigned short clusters;
-    unsigned long k, start_cluster = 0;
+    unsigned long k;
+    unsigned long start_cluster = 0;
     unsigned long dir_cluster = 2;
     unsigned long last_dir_cluster = 2;
     unsigned long contiguous_clusters = 0;
