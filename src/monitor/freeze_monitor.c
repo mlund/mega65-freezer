@@ -19,6 +19,7 @@
 #include "fdisk_screen_monitor.h"
 #include "freezer.h"
 #include "mega65_regs.h"
+#include "trace.h"
 
 #include <mega65.h>
 #include <stdio.h>
@@ -263,6 +264,10 @@ static bool show_disassembly_line(void) {
     if (!disassemble_instruction(mon_address, text, &layout)) {
         return false;
     }
+    /* After the read, not before: the bytes have come back out of the freeze
+     * slot and been decoded, so this is what is on the card rather than what a
+     * caller believed it wrote.  disassemble_instruction NUL-terminates. */
+    TRACE(text);
     /* The saved PC is 16 bits, so it names a CPU address whose physical bank
      * depends on MAP and $01 state this code does not decode.  Marking only
      * bank 0 gives up the highlight on a banked PC rather than reverse-videoing
