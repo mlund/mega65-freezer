@@ -93,7 +93,7 @@ uint8_t audioxbar_getcoefficient(uint8_t n) {
     return PEEK(0xD6F5U);
 }
 
-static uint8_t c, value, select_row, select_column, simple_row;
+static uint8_t c, value, select_row, select_column, simple_row, coefficient;
 static uint8_t mute_save[8];
 static uint16_t i, j;
 
@@ -747,10 +747,8 @@ void do_advanced_mixer(void) {
             ASCIIKEY = 0;
 
             // Get coefficient number ready
-            i = (select_column << 5);
-            i += (select_row << 1);
-            i++;
-            value = audioxbar_getcoefficient(i);
+            coefficient = (uint8_t)((select_column << 5) + (select_row << 1) + 1);
+            value = audioxbar_getcoefficient(coefficient);
 
             // Process char
             switch (cin) {
@@ -777,23 +775,23 @@ void do_advanced_mixer(void) {
                     break;
                 case '+':
                     value++;
-                    audioxbar_setcoefficient(i - 1, value);
-                    audioxbar_setcoefficient(i, value);
+                    audioxbar_setcoefficient(coefficient - 1, value);
+                    audioxbar_setcoefficient(coefficient, value);
                     break;
                 case '0':
                     value += 0x10;
-                    audioxbar_setcoefficient(i - 1, value);
-                    audioxbar_setcoefficient(i, value);
+                    audioxbar_setcoefficient(coefficient - 1, value);
+                    audioxbar_setcoefficient(coefficient, value);
                     break;
                 case '-':
                     value--;
-                    audioxbar_setcoefficient(i - 1, value);
-                    audioxbar_setcoefficient(i, value);
+                    audioxbar_setcoefficient(coefficient - 1, value);
+                    audioxbar_setcoefficient(coefficient, value);
                     break;
                 case '*':
                     value -= 0x10;
-                    audioxbar_setcoefficient(i - 1, value);
-                    audioxbar_setcoefficient(i, value);
+                    audioxbar_setcoefficient(coefficient - 1, value);
+                    audioxbar_setcoefficient(coefficient, value);
                     break;
                 case 't':
                 case 'T':
@@ -803,17 +801,17 @@ void do_advanced_mixer(void) {
                 case 'M':
                     if (audioxbar_getcoefficient(0x14)) {
                         for (i = 0x00; i < 0x100; i += 0x20) {
-                            audioxbar_setcoefficient(i + 0x14, 0);
-                            audioxbar_setcoefficient(i + 0x15, 0);
-                            audioxbar_setcoefficient(i + 0x16, 0);
-                            audioxbar_setcoefficient(i + 0x17, 0);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x14), 0);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x15), 0);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x16), 0);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x17), 0);
                         }
                     } else {
                         for (i = 0x00; i < 0x100; i += 0x20) {
-                            audioxbar_setcoefficient(i + 0x14, 0x30);
-                            audioxbar_setcoefficient(i + 0x15, 0x30);
-                            audioxbar_setcoefficient(i + 0x16, 0x30);
-                            audioxbar_setcoefficient(i + 0x17, 0x30);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x14), 0x30);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x15), 0x30);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x16), 0x30);
+                            audioxbar_setcoefficient((uint8_t)(i + 0x17), 0x30);
                         }
                     }
                     break;
