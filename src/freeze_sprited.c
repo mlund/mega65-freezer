@@ -1254,14 +1254,23 @@ void set_redraw_full_canvas(void) {
     set_rect(&g_state.redraw_rect, 0, 0, g_state.sprite_width, g_state.sprite_height);
 }
 
+/* Exactly 80 columns, so the banner fills row 0 and cannot wrap. */
+static const char HEADER_TEXT[] =
+    "                            THE MEGA65 SPRITE EDITOR                            ";
+
 static void draw_header() {
     if (g_state.redraw_flags & RedrawHeader) {
-        /* Escape names stay lowercase -- libc matches them by hash -- but the
-         * text must be uppercase, because cprintf runs petsciitoscreencode()
-         * over it. */
-        cprintf((const uint8_t*)"{home}{rvson}{lgrn}                            THE MEGA65 SPRITE "
-                                "EDITOR           "
-                                "                 {rvsoff}");
+        /* Not cprintf.  mega65-libc dispatches its `{...}` escapes through a
+         * table indexed by a hash that does not agree with the one filling it,
+         * so `{home}`, `{rvson}` and `{lgrn}` reach the wrong handler or none:
+         * position and attributes have to be set through the API to be set at
+         * all.  cputs writes what cprintf would, since cprintf(s) is
+         * _cprintf(0, s) and does not convert. */
+        gohome();
+        revers(1);
+        textcolor(COLOUR_LIGHTGREEN);
+        screen_puts(HEADER_TEXT);
+        revers(0);
     }
 }
 
