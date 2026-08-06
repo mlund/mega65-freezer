@@ -280,8 +280,11 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
     unsigned char filename_len;
     uint32_t file_sector;
 
-    fat32_open_file_system();
-    if (!fat1_sector) {
+    /* Both conditions: the return catches a card with no MBR signature, while
+     * fat1_sector catches a valid MBR carrying no FAT32 partition.  The global
+     * is never reset, so on a second call it would otherwise still hold the
+     * previous card's value. */
+    if (fat32_open_file_system() != FreezerOk || !fat1_sector) {
         draw_box(10, 8, 30, 13, 2, 1);
         write_text(11, 9, 7, "COULD NOT FIND SD CARD");
         while (!ASCIIKEY) {
