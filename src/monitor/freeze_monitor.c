@@ -721,6 +721,10 @@ constexpr uint8_t BITMAP_ROWS = 2;
 constexpr uint8_t BITMAP_COLUMN = 9;
 constexpr uint8_t BITMAP_CELL_STRIDE = 9; /* eight pixels and a gap */
 
+/* A screen code, not ASCII: the reverse bank at +$80 holds a solid block, and
+ * to_stemp() shifts only letters, so it survives the write. */
+constexpr uint8_t BITMAP_SET = 0xE0;
+
 void show_bitmaps(void) {
     for (unsigned char cell_row = 0; cell_row < BITMAP_ROWS; cell_row++) {
         for (unsigned char pixel_row = 0; pixel_row < 8; pixel_row++) {
@@ -737,7 +741,7 @@ void show_bitmaps(void) {
                 }
                 for (unsigned char bit = 0; bit < 8; bit++) {
                     output_buffer[BITMAP_COLUMN + cell * BITMAP_CELL_STRIDE + bit] =
-                        (bits & (0x80 >> bit)) ? '#' : '.';
+                        (bits & (0x80 >> bit)) ? BITMAP_SET : '.';
                 }
             }
             write_line_len(output_buffer, 0, 80);
