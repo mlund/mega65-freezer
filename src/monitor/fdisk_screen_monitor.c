@@ -20,8 +20,7 @@ char stemp[80];
 /* Via stemp because neither end can be converted in place: callers pass string
  * literals, and screen RAM reads back as ROM when BASIC is banked in. */
 static void to_stemp(const char* s, char length) {
-    char i;
-    for (i = 0; i < length; i++) {
+    for (char i = 0; i < length; i++) {
         char c = s[i];
         if (c >= 'a' && c <= 'z')
             c -= 0x60;
@@ -132,12 +131,6 @@ void setup_screen(void) {
     display_footer(FOOTER_COPYRIGHT);
 }
 
-void screen_colour_line(unsigned char line, unsigned char colour) {
-    // Set colour RAM for this screen line to this colour
-    // (use bit-shifting as fast alternative to multiply)
-    lfill(0x1f800 + (line << 6) + (line << 4), colour, 80);
-}
-
 void fatal_error(const unsigned char* filename, unsigned int line_number) {
     unsigned char i;
     display_footer(FOOTER_FATAL);
@@ -156,8 +149,7 @@ void set_screen_attributes(long p, unsigned char count, unsigned char attr) {
     // map the 2KB colour RAM in at $D800 and work with it there.
     // XXX - For now we are LPOKING
     long addr = COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + p;
-    unsigned char i;
-    for (i = 0; i < count; i++) {
+    for (unsigned char i = 0; i < count; i++) {
         lpoke(addr, lpeek(addr) | attr);
         addr++;
     }

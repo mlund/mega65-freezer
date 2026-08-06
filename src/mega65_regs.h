@@ -97,6 +97,27 @@ static inline uint16_t hw_div16_ceil(uint32_t a, uint32_t b) {
 #define TOUCH_STATUS MMIO8(0xD6B0)
 #define TOUCH_STATUS_EV1_VALID 0x01
 
+// VIC-IV video setup.  $D05C holds the side border width LSB and $D05D bits
+// 0-5 its MSB, but bit 7 of $D05D is HOTREG: the switch that makes legacy
+// VIC-II/III register writes propagate to their VIC-IV equivalents.  Bit 6 is
+// set here and is not documented in the user guide.
+#define VIC4_SIDE_BORDER_WIDTH 80
+#define VIC4_BORDER_MSB_HOTREG 0xC0
+#define VIC4_CTRLB_EXTENDED_ATTRIBUTES 0x20
+#define VIC4_CHRXSCL_80_COLUMN 0x78
+#define VIC4_CTRLC_MODE_MASK 0xA8
+#define VIC4_CTRLC_16BIT_FULL_COLOUR 0x05
+
+// $00/$01 CPU port: all lines driven, BASIC banked out, KERNAL and I/O kept.
+#define CPU_PORT_DDR_ALL_OUTPUTS 0x3F
+#define CPU_PORT_KERNAL_AND_IO 0x36
+
+// VIC bank select lives in the low two bits of CIA2 port A, inverted, so %01
+// selects $8000-$BFFF.
+#define CIA2_VIC_BANK_MASK 0xFC
+#define CIA2_VIC_BANK_8000 0x01
+#define CIA_ICR_DISABLE_ALL 0x7F
+
 // Keyboard event queue: reads the top event as ASCII, 0x00 when empty;
 // assigning any value dequeues.  See the user guide, "Keyboard".
 #define ASCIIKEY MMIO8(0xD610)

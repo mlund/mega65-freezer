@@ -171,7 +171,6 @@ static void hex_to_screen_codes(unsigned char count) {
 
 void show_memory_line(uint32_t addr) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
-    unsigned char i;
 
     lfill((long)output_buffer, 0, 80);
     output_buffer[0] = ':';
@@ -180,7 +179,7 @@ void show_memory_line(uint32_t addr) {
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Memory that isn't saved
-        for (i = 0; i < 65; i++)
+        for (unsigned char i = 0; i < 65; i++)
             output_buffer[9 + i] =
                 "<UNMAPPED OR UNFROZEN MEMORY>                                    "[i] & 0x3f;
         output_buffer[9] = '<';
@@ -190,7 +189,7 @@ void show_memory_line(uint32_t addr) {
         // Two spaces before character rendering of block
         output_buffer[8 + 16 * 3 + 0] = ' ';
         output_buffer[8 + 16 * 3 + 1] = ' ';
-        for (i = 0; i < 16; i++) {
+        for (unsigned char i = 0; i < 16; i++) {
             unsigned char b = mon_sector[(i + freeze_slot_offset) & 0x1ff];
             // Space before hex
             output_buffer[8 + i * 3] = ' ';
@@ -206,8 +205,7 @@ void show_memory_line(uint32_t addr) {
 }
 
 void show_memory(void) {
-    unsigned char i;
-    for (i = 0; i < 16; i++) {
+    for (unsigned char i = 0; i < 16; i++) {
         show_memory_line(mon_address);
         mon_address += 16;
     }
@@ -289,7 +287,7 @@ void show_disassembly(void) {
 
 void set_memory() {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(mon_address);
-    unsigned char i;
+    unsigned char i = 0;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         write_line("? UNMAPPED OR UNFROZEN ADDRESS  ERROR", 0);
@@ -298,8 +296,6 @@ void set_memory() {
     } else {
         cache_sector(freeze_slot_offset);
 
-        // Get position within sector
-        i = 0;
         freeze_slot_offset &= 0x1ff;
 
         // Now accept various forms of input for setting memory.
