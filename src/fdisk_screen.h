@@ -20,35 +20,6 @@ constexpr uint8_t SCREEN_ROWS = 25;
  * sprite editor draws its own footer, so a message for it here was never
  * reachable -- and display_footer() indexes the table at runtime, so an unused
  * entry costs its full 80 columns that --gc-sections cannot reclaim. */
-constexpr uint8_t FOOTER_COPYRIGHT = 0;
-constexpr uint8_t FOOTER_FATAL = 1;
-constexpr uint8_t FOOTER_MAX = 1;
-
-constexpr uint8_t ATTRIB_REVERSE = 0x20;
-constexpr uint8_t ATTRIB_BLINK = 0x10;
-constexpr uint8_t ATTRIB_UNDERLINE = 0x80;
-constexpr uint8_t ATTRIB_HIGHLIGHT = 0x40;
-
-constexpr uint8_t COLOUR_BLACK = 0;
-constexpr uint8_t COLOUR_WHITE = 1;
-constexpr uint8_t COLOUR_RED = 2;
-constexpr uint8_t COLOUR_CYAN = 3;
-constexpr uint8_t COLOUR_PURPLE = 4;
-constexpr uint8_t COLOUR_GREEN = 5;
-constexpr uint8_t COLOUR_BLUE = 6;
-constexpr uint8_t COLOUR_YELLOW = 7;
-constexpr uint8_t COLOUR_ORANGE = 8;
-constexpr uint8_t COLOUR_BROWN = 9;
-constexpr uint8_t COLOUR_PINK = 10;
-constexpr uint8_t COLOUR_GREY1 = 11;
-constexpr uint8_t COLOUR_DARKGREY = 11;
-constexpr uint8_t COLOUR_GREY2 = 12;
-constexpr uint8_t COLOUR_GREY = 12;
-constexpr uint8_t COLOUR_MEDIUMGREY = 12;
-constexpr uint8_t COLOUR_LIGHTGREEN = 13;
-constexpr uint8_t COLOUR_LIGHTBLUE = 14;
-constexpr uint8_t COLOUR_GREY3 = 15;
-constexpr uint8_t COLOUR_LIGHTGREY = 15;
 
 void screen_hex(unsigned int addr, long value);
 void screen_decimal(unsigned int addr, unsigned int value);
@@ -63,3 +34,42 @@ extern char screen_column;
  * and friends themselves afterwards. */
 void setup_menu_screen_base(void);
 void clear_colour_ram(void);
+
+/* Which footer row display_footer() shows. */
+enum Footer : uint8_t {
+    FooterCopyright = 0,
+    FooterFatal = 1,
+    FooterMax = 1,
+};
+
+/* Colour-RAM attribute bits, OR-ed into a colour. */
+enum : uint8_t {
+    AttribReverse = 0x20,
+    AttribBlink = 0x10,
+    AttribUnderline = 0x80,
+    AttribHighlight = 0x40,
+};
+
+/* The sixteen palette entries.  Several have more than one common name. */
+enum Colour : uint8_t {
+    ColourBlack = 0,
+    ColourWhite = 1,
+    ColourRed = 2,
+    ColourCyan = 3,
+    ColourPurple = 4,
+    ColourGreen = 5,
+    ColourBlue = 6,
+    ColourYellow = 7,
+    ColourOrange = 8,
+    ColourBrown = 9,
+    ColourPink = 10,
+    ColourGrey1 = 11,
+    ColourDarkGrey = 11,
+    ColourGrey2 = 12,
+    ColourGrey = 12,
+    ColourMediumGrey = 12,
+    ColourLightGreen = 13,
+    ColourLightBlue = 14,
+    ColourGrey3 = 15,
+    ColourLightGrey = 15,
+};

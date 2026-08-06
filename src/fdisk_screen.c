@@ -125,5 +125,5 @@ void setup_menu_screen_base(void) {
 /* Super-Extended Attribute Mode reads the high nibble as attributes, so the
  * fill has to stay a plain colour. */
 void clear_colour_ram(void) {
-    lfill(COLOUR_RAM_28BIT, COLOUR_WHITE, SCREEN_BYTES);
+    lfill(COLOUR_RAM_28BIT, ColourWhite, SCREEN_BYTES);
 }

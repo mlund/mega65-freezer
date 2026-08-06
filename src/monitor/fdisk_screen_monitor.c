@@ -10,7 +10,7 @@
 
 extern unsigned char* charset;
 
-char* footer_messages[FOOTER_MAX + 1] = {
+char* footer_messages[FooterMax + 1] = {
     /* Exactly 80 columns: display_footer() copies the whole row unconditionally. */
     "(A)SM (B)IT (C)MP (D)ASM (F)ILL (H)UNT (M)EM (R)EG (S)ET (T)RA E(X)IT SETREG(;) ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};
@@ -73,7 +73,7 @@ void write_line(const char* text, char column) {
 
 /* Recolour one field of the line just written, for callers that colour a line
  * piecewise rather than in one shade.  `colour` is a whole colour-RAM byte, so
- * an attribute such as ATTRIB_REVERSE can be OR'd into it. */
+ * an attribute such as AttribReverse can be OR'd into it. */
 void recolour_last_line_segment(unsigned char column, unsigned char width, unsigned char colour) {
     long colour_address =
         COLOUR_RAM_ADDRESS + (screen_line_address - SCREEN_ADDRESS) - SCREEN_ROW_BYTES + column;
@@ -87,7 +87,7 @@ void recolour_last_line(char colour) {
 void display_footer(unsigned char index) {
     to_stemp(footer_messages[index], 80);
     lcopy((long)stemp, FOOTER_ADDRESS, 80);
-    set_screen_attributes(FOOTER_ADDRESS, 80, ATTRIB_REVERSE);
+    set_screen_attributes(FOOTER_ADDRESS, 80, AttribReverse);
 }
 
 void setup_screen(void) {
@@ -131,19 +131,19 @@ void setup_screen(void) {
     screen_line_address = SCREEN_ADDRESS;
     screen_column = 0;
 
-    display_footer(FOOTER_COPYRIGHT);
+    display_footer(FooterCopyright);
 }
 
 void fatal_error(const unsigned char* filename, unsigned int line_number) {
     unsigned char i;
-    display_footer(FOOTER_FATAL);
+    display_footer(FooterFatal);
     for (i = 0; filename[i]; i++) {
         POKE(FOOTER_ADDRESS + 44 + i, filename[i]);
     }
     POKE(FOOTER_ADDRESS + 44 + i, ':');
     i++;
     screen_decimal(FOOTER_ADDRESS + 44 + i, line_number);
-    lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS, 2 | ATTRIB_REVERSE, 80);
+    lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS, 2 | AttribReverse, 80);
     for (;;) {
     }
 }

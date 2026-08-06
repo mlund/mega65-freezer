@@ -237,7 +237,7 @@ constexpr uint8_t COLOUR_OPERAND = 5; /* green */
 static const unsigned char MNEMONIC_CLASS_COLOUR[] = {1, 7, 13};
 
 /* Colour the fields of the line just written.  `attribute` is OR'd into every
- * field so a whole-line marker such as ATTRIB_REVERSE leaves no gaps; the
+ * field so a whole-line marker such as AttribReverse leaves no gaps; the
  * mnemonic is coloured across its padded field for the same reason. */
 static void colour_disassembly_line(const DisassemblyLayout* layout, unsigned char attribute) {
     unsigned char mnemonic_colour = MNEMONIC_CLASS_COLOUR[layout->mnemonic_class];
@@ -267,7 +267,7 @@ static bool show_disassembly_line(void) {
      * depends on MAP and $01 state this code does not decode.  Marking only
      * bank 0 gives up the highlight on a banked PC rather than reverse-videoing
      * an unrelated line -- ROM at $3FA23 and RAM at $0FA23 both match $FA23. */
-    unsigned char attribute = (mon_address == frozen_program_counter) ? ATTRIB_REVERSE : 0;
+    unsigned char attribute = (mon_address == frozen_program_counter) ? AttribReverse : 0;
 
     write_line_len(text, 0, layout.text_length);
     colour_disassembly_line(&layout, attribute);
