@@ -79,18 +79,18 @@ unsigned char not_in_root = 0;
 signed char swipe_dir = 0;
 #endif
 
-void topetsciiupper(char* str, int len);
+void topetsciiupper(char* text, int length);
 
 static unsigned char colour_table[256];
 
 void make_colour_lookup(void) {
-    unsigned char c;
+    unsigned char colour;
 
     // Make colour lookup table
-    c = 0;
+    colour = 0;
     do {
-        colour_table[c] = c;
-    } while (++c);
+        colour_table[colour] = colour;
+    } while (++colour);
 
     // Now map C64 colours directly
     colour_table[0x00] =
@@ -653,10 +653,10 @@ void draw_freeze_menu(unsigned char part) {
     VICIV.bordercol = 6;
 }
 
-void topetsciiupper(char* str, int len) {
-    for (int i = 0; i < len; i++) {
-        if (str[i] >= 0x60 && str[i] < 0x7a) {
-            str[i] &= 0x5f;
+void topetsciiupper(char* text, int length) {
+    for (int i = 0; i < length; i++) {
+        if (text[i] >= 0x60 && text[i] < 0x7a) {
+            text[i] &= 0x5f;
         }
     }
 }
@@ -703,14 +703,14 @@ static unsigned char joy_to_key[32] = {
 };
 
 unsigned char read_joystick() {
-    unsigned char c;
+    unsigned char key;
     // TODO: this is very broken, keypresses will generate F3(FIRE) on DC01
     // We use a simple lookup table to do this
-    c = joy_to_key[CIA1.pra & CIA1.prb & 0x1f];
+    key = joy_to_key[CIA1.pra & CIA1.prb & 0x1f];
     // Then wait for joystick to release
     while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
         continue;
-    return c;
+    return key;
 }
 #endif /* WITH_JOYSTICK */
 
@@ -725,7 +725,7 @@ static unsigned char last_touch = 0;
 static unsigned char last_x;
 
 unsigned char poll_touch_panel(void) {
-    unsigned char c = 0;
+    unsigned char key = 0;
     unsigned short x, y;
 
     if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
@@ -744,7 +744,7 @@ unsigned char poll_touch_panel(void) {
                 x = 0;
             else
                 x = 1;
-            c = touch_keys[x][y - 9];
+            key = touch_keys[x][y - 9];
             // Wait for touch to be released
             // XXX - Records touch event as where your finger was when you touched, not released.
             while (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID)
@@ -806,11 +806,11 @@ unsigned char poll_touch_panel(void) {
             }
 
             if (swipe_dir == -5) {
-                c = 0x1d;
+                key = 0x1d;
                 swipe_dir = 0;
             }
             if (swipe_dir == 5) {
-                c = 0x9d;
+                key = 0x9d;
                 swipe_dir = 0;
             }
 
@@ -822,7 +822,7 @@ unsigned char poll_touch_panel(void) {
     }
     last_touch = TOUCH_STATUS;
 
-    return c;
+    return key;
 }
 #endif
 
@@ -1079,26 +1079,26 @@ int main(void) {
 
     // Main keyboard input loop
     while (1) {
-        unsigned char c = ASCIIKEY;
+        unsigned char key = ASCIIKEY;
 
-        if (c) {
+        if (key) {
             // Flush char from input buffer
             ASCIIKEY = 0;
         }
 #ifdef WITH_JOYSTICK
         // Joystick Support is old and needs to be overhauled!
-        if (!c)
-            c = read_joystick();
+        if (!key)
+            key = read_joystick();
 #endif
 #ifdef WITH_TOUCH
         // This is just for MEGAPHONE and is probably not working (like joystick)!
-        if (!c)
-            c = poll_touch_panel();
+        if (!key)
+            key = poll_touch_panel();
 #endif
 
         // Process char
-        if (c) {
-            switch (c) {
+        if (key) {
+            switch (key) {
                 case 0x13: // Home
                     if (slot_number) {
                         slot_number = 0;
@@ -1194,8 +1194,8 @@ int main(void) {
                     // PRESERVE $FFD304E = TEXTYPOS LSB $FFD304F.0-3 = TEXTYPOS MSB $FFD304F.4-7 =
                     // PRESERVE $FFD306F.0-5 = VIC-II first raster $FFD3072     = Sprite Y position
                     // adjust
-                    c = freeze_peek(0xFFD306fL) & 0x80;
-                    if (c == 0x80) {
+                    key = freeze_peek(0xFFD306fL) & 0x80;
+                    if (key == 0x80) {
                         // Switch to PAL
                         freeze_poke(0xFFD306fL, 0x00);
                         freeze_poke(0xFFD3072L, 0x00);
@@ -1256,7 +1256,7 @@ int main(void) {
                 case '8':
                 case '9':
                     // Change drive number of internal drives
-                    freeze_poke(0x10113L - '8' + c, freeze_peek(0x10113L - '8' + c) ^ 2);
+                    freeze_poke(0x10113L - '8' + key, freeze_peek(0x10113L - '8' + key) ^ 2);
                     draw_freeze_menu(UPDATE_DISK);
                     break;
                 case '0': // Select mounted disk image
@@ -1280,8 +1280,8 @@ int main(void) {
                     // disable interrupts, clear decimal mode
                     freeze_poke(0xFFD3640U + 0x07, 0xe7);
                     // Clear memory mapping
-                    for (c = 0x0a; c <= 0x0f; c++) {
-                        freeze_poke(0xFFD3640U + c, 0);
+                    for (key = 0x0a; key <= 0x0f; key++) {
+                        freeze_poke(0xFFD3640U + key, 0);
                     }
                     // Turn off extended graphics mode, only keep palemu
                     freeze_poke(0xFFD3054U, freeze_peek(0xFFD3054U) & 0x20);
@@ -1289,7 +1289,7 @@ int main(void) {
                 case 0xf3: // F3 = resume
                 case 0xf4: // RESUME even if ROM changed
                     // if rom changed, slot 0 resume is disabled, reset is required
-                    if (c == 0xf3 && slot_number == 0 && rom_changed) {
+                    if (key == 0xf3 && slot_number == 0 && rom_changed) {
                         goto invalid_function;
                     }
                     // Doesn't seem to really help (probably needs to be done by the hypervisor
@@ -1379,12 +1379,12 @@ int main(void) {
 
                 case 'R':
                 case 'r': // switch CRT Emulation
-                    c = freeze_peek(0xFFD3054L);
-                    if (c & 0x20) {
-                        freeze_poke(0xFFD3054L, c & 0xdf);
+                    key = freeze_peek(0xFFD3054L);
+                    if (key & 0x20) {
+                        freeze_poke(0xFFD3054L, key & 0xdf);
                         lpoke(0xFFD3054L, lpeek(0xFFD3054L) & 0xdf);
                     } else {
-                        freeze_poke(0xFFD3054L, c | 0x20);
+                        freeze_poke(0xFFD3054L, key | 0x20);
                         lpoke(0xFFD3054L, lpeek(0xFFD3054L) | 0x20);
                     }
                     draw_freeze_menu(UPDATE_TOP);

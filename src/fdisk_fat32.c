@@ -32,12 +32,12 @@ void mega65_serial_monitor_write(char* s) {
     }
 }
 
-char hexchar2(unsigned char v) {
-    v = v & 0xf;
-    if (v < 10) {
-        return '0' + v;
+char hexchar2(unsigned char nybble) {
+    nybble = nybble & 0xf;
+    if (nybble < 10) {
+        return '0' + nybble;
     }
-    return 0x41 + v - 10;
+    return 0x41 + nybble - 10;
 }
 
 void hexout2(char* m, unsigned long v, int n) {
@@ -66,7 +66,7 @@ void parse_partition_entry(const char i) {
 
     // Only the partition type and the LBA fields are used.  The CHS geometry at
     // offsets 1-3 and 5-7 is what a BIOS needed; nothing here reads it.
-    char id = sector_buffer[offset + 4];
+    char partition_type = sector_buffer[offset + 4];
     uint32_t lba_start = 0, lba_size = 0;
 
     for (char j = 0; j < 4; j++) {
@@ -76,7 +76,7 @@ void parse_partition_entry(const char i) {
         ((char*)&lba_size)[j] = sector_buffer[offset + 12 + j];
     }
 
-    switch (id) {
+    switch (partition_type) {
         case 0x0b:
         case 0x0c:
             // FAT32
@@ -133,28 +133,29 @@ struct M65Tm {
     unsigned char tm_isdst; /* Daylight saving time */
 };
 
-unsigned char db1, db2, db3;
+/* Three reads of the same address; two must agree before it is believed. */
+unsigned char debounce_1, debounce_2, debounce_3;
 
 unsigned char lpeek_debounced(long address) {
-    db1 = 0;
-    db2 = 1;
-    while (db1 != db2 || db1 != db3) {
-        db1 = lpeek(address);
-        db2 = lpeek(address);
-        db3 = lpeek(address);
+    debounce_1 = 0;
+    debounce_2 = 1;
+    while (debounce_1 != debounce_2 || debounce_1 != debounce_3) {
+        debounce_1 = lpeek(address);
+        debounce_2 = lpeek(address);
+        debounce_3 = lpeek(address);
     }
-    return db1;
+    return debounce_1;
 }
 
 unsigned char bcd_work;
 
-unsigned char unbcd(unsigned char in) {
+unsigned char unbcd(unsigned char packed) {
     bcd_work = 0;
-    while (in & 0xf0) {
+    while (packed & 0xf0) {
         bcd_work += 10;
-        in -= 0x10;
+        packed -= 0x10;
     }
-    bcd_work += in;
+    bcd_work += packed;
     return bcd_work;
 }
 
