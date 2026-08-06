@@ -26,7 +26,10 @@ add_compile_options(
     # store through a null pointer rather than undefined behaviour.
     -fno-delete-null-pointer-checks
     # Scoped to this directory so mega65-libc, which is not ours to fix, stays
-    # quiet.  These found two shipped bugs the day they were switched on.
+    # quiet.  These found two shipped bugs the day they were switched on, so
+    # they are errors: a warning nobody has to act on is one everybody scrolls
+    # past, and that is how report_unmapped() shipped calling itself.
+    -Werror
     -Wall
     -Wextra
     -Wconditional-uninitialized
