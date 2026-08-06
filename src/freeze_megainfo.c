@@ -49,14 +49,16 @@ static void write_text_mapped(unsigned char x,
     unsigned char i, c;
     for (i = 0; text[i]; i++) {
         c = text[i] & mask;
-        if ((c >= 'A') && (c <= 'Z'))
+        if ((c >= 'A') && (c <= 'Z')) {
             c -= 0x40;
-        else if ((c >= 'a') && (c <= 'z'))
+        } else if ((c >= 'a') && (c <= 'z')) {
             c -= lower_offset;
-        else if (c == '~') // ~ become pi
+        } else if (c == '~') { // ~ become pi
             c = 94;
-        if (colour & 0x100 && c < 128)
+        }
+        if (colour & 0x100 && c < 128) {
             c |= 0x80;
+        }
         lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x + i, c);
         lpoke(COLOUR_RAM_ADDRESS + y * SCREEN_ROW_BYTES + x + i, (unsigned char)(colour & 0xff));
     }
@@ -187,16 +189,18 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     // snprintf can't do %d!
     itoa(y, tempstr32, 10);
     strcpy(buffer, tempstr32);
-    if (m > 9)
+    if (m > 9) {
         strcat(buffer, "-");
-    else
+    } else {
         strcat(buffer, "-0");
+    }
     itoa(m, tempstr32, 10);
     strcat(buffer, tempstr32);
-    if (ds > 9)
+    if (ds > 9) {
         strcat(buffer, "-");
-    else
+    } else {
         strcat(buffer, "-0");
+    }
     itoa(ds, tempstr32, 10);
     strcat(buffer, tempstr32);
 
@@ -222,20 +226,21 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
  * get_hw_version must have been called to fill code_buffer
  */
 char* format_fpga_hash(unsigned char offset, unsigned char reverse) {
-    if (reverse)
+    if (reverse) {
         sprintf(buffer,
             "%02X%02X%02X%02X",
             code_buffer[offset + 2],
             code_buffer[offset + 3],
             code_buffer[offset + 4],
             code_buffer[offset + 5]);
-    else
+    } else {
         sprintf(buffer,
             "%02X%02X%02X%02X",
             code_buffer[offset + 5],
             code_buffer[offset + 4],
             code_buffer[offset + 3],
             code_buffer[offset + 2]);
+    }
 
     return buffer;
 }
@@ -271,9 +276,9 @@ char* format_hyppo_version(void) {
     gethyppoversion(&v);
 
     if (v.hyppo_major == 0xff && v.hyppo_minor == 0xff && v.hdos_major == 0xff &&
-        v.hdos_minor == 0xff)
+        v.hdos_minor == 0xff) {
         strcpy(buffer, "?.? / ?.?");
-    else {
+    } else {
         itoa(v.hyppo_major, tempstr32, 10);
         strcpy(buffer, tempstr32);
         strcat(buffer, ".");
@@ -313,8 +318,9 @@ unsigned char format_util_version(long addr, const unsigned char* date) {
         if (code_buffer[i] == 0x56 && code_buffer[i + 1] == 0x3a && code_buffer[i + 2] == 0x32 &&
             code_buffer[i + 3] == 0x30) {
             i += 4; // skip v:20
-            while (j < 64 && code_buffer[i])
+            while (j < 64 && code_buffer[i]) {
                 buffer[j++] = code_buffer[i++];
+            }
             buffer[j] = 0;
             break;
         }
@@ -338,16 +344,18 @@ unsigned char format_util_version(long addr, const unsigned char* date) {
                 result = 1;
                 break;
             }
-        } else
+        } else {
             result = 1;
+        }
     }
 
     // cuts on the left side, we always want the rightmost part with the commit hash
     i = strlen(buffer);
     if (i > 25) {
         i -= 25;
-        for (j = 0; j < 25; j++)
+        for (j = 0; j < 25; j++) {
             buffer[j] = buffer[i + j];
+        }
         buffer[j] = 0;
     }
 
@@ -381,8 +389,9 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
             if (cmp_idx < NEEDLE_LEN) {
                 if (needle[cmp_idx] == code_buffer[i]) {
                     cmp_idx++;
-                } else
+                } else {
                     cmp_idx = 0;
+                }
             } else {
                 buffer[j++] = code_buffer[i];
                 if (code_buffer[i] == 0) {
@@ -408,8 +417,9 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
         if (cmp_idx < NEEDLE2_LEN) {
             if (needle2[cmp_idx] == buffer[j]) {
                 cmp_idx++;
-            } else
+            } else {
                 cmp_idx = 0;
+            }
         } else {
             for (p = 0; p < 3; p++) {
                 if (buffer[j + p * 2] >= '0' && buffer[j + p * 2] <= '9' &&
@@ -421,18 +431,21 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
                     snprintf(tempstr32, 5, "%02X", date[p]);
                     write_text(p*3, 21, 12, tempstr32);
                     */
-                    if (temp > date[p])
+                    if (temp > date[p]) {
                         return 0;
-                    else if (temp < date[p])
+                    } else if (temp < date[p]) {
                         return 1;
-                } else
+                    }
+                } else {
                     return 1;
+                }
             }
         }
     }
 
-    if (cmp_idx < NEEDLE2_LEN)
+    if (cmp_idx < NEEDLE2_LEN) {
         return 2;
+    }
 
     return 0;
 }
@@ -466,15 +479,17 @@ unsigned char get_rtc_stats(unsigned char reinit) {
 
     // fetch external RTC state
     if (no_extrtc || lpeek(0xffd7400) == 0xff) { // external not installed
-        if (has_rtc)
+        if (has_rtc) {
             rtc_state = 1;
-        else
+        } else {
             rtc_state = 0;
+        }
     } else {
-        if (lpeek(0xffd74fd) & 0x80)
+        if (lpeek(0xffd74fd) & 0x80) {
             rtc_state = 3; // external installed & active
-        else
+        } else {
             rtc_state = 2; // external installed but inactive
+        }
     }
 
     // clock changed, reinit
@@ -482,8 +497,9 @@ unsigned char get_rtc_stats(unsigned char reinit) {
         clock_init = 1;
         rtc_last_state = rtc_state;
         // if clock is active, give it a few seconds to settle
-        if (rtc_state & 1)
+        if (rtc_state & 1) {
             rtc_settle = 3;
+        }
     }
 
     if (clock_init || reinit) {
@@ -506,8 +522,9 @@ unsigned char get_rtc_stats(unsigned char reinit) {
                 usleep(20000L);
                 rtc_pmu = lpeek(0xffd71d0UL);
             }
-        } else
+        } else {
             rtc_pmu = 0xff;
+        }
         clock_init = 0;
         tod_ov = 0;
         rtc_ov = 0;
@@ -533,8 +550,9 @@ unsigned char get_rtc_stats(unsigned char reinit) {
         }
     }
 
-    if (tod_ticks == tod_last)
+    if (tod_ticks == tod_last) {
         return 0;
+    }
     // tod_ticks changed, update rtc
 
     // external rtc needs a moment to settle
@@ -562,10 +580,11 @@ unsigned char get_rtc_stats(unsigned char reinit) {
             }
         }
 
-        if (rtc_ticks > tod_ticks)
+        if (rtc_ticks > tod_ticks) {
             rtc_diff = rtc_ticks - tod_ticks;
-        else
+        } else {
             rtc_diff = tod_ticks - rtc_ticks;
+        }
     }
 
     return 1;
@@ -624,9 +643,9 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                 if (rtc_ticks > 2) {
                     rtc_ticking = 1;
                     if (rtc_diff > 1) {
-                        if (no_extrtc && is_ntsc)
+                        if (no_extrtc && is_ntsc) {
                             strcpy(buffer, "SLOW TICK, SLOW CIA TOD!");
-                        else {
+                        } else {
                             strcpy(buffer, "SLOW TICK               ");
                             offs = 9;
                         }
@@ -647,15 +666,17 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                 // at index 22.  The terminator is never overwritten.
                 // NOLINTBEGIN(bugprone-not-null-terminated-result)
                 if (offs != 0xff && rtc_pmu != 0xff) {
-                    if ((rtc_pmu & 0x30) == 0x20)
+                    if ((rtc_pmu & 0x30) == 0x20) {
                         memcpy(buffer + offs, ", BACKUP ON", 11);
-                    else
+                    } else {
                         memcpy(buffer + offs, ", BACKUP OFF", 12);
+                    }
                 }
                 // NOLINTEND(bugprone-not-null-terminated-result)
                 write_text(x, y + 1, colour, buffer);
-            } else
+            } else {
                 write_text(x, y + 1, 7, "CHECKING                ");
+            }
         }
         if (!rtc_check) {
             sprintf(buffer,
@@ -667,8 +688,9 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                 rtc_buf[7] & 0x7f,
                 rtc_buf[6]);
             write_text(x, y + 2, 12, buffer);
-        } else
+        } else {
             write_text(x, y + 2, 12, "                    ");
+        }
     }
 }
 
@@ -686,20 +708,22 @@ void display_rtc_debug(unsigned char x, unsigned char y, unsigned char colour, u
                 tod_ticks,
                 rtc_diff,
                 rtc_pmu);
-            if (rtc_state == 1)
+            if (rtc_state == 1) {
                 buffer[0] = 'I';
-            else if (rtc_state == 2 || rtc_state == 3)
+            } else if (rtc_state == 2 || rtc_state == 3) {
                 buffer[0] = 'E';
+            }
             break;
         default:
             strcpy(buffer, "                                                     ");
     }
     write_text(x, y, colour, buffer);
     if (mode > 0) {
-        if (is_ntsc)
+        if (is_ntsc) {
             write_text(strlen(buffer) + 1, y, colour, "NTSC");
-        else
+        } else {
             write_text(strlen(buffer) + 1, y, colour, "PAL ");
+        }
     }
 }
 
@@ -728,10 +752,11 @@ void draw_screen(void) {
     write_text(0, 3, 1, "MEGA65 MODEL:");
     write_text(15, 3, 7, format_mega_model());
     write_text(40, 3, 1, "SCREEN MODE:");
-    if (is_ntsc)
+    if (is_ntsc) {
         write_text(54, 3, 7, "NTSC");
-    else
+    } else {
         write_text(54, 3, 7, "PAL");
+    }
 
     // output fpga versions
     write_text(0, 5, 1, "ARTIX VERSION:");
@@ -766,15 +791,16 @@ void draw_screen(void) {
 
     // check for HICKUP
     write_text(40, 9, 1, "HYPPO STATUS:");
-    if (read_file_from_sdcard("HICKUP.M65", 0x40000L))
+    if (read_file_from_sdcard("HICKUP.M65", 0x40000L)) {
         write_text(54, 9, 7, "NORMAL");
-    else {
+    } else {
         fail = format_hickup_version(0x40000L, artix_ymd);
         write_text_upper(41, 10, 7 + fail * 3, buffer);
-        if (fail)
+        if (fail) {
             write_text(54, 9, 10, "OUT OF DATE HICKUP.M65");
-        else
+        } else {
             write_text(54, 9, 10, "LOCKED BY HICKUP.M65");
+        }
     }
 
     // ROM version
@@ -789,15 +815,15 @@ void draw_screen(void) {
         strcpy(buffer, s_dessentials[i]);
         strcat(buffer, ":");
         write_text(col, row, 1, buffer);
-        if (fail)
+        if (fail) {
             write_text(col + 14, row, 10, "FILE NOT FOUND");
-        else {
+        } else {
             fail = format_util_version(0x40000L, artix_ymd);
             write_text_upper(col + 14, row, 7 + fail * 3, buffer);
         }
-        if (!col)
+        if (!col) {
             col = 40;
-        else {
+        } else {
             col = 0;
             row++;
         }
@@ -812,10 +838,11 @@ void draw_screen(void) {
 void init_megainfo() {
     is_ntsc = (lpeek(0xFFD306fL) & 0x80) == 0x80;
     // fix TOD frequency
-    if (is_ntsc)
+    if (is_ntsc) {
         lpoke(0xffd3c0el, lpeek(0xffd3c0el) & 0x7f);
-    else // is PAL, set 50Hz bit
+    } else { // is PAL, set 50Hz bit
         lpoke(0xffd3c0el, lpeek(0xffd3c0el) | 0x80);
+    }
 
     get_rtc_stats(1); // initialise rtc data cache
     draw_screen();
@@ -830,8 +857,9 @@ void do_megainfo() {
     init_megainfo();
 
     // clear keybuffer
-    while ((x = ASCIIKEY))
+    while ((x = ASCIIKEY)) {
         ASCIIKEY = x;
+    }
 
     // mainloop
     while (1) {
@@ -843,8 +871,9 @@ void do_megainfo() {
             display_rtc_debug(0, 24, 12, rtc_debug);
         }
 
-        if (x == 0)
+        if (x == 0) {
             continue;
+        }
         ASCIIKEY = x;
 
         switch (x) {

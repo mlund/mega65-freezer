@@ -23,8 +23,9 @@ void screen_hex(unsigned int addr, long value) {
     char i;
     char dec[8];
     hex_to_buf(dec, value);
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < 8; i++) {
         POKE(addr + i, dec[i]);
+    }
 }
 
 /* Writes the low `columns` digits.  out is a plain buffer, so take a pointer:
@@ -34,8 +35,9 @@ void format_hex(char* out, const long value, const char columns) {
     char dec[8];
     hex_to_buf(dec, value);
 
-    for (i = 0; i < columns; i++)
+    for (i = 0; i < columns; i++) {
         out[i] = dec[i + 8 - columns];
+    }
 }
 
 static const unsigned char SCREEN_DECIMAL_DIGITS[16][5] = {{0, 0, 0, 0, 1},
@@ -62,8 +64,9 @@ void screen_decimal(unsigned int addr, unsigned int v) {
     unsigned char ii, j, carry, temp;
 
     // Start with all zeros
-    for (ii = 0; ii < 5; ii++)
+    for (ii = 0; ii < 5; ii++) {
         digits[ii] = 0;
+    }
 
     // Add power of two strings for all non-zero bits in value.
     // XXX - We should use BCD mode to do this more efficiently
@@ -75,8 +78,9 @@ void screen_decimal(unsigned int addr, unsigned int v) {
                 if (temp > 9) {
                     temp -= 10;
                     carry = 1;
-                } else
+                } else {
                     carry = 0;
+                }
                 digits[j] = temp;
             }
         }
@@ -84,13 +88,15 @@ void screen_decimal(unsigned int addr, unsigned int v) {
     }
 
     // Now convert to ascii digits
-    for (j = 0; j < 5; j++)
+    for (j = 0; j < 5; j++) {
         digits[j] = digits[j] | '0';
+    }
 
     // and shift out leading zeros
     for (j = 0; j < 4; j++) {
-        if (digits[0] != '0')
+        if (digits[0] != '0') {
             break;
+        }
         digits[0] = digits[1];
         digits[1] = digits[2];
         digits[2] = digits[3];
@@ -99,8 +105,9 @@ void screen_decimal(unsigned int addr, unsigned int v) {
     }
 
     // Copy to screen
-    for (j = 0; j < 5; j++)
+    for (j = 0; j < 5; j++) {
         POKE(addr + j, digits[j]);
+    }
 }
 
 void setup_menu_screen_base(void) {

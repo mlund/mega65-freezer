@@ -33,9 +33,11 @@ void sdcard_reset(void) {
     POKE(SD_CTL, 1);
 
     // Now wait for SD card reset to complete
-    while (PEEK(SD_CTL) & 3)
-        if (hal_border_flicker > 1)
+    while (PEEK(SD_CTL) & 3) {
+        if (hal_border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+        }
+    }
 
     if (sdhc_card) {
         // Set SDHC flag (else writing doesnt work for some reason)
@@ -63,13 +65,13 @@ void sdcard_readsector(const uint32_t sector_number) {
     unsigned short timeout;
 
     uint32_t sector_address = sector_number * 512;
-    if (sdhc_card)
+    if (sdhc_card) {
         sector_address = sector_number;
-    else {
+    } else {
         if (sector_number >= 0x7fffff) {
             //      write_line("ERROR: Asking for sector @ >= 4GB on SDSC card.",0);
-            while (1)
-                continue;
+            while (1) {
+            }
         }
     }
 
@@ -98,8 +100,9 @@ void sdcard_readsector(const uint32_t sector_number) {
             }
             // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
             // but sdcardio.vhdl thinks not. This means a read error
-            if (PEEK(SD_CTL) == 0x01)
+            if (PEEK(SD_CTL) == 0x01) {
                 return;
+            }
         }
 
         // Command read
@@ -109,16 +112,18 @@ void sdcard_readsector(const uint32_t sector_number) {
         timeout = 50000U;
         while (PEEK(SD_CTL) & 0x3) {
             timeout--;
-            if (!timeout)
+            if (!timeout) {
                 return;
+            }
             //      write_line("Waiting for read to complete",0);
             if (PEEK(SD_CTL) & 0x40) {
                 return;
             }
             // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
             // but sdcardio.vhdl thinks not. This means a read error
-            if (PEEK(SD_CTL) == 0x01)
+            if (PEEK(SD_CTL) == 0x01) {
                 return;
+            }
         }
 
         // Note result
@@ -131,8 +136,9 @@ void sdcard_readsector(const uint32_t sector_number) {
             return;
         }
 
-        if (hal_border_flicker > 1)
+        if (hal_border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+        }
 
         // Reset SD card
         sdcard_open();
@@ -152,10 +158,11 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
     // Set address to read/write
     POKE(SD_CTL, 1); // end reset
-    if (!sdhc_card)
+    if (!sdhc_card) {
         sector_address = sector_number * 512;
-    else
+    } else {
         sector_address = sector_number;
+    }
     POKE(SD_ADDR + 0, (sector_address >> 0) & 0xff);
     POKE(SD_ADDR + 1, (sector_address >> 8) & 0xff);
     POKE(SD_ADDR + 2, (sector_address >> 16) & 0xff);
@@ -168,8 +175,9 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
     counter = 0;
     while (PEEK(SD_CTL) & 3) {
-        if (hal_border_flicker > 1)
+        if (hal_border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+        }
         counter++;
         if (!counter) {
             // SD card not becoming ready: try reset
@@ -185,8 +193,9 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
     // VErify that it matches the data we wrote
     for (i = 0; i < 512; i++) {
-        if (sector_buffer[i] != verify_buffer[i])
+        if (sector_buffer[i] != verify_buffer[i]) {
             break;
+        }
     }
     if (i == 512) {
         return;
@@ -207,10 +216,11 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
                 usleep(500000);
                 POKE(SD_CTL, 1);    // end reset
                 POKE(SD_CTL, 0x57); // Open SD card write gate
-                if (is_multi)
+                if (is_multi) {
                     POKE(SD_CTL, 4);
-                else
+                } else {
                     POKE(SD_CTL, 3); // retry write
+                }
             }
             // Show we are doing something
             //	POKE(0x804f,1+(PEEK(0x804f)&0x7f));
@@ -218,10 +228,11 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
         // Command write
         POKE(SD_CTL, 0x57); // Open SD card write gate
-        if (is_multi)
+        if (is_multi) {
             POKE(SD_CTL, 4);
-        else
+        } else {
             POKE(SD_CTL, 3);
+        }
 
         // Wait for write to complete
         counter = 0;
@@ -234,24 +245,27 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
                 POKE(SD_CTL, 1); // end reset
                 // Retry write
                 POKE(SD_CTL, 0x57); // Open SD card write gate
-                if (is_multi)
+                if (is_multi) {
                     POKE(SD_CTL, 4);
-                else
+                } else {
                     POKE(SD_CTL, 3);
+                }
             }
             // Show we are doing something
             //	POKE(0x809f,1+(PEEK(0x809f)&0x7f));
         }
 
         write_count++;
-        if (hal_border_flicker > 1)
+        if (hal_border_flicker > 1) {
             VICIV.bordercol = write_count & 0x0f;
+        }
 
         if (!(PEEK(SD_CTL) & 0x67)) {
             write_count++;
 
-            if (hal_border_flicker > 1)
+            if (hal_border_flicker > 1) {
                 VICIV.bordercol = write_count & 0x0f;
+            }
 
             // There is a bug in the SD controller: You have to read between writes, or it
             // gets really upset.
@@ -270,8 +284,9 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
             // VErify that it matches the data we wrote
             for (i = 0; i < 512; i++) {
-                if (sector_buffer[i] != verify_buffer[i])
+                if (sector_buffer[i] != verify_buffer[i]) {
                     break;
+                }
             }
             if (i != 512) {
                 // VErify error has occurred
@@ -286,8 +301,9 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             }
         }
 
-        if (hal_border_flicker > 1)
+        if (hal_border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+        }
     }
 
     //  write_line("Write error @ $$$$$$$$$",2);

@@ -34,14 +34,16 @@ void mega65_serial_monitor_write(char* s) {
 
 char hexchar2(unsigned char v) {
     v = v & 0xf;
-    if (v < 10)
+    if (v < 10) {
         return '0' + v;
+    }
     return 0x41 + v - 10;
 }
 
 void hexout2(char* m, unsigned long v, int n) {
-    if (!n)
+    if (!n) {
         return;
+    }
     do {
         m[n - 1] = hexchar2(v);
         v = v >> 4L;
@@ -68,10 +70,12 @@ void parse_partition_entry(const char i) {
     char id = sector_buffer[offset + 4];
     uint32_t lba_start, lba_size;
 
-    for (j = 0; j < 4; j++)
+    for (j = 0; j < 4; j++) {
         ((char*)&lba_start)[j] = sector_buffer[offset + 8 + j];
-    for (j = 0; j < 4; j++)
+    }
+    for (j = 0; j < 4; j++) {
         ((char*)&lba_size)[j] = sector_buffer[offset + 12 + j];
+    }
 
     switch (id) {
         case 0x0b:
@@ -87,11 +91,13 @@ void parse_partition_entry(const char i) {
             fat_copies = sector_buffer[0x10];
             // hidden sectors @ $01c-$01f
             // sectors per FAT @ $024-$027
-            for (j = 0; j < 4; j++)
+            for (j = 0; j < 4; j++) {
                 ((char*)&sectors_per_fat)[j] = sector_buffer[0x24 + j];
+            }
             // cluster of root directort @ $02c-$02f
-            for (j = 0; j < 4; j++)
+            for (j = 0; j < 4; j++) {
                 ((char*)&root_dir_cluster)[j] = sector_buffer[0x2c + j];
+            }
             // $55 $AA signature @ $1fe-$1ff
 
             // FATs begin at partition + reserved sectors
@@ -154,8 +160,9 @@ unsigned char unbcd(unsigned char in) {
 }
 
 void getrtc(struct M65Tm* tm) {
-    if (!tm)
+    if (!tm) {
         return;
+    }
 
     tm->tm_sec = 0;
     tm->tm_min = 0;
@@ -225,8 +232,9 @@ unsigned long fat32_allocate_cluster(unsigned long cluster) {
     for (fat_sector_num = 0; fat_sector_num < (fat2_sector - fat1_sector); fat_sector_num++) {
         sdcard_readsector(fat1_sector + fat_sector_num);
         for (i = 0; i < 512; i += 4) {
-            if (*(unsigned long*)&sector_buffer[i] == 0)
+            if (*(unsigned long*)&sector_buffer[i] == 0) {
                 break;
+            }
         }
         if (i < 512) {
             // Found new free cluster, so place end-of-chain marker on it
@@ -289,17 +297,21 @@ long fat32_create_contiguous_file(
         for (sn = 0; sn < sectors_per_cluster; sn++) {
             sdcard_readsector(root_dir_sector + ((dir_cluster - 2) * sectors_per_cluster) + sn);
             for (offset = 0; offset < 512; offset += 32) {
-                for (i = 0; i < 8; i++)
+                for (i = 0; i < 8; i++) {
                     message[i] = sector_buffer[offset + i];
+                }
                 len = 8;
-                while (len && (message[len] == ' ' || message[len] == 0))
+                while (len && (message[len] == ' ' || message[len] == 0)) {
                     len--;
+                }
                 message[len++] = '.';
-                for (i = 0; i < 3; i++)
+                for (i = 0; i < 3; i++) {
                     message[len + i] = sector_buffer[offset + 8 + i];
+                }
                 len += 3;
-                while (len && (message[len] == ' ' || message[len] == 0))
+                while (len && (message[len] == ' ' || message[len] == 0)) {
                     len--;
+                }
                 if (!strcmp(message, name)) {
                     // ERROR: Name already exists
                     mega65_serial_monitor_write("File already exists\n");
@@ -319,12 +331,14 @@ long fat32_create_contiguous_file(
                     break;
                 }
             }
-            if (have_dir_slot)
+            if (have_dir_slot) {
                 break;
+            }
         }
         // Stop once we have found a free directory slot
-        if (have_dir_slot)
+        if (have_dir_slot) {
             break;
+        }
 
         // Chain to next directory cluster, and extend directory
         // if required.
@@ -367,21 +381,25 @@ long fat32_create_contiguous_file(
         sdcard_readsector(fat1_sector + fat_sector_num);
 
         // Skip any FAT sectors with allocated clusters
-        for (j = 0; j < 512; j++)
-            if (sector_buffer[j])
+        for (j = 0; j < 512; j++) {
+            if (sector_buffer[j]) {
                 break;
+            }
+        }
         if (j != 512) {
             // Reset count of contiguous clusters
             contiguous_clusters = 0;
             continue;
         } else {
             // Start from here
-            if (!contiguous_clusters)
+            if (!contiguous_clusters) {
                 start_cluster = fat_sector_num * 128;
+            }
             contiguous_clusters += 128;
         }
-        if (contiguous_clusters >= clusters)
+        if (contiguous_clusters >= clusters) {
             break;
+        }
     }
 
     // Abort if the disk is full
@@ -397,8 +415,9 @@ long fat32_create_contiguous_file(
     mega65_serial_monitor_write("Writing FAT sectors for file\r\n");
     fat_sector_num = start_cluster / 128;
     fat_sector_count = clusters / 128;
-    if (clusters & 127)
+    if (clusters & 127) {
         fat_sector_count++;
+    }
     for (k = 0; k <= fat_sector_count; k++) {
         // Fill FAT sector with chain
         for (offset = 0; offset < 512; offset += 4) {
@@ -421,18 +440,21 @@ long fat32_create_contiguous_file(
     mega65_serial_monitor_write("Building directory entry\r\n");
     sdcard_readsector(free_dir_sector_num);
     // Clear entry
-    for (i = 0; i < 32; i++)
+    for (i = 0; i < 32; i++) {
         sector_buffer[free_dir_sector_ofs + i] = 0x00;
+    }
     // Write name
     // Fill name with space
-    for (i = 0; i < 11; i++)
+    for (i = 0; i < 11; i++) {
         sector_buffer[free_dir_sector_ofs + i] = 0x20;
+    }
     // Then overwrite with actual name
     for (i = 0, j = 0; i < 11; i++, j++) {
-        if (name[j] == '.')
+        if (name[j] == '.') {
             i = 7;
-        else
+        } else {
             sector_buffer[free_dir_sector_ofs + i] = name[j];
+        }
     }
     sector_buffer[free_dir_sector_ofs + 0x0b] = 0x20; // Archive bit set
 

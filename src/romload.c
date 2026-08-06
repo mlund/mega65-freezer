@@ -62,20 +62,22 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (SD_STATUS & SD_STATUS_SDHC)
+    if (SD_STATUS & SD_STATUS_SDHC) {
         sdhc_card = 1;
-    else
+    } else {
         sdhc_card = 0;
+    }
 
     setup_menu_screen();
 
     request_freeze_region_list();
 
     // communicate changed ROM by setting specific border color
-    if (do_rom_loader())
+    if (do_rom_loader()) {
         VICIV.bordercol = 0x83;
-    else
+    } else {
         VICIV.bordercol = 0x06;
+    }
 
     mega65_dos_exechelper("FREEZER.M65");
 

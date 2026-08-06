@@ -796,13 +796,15 @@ static void draw_line(PaintFunc pfun) {
     if (g_state.tool_org_y == g_state.cursor_y) // Horizontal
     {
         register uint8_t x = rc.left;
-        while (x <= rc.right)
+        while (x <= rc.right) {
             pfun(x++, g_state.cursor_y);
+        }
     } else if (g_state.tool_org_x == g_state.cursor_x) // Vertical
     {
         register uint8_t y = rc.top;
-        while (y <= rc.bottom)
+        while (y <= rc.bottom) {
             pfun(g_state.cursor_x, y++);
+        }
     } else // Bresenham- algorithm.
     {
         const signed char dx = rc.right - rc.left;
@@ -815,8 +817,9 @@ static void draw_line(PaintFunc pfun) {
 
         for (;;) {
             pfun(x, y);
-            if (x == g_state.cursor_x && y == g_state.cursor_y)
+            if (x == g_state.cursor_x && y == g_state.cursor_y) {
                 break;
+            }
             e2 = e * 2;
             if (e2 >= dy) {
                 e += dy;
@@ -949,12 +952,13 @@ static void draw_multicolor_cell(uint8_t x, uint8_t y) {
     const uint8_t p0 = b & (0x80 >> (2 * (x % 4)));
     const uint8_t p1 = b & (0x40 >> (2 * (x % 4)));
     uint8_t color = g_state.color[COLOR_BACK];
-    if (!p0 && p1)
+    if (!p0 && p1) {
         color = g_state.color[COLOR_MC1];
-    else if (p0 && !p1)
+    } else if (p0 && !p1) {
         color = g_state.color[COLOR_FORE];
-    else if (p0 && p1)
+    } else if (p0 && p1) {
         color = g_state.color[COLOR_MC2];
+    }
 
     gotoxy(g_state.canvas_left_x + (x * g_state.cells_per_pixel), y + 2);
     for (cell = 0; cell < g_state.cells_per_pixel; ++cell) {
@@ -1160,9 +1164,11 @@ static void erase_canvas_space() {
 static void draw_canvas() {
     register uint8_t row;
     register uint8_t col;
-    for (row = g_state.redraw_rect.top; row < g_state.redraw_rect.bottom; ++row)
-        for (col = g_state.redraw_rect.left; col < g_state.redraw_rect.right; ++col)
+    for (row = g_state.redraw_rect.top; row < g_state.redraw_rect.bottom; ++row) {
+        for (col = g_state.redraw_rect.left; col < g_state.redraw_rect.right; ++col) {
             g_state.draw_cell_fn(col, row);
+        }
+    }
 
     if (g_state.tool_active && (g_state.redraw_flags & REDRAW_TOOL_PREVIEW)) {
         blink(1);
@@ -1188,13 +1194,14 @@ void set_redraw_full_canvas(void) {
 }
 
 static void draw_header() {
-    if (g_state.redraw_flags & REDRAW_TOOL_HEADER)
+    if (g_state.redraw_flags & REDRAW_TOOL_HEADER) {
         /* Escape names stay lowercase -- libc matches them by hash -- but the
          * text must be uppercase, because cprintf runs petsciitoscreencode()
          * over it. */
         cprintf((const uint8_t*)"{home}{rvson}{lgrn}                            THE MEGA65 SPRITE "
                                 "EDITOR           "
                                 "                 {rvsoff}");
+    }
 }
 
 static void draw_color_selector() {
@@ -1339,9 +1346,10 @@ static void draw_coordinates() {
 static void draw_sprite_preview_area() {
     register uint8_t i = 0;
     textcolor(g_state.color[COLOR_BACK]);
-    for (i = 0; i < SIDEBAR_PREVIEW_AREA_HEIGHT; ++i)
+    for (i = 0; i < SIDEBAR_PREVIEW_AREA_HEIGHT; ++i) {
         cputncxy(
             SIDEBAR_COLUMN, SIDEBAR_PREVIEW_AREA_TOP + i, SIDEBAR_WIDTH, SOLID_BLOCK_CHARACTER);
+    }
 }
 
 static void draw_sidebar() {
@@ -1549,12 +1557,13 @@ static void main_loop() {
                         joy_delay_countdown = joy_delay_countdown >> 3;
                     }
                     fire_lock = 1;
-                } else
+                } else {
                     fire_lock = 0;
+                }
 
-                if (joy_delay_countdown)
+                if (joy_delay_countdown) {
                     joy_delay_countdown--;
-                else {
+                } else {
                     switch (CIA1.pra & 0xf) {
                         case 0x7: // RIGHT
                             joy_delay_countdown = JOY_DELAY;
@@ -1584,8 +1593,9 @@ static void main_loop() {
         }
         if (!key) {
             if (mouse_clicked()) {
-                if (!fire_lock)
+                if (!fire_lock) {
                     key = 0x20;
+                }
                 fire_lock = 1;
             }
         }
@@ -1685,10 +1695,11 @@ static void main_loop() {
                 put_sprite_data_to_slot();
                 g_state.redraw_flags = REDRAW_SB_ALL;
 
-                if (key == '.' && g_state.sprite_number++ == SPRITE_MAX_COUNT - 1)
+                if (key == '.' && g_state.sprite_number++ == SPRITE_MAX_COUNT - 1) {
                     g_state.sprite_number = 0;
-                else if (key == ',' && g_state.sprite_number-- == 0)
+                } else if (key == ',' && g_state.sprite_number-- == 0) {
                     g_state.sprite_number = SPRITE_MAX_COUNT - 1;
+                }
 
                 update_and_full_redraw(true);
                 g_state.cursor_x = MIN(g_state.sprite_width - 1, g_state.cursor_x);

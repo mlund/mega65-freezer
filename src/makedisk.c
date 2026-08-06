@@ -79,10 +79,12 @@ void write_text(unsigned char x1, unsigned char y1, unsigned char colour, const 
     unsigned char ofs = 0, x, c;
     for (x = x1; t[x - x1]; x++) {
         c = t[x - x1];
-        if (c > 0x60)
+        if (c > 0x60) {
             c -= 0x60;
-        if (c > 0x40)
+        }
+        if (c > 0x40) {
             c -= 0x40;
+        }
         lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 0, c);
         lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 1, 0);
         lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + x * 2 + 0, 0x00);
@@ -125,8 +127,9 @@ void input_text(
                     // end of line, and allow cursor left and right
                     lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, ' ');
                     lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
-                    if (ofs)
+                    if (ofs) {
                         ofs--;
+                    }
                     lpoke(SCREEN_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 0, ' ');
                     lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour);
                     break;
@@ -142,8 +145,9 @@ void input_text(
                     break;
             }
         }
-        if (c)
+        if (c) {
             ASCIIKEY = 0;
+        }
     }
 }
 
@@ -169,8 +173,9 @@ unsigned char bam_sector1[0x100] = {
 // clang-format on
 
 unsigned char to_hex(unsigned char i) {
-    if (i < 10)
+    if (i < 10) {
         return '0' + i;
+    }
     return 0x41 + i - 10;
 }
 
@@ -178,8 +183,9 @@ void format_disk_image(unsigned long file_sector, char* diskname, unsigned char 
     unsigned char i;
     unsigned short s;
     unsigned short sect_count = D81_TRACKS * D81_SECTORS_PER_TRACK;
-    if (is_d65)
+    if (is_d65) {
         sect_count = 85 * 64;
+    }
 
     // Make sure entire image is empty
     clear_sector_buffer();
@@ -199,8 +205,9 @@ void format_disk_image(unsigned long file_sector, char* diskname, unsigned char 
     // Diskname
     lcopy((long)diskname, (long)&sector_buffer[4], 16);
     if (strlen(diskname) < 16) {
-        for (i = strlen(diskname); i < 16; i++)
+        for (i = strlen(diskname); i < 16; i++) {
             sector_buffer[4 + i] = 0xa0;
+        }
     }
 
     sector_buffer[0x14] = 0xa0;
@@ -226,10 +233,11 @@ void format_disk_image(unsigned long file_sector, char* diskname, unsigned char 
     sector_buffer[0x104] = to_hex(i & 0xf);
     sector_buffer[0x105] = to_hex(i >> 4);
 
-    if (!is_d65)
+    if (!is_d65) {
         sdcard_writesector(file_sector + (39 * 10 * 2 + 0), 0);
-    else
+    } else {
         sdcard_writesector(file_sector + (39 * 64 * 2 + 0), 0);
+    }
 
     clear_sector_buffer();
     lcopy((long)bam_sector1, (long)sector_buffer, 0x100);
@@ -244,10 +252,11 @@ void format_disk_image(unsigned long file_sector, char* diskname, unsigned char 
     sector_buffer[0x0FA] = 40;
     sector_buffer[0x0FB] = 0xff;
 
-    if (!is_d65)
+    if (!is_d65) {
         sdcard_writesector(file_sector + (39 * 10 * 2 + 1), 0);
-    else
+    } else {
         sdcard_writesector(file_sector + (39 * 64 * 2 + 1), 0);
+    }
 }
 
 void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
@@ -261,26 +270,29 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
     if (!fat1_sector) {
         draw_box(10, 8, 30, 13, 2, 1);
         write_text(11, 9, 7, "COULD NOT FIND SD CARD");
-        while (!ASCIIKEY)
-            continue;
+        while (!ASCIIKEY) {
+        }
         ASCIIKEY = 0;
         return;
     }
 
     draw_box(10, 8, 30, 14, 14, 1);
     write_text(11, 9, 14, "ENTER NAME FOR");
-    if (is_d65)
+    if (is_d65) {
         write_text(11, 10, 14, "HD (D65) IMAGE:");
-    else
+    } else {
         write_text(11, 10, 14, "DD (D81) IMAGE:");
+    }
     input_text(11, 12, 8, 1, filename);
     for (filename_len = 0; filename[filename_len]; filename_len++) {
         // Convert to upper case and work out length of string
-        if (filename[filename_len] >= 0x61 && filename[filename_len] <= 0x7a)
+        if (filename[filename_len] >= 0x61 && filename[filename_len] <= 0x7a) {
             filename[filename_len] -= 0x20;
+        }
     }
-    if (!filename_len)
+    if (!filename_len) {
         return;
+    }
 
     // Copy filename into diskname before it gets extended by the filename extension
     strcpy(diskname, filename);
@@ -312,8 +324,8 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
         draw_box(10, 8, 30, 14, 2, 1);
         write_text(11, 9, 2, "Error creating file");
         write_text(11, 12, 1, "Press almost any key...");
-        while (!ASCIIKEY)
-            continue;
+        while (!ASCIIKEY) {
+        }
         ASCIIKEY = 0;
     } else {
         // File creation succeeded
@@ -332,8 +344,8 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
 
         write_text(9, 12, 1, "Press almost any key...");
 
-        while (!ASCIIKEY)
-            continue;
+        while (!ASCIIKEY) {
+        }
         ASCIIKEY = 0;
     }
 }
@@ -376,10 +388,11 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (SD_STATUS & SD_STATUS_SDHC)
+    if (SD_STATUS & SD_STATUS_SDHC) {
         sdhc_card = 1;
-    else
+    } else {
         sdhc_card = 0;
+    }
 
     setup_menu_screen();
 

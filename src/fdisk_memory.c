@@ -52,8 +52,9 @@ __attribute__((noinline)) void do_dma(void) {
 
 __attribute__((noinline)) void lcopy(
     Addr28 source_address, Addr28 destination_address, unsigned int count) {
-    if (!count)
+    if (!count) {
         return;
+    }
     dmalist.option_0b = 0x0b;
     dmalist.option_80 = 0x80;
     dmalist.source_mb = source_address >> 20;
@@ -66,20 +67,23 @@ __attribute__((noinline)) void lcopy(
     dmalist.sub_cmd = 0;
     dmalist.source_addr = source_address & 0xffff;
     dmalist.source_bank = (source_address >> 16) & 0x0f;
-    if (source_address >= 0xd000 && source_address < 0xe000)
+    if (source_address >= 0xd000 && source_address < 0xe000) {
         dmalist.source_bank |= 0x80;
+    }
     dmalist.dest_addr = destination_address & 0xffff;
     dmalist.dest_bank = (destination_address >> 16) & 0x0f;
-    if (destination_address >= 0xd000 && destination_address < 0xe000)
+    if (destination_address >= 0xd000 && destination_address < 0xe000) {
         dmalist.dest_bank |= 0x80;
+    }
 
     do_dma();
 }
 
 __attribute__((noinline)) void lfill(
     Addr28 destination_address, unsigned char value, unsigned int count) {
-    if (!count)
+    if (!count) {
         return;
+    }
     dmalist.option_0b = 0x0b;
     dmalist.option_80 = 0x80;
     dmalist.source_mb = 0x00;
@@ -93,8 +97,9 @@ __attribute__((noinline)) void lfill(
     dmalist.source_addr = value;
     dmalist.dest_addr = destination_address & 0xffff;
     dmalist.dest_bank = (destination_address >> 16) & 0x0f;
-    if (destination_address >= 0xd000 && destination_address < 0xe000)
+    if (destination_address >= 0xd000 && destination_address < 0xe000) {
         dmalist.dest_bank |= 0x80;
+    }
 
     do_dma();
 }

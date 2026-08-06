@@ -235,8 +235,9 @@ void draw_thumbnail(void) {
     }
 
     // Pick colours of all pixels in the thumbnail
-    for (j = 0; j < 4096; j++)
+    for (j = 0; j < 4096; j++) {
         thumbnail_buffer[j] = colour_table[thumbnail_buffer[j]];
+    }
     // Fix column 0 of pixels
     yoffset = 0;
     for (j = 0; j < 49; j++) {
@@ -254,8 +255,9 @@ void draw_thumbnail(void) {
             // PGS Optimise here
 
             j = 8;
-            if (x == 72)
+            if (x == 72) {
                 j = 2;
+            }
 
             lcopy(
                 (unsigned long)&thumbnail_buffer[x + yoffset], 0x50000L + xoffset + yoffset_out, j);
@@ -293,8 +295,9 @@ void predraw_freeze_menu(void)
   for (i = 40; i < 80; i += 2) {
     lpoke(0xff80000 + 21 * SCREEN_ROW_BYTES + 1 + i, 0xe);
     lpoke(0xff80000 + 24 * SCREEN_ROW_BYTES + 1 + i, 0xe);
-    if (i > 50) // ROM VERSION
+    if (i > 50) { // ROM VERSION
       lpoke(0xff80000 + 15 * SCREEN_ROW_BYTES + 1 + i, 0xf);
+}
   }
 
   // Clear 16-bit text mode screen using DMA copy to copy the
@@ -325,16 +328,18 @@ void copy_convert_to_screen(const unsigned char* data, short offset) {
     unsigned short i;
     offset <<= 1;
 
-    for (i = 0; data[i]; i++)
+    for (i = 0; data[i]; i++) {
         if (data[i] != '~') { // skip thumb area
-            if ((data[i] >= 'A') && (data[i] <= 'Z'))
+            if ((data[i] >= 'A') && (data[i] <= 'Z')) {
                 POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i] - 0x40);
-            else if ((data[i] >= 'a') && (data[i] <= 'z'))
+            } else if ((data[i] >= 'a') && (data[i] <= 'z')) {
                 POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i] - 0x20);
-            else
+            } else {
                 POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i]);
+            }
             POKE(SCREEN_ADDRESS + i * 2 + 1 + offset, 0);
         }
+    }
 }
 
 void draw_freeze_menu(unsigned char part) {
@@ -366,8 +371,9 @@ void draw_freeze_menu(unsigned char part) {
             lcopy((unsigned long)freeze_menu_bar,
                 (unsigned long)&freeze_menu[LOAD_RESUME_OFFSET],
                 40);
-            if (rom_changed)
+            if (rom_changed) {
                 lfill((unsigned long)&freeze_menu[LOAD_RESUME_OFFSET], ' ', 9);
+            }
 
             // Display "- PAUSED STATE -"
             lcopy((unsigned long)" - PAUSED STATE -   ",
@@ -376,10 +382,11 @@ void draw_freeze_menu(unsigned char part) {
         }
 
         // CPU MODE
-        if (freeze_peek(0xffd367dL) & 0x20)
+        if (freeze_peek(0xffd367dL) & 0x20) {
             lcopy((unsigned long)"  4502", (unsigned long)&freeze_menu[CPU_MODE_OFFSET], 6);
-        else
+        } else {
             lcopy((unsigned long)"  AUTO", (unsigned long)&freeze_menu[CPU_MODE_OFFSET], 6);
+        }
 
         // Joystick 1/2 swap
         lcopy((unsigned long)((PEEK(0xd612L) & 0x20) ? "YES" : " NO"),
@@ -391,15 +398,17 @@ void draw_freeze_menu(unsigned char part) {
             (unsigned long)&freeze_menu[CART_ENABLE_OFFSET],
             3);
 
-        if (freeze_peek(0xFFD3054L) & 0x20) // PALEMU
+        if (freeze_peek(0xFFD3054L) & 0x20) { // PALEMU
             lcopy((unsigned long)" ON", (unsigned long)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
-        else // PAL50
+        } else { // PAL50
             lcopy((unsigned long)"OFF", (unsigned long)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
+        }
 
-        if (freeze_peek(0xffd306fL) & 0x80) // NTSC60
+        if (freeze_peek(0xffd306fL) & 0x80) { // NTSC60
             lcopy((unsigned long)"NTSC60", (unsigned long)&freeze_menu[VIDEO_MODE_OFFSET], 6);
-        else // PAL50
+        } else { // PAL50
             lcopy((unsigned long)" PAL50", (unsigned long)&freeze_menu[VIDEO_MODE_OFFSET], 6);
+        }
     }
 
     // ROM version
@@ -409,7 +418,7 @@ void draw_freeze_menu(unsigned char part) {
     */
 
     // CPU frequency
-    if (part & UPDATE_FREQ)
+    if (part & UPDATE_FREQ) {
         switch (detect_cpu_speed()) {
             case 1:
                 lcopy((unsigned long)"  1", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
@@ -427,9 +436,11 @@ void draw_freeze_menu(unsigned char part) {
                 lcopy((unsigned long)"???", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
                 break;
         }
+    }
 
-    if ((part & UPDATE_PROCESS) || (part & UPDATE_THUMB))
+    if ((part & UPDATE_PROCESS) || (part & UPDATE_THUMB)) {
         detect_rom();
+    }
 
     /* Display info from the process descriptor
        The useful bits are:
@@ -455,17 +466,20 @@ void draw_freeze_menu(unsigned char part) {
         screen_decimal((unsigned long)&freeze_menu[PROCESS_ID_OFFSET], process_descriptor.task_id);
 
         // Process name: only display if no unprintable PETSCII chars
-        for (i = 0; i < 16; i++)
-            if ((process_descriptor.process_name[i] & 0x7f) < 0x20)
+        for (i = 0; i < 16; i++) {
+            if ((process_descriptor.process_name[i] & 0x7f) < 0x20) {
                 break;
-        if (i == 16)
+            }
+        }
+        if (i == 16) {
             lcopy((unsigned long)process_descriptor.process_name,
                 (unsigned long)&freeze_menu[PROCESS_NAME_OFFSET],
                 16);
-        else
+        } else {
             lcopy((unsigned long)"UNNAMED TASK    ",
                 (unsigned long)&freeze_menu[PROCESS_NAME_OFFSET],
                 16);
+        }
 
         lcopy((unsigned long)mega65_rom_name, (unsigned long)&freeze_menu[PROCESS_ROM_OFFSET], 11);
     }
@@ -482,9 +496,11 @@ void draw_freeze_menu(unsigned char part) {
 
         if ((process_descriptor.d81_image0_flags & PD_IMGFLAGS_MOUNTED) &&
             process_descriptor.d81_image0_namelen) {
-            for (i = 0; i < process_descriptor.d81_image0_namelen; i++)
-                if (!process_descriptor.d81_image0_name[i])
+            for (i = 0; i < process_descriptor.d81_image0_namelen; i++) {
+                if (!process_descriptor.d81_image0_name[i]) {
                     break;
+                }
+            }
             if (i == process_descriptor.d81_image0_namelen) {
                 topetsciiupper(
                     process_descriptor.d81_image0_name, process_descriptor.d81_image0_namelen);
@@ -506,9 +522,11 @@ void draw_freeze_menu(unsigned char part) {
 
         if ((process_descriptor.d81_image1_flags & PD_IMGFLAGS_MOUNTED) &&
             process_descriptor.d81_image1_namelen) {
-            for (i = 0; i < process_descriptor.d81_image1_namelen; i++)
-                if (!process_descriptor.d81_image1_name[i])
+            for (i = 0; i < process_descriptor.d81_image1_namelen; i++) {
+                if (!process_descriptor.d81_image1_name[i]) {
                     break;
+                }
+            }
             if (i == process_descriptor.d81_image1_namelen) {
                 topetsciiupper(
                     process_descriptor.d81_image1_name, process_descriptor.d81_image1_namelen);
@@ -530,8 +548,8 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     // wait till raster leaves screen
-    while (VICIV.rasterline < 0xf8)
-        continue;
+    while (VICIV.rasterline < 0xf8) {
+    }
 
     // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
     // (in fact, most of memory contains what the frozen program had. Only our freezer program
@@ -557,10 +575,11 @@ void draw_freeze_menu(unsigned char part) {
                 thumb_frame = F_C65;
                 break;
             case MEGA65_ROM_M65:
-                if (detect_cpu_speed() == 1)
+                if (detect_cpu_speed() == 1) {
                     thumb_frame = F_C64;
-                else
+                } else {
                     thumb_frame = F_M65;
+                }
                 break;
             case MEGA65_ROM_OPENROM:
             default:
@@ -572,8 +591,9 @@ void draw_freeze_menu(unsigned char part) {
         if (!not_in_root &&
             thumb_frame != last_thumb_frame) { // only load a frame if we are in the root
             while (thumb_frame > -1) {
-                if (!read_file_from_sdcard(thumb_frame_name[thumb_frame], 0x052000L))
+                if (!read_file_from_sdcard(thumb_frame_name[thumb_frame], 0x052000L)) {
                     break;
+                }
                 // fall through to next lower thumb image
                 thumb_frame--;
             }
@@ -598,10 +618,11 @@ void draw_freeze_menu(unsigned char part) {
                 for (x = 0; x < 19; x++) {
                     tile_num = (unsigned short*)(SCREEN_ADDRESS + (13 * SCREEN_ROW_BYTES) +
                         (y * SCREEN_ROW_BYTES) + (x << 1));
-                    if (*tile_num)
+                    if (*tile_num) {
                         (*tile_num) += tile_offset;
-                    else
+                    } else {
                         *tile_num = 0x20;
+                    }
                 }
             }
             thumb_xoff = lpeek(0x52020L);
@@ -618,7 +639,7 @@ void draw_freeze_menu(unsigned char part) {
         // This sits in the region below the menu where we will also have left and right arrows,
         // the program name etc, so you can easily browse through the freeze slots.
         draw_thumbnail();
-        for (x = 0; x < 9; x++)
+        for (x = 0; x < 9; x++) {
             for (y = 0; y < 6; y++) {
                 POKE(SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) + ((thumb_xoff + x) * 2) +
                         ((thumb_yoff + y) * SCREEN_ROW_BYTES) + 0,
@@ -627,6 +648,7 @@ void draw_freeze_menu(unsigned char part) {
                         ((thumb_yoff + y) * SCREEN_ROW_BYTES) + 1,
                     0x14); // $50000 base address
             }
+        }
     }
 
     // restore border colour (fdisk/sd stuff still twiddles with it)
@@ -636,8 +658,9 @@ void draw_freeze_menu(unsigned char part) {
 void topetsciiupper(char* str, int len) {
     int i;
     for (i = 0; i < len; i++) {
-        if (str[i] >= 0x60 && str[i] < 0x7a)
+        if (str[i] >= 0x60 && str[i] < 0x7a) {
             str[i] &= 0x5f;
+        }
     }
 }
 
@@ -810,10 +833,11 @@ void change_mounted_disk_image(int diskid) {
     char* ret;
     ret = freeze_select_disk_image(diskid);
     if (ret) {
-        if (hdos_new_attach)
+        if (hdos_new_attach) {
             copy_imageproc_to_freezeregion(diskid, 0);
-        else
+        } else {
             old_store_selected_disk_image(diskid, ret);
+        }
     }
 
     predraw_freeze_menu();
@@ -867,35 +891,40 @@ void fix_chargen_area(unsigned char flags) {
     // debug_region_list();
 
     if (!(flags & CHARGEN_NOCHECK)) {
-        if (!freeze_fetch_sector(CHARGEN_ADDRESS, NULL))
+        if (!freeze_fetch_sector(CHARGEN_ADDRESS, NULL)) {
             // check if everything is zero
-            for (i = 0; i < 512 && !sector_buffer[i]; i++)
+            for (i = 0; i < 512 && !sector_buffer[i]; i++) {
                 ;
-        else
+            }
+        } else {
             // error while reading sector (old core?)
             i = (flags & CHARGEN_FORCE) ? 512 : 0;
+        }
     }
 
     // if first chargen sector was zero...
     if (i == 512) {
         charset_start = -1;
         // try to load DEFAULT_CHARSET or MEGA65.ROM
-        if (!read_file_from_sdcard(DEFAULT_CHARSET, 0x40000L))
+        if (!read_file_from_sdcard(DEFAULT_CHARSET, 0x40000L)) {
             charset_start = 0x40000L;
-        else if (!read_file_from_sdcard(MAIN_ROM_FILE, 0x40000L))
+        } else if (!read_file_from_sdcard(MAIN_ROM_FILE, 0x40000L)) {
             charset_start = 0x4D000L;
+        }
 
         if (charset_start != -1) {
             // copy the font to chargen WOM directly
-            if (flags & CHARGEN_FIXMEM)
+            if (flags & CHARGEN_FIXMEM) {
                 lcopy(charset_start, CHARGEN_ADDRESS, 4096);
+            }
 
             // should we also fix the slot?
-            if (flags & CHARGEN_FIXSLOT)
+            if (flags & CHARGEN_FIXSLOT) {
                 for (i = 0; i < 8; i++) {
                     lcopy(charset_start + 512L * i, (long)sector_buffer, 512);
                     freeze_store_sector(CHARGEN_ADDRESS + 512L * i, NULL);
                 }
+            }
         } else {
             // failed to load font, flash screen
             VICIV.bordercol = 2;
@@ -914,8 +943,9 @@ void start_freezer_tool(char* toolfile) {
         copy_convert_to_screen(freeze_root_warn, TOOLS_MENU_OFFSET);
 
         while (!start_tool) {
-            while (!(x = ASCIIKEY))
+            while (!(x = ASCIIKEY)) {
                 ;
+            }
             ASCIIKEY = 0;
             switch (x) {
                 case 'y':
@@ -953,8 +983,9 @@ int main(void) {
     // C65 UART, ethernet etc
 
     // check border for return codes from other helpers
-    if (VICIV.bordercol == 0x83)
+    if (VICIV.bordercol == 0x83) {
         rom_changed = 1;
+    }
 
     // Bank out BASIC ROM, leave KERNAL and IO in
     POKE(0x00, 0x3F);
@@ -1001,10 +1032,11 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (SD_STATUS & SD_STATUS_SDHC)
+    if (SD_STATUS & SD_STATUS_SDHC) {
         sdhc_card = 1;
-    else
+    } else {
         sdhc_card = 0;
+    }
 
     request_freeze_region_list();
 
@@ -1018,10 +1050,12 @@ int main(void) {
     // drive mounted
     if (hdos_new_attach) {
         drive_state = lpeek(0xFFD36A1);
-        if (drive_state & 0x1)
+        if (drive_state & 0x1) {
             copy_imageproc_to_freezeregion(0, 1);
-        if (drive_state & 0x2)
+        }
+        if (drive_state & 0x2) {
             copy_imageproc_to_freezeregion(1, 1);
+        }
     } else {
         // for old HDOS < 1.3 we need to fix image RW flag,
         // and override the flags for drive / no disk
@@ -1039,8 +1073,9 @@ int main(void) {
     draw_freeze_menu(UPDATE_ALL);
 
     // Flush input buffer
-    while (ASCIIKEY)
+    while (ASCIIKEY) {
         ASCIIKEY = 0;
+    }
 
     // Ensure correct keyboard DDR etc
     CIA1.pra = 0xFF;
@@ -1050,9 +1085,10 @@ int main(void) {
     while (1) {
         unsigned char c = ASCIIKEY;
 
-        if (c)
+        if (c) {
             // Flush char from input buffer
             ASCIIKEY = 0;
+        }
 #ifdef WITH_JOYSTICK
         // Joystick Support is old and needs to be overhauled!
         if (!c)
@@ -1065,7 +1101,7 @@ int main(void) {
 #endif
 
         // Process char
-        if (c)
+        if (c) {
             switch (c) {
                 case 0x13: // Home
                     if (slot_number) {
@@ -1081,8 +1117,9 @@ int main(void) {
                     slot_number -= 9;
                 case 0x9D: // Cursor left
                     slot_number--;
-                    if (slot_number >= get_freeze_slot_count()) // unsigned!
+                    if (slot_number >= get_freeze_slot_count()) { // unsigned!
                         slot_number = get_freeze_slot_count() - 1;
+                    }
 
                     draw_freeze_menu(
                         UPDATE_TOP | UPDATE_PROCESS | UPDATE_DISK | UPDATE_THUMB | UPDATE_CHGSLOT);
@@ -1093,8 +1130,9 @@ int main(void) {
                     slot_number += 9;
                 case 0x1D: // Cursor right
                     slot_number++;
-                    if (slot_number >= get_freeze_slot_count())
+                    if (slot_number >= get_freeze_slot_count()) {
                         slot_number = 0;
+                    }
 
                     draw_freeze_menu(
                         UPDATE_TOP | UPDATE_PROCESS | UPDATE_DISK | UPDATE_THUMB | UPDATE_CHGSLOT);
@@ -1143,10 +1181,11 @@ int main(void) {
 
                 case 'F':
                 case 'f': // Change CPU speed
-                    if (next_cpu_speed())
+                    if (next_cpu_speed()) {
                         draw_freeze_menu(UPDATE_FREQ | UPDATE_THUMB);
-                    else
+                    } else {
                         draw_freeze_menu(UPDATE_FREQ);
+                    }
                     break;
 
                 case 'V':
@@ -1233,8 +1272,9 @@ int main(void) {
 
                 case 0xf5: // F5 = Reset
                     // reset only works for slot 0!
-                    if (slot_number != 0)
+                    if (slot_number != 0) {
                         goto invalid_function;
+                    }
                     // Set C64 memory map, PC to reset vector and resume
                     freeze_poke(0xFFD3640U + 8, freeze_peek(0x2FFFCL));
                     freeze_poke(0xFFD3640U + 9, freeze_peek(0x2FFFDL));
@@ -1244,16 +1284,18 @@ int main(void) {
                     // disable interrupts, clear decimal mode
                     freeze_poke(0xFFD3640U + 0x07, 0xe7);
                     // Clear memory mapping
-                    for (c = 0x0a; c <= 0x0f; c++)
+                    for (c = 0x0a; c <= 0x0f; c++) {
                         freeze_poke(0xFFD3640U + c, 0);
+                    }
                     // Turn off extended graphics mode, only keep palemu
                     freeze_poke(0xFFD3054U, freeze_peek(0xFFD3054U) & 0x20);
                     // fall through
                 case 0xf3: // F3 = resume
                 case 0xf4: // RESUME even if ROM changed
                     // if rom changed, slot 0 resume is disabled, reset is required
-                    if (c == 0xf3 && slot_number == 0 && rom_changed)
+                    if (c == 0xf3 && slot_number == 0 && rom_changed) {
                         goto invalid_function;
+                    }
                     // Doesn't seem to really help (probably needs to be done by the hypervisor
                     // unfreezing routine?)
                     POKE(0xD689, orig_d689);
@@ -1373,6 +1415,7 @@ int main(void) {
                     VICIV.screencol = 6;
                     break;
             }
+        }
     }
 
     return 0;

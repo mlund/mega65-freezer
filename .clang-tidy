@@ -15,6 +15,7 @@ Checks: >
   portability-*,
   readability-identifier-naming,
   readability-inconsistent-declaration-parameter-name,
+  readability-braces-around-statements,
   readability-misleading-indentation,
   readability-non-const-parameter,
   readability-redundant-control-flow,
@@ -29,7 +30,6 @@ Checks: >
   -bugprone-signed-bitwise,
   -bugprone-implicit-widening-of-multiplication-result,
   -bugprone-narrowing-conversions,
-  -misc-no-recursion,
   -misc-use-anonymous-namespace,
   -misc-include-cleaner,
   -misc-use-internal-linkage,
@@ -74,6 +74,11 @@ CheckOptions:
   readability-identifier-naming.LocalConstantPointerCase: lower_case
   readability-identifier-naming.ConstantParameterCase: lower_case
   readability-identifier-naming.ConstantMemberCase: lower_case
+
+# misc-no-recursion was excluded here as "nothing here recurses, and it fires through the SDK's
+# templates". Both had stopped being true: the header filter now keeps the SDK out, and the check
+# was the one thing that would have caught report_unmapped() calling itself. It reports zero on
+# this tree, so it costs nothing to keep enforced.
 
 # Why each exclusion:
 #
@@ -123,9 +128,6 @@ CheckOptions:
 #       copy(source, destination, count) and fill(destination, value, count) mirror the DMA
 #       controller's own argument order. Renaming or wrapping them to satisfy the check would put
 #       this code further from the hardware it describes, not closer.
-#
-#   misc-no-recursion
-#       Nothing here recurses, but the check also fires through the SDK's templates.
 #
 #   misc-use-anonymous-namespace
 #       `static` at file scope is what the llvm-mos optimisation guide asks for, and it is what

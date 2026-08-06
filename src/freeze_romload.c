@@ -105,50 +105,60 @@ char draw_directory_entry(unsigned char screen_row) {
     char invalid = 0;
     unsigned char i, c;
     // Skip first 5 bytes
-    for (i = 0; i < 2; i++)
+    for (i = 0; i < 2; i++) {
         (void)F011_DATA;
+    }
     type = F011_DATA;
-    if (!(type & 0xf))
+    if (!(type & 0xf)) {
         invalid = 1;
-    for (i = 0; i < 2; i++)
+    }
+    for (i = 0; i < 2; i++) {
         (void)F011_DATA;
+    }
     // Then draw the 16 chars with quotes
     POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2), '"');
     for (i = 0; i < 16; i++) {
         c = F011_DATA;
-        if (!c)
+        if (!c) {
             invalid = 1;
+        }
         if (firsta0 && (c == 0xa0)) {
             POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2), 0x22);
             firsta0 = 0;
         } else {
-            if (c >= 'A' && c <= 'Z')
+            if (c >= 'A' && c <= 'Z') {
                 c &= 0x1f;
-            if (c >= 'a' && c <= 'z')
+            }
+            if (c >= 'a' && c <= 'z') {
                 c &= 0x1f;
+            }
             POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2), c & 0x7f);
         }
     }
     if (firsta0) {
         POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (38 * 2), '"');
     }
-    if (type & 0x40)
+    if (type & 0x40) {
         POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '<');
+    }
     // Parses as `(!type) & 0xf0`, which is always 0, so the '*' never draws.
     // Left as-is on purpose: the cc65 original has the identical line, and
     // correcting it changes what the user sees.  See TODO.md section 2 -- it
     // wants fixing here and upstream together, not silently diverging here.
-    if (!type & 0xf0) // NOLINT(clang-diagnostic-logical-not-parentheses)
+    if (!type & 0xf0) { // NOLINT(clang-diagnostic-logical-not-parentheses)
         POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '*');
+    }
 
     // Read the rest of the entry to advance buffer pointer nicely
-    for (i = 0; i < 11; i++)
+    for (i = 0; i < 11; i++) {
         (void)F011_DATA;
+    }
 
     if (invalid) {
         // Erase whatever we drew
-        for (i = 21; i < 40; i++)
+        for (i = 21; i < 40; i++) {
             POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (i * 2), ' ');
+        }
     } else {
         lcopy((unsigned long)dir_line_colour,
             COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2),
@@ -200,10 +210,11 @@ void draw_file_list(void) {
             lcopy(0x40000U + ((display_offset + i) << 6), (unsigned long)name, 64);
 
             for (x = 0; x < 32; x++) {
-                if ((name[x] >= 'A' && name[x] <= 'Z') || (name[x] >= 'a' && name[x] <= 'z'))
+                if ((name[x] >= 'A' && name[x] <= 'Z') || (name[x] >= 'a' && name[x] <= 'z')) {
                     POKE(addr + (x << 1), name[x] & 0x1f);
-                else
+                } else {
                     POKE(addr + (x << 1), name[x]);
+                }
             }
         }
         /*    else {
@@ -237,8 +248,9 @@ void scan_directory(void) {
 
         x = strlen(dirent->d_name);
         // only accept 32 characters max!
-        if (x > 32)
+        if (x > 32) {
             goto next_entry;
+        }
 
         // check DIR attribute of dirent
         if (dirent->d_type & 0x10) {
@@ -247,15 +259,17 @@ void scan_directory(void) {
             if (strcmp(dirent->d_name, ".") != 0) {
                 // keep directories at the top, and
                 // always put ROMS dir at the very top
-                if (!strcmp(dirent->d_name, "ROMS"))
+                if (!strcmp(dirent->d_name, "ROMS")) {
                     dir_pos = 0;
-                else
+                } else {
                     dir_pos = last_dir + 1;
+                }
                 if (file_count && dir_pos != file_count) {
-                    for (i = file_count - 1; i >= dir_pos; i--)
+                    for (i = file_count - 1; i >= dir_pos; i--) {
                         lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(i),
                             DIR_NAME_BUF + 0x40 + DIR_ENTRY_INDEX(i),
                             64); // can't reverse copy!
+                    }
                 }
                 lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(dir_pos), ' ', 64);
                 lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + 1 + DIR_ENTRY_INDEX(dir_pos), x);
@@ -312,21 +326,24 @@ unsigned char freeze_load_romarea(void) {
     POKE(SCREEN_ADDRESS + 3, 0);
     lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 40 * 2 * 25 - 4);
 
-    for (x = 0; reading_disk_list_message[x]; x++)
+    for (x = 0; reading_disk_list_message[x]; x++) {
         POKE(SCREEN_ADDRESS + 12 * 40 * 2 + (9 * 2) + (x * 2), reading_disk_list_message[x] & 0x3f);
+    }
 
     scan_directory();
 
     // If we didn't find any disk images, then just return
-    if (!file_count)
+    if (!file_count) {
         return 0;
+    }
 
     // Okay, we have some disk images, now get the user to pick one!
     draw_file_list();
     while (1) {
         x = ASCIIKEY;
-        if (x)
+        if (x) {
             ASCIIKEY = 0;
+        }
 
 #ifdef WITH_JOYSTICK
         if (!x) {
@@ -360,12 +377,13 @@ unsigned char freeze_load_romarea(void) {
                     (unsigned long)rom_name_return,
                     32);
                 // Then null terminate it
-                for (x = 31; x; x--)
+                for (x = 31; x; x--) {
                     if (rom_name_return[x] == ' ') {
                         rom_name_return[x] = 0;
                     } else {
                         break;
                     }
+                }
 
                 // Is it a directory?
                 if (rom_name_return[0] == '/') {
@@ -421,12 +439,13 @@ unsigned char freeze_load_romarea(void) {
                         freeze_slot_start_sector =
                             read_freeze_slot_start_sector(0); // we only work on slot 0!
 
-                        if (freeze_region_flags & FREEZE_REGION_HAS_CHARGEN)
+                        if (freeze_region_flags & FREEZE_REGION_HAS_CHARGEN) {
                             // only put that into the slot, if HYPPO supports it!
                             for (i = 0; i < 8; i++) {
                                 lcopy(0x40000L + 512L * i, (long)sector_buffer, 512);
                                 freeze_store_sector(CHARGEN_ADDRESS + 512L * i, NULL);
                             }
+                        }
 
                         // set or reset TALL character bit depending on charset extension
                         if (!strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".TCR")) {
@@ -459,32 +478,39 @@ unsigned char freeze_load_romarea(void) {
                 selection_number += 22;
             case 0x11: // Cursor down, one down
                 selection_number++;
-                if (selection_number >= file_count)
+                if (selection_number >= file_count) {
                     selection_number = file_count - 1;
+                }
                 break;
             case 0x9d: // Cursor left, prev page
                 selection_number -= 22;
             case 0x91: // Cursor up, one up
                 selection_number--;
-                if (selection_number < 0)
+                if (selection_number < 0) {
                     selection_number = 0;
+                }
                 break;
             default:
                 break;
         }
 
         // Adjust display position
-        if (selection_number < display_offset)
+        if (selection_number < display_offset) {
             display_offset = selection_number;
-        if (selection_number > (display_offset + 22))
+        }
+        if (selection_number > (display_offset + 22)) {
             display_offset = selection_number - 22;
-        if (display_offset > (file_count - 22))
+        }
+        if (display_offset > (file_count - 22)) {
             display_offset = file_count - 22;
-        if (display_offset < 0)
+        }
+        if (display_offset < 0) {
             display_offset = 0;
+        }
 
-        if (x)
+        if (x) {
             draw_file_list();
+        }
     }
 
     return 0;
@@ -500,8 +526,9 @@ void user_reset_prompt(void) {
 
     while (x != 'Y' && x != 'y' && x != 'N' && x != 'n') {
         x = ASCIIKEY;
-        if (x)
+        if (x) {
             ASCIIKEY = 0;
+        }
 
 #ifdef WITH_JOYSTICK
         if (!x) {
@@ -528,14 +555,16 @@ void user_reset_prompt(void) {
         // disable interrupts, clear decimal mode
         freeze_poke(0xFFD3640U + 0x07, 0xe7);
         // Clear memory mapping
-        for (x = 0x0a; x <= 0x0f; x++)
+        for (x = 0x0a; x <= 0x0f; x++) {
             freeze_poke(0xFFD3640U + x, 0);
+        }
         // Turn off extended graphics mode, only keep palemu
         freeze_poke(0xFFD3054U, freeze_peek(0xFFD3054U) & 0x20);
         unfreeze_slot(0);
 
-        while (1)
+        while (1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+        }
     }
 }
 

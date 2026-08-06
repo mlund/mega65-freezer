@@ -23,8 +23,8 @@ static inline uint32_t hw_div32(uint32_t a, uint32_t b) {
     MATH.multina32 = a;
     MATH.multinb32 = b;
     __asm__ volatile("" ::: "memory");
-    while (MATHBUSY & MATH_DIVBUSY)
-        continue;
+    while (MATHBUSY & MATH_DIVBUSY) {
+    }
     return MATH.divout_whole32;
 }
 
@@ -32,8 +32,9 @@ static inline uint32_t hw_div32(uint32_t a, uint32_t b) {
 // this costs no second division.
 static inline uint32_t hw_div32_ceil(uint32_t a, uint32_t b) {
     uint32_t whole = hw_div32(a, b);
-    if (MATH.divout_fract32)
+    if (MATH.divout_fract32) {
         whole++;
+    }
     return whole;
 }
 
@@ -51,15 +52,16 @@ static inline uint16_t hw_div16(uint32_t a, uint32_t b) {
     MATH.multina32 = a;
     MATH.multinb32 = b;
     __asm__ volatile("" ::: "memory");
-    while (MATHBUSY & MATH_DIVBUSY)
-        continue;
+    while (MATHBUSY & MATH_DIVBUSY) {
+    }
     return MATH.divout_whole16;
 }
 
 static inline uint16_t hw_div16_ceil(uint32_t a, uint32_t b) {
     uint16_t whole = hw_div16(a, b);
-    if (MATH.divout_fract32)
+    if (MATH.divout_fract32) {
         whole++;
+    }
     return whole;
 }
 

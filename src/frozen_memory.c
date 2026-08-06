@@ -24,10 +24,12 @@ void request_freeze_region_list(void) {
 
     freeze_region_flags = 0;
     for (i = 0; i < MAX_REGIONS; i++) {
-        if (freeze_region_list[i].address_base == CHARGEN_ADDRESS)
+        if (freeze_region_list[i].address_base == CHARGEN_ADDRESS) {
             freeze_region_flags |= FREEZE_REGION_HAS_CHARGEN;
-        if (freeze_region_list[i].freeze_prep == 0xFF)
+        }
+        if (freeze_region_list[i].freeze_prep == 0xFF) {
             break;
+        }
     }
     freeze_region_count = i;
 }
@@ -57,8 +59,9 @@ uint32_t find_thumbnail_offset(void) {
         freeze_slot_offset += region_length >> 9;
         // If region is not an integer number of sectors long, don't forget to count the partial
         // sector
-        if (region_length & 0x1ff)
+        if (region_length & 0x1ff) {
             freeze_slot_offset++;
+        }
     }
     return 0xFFFFFFFFUL;
 }
@@ -75,8 +78,9 @@ uint32_t address_to_freeze_slot_offset(uint32_t address) {
 
     for (i = 0; i < freeze_region_count; i++) {
         skip = 0;
-        if (address < freeze_region_list[i].address_base)
+        if (address < freeze_region_list[i].address_base) {
             skip = 1;
+        }
         relative_address = address - freeze_region_list[i].address_base;
         if (freeze_region_list[i].address_base == 0x1000L) {
             // Thumbnail region: Treat specially so that we can examine it
@@ -89,15 +93,17 @@ uint32_t address_to_freeze_slot_offset(uint32_t address) {
             }
         }
         region_length = freeze_region_list[i].region_length & REGION_LENGTH_MASK;
-        if (relative_address >= region_length)
+        if (relative_address >= region_length) {
             skip = 1;
+        }
         if (skip) {
             // Skip this region if our address is not in it
             freeze_slot_offset += region_length >> 9;
             // If region is not an integer number of sectors long, don't forget to count the partial
             // sector
-            if (region_length & 0x1ff)
+            if (region_length & 0x1ff) {
                 freeze_slot_offset++;
+            }
         } else {
             // The address is in this region.
 
@@ -160,8 +166,9 @@ unsigned char freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
     sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
     // Copy the sector
-    if (buffer != NULL)
+    if (buffer != NULL) {
         lcopy((long)&sector_buffer[offset], (long)buffer, 512 - offset);
+    }
 
     return 0;
 }
@@ -213,10 +220,11 @@ unsigned char freeze_store_sector(uint32_t addr, unsigned char* buffer) {
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
     }
 
-    if (buffer != NULL)
+    if (buffer != NULL) {
         lcopy((long)buffer,
             (long)&sector_buffer[offset],
             512 - offset); // don't write behind the buffer!
+    }
 
     // Write the sector
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);

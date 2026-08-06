@@ -190,14 +190,18 @@ unsigned char detect_cpu_speed(void) {
     //          (freeze_peek(0xffd0030L) & 0x01)))
     //    return 40;
 
-    if (freeze_peek(0xffd367dL) & 0x10)
+    if (freeze_peek(0xffd367dL) & 0x10) {
         return 40;
-    if (freeze_peek(0xffd3054L) & 0x40)
+    }
+    if (freeze_peek(0xffd3054L) & 0x40) {
         return 40;
-    if (freeze_peek(0xffd3031L) & 0x40)
+    }
+    if (freeze_peek(0xffd3031L) & 0x40) {
         return 3;
-    if (freeze_peek(0xffd0030L) & 0x01)
+    }
+    if (freeze_peek(0xffd0030L) & 0x01) {
         return 2;
+    }
     return 1;
 }
 
@@ -209,27 +213,35 @@ unsigned char detect_cpu_speed(void) {
  */
 uint8_t nybl_to_screen(uint8_t v) {
     v &= 0xf;
-    if (v < 0xa)
+    if (v < 0xa) {
         return 0x30 + v;
+    }
     return v - 0x9;
 }
 
 unsigned char petscii_to_screen(unsigned char petscii) {
     // control characters => space
-    if ((petscii & 0x7f) < 0x20)
+    if ((petscii & 0x7f) < 0x20) {
         return 0x20;
-    if (petscii < 0x40)
+    }
+    if (petscii < 0x40) {
         return petscii;
-    if (petscii < 0x60)
+    }
+    if (petscii < 0x60) {
         return petscii & 0x3f;
-    if (petscii < 0x80)
+    }
+    if (petscii < 0x80) {
         return petscii & 0x5f;
-    if (petscii < 0xc0)
+    }
+    if (petscii < 0xc0) {
         return petscii ^ 0xc0;
-    if (petscii < 0xe0)
+    }
+    if (petscii < 0xe0) {
         return petscii & 0x5f;
-    if (petscii < 0xff)
+    }
+    if (petscii < 0xff) {
         return petscii & 0x7f;
+    }
     // want some pi?
     return 0x5e;
 }
@@ -270,8 +282,8 @@ void screen_of_death(const char* msg) {
   for(i=0;deadly_haiku[1][i];i++) POKE(0x0400+12*40+11+i,ascii_to_screencode(deadly_haiku[1][i]));
   for(i=0;deadly_haiku[2][i];i++) POKE(0x0400+14*40+11+i,ascii_to_screencode(deadly_haiku[2][i]));
 #endif
-    while (1 || msg)
-        continue;
+    while (1 || msg) {
+    }
 }
 
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
@@ -283,8 +295,9 @@ void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
 
     i = PEEK(0x0400U + disk_img_flag_loc);
     // write enable fix for HDOS < 1.3
-    if (!hdos_new_attach && i == 1)
+    if (!hdos_new_attach && i == 1) {
         i = 5;
+    }
 
     freeze_poke(
         0xFFFBD00L + disk_img_flag_loc, overrides ? (overrides & IMGPROC_NODISK ? 0x40 : 0) : i);
@@ -302,22 +315,25 @@ void old_store_selected_disk_image(uint8_t diskid, char* disk_image) {
     uint8_t i;
 
     // reflect mount hyppo mount state into image flags
-    if (lpeek(0xFFD368B) & (diskid ? 0x08 : 0x01))
+    if (lpeek(0xFFD368B) & (diskid ? 0x08 : 0x01)) {
         i = 0b00000101;
-    else {
-        if (lpeek(0xFFD36A1) & (diskid ? 0x04 : 0x01))
+    } else {
+        if (lpeek(0xFFD36A1) & (diskid ? 0x04 : 0x01)) {
             i = 0;
-        else
+        } else {
             i = 0x40;
+        }
     }
     freeze_poke(0xFFFBD00L + disk_img_flag_loc, i);
 
     // Replace disk image name in process descriptor block
-    for (i = 0; (i < 32) && disk_image[i]; i++)
+    for (i = 0; (i < 32) && disk_image[i]; i++) {
         freeze_poke(0xFFFBD00L + disk_img_name_loc + i, disk_image[i]);
+    }
     // Update length of name
     freeze_poke(0xFFFBD02L + disk_img_flag_loc, i);
     // Pad with spaces as required by hypervisor
-    for (; i < 32; i++)
+    for (; i < 32; i++) {
         freeze_poke(0xFFFBD00L + disk_img_name_loc + i, ' ');
+    }
 }

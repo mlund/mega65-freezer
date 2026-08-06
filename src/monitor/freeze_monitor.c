@@ -164,8 +164,9 @@ bool disasm_read_byte(uint32_t address, uint8_t* value) {
  * write_line_len() applies, so A-F have to be folded to screen codes here. */
 static void hex_to_screen_codes(unsigned char count) {
     for (unsigned char i = 0; i < count; i++) {
-        if (output_buffer[i] >= 'A' && output_buffer[i] <= 'F')
+        if (output_buffer[i] >= 'A' && output_buffer[i] <= 'F') {
             output_buffer[i] &= 0x0f;
+}
     }
 }
 
@@ -179,9 +180,10 @@ void show_memory_line(uint32_t addr) {
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Memory that isn't saved
-        for (unsigned char i = 0; i < 65; i++)
+        for (unsigned char i = 0; i < 65; i++) {
             output_buffer[9 + i] =
                 "<UNMAPPED OR UNFROZEN MEMORY>                                    "[i] & 0x3f;
+}
         output_buffer[9] = '<';
         output_buffer[9 + 28] = '>';
     } else {
@@ -333,12 +335,13 @@ void set_memory() {
                         if (((screen_line_buffer[screen_line_offset] >= 'A') &&
                                 (screen_line_buffer[screen_line_offset] < 'Z')) ||
                             ((screen_line_buffer[screen_line_offset] >= 'a') &&
-                                (screen_line_buffer[screen_line_offset] < 'z')))
+                                (screen_line_buffer[screen_line_offset] < 'z'))) {
                             mon_sector[(freeze_slot_offset + i) & 0x1ff] =
                                 screen_line_buffer[screen_line_offset++] & 0x1f;
-                        else
+                        } else {
                             mon_sector[(freeze_slot_offset + i) & 0x1ff] =
                                 screen_line_buffer[screen_line_offset++];
+}
                         i++;
                     }
                     break;
@@ -856,8 +859,9 @@ void freeze_monitor(void) {
     setup_screen();
 
     // Flush input buffer
-    while (ASCIIKEY)
+    while (ASCIIKEY) {
         ASCIIKEY = 0;
+}
 
     show_registers();
 
@@ -888,8 +892,9 @@ void freeze_monitor(void) {
             case 'b':
             case 'B':
                 // Bitmaps: B start
-                if (parse_address())
+                if (parse_address()) {
                     break;
+}
                 show_bitmaps();
                 break;
             case 'c':
@@ -901,8 +906,9 @@ void freeze_monitor(void) {
             case 'D':
                 // Disassemble; a bare D continues from where the last one
                 // stopped, as M does.
-                if (parse_address())
+                if (parse_address()) {
                     break;
+}
                 show_disassembly();
                 break;
             case 'f':
@@ -918,8 +924,9 @@ void freeze_monitor(void) {
             case 'm':
             case 'M':
                 // Display memory
-                if (parse_address())
+                if (parse_address()) {
                     break;
+}
                 show_memory();
                 break;
             case 'r':
@@ -930,8 +937,9 @@ void freeze_monitor(void) {
             case 's':
             case 'S':
                 // Set memory values
-                if (parse_address())
+                if (parse_address()) {
                     break;
+}
                 set_memory();
                 break;
             case 't':

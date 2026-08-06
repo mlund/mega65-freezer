@@ -9,8 +9,9 @@ char* itoa(int value, char* s, int radix) {
     if (radix == 10 && value < 0) {
         *p++ = '-';
         u = (unsigned int)-value;
-    } else
+    } else {
         u = (unsigned int)value;
+    }
 
     utoa(u, p, radix);
     return s;
@@ -27,8 +28,9 @@ char* utoa(unsigned value, char* s, int radix) {
         value /= (unsigned)radix;
     } while (value);
 
-    while (n)
+    while (n) {
         *p++ = buf[--n];
+    }
     *p = '\0';
     return s;
 }
