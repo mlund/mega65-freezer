@@ -7,3 +7,12 @@ TODO.md
 *.swp
 *.swo
 __pycache__/
+
+# SD and disk images, and ROMs.  MEGA65.ROM is proprietary and an SD image
+# carries a copy of it, so neither belongs in the repository -- a test that
+# wants one takes a path to yours, as MEGA65_ROM does.
+*.img
+*.rom
+*.ROM
+*.d81
+*.D81
