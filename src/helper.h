@@ -10,15 +10,11 @@
 // Trap registers.  The value written selects the function; the two registers
 // reach different trap handlers.
 #define HTRAP_DOS 0xD640
-#define HTRAP_SYSPART 0xD642
 
 // HTRAP_DOS functions.
 #define HYPPO_GETVERSION 0x00
 #define HYPPO_GETCURRENTDRIVE 0x04
 #define HYPPO_CHDIR 0x0C
-#define HYPPO_OPENDIR 0x12
-#define HYPPO_READDIR 0x14
-#define HYPPO_CLOSEDIR 0x16
 #define HYPPO_CLOSEALL 0x22
 #define HYPPO_SETNAME 0x2E
 #define HYPPO_FINDFILE 0x34
@@ -28,11 +24,6 @@
 #define HYPPO_ATTACH 0x4A
 
 // HTRAP_SYSPART functions.
-#define SYSPART_SLOT_SECTOR 0x10
-#define SYSPART_UNFREEZE 0x12
-#define SYSPART_REGION_LIST 0x14
-#define SYSPART_SLOT_COUNT 0x16
-#define SYSPART_GETERRORCODE 0x38
 
 // Hyppo needs its filename buffer page-aligned and in the bottom 32KB.  Two
 // are used so a pending attach name is not clobbered by an exec.
@@ -59,7 +50,6 @@
 #define ATTACH_LEGACY_DRIVE1 0x06
 
 // Offsets into hyppo's dirent, written to NAME_BUF_DOS.
-#define HDIRENT_NAME 0
 #define HDIRENT_NAME_LEN 64 // name is 64 bytes
 #define HDIRENT_CLUSTER 77  // 64 + 1 + 12
 #define HDIRENT_SIZE 81     // HDIRENT_CLUSTER + 4
@@ -71,7 +61,6 @@
 #define DIRENT_RECLEN 6 // d_reclen, 4 bytes
 #define DIRENT_TYPE 10  // d_type,   2 bytes
 #define DIRENT_NAME 12  // d_name
-#define DIRENT_NAME_MAX 256
 
 // The filename pointer is stashed alongside each buffer for post-mortem
 // inspection from the monitor.
@@ -102,6 +91,22 @@
  * It holds here: helper.s only ever transfers to LOADER_STUB and
  * PROGRAM_ENTRY, neither of which is C. */
 #define HELPER_ASM __attribute__((leaf))
+
+/* C-only: helper.S never names these, so they need not be preprocessor
+ * constants and the compiler can check their type. */
+#ifndef __ASSEMBLER__
+constexpr uint16_t HTRAP_SYSPART = 0xD642;
+constexpr uint8_t HYPPO_OPENDIR = 0x12;
+constexpr uint8_t HYPPO_READDIR = 0x14;
+constexpr uint8_t HYPPO_CLOSEDIR = 0x16;
+constexpr uint8_t SYSPART_SLOT_SECTOR = 0x10;
+constexpr uint8_t SYSPART_UNFREEZE = 0x12;
+constexpr uint8_t SYSPART_REGION_LIST = 0x14;
+constexpr uint8_t SYSPART_SLOT_COUNT = 0x16;
+constexpr uint8_t SYSPART_GETERRORCODE = 0x38;
+constexpr uint8_t HDIRENT_NAME = 0;
+constexpr uint16_t DIRENT_NAME_MAX = 256;
+#endif
 
 /* Traps short enough to state their own clobbers live here as inline asm, so
  * the compiler places operands in the registers the trap wants instead of the
