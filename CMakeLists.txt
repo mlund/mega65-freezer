@@ -210,6 +210,24 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(launch_monitor PROPERTIES TIMEOUT 180)
         endif()
 
+        # Assemble in the monitor and read the bytes back off the card, which
+        # needs an SD image: the freezer loads its tools from there, and Xemu's
+        # own image carries stock MEGA65 binaries, so without one this would
+        # test upstream's monitor rather than ours.  The image is cloned before
+        # our builds go in, so yours is never written to.  None is committed --
+        # such an image contains MEGA65.ROM.  macOS only; the clone-and-inject
+        # step uses hdiutil.
+        set(MEGA65_SDIMG "$ENV{MEGA65_SDIMG}" CACHE FILEPATH
+            "SD image to clone for the monitor test, e.g. Xemu's own mega65.img")
+        if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
+            add_test(NAME monitor_assemble
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_monitor.py
+                        --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                        --build $<TARGET_FILE_DIR:MONITOR>)
+            set_tests_properties(monitor_assemble PROPERTIES TIMEOUT 300)
+        endif()
+
         set(MEGA65_ROM "$ENV{MEGA65_ROM}" CACHE FILEPATH
             "MEGA65.ROM image for the disassembler's real-code test")
         if(MEGA65_ROM AND EXISTS ${MEGA65_ROM})
