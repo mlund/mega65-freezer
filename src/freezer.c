@@ -390,7 +390,7 @@ void draw_freeze_menu(unsigned char part) {
         }
 
         // Joystick 1/2 swap
-        lcopy((uint32_t)((PEEK(0xd612L) & 0x20) ? "YES" : " NO"),
+        lcopy((uint32_t)((UART_MISC & UART_MISC_JOYSWAP) ? "YES" : " NO"),
             (uint32_t)&freeze_menu[JOY_SWAP_OFFSET],
             3);
 
@@ -730,8 +730,8 @@ unsigned char poll_touch_panel(void) {
     uint16_t x, y;
 
     if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
-        x = PEEK(0xD6B9) + ((PEEK(0xD6BB) & 0x03) << 8);
-        y = PEEK(0xD6BA) + ((PEEK(0xD6BB) & 0x30) << 4);
+        x = TOUCH1_X_LSB + ((TOUCH1_MSB & TOUCH1_X_MSB_MASK) << 8);
+        y = TOUCH1_Y_LSB + ((TOUCH1_MSB & TOUCH1_Y_MSB_MASK) << 4);
         x = x >> 4;
         y = y >> 4;
     } else {
@@ -1026,8 +1026,8 @@ int main(void) {
     make_colour_lookup();
 
     // assure we're viewing the sdcard's sector buffer (and not the floppy disk buffer)
-    unsigned char orig_d689 = PEEK(0xD689);
-    POKE(0xD689, PEEK(0xD689) | 128);
+    uint8_t orig_sd_misc = SD_MISC;
+    SD_MISC = SD_MISC | SD_MISC_BUFSEL_SDCARD;
 
     // Now find the start sector of the slot, and make a copy for safe keeping
     slot_number = 0;
@@ -1156,7 +1156,7 @@ int main(void) {
 
                 case 'J':
                 case 'j': // Toggle joystick swap
-                    POKE(0xD612L, (PEEK(0xD612L) ^ 0x20) & 0xEF);
+                    UART_MISC = (UART_MISC ^ UART_MISC_JOYSWAP) & (uint8_t)~UART_MISC_OSKDEBUG;
 
                     draw_freeze_menu(UpdateTop);
                     break;
@@ -1299,7 +1299,7 @@ int main(void) {
                     }
                     // Doesn't seem to really help (probably needs to be done by the hypervisor
                     // unfreezing routine?)
-                    POKE(0xD689, orig_d689);
+                    SD_MISC = orig_sd_misc;
 
                     // workaround for old freeze slots that have an empty chargen area
                     fix_chargen_area(ChargenFixMem | ChargenFixSlot);

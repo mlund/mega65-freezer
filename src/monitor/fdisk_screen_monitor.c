@@ -188,13 +188,15 @@ char read_line(char* buffer, unsigned char max_length, unsigned char column) {
         // Show cursor
         set_attr(column + length, 0xf, reverse);
 
-        if ((PEEK(0xD611U) & 0x0b) >= 0x09) {
+        if ((MODKEY & (MODKEY_MEGA | MODKEY_RSHIFT | MODKEY_LSHIFT)) >=
+            (MODKEY_MEGA | MODKEY_LSHIFT)) {
             // C= + shift, so toggle case
 
             // Toggle upper/lower case font
             VICIV.addr = VICIV.addr ^ 0x02;
 
-            while ((PEEK(0xD611U) & 0x0b) >= 0x09) {
+            while ((MODKEY & (MODKEY_MEGA | MODKEY_RSHIFT | MODKEY_LSHIFT)) >=
+                (MODKEY_MEGA | MODKEY_LSHIFT)) {
             }
         }
 

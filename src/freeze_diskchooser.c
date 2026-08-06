@@ -262,9 +262,9 @@ void draw_entries(void) {
 }
 
 int read_sector_with_cancel(void) {
-    POKE(0xD084U, dir_track);
-    POKE(0xD085U, current_sector);
-    POKE(0xD086U, current_side);
+    F011_TRACK = dir_track;
+    F011_SECTOR = current_sector;
+    F011_SIDE = current_side;
     while (F011_STATUS & F011_STATUS_BUSY) {
         // Exit if a key has been pressed
         if (ASCIIKEY) {
@@ -328,7 +328,8 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     // determine disk image type
     // d68a.6/7 -> d64 flag
     // d68b.6/7 -> d65 flag
-    disk_type = ((PEEK(0xd68b) >> (5 + drive_id)) & 0x2) | ((PEEK(0xd68a) >> (6 + drive_id)) & 0x1);
+    disk_type =
+        ((SDFDC_CONTROL >> (5 + drive_id)) & 0x2) | ((SDFDC_IMAGE_TYPE >> (6 + drive_id)) & 0x1);
     switch (disk_type) {
         case DiskTypeD81:
             dir_track = 39;

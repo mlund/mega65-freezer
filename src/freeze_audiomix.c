@@ -71,26 +71,26 @@ unsigned char audio_menu_simple[] = "         MEGA65 AUDIO MIXER MENU        "
 
 void audioxbar_setcoefficient(uint8_t n, uint8_t value) {
     // Select the coefficient
-    POKE(0xD6F4, n);
+    AUDIOMIX_REGSEL = n;
 
     // Now wait at least 16 cycles for it to settle
     VICIV.bordercol = VICIV.bordercol;
     VICIV.bordercol = VICIV.bordercol;
     VICIV.bordercol = VICIV.bordercol;
 
-    POKE(0xD6F5U, value);
+    AUDIOMIX_REGDATA = value;
 }
 
 uint8_t audioxbar_getcoefficient(uint8_t n) {
     // Select the coefficient
-    POKE(0xD6F4, n);
+    AUDIOMIX_REGSEL = n;
 
     // Now wait at least 16 cycles for it to settle
     VICIV.bordercol = VICIV.bordercol;
     VICIV.bordercol = VICIV.bordercol;
     VICIV.bordercol = VICIV.bordercol;
 
-    return PEEK(0xD6F5U);
+    return AUDIOMIX_REGDATA;
 }
 
 static uint8_t c, value, select_row, select_column, simple_row, coefficient;
@@ -314,7 +314,7 @@ void set_amplifier(unsigned char left_right, uint16_t first_coefficient) {
   unsigned char amp_value = 0x20 + (first_coefficient / 293);
 
   // Do we have an amplifier, and if so, where is it?
-  switch (PEEK(0xD629)) {
+  switch (M65MODEL) {
   case 0x03: // MEGA65R3
     // $FFD71DC
     // try 20 times, no endless loop please!

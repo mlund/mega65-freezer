@@ -81,6 +81,9 @@ constexpr uint8_t VIC4_KNOCK_2 = 0x53;
 #define F011_CONTROL MMIO8(0xD080) // motor and drive select
 #define F011_COMMAND MMIO8(0xD081)
 #define F011_STATUS MMIO8(0xD082)          // BUSY is bit 7
+#define F011_TRACK MMIO8(0xD084)           // FDC:TRACK
+#define F011_SECTOR MMIO8(0xD085)          // FDC:SECTOR
+#define F011_SIDE MMIO8(0xD086)            // FDC:SIDE
 #define F011_DATA MMIO8(0xD087)            // sector byte port
 constexpr uint8_t F011_CMD_SPINUP = 0x20;  // guide: write to COMMAND, then poll BUSY
 constexpr uint8_t F011_STATUS_BUSY = 0x80; // guide: bit 7 of STATUS
@@ -99,6 +102,27 @@ constexpr uint8_t F011_STATUS_READ_ERROR = 0x18; // sector read failed
 constexpr uint8_t SD_STATUS_SDHC = 0x10;
 #define TOUCH_STATUS MMIO8(0xD6B0)
 constexpr uint8_t TOUCH_STATUS_EV1_VALID = 0x01;
+// TOUCH:TOUCH1XLSB / TOUCH1YLSB, with both MSB pairs sharing $D6BB.
+#define TOUCH1_X_LSB MMIO8(0xD6B9)
+#define TOUCH1_Y_LSB MMIO8(0xD6BA)
+#define TOUCH1_MSB MMIO8(0xD6BB)
+constexpr uint8_t TOUCH1_X_MSB_MASK = 0x03; // bits 0-1
+constexpr uint8_t TOUCH1_Y_MSB_MASK = 0x30; // bits 4-5
+
+// $D689 carries several unrelated signals; only the buffer select is used
+// here.  SD:BUFSEL, 1 = the SD card's sector buffer, 0 = the F011/FDC's.
+#define SD_MISC MMIO8(0xD689)
+constexpr uint8_t SD_MISC_BUFSEL_SDCARD = 0x80;
+
+// F011 disk-image type and control.  Bit 6 is drive 0 and bit 7 drive 1 in
+// both, so the code shifts by the drive id.
+#define SDFDC_IMAGE_TYPE MMIO8(0xD68A) // SDFDC:D0D64 / D1D64, set for D64
+#define SDFDC_CONTROL MMIO8(0xD68B)    // SDFDC:D0MD / D1MD, set for D65
+
+// AUDIOMIX:REGSEL selects a mixer coefficient, which is then read or written
+// through AUDIOMIX:REGWDATA.
+#define AUDIOMIX_REGSEL MMIO8(0xD6F4)
+#define AUDIOMIX_REGDATA MMIO8(0xD6F5)
 
 // VIC-IV video setup.  $D05C holds the side border width LSB and $D05D bits
 // 0-5 its MSB, but bit 7 of $D05D is HOTREG: the switch that makes legacy
@@ -128,3 +152,19 @@ constexpr uint8_t CIA_ICR_DISABLE_ALL = 0x7F;
 // Keyboard event queue: reads the top event as ASCII, 0x00 when empty;
 // assigning any value dequeues.  See the user guide, "Keyboard".
 #define ASCIIKEY MMIO8(0xD610)
+
+// UARTMISC modifier key state, read live rather than through the queue: a bit
+// is set while its key is held.
+#define MODKEY MMIO8(0xD611)
+constexpr uint8_t MODKEY_LSHIFT = 0x01; // UARTMISC:MLSHFT
+constexpr uint8_t MODKEY_RSHIFT = 0x02; // UARTMISC:MRSHFT
+constexpr uint8_t MODKEY_CTRL = 0x04;   // UARTMISC:MCTRL
+constexpr uint8_t MODKEY_MEGA = 0x08;   // UARTMISC:MMEGA
+
+// UARTMISC joystick options.
+#define UART_MISC MMIO8(0xD612)
+constexpr uint8_t UART_MISC_OSKDEBUG = 0x10; // UARTMISC:OSKDEBUG, write only
+constexpr uint8_t UART_MISC_JOYSWAP = 0x20;  // UARTMISC:JOYSWAP
+
+// UARTMISC:M65MODEL, the board this core is running on.
+#define M65MODEL MMIO8(0xD629)
