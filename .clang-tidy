@@ -143,6 +143,13 @@ CheckOptions:
 #       it supports `#pragma once`; include guards would trade a working line for a name to keep
 #       unique. This was the only thing the broken filter had been hiding.
 #
+#   modernize-redundant-void-arg
+#       Never enabled, and deliberately: it is a C++ check giving backwards advice in C. It
+#       flags `int main(void)` and wants the `void` removed, but `f()` and `f(void)` are only
+#       equivalent from C23 -- before that `f()` declares unspecified parameters and turns off
+#       argument checking. The 107 sites it reports are the correct ones; the 34 written `f()`
+#       were the defect, and are now `f(void)` too.
+#
 #   portability-no-assembler
 #       A safety-critical coding-standard rule (no assembler at all). Inline asm is how this
 #       program reaches the hypervisor and the 45GS02's own instructions; there is no C spelling

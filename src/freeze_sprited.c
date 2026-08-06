@@ -759,7 +759,7 @@ static void set_sprite_pointer(uint8_t sprite, uint32_t data_address) {
     lpoke(SPRITE_POINTER_TABLE + sprite * 2 + 1, (uint8_t)(block >> 8));
 }
 
-static void initialize() {
+static void initialize(void) {
     POKE(0, CPU_PORT_FAST);
 
     // --- Freezer slot setup
@@ -842,7 +842,7 @@ static void initialize() {
     g_state.update_cursor_y_fn();
 }
 
-void load_slot_sprite_palette() {
+void load_slot_sprite_palette(void) {
 }
 
 void setup_text_palette(void) {
@@ -856,18 +856,18 @@ void setup_text_palette(void) {
     // setmapedpal(sprite_palette());
 }
 
-void update_cursor_x() {
+void update_cursor_x(void) {
     uint8_t canvas_left_pixels = g_state.canvas_left_x * CELL_PIXELS_X;
     uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * CELL_PIXELS_X;
     VICIV.spr_pos[EDIT_CURSOR_NUM].x = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
 }
 
-void update_cursor_y() {
+void update_cursor_y(void) {
     uint8_t yc = g_state.cursor_y * CELL_PIXELS_Y;
     VICIV.spr_pos[EDIT_CURSOR_NUM].y = SPRITE_OFFSET_Y + (CANVAS_TOP_ROW * CELL_PIXELS_Y) + yc;
 }
 
-void update_cursor_xmsb() {
+void update_cursor_xmsb(void) {
     uint8_t canvas_left_pixels = g_state.canvas_left_x * CELL_PIXELS_X;
     uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * CELL_PIXELS_X;
     const unsigned short sx = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
@@ -1098,12 +1098,12 @@ static void paint_pixel16_color(uint8_t x, uint8_t y) {
             (g_state.color[g_state.current_color_idx] << bitsel)));
 }
 
-static void clear_sprite() {
+static void clear_sprite(void) {
     set_redraw_full_canvas();
     lfill(SPRITE_BUFFER, 0, g_state.sprite_size_bytes);
 }
 
-static void fetch_vic2_regs_from_slot() {
+static void fetch_vic2_regs_from_slot(void) {
     // H/Y expand
 
     const uint8_t spr_bit = 1 << PREVIEW_SPRITE_NUM;
@@ -1124,12 +1124,12 @@ static void fetch_vic2_regs_from_slot() {
     }
 }
 
-static void fetch_sprite_data_from_slot() {
+static void fetch_sprite_data_from_slot(void) {
     // TODO: Sprites may exceed 512 bytes
     freeze_fetch_sector_partial(g_state.sprite_data_addr, SPRITE_BUFFER, g_state.sprite_size_bytes);
 }
 
-static void put_sprite_data_to_slot() {
+static void put_sprite_data_to_slot(void) {
     // TODO: Sprites may exceed 512 bytes
     freeze_store_sector_partial(g_state.sprite_data_addr, SPRITE_BUFFER, g_state.sprite_size_bytes);
 }
@@ -1238,7 +1238,7 @@ void update_sprite_parameters(bool f_fetch_slot) {
     g_state.update_cursor_y_fn();
 }
 
-static void update_color_regs() {
+static void update_color_regs(void) {
     reg_poke(reg_sprite_color(g_state.sprite_number), g_state.color[ColorFore]);
     reg_poke(REG_SPRITE_MULTICOL1, g_state.color[ColorMc1]);
     reg_poke(REG_SPRITE_MULTICOL2, g_state.color[ColorMc2]);
@@ -1249,7 +1249,7 @@ static void update_color_regs() {
     VICIV.spr_mcolors[1] = g_state.color[ColorMc2];
 }
 
-static void erase_canvas_space() {
+static void erase_canvas_space(void) {
     RECT rc;
     rc.top = 2;
     rc.left = 0;
@@ -1258,7 +1258,7 @@ static void erase_canvas_space() {
     fillrect(&rc, ' ', 1);
 }
 
-static void draw_canvas() {
+static void draw_canvas(void) {
     register uint8_t row;
     register uint8_t col;
     for (row = g_state.redraw_rect.top; row < g_state.redraw_rect.bottom; ++row) {
@@ -1294,7 +1294,7 @@ void set_redraw_full_canvas(void) {
 static const char HEADER_TEXT[] =
     "                            THE MEGA65 SPRITE EDITOR                            ";
 
-static void draw_header() {
+static void draw_header(void) {
     if (g_state.redraw_flags & RedrawHeader) {
         /* Not cprintf.  mega65-libc dispatches its `{...}` escapes through a
          * table indexed by a hash that does not agree with the one filling it,
@@ -1310,7 +1310,7 @@ static void draw_header() {
     }
 }
 
-static void draw_color_selector() {
+static void draw_color_selector(void) {
     RECT rc;
     if (g_state.redraw_flags & RedrawSidebarColor) {
         set_rect(&rc, SIDEBAR_COLUMN, 5, 80, 7);
@@ -1385,7 +1385,7 @@ static void draw_color_selector() {
     }
 }
 
-static void draw_toolbox() {
+static void draw_toolbox(void) {
     register uint8_t i = 0;
     const uint8_t num_buttons = sizeof(CHSET_TOOLBOX) / 8 / 2 / 2;
 
@@ -1411,7 +1411,7 @@ static void draw_toolbox() {
     }
 }
 
-static void draw_side_bar_sprite_info() {
+static void draw_side_bar_sprite_info(void) {
     if (g_state.redraw_flags & RedrawSidebarInfo) {
         textcolor(1);
         gotoxy(SIDEBAR_COLUMN, 2);
@@ -1436,7 +1436,7 @@ static void draw_side_bar_sprite_info() {
     }
 }
 
-static void draw_coordinates() {
+static void draw_coordinates(void) {
     if (g_state.redraw_flags & RedrawSidebarCoords) {
         cputncxy(SIDEBAR_COLUMN, SCREEN_ROWS - 1, SIDEBAR_WIDTH, ' ');
         gotoxy(SIDEBAR_COLUMN, SCREEN_ROWS - 1);
@@ -1449,7 +1449,7 @@ static void draw_coordinates() {
     }
 }
 
-static void draw_sprite_preview_area() {
+static void draw_sprite_preview_area(void) {
     register uint8_t i = 0;
     textcolor(g_state.color[ColorBack]);
     for (i = 0; i < SIDEBAR_PREVIEW_AREA_HEIGHT; ++i) {
@@ -1458,7 +1458,7 @@ static void draw_sprite_preview_area() {
     }
 }
 
-static void draw_sidebar() {
+static void draw_sidebar(void) {
     draw_header();
     draw_side_bar_sprite_info();
     draw_coordinates();
@@ -1505,7 +1505,7 @@ static void print_key_group(const char* list[], uint8_t count, uint8_t x, uint8_
     }
 }
 
-static void show_help() {
+static void show_help(void) {
     // clang-format off
   static const char* file_keys[] = {
     "  FILE / TXFER     ",
@@ -1598,14 +1598,14 @@ static void show_help() {
     VICIV.spr_ena = 7;
 }
 
-static void do_exit() {
+static void do_exit(void) {
     textcolor(14);
     bordercolor(14);
     bgcolor(6);
     clrscr();
 }
 
-static void draw_screen() {
+static void draw_screen(void) {
     bgcolor(DEFAULT_SCREEN_COLOR);
     clrscr();
     draw_header();
@@ -1624,7 +1624,7 @@ unsigned char fire_lock = 0;
 
 unsigned short mx, my;
 
-static void set_background() {
+static void set_background(void) {
     g_state.redraw_flags = RedrawSidebarColor;
     if (g_state.sprite_color_mode == SpriteColorMode16) {
         g_state.color[g_state.current_color_idx] = 0;
@@ -1641,7 +1641,7 @@ static void set_background() {
  * under a second. */
 constexpr uint8_t CURSOR_COLOUR_TICKS = 6;
 
-static void main_loop() {
+static void main_loop(void) {
     static uint8_t edit_color_index = 0;
     static uint8_t colour_countdown = CURSOR_COLOUR_TICKS;
     static uint8_t previous_raster = 0;
@@ -2067,7 +2067,7 @@ static void main_loop() {
     }
 }
 
-void do_sprite_editor() {
+void do_sprite_editor(void) {
     initialize();
     draw_screen();
     main_loop();

@@ -184,7 +184,7 @@ HELPER_ASM char mega65_dos_attach(char* image_name, uint8_t driveid);
 HELPER_ASM char mega65_dos_detach(uint8_t driveid_and_flags);
 
 HELPER_ASM char mega65_dos_chdir(unsigned char* dirname);
-HELPER_ASM char mega65_dos_cdroot();
+HELPER_ASM char mega65_dos_cdroot(void);
 
 HELPER_ASM char mega65_dos_exechelper(char* filename);
 

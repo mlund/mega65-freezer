@@ -287,7 +287,7 @@ void show_disassembly(void) {
     }
 }
 
-void set_memory() {
+void set_memory(void) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(mon_address);
     unsigned char i = 0;
 

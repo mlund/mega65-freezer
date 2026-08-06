@@ -715,7 +715,7 @@ static unsigned char joy_to_key[32] = {
     0 // without fire
 };
 
-unsigned char read_joystick() {
+unsigned char read_joystick(void) {
     unsigned char key;
     // TODO: this is very broken, keypresses will generate F3(FIRE) on DC01
     // We use a simple lookup table to do this
@@ -855,7 +855,7 @@ void change_mounted_disk_image(uint8_t diskid) {
 }
 
 #if 0
-void debug_region_list()
+void debug_region_list(void)
 {
   // display region list on screen
   unsigned long test;

@@ -169,7 +169,7 @@ static unsigned char current_side = 0;
 /* Exactly 18 screen columns, deliberately without a terminator. */
 static unsigned char entry_buffer[18] __attribute__((nonstring)) = "\"                 ";
 
-void display_error() {
+void display_error(void) {
     char* errstr;
 
     VICIV.bordercol = 2;

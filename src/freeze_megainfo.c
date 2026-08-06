@@ -88,7 +88,7 @@ void write_text_upper(unsigned char x, unsigned char y, unsigned short colour, c
  * copying 32 bytes to global code_buffer, to make access
  * faster (lpeek is a dma_copy!)
  */
-void copy_hw_version() {
+void copy_hw_version(void) {
     lcopy(0xFFD3628L, (long)code_buffer, 33);
     m65model = code_buffer[1];
     m65submodel = (code_buffer[0] >> 4) & 0xf;
@@ -104,7 +104,7 @@ void copy_hw_version() {
  *
  * get_hw_version must have been called to fill code_buffer
  */
-char* format_mega_model() {
+char* format_mega_model(void) {
     switch (m65model) {
         case 0x01:
             return "MEGA65 R1";
@@ -853,7 +853,7 @@ void draw_screen(void) {
  *
  * initialize basic structures and screen
  */
-void init_megainfo() {
+void init_megainfo(void) {
     is_ntsc = (lpeek(0xFFD306fL) & 0x80) == 0x80;
     // fix TOD frequency
     if (is_ntsc) {
@@ -869,7 +869,7 @@ void init_megainfo() {
 /*
  * do_megainfo
  */
-void do_megainfo() {
+void do_megainfo(void) {
     unsigned char x;
     unsigned char rtc_debug = 0;
 
