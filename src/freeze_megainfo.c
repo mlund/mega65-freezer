@@ -35,14 +35,16 @@ static char s_dessentials[][13] = {
 constexpr uint16_t RTC_YEAR_EPOCH = 2000;
 
 constexpr uint8_t BUFFER_LENGTH = 254;
+/* Text. */
 static char buffer[BUFFER_LENGTH + 2];
 static char tempstr32[32];
-static char is_ntsc = 0;
-static char has_rtc = 0;
-static char m65model;
-static char m65submodel;
-static unsigned char code_buffer[512];
-static unsigned char ymd[3];
+/* Bytes. */
+static uint8_t is_ntsc = 0;
+static uint8_t has_rtc = 0;
+static uint8_t m65model;
+static uint8_t m65submodel;
+static uint8_t code_buffer[512];
+static uint8_t ymd[3];
 
 /* Bit 8 of colour requests the reverse-video attribute. */
 static void write_text_mapped(unsigned char x,
