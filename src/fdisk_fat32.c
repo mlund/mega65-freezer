@@ -109,17 +109,23 @@ void parse_partition_entry(const char i) {
     }
 }
 
-#define detect_target() (lpeek(0xffd3629))
-#define TARGET_UNKNOWN 0
-#define TARGET_MEGA65R1 1
-#define TARGET_MEGA65R2 2
-#define TARGET_MEGA65R3 3
-#define TARGET_MEGAPHONER1 0x21
-#define TARGET_NEXYS4 0x40
-#define TARGET_NEXYS4DDR 0x41
-#define TARGET_NEXYS4DDRWIDGET 0x42
-#define TARGET_WUKONG 0xFD
-#define TARGET_SIMULATION 0xFE
+/* The board the core is running on, as $D3629 reports it. */
+enum Target : uint8_t {
+    TargetUnknown = 0,
+    TargetMega65R1 = 1,
+    TargetMega65R2 = 2,
+    TargetMega65R3 = 3,
+    TargetMegaphoneR1 = 0x21,
+    TargetNexys4 = 0x40,
+    TargetNexys4Ddr = 0x41,
+    TargetNexys4DdrWidget = 0x42,
+    TargetWukong = 0xFD,
+    TargetSimulation = 0xFE,
+};
+
+static inline enum Target detect_target(void) {
+    return (enum Target)lpeek(0xffd3629);
+}
 
 struct M65Tm {
     unsigned char tm_sec;   /* Seconds (0-60) */
@@ -174,8 +180,8 @@ void getrtc(struct M65Tm* tm) {
     tm->tm_isdst = 0;
 
     switch (detect_target()) {
-        case TARGET_MEGA65R2:
-        case TARGET_MEGA65R3:
+        case TargetMega65R2:
+        case TargetMega65R3:
             tm->tm_sec = unbcd(lpeek_debounced(0xffd7110));
             tm->tm_min = unbcd(lpeek_debounced(0xffd7111));
             tm->tm_hour = lpeek_debounced(0xffd7112);
@@ -195,7 +201,7 @@ void getrtc(struct M65Tm* tm) {
             tm->tm_wday = unbcd(lpeek_debounced(0xffd7116));
             tm->tm_isdst = lpeek_debounced(0xffd7117) & 0x20;
             break;
-        case TARGET_MEGAPHONER1:
+        case TargetMegaphoneR1:
             break;
         default:
             return;

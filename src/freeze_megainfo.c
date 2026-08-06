@@ -1,5 +1,3 @@
-#define RTC_YEAR_EPOCH 2000 // the RTC counts years from 2000, not 1900
-
 #include "cc65compat.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
@@ -33,8 +31,10 @@ static char s_dessentials[][13] = {
 /*
  * Global Variables
  */
-#define BUFFER_LENGTH 254
-#define BUFFER_COLOUR 255
+/* The RTC counts years from 2000, not 1900. */
+constexpr uint16_t RTC_YEAR_EPOCH = 2000;
+
+constexpr uint8_t BUFFER_LENGTH = 254;
 static char buffer[BUFFER_LENGTH + 2], tempstr32[32], is_ntsc = 0, has_rtc = 0, m65model,
                                                       m65submodel;
 static unsigned char code_buffer[512], ymd[3];
@@ -378,8 +378,8 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
     unsigned short p, i, j = 0;
     char* needle = "GIT: ";
     char* needle2 = ",20";
-#define NEEDLE_LEN 5
-#define NEEDLE2_LEN 3
+    constexpr uint8_t NEEDLE_LEN = 5;
+    constexpr uint8_t NEEDLE2_LEN = 3;
     unsigned char finished = 0, cmp_idx = 0, temp;
 
     for (p = 0; p < 64 && !finished; p++) {

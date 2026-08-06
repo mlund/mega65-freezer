@@ -33,10 +33,12 @@ void do_sprite_editor(void);
 unsigned char do_rom_loader(void);
 void do_megainfo(void);
 
-struct freeze_region_t {
+/* Only the lower 24 bits of region_length are valid. */
+constexpr uint32_t REGION_LENGTH_MASK = 0x7FFFFF;
+
+struct FreezeRegion {
     unsigned long address_base;
     union {
-#define REGION_LENGTH_MASK 0x7FFFFF
         unsigned long region_length; // only lower 24 bits are valid, space occupied rounded up to
                                      // next 512 bytes
         struct {
@@ -46,13 +48,16 @@ struct freeze_region_t {
     };
 };
 
-#define MAX_REGIONS (256 / sizeof(struct freeze_region_t))
+constexpr uint8_t MAX_REGIONS = 256 / sizeof(struct FreezeRegion);
 
 extern unsigned char not_in_root;
-extern struct freeze_region_t freeze_region_list[MAX_REGIONS];
+extern struct FreezeRegion freeze_region_list[MAX_REGIONS];
 extern unsigned char freeze_region_count;
 
-#define FREEZE_REGION_HAS_CHARGEN 0x01
+/* Bits of freeze_region_flags. */
+enum : uint8_t {
+    FreezeRegionHasChargen = 0x01,
+};
 extern unsigned char freeze_region_flags;
 
 extern unsigned long freeze_slot_start_sector;
@@ -60,8 +65,9 @@ extern unsigned long freeze_slot_start_sector;
  * the hypervisor leaves in $D681-$D684 rather than in a return value. */
 uint32_t read_freeze_slot_start_sector(unsigned short slot);
 
+constexpr uint8_t FD_DISK_ID_FILE_CLOSED = 0xFF;
+
 struct FileDescriptor {
-#define FD_DISK_ID_FILE_CLOSED 0xFF
     unsigned char disk_id;
     unsigned long start_cluster;
     unsigned long current_cluster;
@@ -75,9 +81,12 @@ struct FileDescriptor {
     unsigned short offset_in_buffer;
 };
 
-#define PD_IMGFLAGS_MOUNTED 0b00000001
-#define PD_IMGFLAGS_WRITEEN 0b00000101
-#define PD_IMGFLAGS_NOREAL 0b01000000
+/* Bits of ProcessDescriptor::d81_imageN_flags. */
+enum : uint8_t {
+    PdImgFlagsMounted = 0b00000001,
+    PdImgFlagsWriteEn = 0b00000101,
+    PdImgFlagsNoReal = 0b01000000,
+};
 struct ProcessDescriptor {
     unsigned char task_id;
     char process_name[16];

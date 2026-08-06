@@ -275,9 +275,12 @@ struct ProcessDescriptor process_descriptor;
 // clang-format off
 static int8_t last_thumb_frame = -1;
 static unsigned char thumb_xoff = 5, thumb_yoff = 1;
-#define F_M65 0
-#define F_C65 1
-#define F_C64 2
+/* Index into thumb_frame_name[]. */
+enum ThumbFrame : uint8_t {
+    ThumbFrameM65 = 0,
+    ThumbFrameC65 = 1,
+    ThumbFrameC64 = 2,
+};
 static char thumb_frame_name[][13] = {
   "M65THUMB.M65",
   "C65THUMB.M65",
@@ -312,16 +315,19 @@ void predraw_freeze_menu(void)
   last_thumb_frame = -1;
 }
 
-#define UPDATE_ALL     0x7f
-#define UPDATE_UPPER   0x0f
-#define UPDATE_TOP     0x01
-#define UPDATE_ROM     0x02
-#define UPDATE_FREQ    0x04
-#define UPDATE_LOWER   0x70
-#define UPDATE_PROCESS 0x10
-#define UPDATE_DISK    0x20
-#define UPDATE_THUMB   0x40
-#define UPDATE_CHGSLOT 0x80
+/* Which parts of the menu draw_freeze_menu() redraws, OR-ed together. */
+enum : uint8_t {
+    UpdateTop = 0x01,
+    UpdateRom = 0x02,
+    UpdateFreq = 0x04,
+    UpdateUpper = 0x0f,
+    UpdateProcess = 0x10,
+    UpdateDisk = 0x20,
+    UpdateThumb = 0x40,
+    UpdateLower = 0x70,
+    UpdateAll = 0x7f,
+    UpdateChgSlot = 0x80,
+};
 // clang-format on
 
 void copy_convert_to_screen(const unsigned char* data, short offset) {
@@ -350,12 +356,12 @@ void draw_freeze_menu(unsigned char part) {
   freeze_menu[0] = hdos_new_attach ? '1' : '0';
 #endif
 
-    if (part & UPDATE_CHGSLOT) {
+    if (part & UpdateChgSlot) {
         freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
     }
 
     // Update messages based on the settings we allow to be easily changed
-    if (part & UPDATE_TOP) {
+    if (part & UpdateTop) {
 
         if (slot_number) {
             lcopy((unsigned long)freeze_menu_bar + 40,
@@ -412,12 +418,12 @@ void draw_freeze_menu(unsigned char part) {
 
     // ROM version
     /*
-    if (part & UPDATE_ROM)
+    if (part & UpdateRom)
       lcopy((long)detect_rom(), (unsigned long)&freeze_menu[ROM_NAME_OFFSET], 11);
     */
 
     // CPU frequency
-    if (part & UPDATE_FREQ) {
+    if (part & UpdateFreq) {
         switch (detect_cpu_speed()) {
             case 1:
                 lcopy((unsigned long)"  1", (unsigned long)&freeze_menu[CPU_FREQ_OFFSET], 3);
@@ -437,7 +443,7 @@ void draw_freeze_menu(unsigned char part) {
         }
     }
 
-    if ((part & UPDATE_PROCESS) || (part & UPDATE_THUMB)) {
+    if ((part & UpdateProcess) || (part & UpdateThumb)) {
         detect_rom();
     }
 
@@ -456,11 +462,11 @@ void draw_freeze_menu(unsigned char part) {
 
        We should just read the sector containing all this, and get it out all at once.
     */
-    if ((part & UPDATE_PROCESS) || (part & UPDATE_DISK)) {
+    if ((part & UpdateProcess) || (part & UpdateDisk)) {
         freeze_fetch_sector(0xFFFBD00L, (unsigned char*)&process_descriptor);
     }
 
-    if (part & UPDATE_PROCESS) {
+    if (part & UpdateProcess) {
         // Display process ID as decimal
         screen_decimal((unsigned int)&freeze_menu[PROCESS_ID_OFFSET], process_descriptor.task_id);
 
@@ -483,7 +489,7 @@ void draw_freeze_menu(unsigned char part) {
         lcopy((unsigned long)mega65_rom_name, (unsigned long)&freeze_menu[PROCESS_ROM_OFFSET], 11);
     }
 
-    if (part & UPDATE_DISK) {
+    if (part & UpdateDisk) {
         // Draw drive numbers for internal drive
         lfill((unsigned long)&freeze_menu[DRIVE0_NUM_OFFSET], 0, 2);
         lfill((unsigned long)&freeze_menu[DRIVE1_NUM_OFFSET], 0, 2);
@@ -493,7 +499,7 @@ void draw_freeze_menu(unsigned char part) {
         lfill((unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET], ' ', 18);
         lfill((unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET], ' ', 18);
 
-        if ((process_descriptor.d81_image0_flags & PD_IMGFLAGS_MOUNTED) &&
+        if ((process_descriptor.d81_image0_flags & PdImgFlagsMounted) &&
             process_descriptor.d81_image0_namelen) {
             for (i = 0; i < process_descriptor.d81_image0_namelen; i++) {
                 if (!process_descriptor.d81_image0_name[i]) {
@@ -509,7 +515,7 @@ void draw_freeze_menu(unsigned char part) {
                         ? process_descriptor.d81_image0_namelen
                         : 18);
             }
-        } else if (process_descriptor.d81_image0_flags & PD_IMGFLAGS_NOREAL) {
+        } else if (process_descriptor.d81_image0_flags & PdImgFlagsNoReal) {
             lcopy((unsigned long)NO_DISK_DRIVE,
                 (unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
                 sizeof(NO_DISK_DRIVE) - 1);
@@ -519,7 +525,7 @@ void draw_freeze_menu(unsigned char part) {
                 sizeof(INTERNAL_DRIVE_0) - 1);
         }
 
-        if ((process_descriptor.d81_image1_flags & PD_IMGFLAGS_MOUNTED) &&
+        if ((process_descriptor.d81_image1_flags & PdImgFlagsMounted) &&
             process_descriptor.d81_image1_namelen) {
             for (i = 0; i < process_descriptor.d81_image1_namelen; i++) {
                 if (!process_descriptor.d81_image1_name[i]) {
@@ -535,7 +541,7 @@ void draw_freeze_menu(unsigned char part) {
                         ? process_descriptor.d81_image1_namelen
                         : 18);
             }
-        } else if (process_descriptor.d81_image1_flags & PD_IMGFLAGS_NOREAL) {
+        } else if (process_descriptor.d81_image1_flags & PdImgFlagsNoReal) {
             lcopy((unsigned long)NO_DISK_DRIVE,
                 (unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
                 sizeof(NO_DISK_DRIVE) - 1);
@@ -563,26 +569,26 @@ void draw_freeze_menu(unsigned char part) {
 #endif
 
     // Draw the thumbnail surround area
-    if (part & UPDATE_THUMB) {
-        int8_t thumb_frame = F_M65;
+    if (part & UpdateThumb) {
+        int8_t thumb_frame = ThumbFrameM65;
 
         switch (mega65_rom_type) {
-            case MEGA65_ROM_C64:
-                thumb_frame = F_C64;
+            case Mega65RomC64:
+                thumb_frame = ThumbFrameC64;
                 break;
-            case MEGA65_ROM_C65:
-                thumb_frame = F_C65;
+            case Mega65RomC65:
+                thumb_frame = ThumbFrameC65;
                 break;
-            case MEGA65_ROM_M65:
+            case Mega65RomM65:
                 if (detect_cpu_speed() == 1) {
-                    thumb_frame = F_C64;
+                    thumb_frame = ThumbFrameC64;
                 } else {
-                    thumb_frame = F_M65;
+                    thumb_frame = ThumbFrameM65;
                 }
                 break;
-            case MEGA65_ROM_OPENROM:
+            case Mega65RomOpenRom:
             default:
-                thumb_frame = F_M65;
+                thumb_frame = ThumbFrameM65;
                 break;
         }
 
@@ -839,7 +845,7 @@ void change_mounted_disk_image(uint8_t diskid) {
     }
 
     predraw_freeze_menu();
-    draw_freeze_menu(UPDATE_ALL | UPDATE_CHGSLOT);
+    draw_freeze_menu(UpdateAll | UpdateChgSlot);
 }
 
 #if 0
@@ -877,17 +883,20 @@ void debug_region_list()
 }
 #endif
 
-#define CHARGEN_FIXMEM 0x01  // write char data to chargen memory
-#define CHARGEN_FIXSLOT 0x02 // write char data to slot storage
-#define CHARGEN_FORCE 0x40   // if check can't load region, do fix anyway
-#define CHARGEN_NOCHECK 0x80 // don't execute check, always fix
+/* Flags for fix_chargen_area(), OR-ed together. */
+enum : uint8_t {
+    ChargenFixMem = 0x01,  // write char data to chargen memory
+    ChargenFixSlot = 0x02, // write char data to slot storage
+    ChargenForce = 0x40,   // if check can't load region, do fix anyway
+    ChargenNoCheck = 0x80, // don't execute check, always fix
+};
 void fix_chargen_area(unsigned char flags) {
     unsigned short i = 512; // needs to be 512 for nocheck to trigger!
     long charset_start;
 
     // debug_region_list();
 
-    if (!(flags & CHARGEN_NOCHECK)) {
+    if (!(flags & ChargenNoCheck)) {
         if (!freeze_fetch_sector(CHARGEN_ADDRESS, NULL)) {
             // check if everything is zero
             for (i = 0; i < 512 && !sector_buffer[i]; i++) {
@@ -895,7 +904,7 @@ void fix_chargen_area(unsigned char flags) {
             }
         } else {
             // error while reading sector (old core?)
-            i = (flags & CHARGEN_FORCE) ? 512 : 0;
+            i = (flags & ChargenForce) ? 512 : 0;
         }
     }
 
@@ -911,12 +920,12 @@ void fix_chargen_area(unsigned char flags) {
 
         if (charset_start != -1) {
             // copy the font to chargen WOM directly
-            if (flags & CHARGEN_FIXMEM) {
+            if (flags & ChargenFixMem) {
                 lcopy(charset_start, CHARGEN_ADDRESS, 4096);
             }
 
             // should we also fix the slot?
-            if (flags & CHARGEN_FIXSLOT) {
+            if (flags & ChargenFixSlot) {
                 for (i = 0; i < 8; i++) {
                     lcopy(charset_start + 512L * i, (long)sector_buffer, 512);
                     freeze_store_sector(CHARGEN_ADDRESS + 512L * i, NULL);
@@ -954,7 +963,7 @@ void start_freezer_tool(char* toolfile) {
                 case 'N':
                 case 0x1b:
                 case 0x03:
-                    draw_freeze_menu(UPDATE_TOP);
+                    draw_freeze_menu(UpdateTop);
                     return;
                 default:
                     break;
@@ -1066,8 +1075,8 @@ int main(void) {
     predraw_freeze_menu();
     // chargen fix needs happen before the thumbnail frame is loaded as it clobbers
     // the thumbnail frame data.
-    fix_chargen_area(CHARGEN_FIXMEM | CHARGEN_NOCHECK);
-    draw_freeze_menu(UPDATE_ALL);
+    fix_chargen_area(ChargenFixMem | ChargenNoCheck);
+    draw_freeze_menu(UpdateAll);
 
     // Flush input buffer
     while (ASCIIKEY) {
@@ -1104,8 +1113,7 @@ int main(void) {
                     if (slot_number) {
                         slot_number = 0;
 
-                        draw_freeze_menu(
-                            UPDATE_TOP | UPDATE_PROCESS | UPDATE_THUMB | UPDATE_CHGSLOT);
+                        draw_freeze_menu(UpdateTop | UpdateProcess | UpdateThumb | UpdateChgSlot);
                     }
                     break;
                 case ',':
@@ -1119,7 +1127,7 @@ int main(void) {
                     }
 
                     draw_freeze_menu(
-                        UPDATE_TOP | UPDATE_PROCESS | UPDATE_DISK | UPDATE_THUMB | UPDATE_CHGSLOT);
+                        UpdateTop | UpdateProcess | UpdateDisk | UpdateThumb | UpdateChgSlot);
                     break;
                 case '.':
                     slot_number += 90;
@@ -1132,7 +1140,7 @@ int main(void) {
                     }
 
                     draw_freeze_menu(
-                        UPDATE_TOP | UPDATE_PROCESS | UPDATE_DISK | UPDATE_THUMB | UPDATE_CHGSLOT);
+                        UpdateTop | UpdateProcess | UpdateDisk | UpdateThumb | UpdateChgSlot);
                     break;
 
                 case 'M':
@@ -1154,13 +1162,13 @@ int main(void) {
                 case 'j': // Toggle joystick swap
                     POKE(0xD612L, (PEEK(0xD612L) ^ 0x20) & 0xEF);
 
-                    draw_freeze_menu(UPDATE_TOP);
+                    draw_freeze_menu(UpdateTop);
                     break;
 
                 case 'T':
                 case 't': // Toggle cartridge enable
                     freeze_poke(0xFFD367dL, freeze_peek(0xFFD367dL) ^ 0x01);
-                    draw_freeze_menu(UPDATE_TOP);
+                    draw_freeze_menu(UpdateTop);
                     break;
 
 #if 0
@@ -1173,15 +1181,15 @@ int main(void) {
                 case 'c':
                 case 'C': // Toggle CPU mode
                     freeze_poke(0xFFD367dL, freeze_peek(0xFFD367dL) ^ 0x20);
-                    draw_freeze_menu(UPDATE_TOP);
+                    draw_freeze_menu(UpdateTop);
                     break;
 
                 case 'F':
                 case 'f': // Change CPU speed
                     if (next_cpu_speed()) {
-                        draw_freeze_menu(UPDATE_FREQ | UPDATE_THUMB);
+                        draw_freeze_menu(UpdateFreq | UpdateThumb);
                     } else {
-                        draw_freeze_menu(UPDATE_FREQ);
+                        draw_freeze_menu(UpdateFreq);
                     }
                     break;
 
@@ -1251,14 +1259,14 @@ int main(void) {
                         lpoke(0xffd3c0el, lpeek(0xffd3c0el) & 0x7f);
                         lpoke(0xffd3d0el, lpeek(0xffd3d0el) & 0x7f);
                     }
-                    draw_freeze_menu(UPDATE_TOP);
+                    draw_freeze_menu(UpdateTop);
                     break;
 
                 case '8':
                 case '9':
                     // Change drive number of internal drives
                     freeze_poke(0x10113L - '8' + key, freeze_peek(0x10113L - '8' + key) ^ 2);
-                    draw_freeze_menu(UPDATE_DISK);
+                    draw_freeze_menu(UpdateDisk);
                     break;
                 case '0': // Select mounted disk image
                     change_mounted_disk_image(0);
@@ -1298,7 +1306,7 @@ int main(void) {
                     POKE(0xD689, orig_d689);
 
                     // workaround for old freeze slots that have an empty chargen area
-                    fix_chargen_area(CHARGEN_FIXMEM | CHARGEN_FIXSLOT);
+                    fix_chargen_area(ChargenFixMem | ChargenFixSlot);
 
                     unfreeze_slot(slot_number);
 
@@ -1359,7 +1367,7 @@ int main(void) {
 
                     VICIV.bordercol = 6;
 
-                    draw_freeze_menu(UPDATE_TOP | UPDATE_PROCESS | UPDATE_THUMB);
+                    draw_freeze_menu(UpdateTop | UpdateProcess | UpdateThumb);
                 } break;
 
                 case 0xfe: // F14 - restore CHARSET from FILE
@@ -1367,11 +1375,11 @@ int main(void) {
                     // clear screen first
                     predraw_freeze_menu();
                     // don't check, just put font into chargen
-                    fix_chargen_area(CHARGEN_NOCHECK | CHARGEN_FIXMEM);
+                    fix_chargen_area(ChargenNoCheck | ChargenFixMem);
                     // we need to redraw everything, because loading the ROM
                     // will mess things up (thumbnail for example)
                     last_thumb_frame = -1; // invalidate thumbnail
-                    draw_freeze_menu(UPDATE_ALL);
+                    draw_freeze_menu(UpdateAll);
                 } break;
 
                 case 0x1f: // HELP MEGAINFO
@@ -1388,7 +1396,7 @@ int main(void) {
                         freeze_poke(0xFFD3054L, key | 0x20);
                         lpoke(0xFFD3054L, lpeek(0xFFD3054L) | 0x20);
                     }
-                    draw_freeze_menu(UPDATE_TOP);
+                    draw_freeze_menu(UpdateTop);
                     break;
                 case 'L':
                 case 'l':

@@ -590,7 +590,7 @@ static const uint8_t CHSET_TOOLBOX[] = {
 // clang-format on
 // clang-format on
 
-#define TOOLBOX_CHARSET_BASE_IDX 232
+constexpr uint8_t TOOLBOX_CHARSET_BASE_IDX = 232;
 
 // clang-format off
 // clang-format off

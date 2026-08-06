@@ -3,10 +3,6 @@
 
 */
 
-// D81 geometry, unrelated to screen geometry despite sharing the number 80.
-#define D81_TRACKS 80
-#define D81_SECTORS_PER_TRACK 20
-
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -18,6 +14,10 @@
 #include <mega65.h>
 #include <stdio.h>
 #include <string.h>
+
+// D81 geometry, unrelated to screen geometry despite sharing the number 80.
+constexpr uint8_t D81_TRACKS = 80;
+constexpr uint8_t D81_SECTORS_PER_TRACK = 20;
 
 void setup_menu_screen(void) {
     setup_menu_screen_base();

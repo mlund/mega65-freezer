@@ -16,12 +16,15 @@ extern unsigned short slot_number;
 
 #define CHARGEN_ADDRESS 0xFF7E000L
 
-#define MEGA65_ROM_UNKNOWN 0
-#define MEGA65_ROM_C64 1
-#define MEGA65_ROM_C65 2
-#define MEGA65_ROM_M65 3
-#define MEGA65_ROM_OPENROM 4
-extern char mega65_rom_type; // set by detect_rom()
+/* Which ROM the frozen program is running. */
+enum Mega65Rom : uint8_t {
+    Mega65RomUnknown = 0,
+    Mega65RomC64 = 1,
+    Mega65RomC65 = 2,
+    Mega65RomM65 = 3,
+    Mega65RomOpenRom = 4,
+};
+extern enum Mega65Rom mega65_rom_type; // set by detect_rom()
 extern char mega65_rom_name[];
 
 void set_palette(void);
@@ -31,7 +34,10 @@ uint8_t nybl_to_screen(uint8_t v);
 unsigned char petscii_to_screen(unsigned char petscii);
 void screen_of_death(const char* msg);
 
-#define IMGPROC_INTERNAL 0x01
-#define IMGPROC_NODISK 0x02
+/* Overrides for copy_imageproc_to_freezeregion(), OR-ed together. */
+enum : uint8_t {
+    ImgProcInternal = 0x01,
+    ImgProcNoDisk = 0x02,
+};
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides);
 void old_store_selected_disk_image(uint8_t diskid, char* disk_image);

@@ -157,10 +157,13 @@ char* hyppoerror_to_screen(unsigned char error) {
     return default_error;
 }
 
-#define DISK_TYPE_D81 0
-#define DISK_TYPE_D64 1
-#define DISK_TYPE_D65 2
-#define DISK_TYPE_D71 3
+/* The disk image formats the chooser can create. */
+enum DiskType : uint8_t {
+    DiskTypeD81 = 0,
+    DiskTypeD64 = 1,
+    DiskTypeD65 = 2,
+    DiskTypeD71 = 3,
+};
 static unsigned char disk_type, current_sector, dir_track, entries, cur_row, next_sector, messed_up;
 static unsigned char current_side = 0;
 /* Exactly 18 screen columns, deliberately without a terminator. */
@@ -197,7 +200,7 @@ void draw_directory_entry(unsigned char screen_row) {
 unsigned char next_directory_entry(void) {
     unsigned char c, i, type = 0;
 
-    if (disk_type == DISK_TYPE_D81 || disk_type == DISK_TYPE_D64) {
+    if (disk_type == DiskTypeD81 || disk_type == DiskTypeD64) {
         // D81 || D64
         i = F011_DATA;                      // track next dir
         c = F011_DATA;                      // sector next dir
@@ -322,20 +325,20 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     // d68b.6/7 -> d65 flag
     disk_type = ((PEEK(0xd68b) >> (5 + drive_id)) & 0x2) | ((PEEK(0xd68a) >> (6 + drive_id)) & 0x1);
     switch (disk_type) {
-        case DISK_TYPE_D81:
+        case DiskTypeD81:
             dir_track = 39;
             current_side = 0;
             current_sector = 1;
             skip_bytes = 4;
             break;
-        case DISK_TYPE_D64:
+        case DiskTypeD64:
             dir_track = 8;
             current_side = 1;
             current_sector = 9;
             skip_bytes = 256 + 0x90;
             break;
-        case DISK_TYPE_D65:
-        case DISK_TYPE_D71:
+        case DiskTypeD65:
+        case DiskTypeD71:
             // write_entry
             return 1; // not supported
         default:
@@ -428,7 +431,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     }
 
     // move to first dir entry depending on disk_type
-    if (disk_type == DISK_TYPE_D81) {
+    if (disk_type == DiskTypeD81) {
         // D81
         current_sector++;
         if (!read_sector_with_cancel()) {
@@ -440,7 +443,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
             (void)F011_DATA;
         } while (++x);
         entries = 8;
-    } else { // DISK_TYPE_D64
+    } else { // DiskTypeD64
         current_sector++;
         if (!read_sector_with_cancel()) {
             goto exit_with_motor_off;
@@ -453,11 +456,11 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         goto exit_with_motor_off;
     }
     do {
-        if (disk_type == DISK_TYPE_D81) {
+        if (disk_type == DiskTypeD81) {
             current_sector++;
             entries = 16;
             skip_bytes = 0;
-        } else { // DISK_TYPE_D64
+        } else { // DiskTypeD64
             // with D64 dir is normally 18/1, 18/4, 18/7, ...
             if (next_sector < 2 || next_sector > 19) { // illegal next sector, abort
                 goto exit_with_motor_off;
@@ -722,10 +725,10 @@ char* freeze_select_disk_image(unsigned char drive_id) {
             case 0x1b: // ESC
             case 0x03: // RUN-STOP = make no change, but only if we did not mess up the drive!
                 if (messed_up) {
-                    if (old_disk_flags & PD_IMGFLAGS_MOUNTED) {
+                    if (old_disk_flags & PdImgFlagsMounted) {
                         mega65_dos_attach(old_disk_name, drive_id);
                     } else {
-                        mega65_dos_detach(drive_id | (old_disk_flags & PD_IMGFLAGS_NOREAL));
+                        mega65_dos_detach(drive_id | (old_disk_flags & PdImgFlagsNoReal));
                     }
                 }
                 return NULL;

@@ -397,20 +397,23 @@ void set_memory() {
 
 static const char REG_DESC_LINE[] =
     "PC   IRQ  NMI  A  X  Y  Z  B  SP   FLAGS    $01   MAPLO   MAPHI   PC28";
-#define REGLINE_PC 0
-#define REGLINE_IRQ 5
-#define REGLINE_NMI 10
-#define REGLINE_A 15
-#define REGLINE_X 18
-#define REGLINE_Y 21
-#define REGLINE_Z 24
-#define REGLINE_B 27
-#define REGLINE_SP 30
-#define REGLINE_FLAGS 35
-#define REGLINE_01 44
-#define REGLINE_MAPLO 50
-#define REGLINE_MAPHI 58
-#define REGLINE_PC28 66
+/* Column of each field in REG_DESC_LINE. */
+constexpr uint8_t REGLINE_PC = 0;
+/* show_registers() never fills these two, so the header advertises IRQ and NMI
+ * over blank columns.  Shared with the cc65 monitor. */
+[[maybe_unused]] constexpr uint8_t REGLINE_IRQ = 5;
+[[maybe_unused]] constexpr uint8_t REGLINE_NMI = 10;
+constexpr uint8_t REGLINE_A = 15;
+constexpr uint8_t REGLINE_X = 18;
+constexpr uint8_t REGLINE_Y = 21;
+constexpr uint8_t REGLINE_Z = 24;
+constexpr uint8_t REGLINE_B = 27;
+constexpr uint8_t REGLINE_SP = 30;
+constexpr uint8_t REGLINE_FLAGS = 35;
+constexpr uint8_t REGLINE_01 = 44;
+constexpr uint8_t REGLINE_MAPLO = 50;
+constexpr uint8_t REGLINE_MAPHI = 58;
+constexpr uint8_t REGLINE_PC28 = 66;
 void show_registers(void) {
     // Get hypervisor register backup area
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(0xFFD3640U);

@@ -9,7 +9,7 @@
 
 uint8_t sector_buffer[512];
 unsigned short slot_number = 0;
-char mega65_rom_type = 0;
+enum Mega65Rom mega65_rom_type = Mega65RomUnknown;
 /* 20, not 12: the OpenROM probe below does memcpy(name + 4, ..., 16), which
  * needs offsets 4..19.  At 12 it wrote eight bytes past the end and then read
  * [12] and [13] to identify the ROM. */
@@ -71,10 +71,10 @@ char* detect_rom(void) {
     if ((mega65_rom_name[4] == 'V') && (mega65_rom_name[5] == '9')) {
         if (mega65_rom_name[6] >= '2') {
             mega65_rom_name[0] = 'M';
-            mega65_rom_type = MEGA65_ROM_M65;
+            mega65_rom_type = Mega65RomM65;
         } else {
             mega65_rom_name[0] = 'C';
-            mega65_rom_type = MEGA65_ROM_C65;
+            mega65_rom_type = Mega65RomC65;
         }
         mega65_rom_name[1] = '6';
         mega65_rom_name[2] = '5';
@@ -87,7 +87,7 @@ char* detect_rom(void) {
     memcpy(mega65_rom_name + 4, sector + 0x10, 16);
     if ((mega65_rom_name[4] == 'O') && (mega65_rom_name[11] == '2') &&
         (mega65_rom_name[12] == '0') && (mega65_rom_name[13] == ' ')) {
-        mega65_rom_type = MEGA65_ROM_OPENROM;
+        mega65_rom_type = Mega65RomOpenRom;
         mega65_rom_name[0] = 'O';
         mega65_rom_name[1] = 'P';
         mega65_rom_name[2] = 'E';
@@ -108,7 +108,7 @@ char* detect_rom(void) {
       so it is save to return UNKNOWN for now
 
       // entering C64 region
-      mega65_rom_type = MEGA65_ROM_C64;
+      mega65_rom_type = Mega65RomC64;
 
       if (freeze_peek(0x2e47dL) == 'J') {
         // Probably jiffy dos
@@ -176,7 +176,7 @@ char* detect_rom(void) {
     */
 
     // set some flags
-    mega65_rom_type = MEGA65_ROM_UNKNOWN;
+    mega65_rom_type = Mega65RomUnknown;
     COPY_AND_RETURN_ROM("UNKNOWN    ")
 }
 
@@ -300,7 +300,7 @@ void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
     }
 
     freeze_poke(
-        0xFFFBD00L + disk_img_flag_loc, overrides ? (overrides & IMGPROC_NODISK ? 0x40 : 0) : i);
+        0xFFFBD00L + disk_img_flag_loc, overrides ? (overrides & ImgProcNoDisk ? 0x40 : 0) : i);
     freeze_poke(0xFFFBD02L + disk_img_flag_loc,
         overrides ? 0 : PEEK(0x0402U + disk_img_flag_loc)); // this is namelength
     for (i = 0; i < 32; i++) {

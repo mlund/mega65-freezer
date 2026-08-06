@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 
-struct freeze_region_t freeze_region_list[MAX_REGIONS];
+struct FreezeRegion freeze_region_list[MAX_REGIONS];
 unsigned char freeze_region_count = 0;
 unsigned char freeze_region_flags = 0;
 
@@ -25,7 +25,7 @@ void request_freeze_region_list(void) {
     freeze_region_flags = 0;
     for (i = 0; i < MAX_REGIONS; i++) {
         if (freeze_region_list[i].address_base == CHARGEN_ADDRESS) {
-            freeze_region_flags |= FREEZE_REGION_HAS_CHARGEN;
+            freeze_region_flags |= FreezeRegionHasChargen;
         }
         if (freeze_region_list[i].freeze_prep == 0xFF) {
             break;

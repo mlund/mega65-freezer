@@ -435,7 +435,7 @@ unsigned char freeze_load_romarea(void) {
                         freeze_slot_start_sector =
                             read_freeze_slot_start_sector(0); // we only work on slot 0!
 
-                        if (freeze_region_flags & FREEZE_REGION_HAS_CHARGEN) {
+                        if (freeze_region_flags & FreezeRegionHasChargen) {
                             // only put that into the slot, if HYPPO supports it!
                             for (unsigned short i = 0; i < 8; i++) {
                                 lcopy(0x40000L + 512L * i, (long)sector_buffer, 512);
