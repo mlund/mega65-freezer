@@ -982,11 +982,11 @@ static void paint_pixel_multi(uint8_t x, uint8_t y) {
         lpoke(byte_addr, lpeek(byte_addr) & ~mask);
     } else {
         if (g_state.current_color_idx == COLOR_FORE) {
-            lpoke(byte_addr, lpeek(byte_addr) & ~mask | (0x80 >> bitsel));
+            lpoke(byte_addr, (lpeek(byte_addr) & ~mask) | (0x80 >> bitsel));
         } else if (g_state.current_color_idx == COLOR_MC1) {
-            lpoke(byte_addr, lpeek(byte_addr) & ~mask | (0x40 >> bitsel));
+            lpoke(byte_addr, (lpeek(byte_addr) & ~mask) | (0x40 >> bitsel));
         } else if (g_state.current_color_idx == COLOR_MC2) {
-            lpoke(byte_addr, lpeek(byte_addr) & ~mask | ((0x80 >> bitsel) | (0x40 >> bitsel)));
+            lpoke(byte_addr, (lpeek(byte_addr) & ~mask) | ((0x80 >> bitsel) | (0x40 >> bitsel)));
         }
     }
 }
@@ -995,7 +995,8 @@ static void paint_pixel16_color(uint8_t x, uint8_t y) {
     const long byte_addr = (SPRITE_BUFFER + (y * 8)) + (x / 2);
     const uint8_t bitsel = (((x + 1) % 2) * 4);
     lpoke(byte_addr,
-        lpeek(byte_addr) & (0xF0 >> bitsel) | (g_state.color[g_state.current_color_idx] << bitsel));
+        (lpeek(byte_addr) & (0xF0 >> bitsel)) |
+            (g_state.color[g_state.current_color_idx] << bitsel));
 }
 
 static void clear_sprite() {
@@ -1037,17 +1038,6 @@ static void put_sprite_data_to_slot() {
 static void copy_sprite_data(const uint32_t to_addr) {
     // TODO: Sprites may exceed 512 bytes
     freeze_store_sector_partial(to_addr, SPRITE_BUFFER, g_state.sprite_size_bytes);
-}
-
-static void update_palette(void) {
-    // register uint8_t i = 0;
-    // if (IS_SPR_16COL(g_state.spriteNumber)) {
-
-    //     setmapedpal( (FREEZE_PEEK(REG_SPRPALSEL) >> 2) & 0x3);
-    //     for (i = 0; i < 16; ++i) {
-    //         POKE(0xD100 + i,
-    //     }
-    // }
 }
 
 #define HFACTOR (IS_SPR_HEXPAND(g_state.sprite_number) ? 2 : 1)
@@ -1521,7 +1511,7 @@ static void set_background() {
 static void main_loop() {
     static uint8_t edit_color_counter = 0;
     unsigned char buf[64];
-    unsigned char key = 0, keymod = 0;
+    unsigned char key = 0;
 
     mouse_set_bounding_box(0 + 24, 0 + 50, 319 + 24 - 8, 199 + 50);
     mouse_warp_to(24, 100);

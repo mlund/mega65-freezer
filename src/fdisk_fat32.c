@@ -68,7 +68,7 @@ void parse_partition_entry(const char i) {
     // Only the partition type and the LBA fields are used.  The CHS geometry at
     // offsets 1-3 and 5-7 is what a BIOS needed; nothing here reads it.
     char id = sector_buffer[offset + 4];
-    uint32_t lba_start, lba_size;
+    uint32_t lba_start = 0, lba_size = 0;
 
     for (j = 0; j < 4; j++) {
         ((char*)&lba_start)[j] = sector_buffer[offset + 8 + j];
@@ -371,7 +371,8 @@ long fat32_create_contiguous_file(
     mega65_serial_monitor_write("Search for free disk space\n");
     contiguous_clusters = 0;
     start_cluster = 0;
-    for (fat_sector_num = 0; fat_sector_num <= (fat2_sector - fat1_sector); fat_sector_num++) {
+    for (fat_sector_num = 0; fat_sector_num <= (uint32_t)(fat2_sector - fat1_sector);
+        fat_sector_num++) {
 
         // This can take a while if the disk is full, because we use a naive search.
         // So show the user that something is happening.

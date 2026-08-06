@@ -380,7 +380,7 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
     char* needle2 = ",20";
 #define NEEDLE_LEN 5
 #define NEEDLE2_LEN 3
-    unsigned char version_fail = 1, finished = 0, cmp_idx = 0, temp;
+    unsigned char finished = 0, cmp_idx = 0, temp;
 
     for (p = 0; p < 64 && !finished; p++) {
         lcopy(addr + 512l * p, (long)code_buffer, 512);
@@ -455,7 +455,7 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
  */
 static unsigned char clock_init = 1, tod_buf[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 static unsigned char rtc_state = 0, rtc_last_state = 0, rtc_settle = 0, no_extrtc = 0;
-static unsigned char rtc_check = 1, rtc_ticking = 0, rtc_diff = 0,
+static unsigned char rtc_check = 1, rtc_diff = 0,
                      rtc_buf[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static unsigned char rtc_pmu = 0xff;
 static unsigned short tod_ov = 0, rtc_ov = 0;
@@ -529,7 +529,6 @@ unsigned char get_rtc_stats(unsigned char reinit) {
         tod_ov = 0;
         rtc_ov = 0;
         rtc_check = 1;
-        rtc_ticking = 0;
         rtc_diff = 0;
     }
     lcopy(0xffd7110l, (long)rtc_buf + 6, 6);
@@ -641,7 +640,6 @@ void display_rtc_status(unsigned char x, unsigned char y) {
             if (tod_ticks > 20) {
                 rtc_check = 0;
                 if (rtc_ticks > 2) {
-                    rtc_ticking = 1;
                     if (rtc_diff > 1) {
                         if (no_extrtc && is_ntsc) {
                             strcpy(buffer, "SLOW TICK, SLOW CIA TOD!");

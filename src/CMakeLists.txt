@@ -25,6 +25,15 @@ add_compile_options(
     # $0000/$0001 are the CPU port registers, so POKE(0,..) is a legitimate
     # store through a null pointer rather than undefined behaviour.
     -fno-delete-null-pointer-checks
+    # Scoped to this directory so mega65-libc, which is not ours to fix, stays
+    # quiet.  These found two shipped bugs the day they were switched on.
+    -Wall
+    -Wextra
+    -Wconditional-uninitialized
+    # char is unsigned on llvm-mos -- verified with a _Static_assert -- so a
+    # char subscript is 0..255 and cannot go negative.  The warning guards
+    # against a signed-char platform this one is not.
+    -Wno-char-subscripts
 )
 # include_directories() also feeds the ASM rule, so helper.S finds helper.h
 # here too -- no separate CMAKE_ASM_FLAGS entry needed.
@@ -35,7 +44,12 @@ set(MEGA65_INCLUDE ${LLVM_MOS_ROOT}/mos-platform/mega65/include)
 if(NOT EXISTS ${MEGA65_INCLUDE}/mega65.h)
     message(FATAL_ERROR "MEGA65 register headers not found at ${MEGA65_INCLUDE}")
 endif()
-include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR} ${MEGA65_INCLUDE})
+include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
+# SYSTEM: the SDK headers are not ours to fix, and <mega65.h> disables
+# -Wfixed-enum-extension, a warning this clang does not know.  Marking them
+# system suppresses that at the source rather than switching the diagnostic off
+# for our own code too.
+include_directories(SYSTEM ${MEGA65_INCLUDE})
 
 # Must be a link option: -mlto-zp governs LTO codegen, and is silently ignored
 # at compile time.  Moves together with freezemenu.ld's __basic_zp_end; the

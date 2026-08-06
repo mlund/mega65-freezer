@@ -141,11 +141,10 @@ char draw_directory_entry(unsigned char screen_row) {
     if (type & 0x40) {
         POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '<');
     }
-    // Parses as `(!type) & 0xf0`, which is always 0, so the '*' never draws.
-    // Left as-is on purpose: the cc65 original has the identical line, and
-    // correcting it changes what the user sees.  See TODO.md section 2 -- it
-    // wants fixing here and upstream together, not silently diverging here.
-    if (!type & 0xf0) { // NOLINT(clang-diagnostic-logical-not-parentheses)
+    // Marks an entry whose type carries none of the high-nibble bits.  Written
+    // `!type & 0xf0` here and in cc65, which parses as `(!type) & 0xf0` and is
+    // always 0, so the '*' never drew.
+    if (!(type & 0xf0)) {
         POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '*');
     }
 
@@ -313,7 +312,6 @@ void scan_directory(void) {
  */
 unsigned char freeze_load_romarea(void) {
     unsigned char x;
-    int idle_time = 0;
 
     file_count = 0;
     selection_number = 0;

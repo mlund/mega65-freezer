@@ -162,7 +162,9 @@ char* hyppoerror_to_screen(unsigned char error) {
 #define DISK_TYPE_D65 2
 #define DISK_TYPE_D71 3
 static unsigned char disk_type, current_sector, dir_track, entries, cur_row, next_sector, messed_up;
-static unsigned char current_side = 0, entry_buffer[18] = "\"                 ";
+static unsigned char current_side = 0;
+/* Exactly 18 screen columns, deliberately without a terminator. */
+static unsigned char entry_buffer[18] __attribute__((nonstring)) = "\"                 ";
 
 void display_error() {
     unsigned char i;
@@ -285,7 +287,7 @@ int read_sector_with_cancel(void) {
 
 unsigned char draw_directory_contents(unsigned char drive_id) {
     unsigned char c, i, x;
-    short skip_bytes, j;
+    short skip_bytes = 0, j;
 
     // only work on drive 0 and 1
     if (drive_id > 1) {

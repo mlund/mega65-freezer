@@ -76,7 +76,7 @@ void draw_box(unsigned char x1,
 }
 
 void write_text(unsigned char x1, unsigned char y1, unsigned char colour, const char* t) {
-    unsigned char ofs = 0, x, c;
+    unsigned char x, c;
     for (x = x1; t[x - x1]; x++) {
         c = t[x - x1];
         if (c > 0x60) {
@@ -109,7 +109,7 @@ void input_text(
         lpoke(COLOUR_RAM_ADDRESS + y1 * SCREEN_ROW_BYTES + (x1 + ofs) * 2 + 1, colour | 0x30);
 
         c = ASCIIKEY;
-        if (c >= 0x41 && c <= 0x5a || c >= 0x61 && c <= 0x7a || c >= 0x30 && c <= 0x39) {
+        if ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) || (c >= 0x30 && c <= 0x39)) {
             if (ofs < len) {
                 out[ofs] = c;
                 // ASCII to screen code conversion
@@ -263,7 +263,6 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
     char diskname[16 + 1];
     char filename[16 + 1];
     unsigned char filename_len;
-    unsigned short slot_number = 0;
     unsigned long file_sector;
 
     fat32_open_file_system();
