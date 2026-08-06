@@ -218,7 +218,7 @@ static void report_error(const char* message) {
 
 /* The failure every command that walks frozen memory can reach. */
 static void report_unmapped(void) {
-    report_unmapped();
+    report_error("? UNMAPPED OR UNFROZEN ADDRESS  ERROR");
 }
 
 /* A screenful, matching show_memory()'s sixteen lines. */
@@ -290,8 +290,7 @@ void set_memory() {
     unsigned char i = 0;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
-        write_line("? UNMAPPED OR UNFROZEN ADDRESS  ERROR", 0);
-        recolour_last_line(2);
+        report_unmapped();
         return;
     } else {
         cache_sector(freeze_slot_offset);
@@ -645,20 +644,6 @@ void hunt_memory(void) {
 /* T and C walk two regions at once, and the sector cache holds one sector, so
  * a byte at a time would evict the far end on every byte -- an SD access per
  * byte rather than per chunk.  .bss costs nothing in the image. */
-constexpr uint16_t CHUNK_MAX = 256;
-static unsigned char chunk_buffer[CHUNK_MAX];
-
-/* Read up to CHUNK_MAX bytes into chunk_buffer, returning how many. */
-static uint16_t read_chunk(uint32_t address, uint32_t wanted) {
-    uint16_t take = (wanted > CHUNK_MAX) ? CHUNK_MAX : (uint16_t)wanted;
-    uint16_t got = 0;
-
-    while (got < take && disasm_read_byte(address + got, &chunk_buffer[got])) {
-        got++;
-    }
-    return got;
-}
-
 /* C start end other */
 void compare_memory(void) {
     unsigned char differences = 0;
