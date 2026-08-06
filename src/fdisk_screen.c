@@ -4,7 +4,7 @@
 #include "freezer_common.h"
 #include "mega65_regs.h"
 
-long screen_line_address = SCREEN_ADDRESS;
+unsigned int screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
 
 /* Writes eight hex digits to a buffer. */

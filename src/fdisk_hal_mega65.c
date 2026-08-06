@@ -291,7 +291,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             if (i != 512) {
                 // VErify error has occurred
                 //	write_line("Verify error for sector $$$$$$$$",0);
-                screen_hex((unsigned int)(screen_line_address - 80 + 24), sector_number);
+                screen_hex(screen_line_address - 80 + 24, sector_number);
             } else {
                 //      write_line("Wrote sector $$$$$$$$, result=$$",2);
                 //      screen_hex(screen_line_address-80+2+14,sector_number);

@@ -53,7 +53,7 @@ void screen_decimal(unsigned int addr, unsigned int value);
 
 void format_hex(char* out, const long value, const char columns);
 
-extern long screen_line_address;
+extern unsigned int screen_line_address;
 extern char screen_column;
 
 /* The VIC-IV setup every menu target shares: border, sprites off, screen and
