@@ -32,7 +32,7 @@ void mega65_serial_monitor_write(char* s) {
     }
 }
 
-char hexchar2(unsigned char nybble) {
+char nybble_to_hex_char(unsigned char nybble) {
     nybble = nybble & 0xf;
     if (nybble < 10) {
         return '0' + nybble;
@@ -45,7 +45,7 @@ void hexout2(char* m, unsigned long v, int n) {
         return;
     }
     do {
-        m[n - 1] = hexchar2((unsigned char)(v & 0xf));
+        m[n - 1] = nybble_to_hex_char((unsigned char)(v & 0xf));
         v = v >> 4L;
 
     } while (--n);

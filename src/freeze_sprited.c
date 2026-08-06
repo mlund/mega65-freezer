@@ -1352,13 +1352,13 @@ static void draw_sidebar() {
     g_state.redraw_flags = REDRAW_SB_NONE;
 }
 
-static void ask(const char* question, uint8_t* outbuffer, uint8_t maxlen) {
+static void ask(const char* question, uint8_t* into, uint8_t max_length) {
     gotoy(SCREEN_ROWS - 1);
     revers(1);
     textcolor(COLOUR_PINK);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
     screen_putsxy(0, SCREEN_ROWS - 1, question);
-    cinput(outbuffer, maxlen + 1, CINPUT_ACCEPT_ALL);
+    cinput(into, max_length + 1, CINPUT_ACCEPT_ALL);
     revers(0);
     textcolor(COLOUR_BLUE);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');

@@ -79,7 +79,7 @@ unsigned char not_in_root = 0;
 signed char swipe_dir = 0;
 #endif
 
-void topetsciiupper(char* text, int length);
+void to_petscii_upper(char* text, int length);
 
 static unsigned char colour_table[256];
 
@@ -500,7 +500,7 @@ void draw_freeze_menu(unsigned char part) {
                 }
             }
             if (i == process_descriptor.d81_image0_namelen) {
-                topetsciiupper(
+                to_petscii_upper(
                     process_descriptor.d81_image0_name, process_descriptor.d81_image0_namelen);
                 lcopy((unsigned long)process_descriptor.d81_image0_name,
                     (unsigned long)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
@@ -526,7 +526,7 @@ void draw_freeze_menu(unsigned char part) {
                 }
             }
             if (i == process_descriptor.d81_image1_namelen) {
-                topetsciiupper(
+                to_petscii_upper(
                     process_descriptor.d81_image1_name, process_descriptor.d81_image1_namelen);
                 lcopy((unsigned long)process_descriptor.d81_image1_name,
                     (unsigned long)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
@@ -653,7 +653,7 @@ void draw_freeze_menu(unsigned char part) {
     VICIV.bordercol = 6;
 }
 
-void topetsciiupper(char* text, int length) {
+void to_petscii_upper(char* text, int length) {
     for (int i = 0; i < length; i++) {
         if (text[i] >= 0x60 && text[i] < 0x7a) {
             text[i] &= 0x5f;
