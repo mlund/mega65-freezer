@@ -17,28 +17,12 @@
 #include <string.h>
 
 void setup_menu_screen(void) {
-    VICIV.addr = 0x15; // upper case
-
-    // NTSC 60Hz mode for monitor compatibility?
-    //  VICIV.rasline0 = 0x80;
-
-    VICIV.sdbdrwd_lsb = VIC4_SIDE_BORDER_WIDTH;
-    VICIV.sdbdrwd_msb = VIC4_BORDER_MSB_HOTREG;
-
-    // No sprites
-    VICIV.spr_ena = 0x00;
-
-    // Move screen to SCREEN_ADDRESS
-    VICIV.addr =
-        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
-    CIA2.pra = (CIA2.pra & CIA2_VIC_BANK_MASK) | CIA2_VIC_BANK_8000;
+    setup_menu_screen_base();
 
     VICIV.ctrlc = (VICIV.ctrlc & VIC4_CTRLC_MODE_MASK) | VIC4_CTRLC_16BIT_FULL_COLOUR;
     VICIV.linestep = SCREEN_ROW_BYTES;
 
-    /* Super-Extended Attribute Mode reads the high nibble as attributes, so the
-     * fill has to stay a plain colour. */
-    lfill(0xff80000U, COLOUR_WHITE, SCREEN_BYTES);
+    clear_colour_ram();
 }
 
 int main(void) {

@@ -4,6 +4,8 @@
 // Use default char set, not ASCII charset
 #define CHARSET_ADDRESS (0x9000U)
 #define COLOUR_RAM_ADDRESS (0x1f800)
+/* The same colour RAM by its 28-bit address, for lfill/lcopy. */
+#define COLOUR_RAM_28BIT (0xff80000U)
 // 16-bit text mode: 40 columns of two bytes, 25 rows.  No SCREEN_COLS here --
 // freeze_sprited.c defines that as 80 for its own layout.
 #define SCREEN_ROW_BYTES 80
@@ -53,3 +55,9 @@ void format_hex(char* out, const long value, const char columns);
 
 extern long screen_line_address;
 extern char screen_column;
+
+/* The VIC-IV setup every menu target shares: border, sprites off, screen and
+ * charset base, VIC bank.  Text mode differs per target, so callers set ctrlc
+ * and friends themselves afterwards. */
+void setup_menu_screen_base(void);
+void clear_colour_ram(void);

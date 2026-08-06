@@ -2,6 +2,7 @@
 
 #include "fdisk_memory.h"
 #include "freezer_common.h"
+#include "mega65_regs.h"
 
 long screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
@@ -100,4 +101,24 @@ void screen_decimal(unsigned int addr, unsigned int v) {
     // Copy to screen
     for (j = 0; j < 5; j++)
         POKE(addr + j, digits[j]);
+}
+
+void setup_menu_screen_base(void) {
+    /* Written before the base registers below, so the hot-register
+     * recalculation that lands is the one the second write triggers. */
+    VICIV.addr = VIC4_ADDR_UPPERCASE;
+
+    VICIV.sdbdrwd_lsb = VIC4_SIDE_BORDER_WIDTH;
+    VICIV.sdbdrwd_msb = VIC4_BORDER_MSB_HOTREG;
+    VICIV.spr_ena = 0x00;
+
+    VICIV.addr =
+        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
+    CIA2.pra = (CIA2.pra & CIA2_VIC_BANK_MASK) | CIA2_VIC_BANK_8000;
+}
+
+/* Super-Extended Attribute Mode reads the high nibble as attributes, so the
+ * fill has to stay a plain colour. */
+void clear_colour_ram(void) {
+    lfill(COLOUR_RAM_28BIT, COLOUR_WHITE, SCREEN_BYTES);
 }

@@ -101,6 +101,10 @@ static inline uint16_t hw_div16_ceil(uint32_t a, uint32_t b) {
 // 0-5 its MSB, but bit 7 of $D05D is HOTREG: the switch that makes legacy
 // VIC-II/III register writes propagate to their VIC-IV equivalents.  Bit 6 is
 // set here and is not documented in the user guide.
+// $D018 in its C64 form: charset at $1000, i.e. the uppercase ROM set.
+#define VIC4_ADDR_UPPERCASE 0x15
+#define VIC4_CTRLC_LEGACY_MASK 0xF8
+#define VIC4_CTRLB_80_COLUMN 0xE0
 #define VIC4_SIDE_BORDER_WIDTH 80
 #define VIC4_BORDER_MSB_HOTREG 0xC0
 #define VIC4_CTRLB_EXTENDED_ATTRIBUTES 0x20

@@ -16,31 +16,13 @@
 #include <string.h>
 
 void setup_menu_screen(void) {
-    VICIV.addr = 0x15; // upper case
+    setup_menu_screen_base();
 
-    // NTSC 60Hz mode for monitor compatibility?
-    //  VICIV.rasline0 = 0x80;
-
-    // Reset border widths
-    POKE(0xD05CU, 80);
-    POKE(0xD05DU, 0xC0);
-
-    // No sprites
-    VICIV.spr_ena = 0x00;
-
-    // Move screen to SCREEN_ADDRESS
-    VICIV.addr =
-        (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
-    CIA2.pra = (CIA2.pra & 0xfc) | 0x01;
-
-    VICIV.ctrlc = VICIV.ctrlc & 0xf8; // turn off CHR16, FCLRLO/HI
+    VICIV.ctrlc = VICIV.ctrlc & VIC4_CTRLC_LEGACY_MASK;
     VICIV.linestep = SCREEN_ROW_BYTES;
+    VICIV.ctrlb = VIC4_CTRLB_80_COLUMN;
 
-    // 80-columns mode
-    VICIV.ctrlb = 0xE0;
-
-    // Fill colour RAM with a value that won't cause problems in Super-Extended Attribute Mode
-    lfill(0xff80000U, 1, SCREEN_BYTES);
+    clear_colour_ram();
 }
 
 int main(void) {
