@@ -1597,8 +1597,18 @@ static void set_background() {
     }
 }
 
+/* The edit cursor's colour steps on the raster rather than once per pass of
+ * the loop, because the pass rate is whatever the build happens to achieve --
+ * here fast enough to recolour the sprite several times within one frame, and
+ * mid-frame at that, which shimmers rather than pulses.  A tick is one wrap of
+ * the raster line, about 1/100 s on PAL, so sixteen colours take a little
+ * under a second. */
+constexpr uint8_t CURSOR_COLOUR_TICKS = 6;
+
 static void main_loop() {
-    static uint8_t edit_color_counter = 0;
+    static uint8_t edit_color_index = 0;
+    static uint8_t colour_countdown = CURSOR_COLOUR_TICKS;
+    static uint8_t previous_raster = 0;
     unsigned char buf[64];
     unsigned char key = 0;
 
@@ -1607,8 +1617,12 @@ static void main_loop() {
     mouse_bind_to_sprite(0);
 
     while (1) {
-        POKE(
-            0xD028, EDIT_CURSOR_COLOR_MAP[edit_color_counter++ / 16]); // Update editor cursor color
+        const uint8_t raster = VICIV.rasterline;
+        if (raster < previous_raster && --colour_countdown == 0) {
+            colour_countdown = CURSOR_COLOUR_TICKS;
+            VICIV.spr_color[EDIT_CURSOR_NUM] = EDIT_CURSOR_COLOR_MAP[edit_color_index++ & 0x0F];
+        }
+        previous_raster = raster;
 
         mouse_update_position(&mx, &my);
         if ((my >= 66 && my <= 233) && (mx >= 55 && mx <= 235)) {
