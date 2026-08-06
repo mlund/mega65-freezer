@@ -26,7 +26,7 @@ static void to_stemp(const char* s, char length) {
             c -= 0x60;
         } else if (c >= 'A' && c <= 'Z') {
             c -= 0x40;
-}
+        }
         stemp[i] = c;
     }
 }
@@ -34,7 +34,7 @@ static void to_stemp(const char* s, char length) {
 void write_line_len(const char* s, char col, char length) {
     if (length > (char)sizeof(stemp)) {
         length = (char)sizeof(stemp);
-}
+    }
     to_stemp(s, length);
     write_line_raw(stemp, col, length);
 }
@@ -67,7 +67,7 @@ void write_line(const char* s, char col) {
     char len = 0;
     while (s[len] && len < 78) {
         len++;
-}
+    }
     write_line_len(s, col, len);
 }
 
@@ -139,13 +139,13 @@ void fatal_error(const unsigned char* filename, unsigned int line_number) {
     display_footer(FOOTER_FATAL);
     for (i = 0; filename[i]; i++) {
         POKE(FOOTER_ADDRESS + 44 + i, filename[i]);
-}
+    }
     POKE(FOOTER_ADDRESS + 44 + i, ':');
     i++;
     screen_decimal(FOOTER_ADDRESS + 44 + i, line_number);
     lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS, 2 | ATTRIB_REVERSE, 80);
     for (;;) {
-        }
+    }
 }
 
 void set_screen_attributes(long p, unsigned char count, unsigned char attr) {
@@ -168,7 +168,9 @@ static void set_attr(unsigned char col, unsigned char keep, unsigned char set) {
 
 char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
     char len = 0;
-    char c;
+    /* The trailing key-clear reads this, and a maxlen of 0 never enters the
+     * loop that assigns it. */
+    char c = 0;
     char reverse = 0x90;
 
     // Read input using hardware keyboard scanner
@@ -176,7 +178,7 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
     // Flush keyboard input queue before reading input
     while (ASCIIKEY) {
         ASCIIKEY = 0;
-}
+    }
 
     while (len < maxlen) {
         c = ASCIIKEY;
@@ -191,7 +193,7 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
             VICIV.addr = VICIV.addr ^ 0x02;
 
             while ((PEEK(0xD611U) & 0x0b) >= 0x09) {
-                }
+            }
         }
 
         if (c) {
@@ -235,7 +237,7 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
                 // Mask char so that it looks right using screen codes instead of ASCII codes
                 if (c > 0x40) {
                     c &= 0x1f;
-}
+                }
                 lpoke(screen_line_address + column + len - 1, c);
             }
 
@@ -255,7 +257,7 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
     // clear char from queue
     while (c && (ASCIIKEY == c)) {
         ASCIIKEY = 1;
-}
+    }
 
     return len;
 }

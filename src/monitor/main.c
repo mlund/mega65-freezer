@@ -63,7 +63,7 @@ int main(void) {
         sdhc_card = 1;
     } else {
         sdhc_card = 0;
-}
+    }
 
     setup_menu_screen();
 

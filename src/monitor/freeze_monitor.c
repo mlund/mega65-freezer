@@ -166,7 +166,7 @@ static void hex_to_screen_codes(unsigned char count) {
     for (unsigned char i = 0; i < count; i++) {
         if (output_buffer[i] >= 'A' && output_buffer[i] <= 'F') {
             output_buffer[i] &= 0x0f;
-}
+        }
     }
 }
 
@@ -183,7 +183,7 @@ void show_memory_line(uint32_t addr) {
         for (unsigned char i = 0; i < 65; i++) {
             output_buffer[9 + i] =
                 "<UNMAPPED OR UNFROZEN MEMORY>                                    "[i] & 0x3f;
-}
+        }
         output_buffer[9] = '<';
         output_buffer[9 + 28] = '>';
     } else {
@@ -341,7 +341,7 @@ void set_memory() {
                         } else {
                             mon_sector[(freeze_slot_offset + i) & 0x1ff] =
                                 screen_line_buffer[screen_line_offset++];
-}
+                        }
                         i++;
                     }
                     break;
@@ -861,7 +861,7 @@ void freeze_monitor(void) {
     // Flush input buffer
     while (ASCIIKEY) {
         ASCIIKEY = 0;
-}
+    }
 
     show_registers();
 
@@ -894,7 +894,7 @@ void freeze_monitor(void) {
                 // Bitmaps: B start
                 if (parse_address()) {
                     break;
-}
+                }
                 show_bitmaps();
                 break;
             case 'c':
@@ -908,7 +908,7 @@ void freeze_monitor(void) {
                 // stopped, as M does.
                 if (parse_address()) {
                     break;
-}
+                }
                 show_disassembly();
                 break;
             case 'f':
@@ -926,7 +926,7 @@ void freeze_monitor(void) {
                 // Display memory
                 if (parse_address()) {
                     break;
-}
+                }
                 show_memory();
                 break;
             case 'r':
@@ -939,7 +939,7 @@ void freeze_monitor(void) {
                 // Set memory values
                 if (parse_address()) {
                     break;
-}
+                }
                 set_memory();
                 break;
             case 't':

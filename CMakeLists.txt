@@ -92,8 +92,10 @@ add_subdirectory(src)
 
 # Static analysis and formatting.  The .c files carry the diagnostics; headers
 # are reached through them.
-file(GLOB TIDY_SOURCES ${SRC}/*.c)
-file(GLOB FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.h)
+# GLOB_RECURSE, not GLOB: src/monitor/ was silently unchecked from the moment it
+# existed, so both targets passed while the files being changed went unread.
+file(GLOB_RECURSE TIDY_SOURCES ${SRC}/*.c)
+file(GLOB_RECURSE FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.h)
 
 find_program(CLANG_TIDY_EXE   NAMES clang-tidy   HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
