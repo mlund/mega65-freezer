@@ -20,10 +20,9 @@ static void hex_to_buf(char* out, const long value) {
 }
 
 void screen_hex(unsigned int addr, long value) {
-    char i;
     char dec[8];
     hex_to_buf(dec, value);
-    for (i = 0; i < 8; i++) {
+    for (char i = 0; i < 8; i++) {
         POKE(addr + i, dec[i]);
     }
 }
@@ -31,11 +30,10 @@ void screen_hex(unsigned int addr, long value) {
 /* Writes the low `columns` digits.  out is a plain buffer, so take a pointer:
  * an address passed as an integer hides the stores from the compiler. */
 void format_hex(char* out, const long value, const char columns) {
-    char i;
     char dec[8];
     hex_to_buf(dec, value);
 
-    for (i = 0; i < columns; i++) {
+    for (char i = 0; i < columns; i++) {
         out[i] = dec[i + 8 - columns];
     }
 }

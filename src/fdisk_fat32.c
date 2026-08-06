@@ -61,7 +61,6 @@ void serial_hex(unsigned long v) {
 }
 
 void parse_partition_entry(const char i) {
-    char j;
 
     int offset = 0x1be + (i << 4);
 
@@ -70,10 +69,10 @@ void parse_partition_entry(const char i) {
     char id = sector_buffer[offset + 4];
     uint32_t lba_start = 0, lba_size = 0;
 
-    for (j = 0; j < 4; j++) {
+    for (char j = 0; j < 4; j++) {
         ((char*)&lba_start)[j] = sector_buffer[offset + 8 + j];
     }
-    for (j = 0; j < 4; j++) {
+    for (char j = 0; j < 4; j++) {
         ((char*)&lba_size)[j] = sector_buffer[offset + 12 + j];
     }
 
@@ -91,11 +90,11 @@ void parse_partition_entry(const char i) {
             fat_copies = sector_buffer[0x10];
             // hidden sectors @ $01c-$01f
             // sectors per FAT @ $024-$027
-            for (j = 0; j < 4; j++) {
+            for (char j = 0; j < 4; j++) {
                 ((char*)&sectors_per_fat)[j] = sector_buffer[0x24 + j];
             }
             // cluster of root directort @ $02c-$02f
-            for (j = 0; j < 4; j++) {
+            for (char j = 0; j < 4; j++) {
                 ((char*)&root_dir_cluster)[j] = sector_buffer[0x2c + j];
             }
             // $55 $AA signature @ $1fe-$1ff
@@ -203,12 +202,11 @@ void getrtc(struct M65Tm* tm) {
 }
 
 unsigned char fat32_open_file_system(void) {
-    unsigned char i;
     sdcard_readsector(0);
     if ((sector_buffer[0x1fe] != 0x55) || (sector_buffer[0x1ff] != 0xAA)) {
         return 255;
     } else {
-        for (i = 0; i < 4; i++) {
+        for (unsigned char i = 0; i < 4; i++) {
             parse_partition_entry(i);
         }
     }

@@ -38,9 +38,8 @@ uint32_t find_thumbnail_offset(void) {
     uint32_t freeze_slot_offset =
         1; // Skip the initial saved SD sector at the beginning of each slot
     uint32_t region_length = 0;
-    char i;
 
-    for (i = 0; i < freeze_region_count; i++) {
+    for (char i = 0; i < freeze_region_count; i++) {
         region_length = freeze_region_list[i].region_length & REGION_LENGTH_MASK;
         /* Thumbnail freezing has changed recently:
            Previously the thumbnail was accessed indirectly, and had to be extracted to $1000 first,

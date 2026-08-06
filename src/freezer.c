@@ -285,14 +285,13 @@ static char thumb_frame_name[][13] = {
 
 void predraw_freeze_menu(void)
 {
-  unsigned short i;
   // Clear screen, blue background, white text, like Action Replay
   VICIV.bordercol = 6;
   VICIV.screencol = 6;
 
   lfill(0xFF80000L, 1, SCREEN_BYTES);
   // Make disk image names different colour to avoid confusion
-  for (i = 40; i < 80; i += 2) {
+  for (unsigned short i = 40; i < 80; i += 2) {
     lpoke(0xff80000 + 21 * SCREEN_ROW_BYTES + 1 + i, 0xe);
     lpoke(0xff80000 + 24 * SCREEN_ROW_BYTES + 1 + i, 0xe);
     if (i > 50) { // ROM VERSION
@@ -325,10 +324,9 @@ void predraw_freeze_menu(void)
 // clang-format on
 
 void copy_convert_to_screen(const unsigned char* data, short offset) {
-    unsigned short i;
     offset <<= 1;
 
-    for (i = 0; data[i]; i++) {
+    for (unsigned short i = 0; data[i]; i++) {
         if (data[i] != '~') { // skip thumb area
             if ((data[i] >= 'A') && (data[i] <= 'Z')) {
                 POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i] - 0x40);
@@ -656,8 +654,7 @@ void draw_freeze_menu(unsigned char part) {
 }
 
 void topetsciiupper(char* str, int len) {
-    int i;
-    for (i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++) {
         if (str[i] >= 0x60 && str[i] < 0x7a) {
             str[i] &= 0x5f;
         }
@@ -849,8 +846,7 @@ void debug_region_list()
 {
   // display region list on screen
   unsigned long test;
-  unsigned short j;
-  for (j = 0; j < freeze_region_count; j++) {
+  for (unsigned short j = 0; j < freeze_region_count; j++) {
     test = freeze_region_list[j].address_base;
     POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 60 - 16, 32);
     for (i = 0; i < 8; i++) {
@@ -1312,8 +1308,6 @@ int main(void) {
 
                 case 0xf7: // F7 = save to slot
                 {
-                    uint32_t i;
-                    uint32_t j;
                     uint32_t dest_freeze_slot_start_sector;
 
                     // can't save to slot 0
@@ -1336,14 +1330,14 @@ int main(void) {
                     // 512KB = 1024 sectors
                     // Process in 64KB blocks, so that we can do multi-sector writes
                     // and generally be about 10x faster than otherwise.
-                    for (i = 0; i < 1024; i += 128) {
+                    for (uint32_t i = 0; i < 1024; i += 128) {
                         VICIV.bordercol = 0x0e;
-                        for (j = 0; j < 128; j++) {
+                        for (uint32_t j = 0; j < 128; j++) {
                             sdcard_readsector(freeze_slot_start_sector + i + j);
                             lcopy((unsigned long)sector_buffer, 0x40000U + (j << 9), 512);
                         }
                         VICIV.bordercol = 0x00;
-                        for (j = 0; j < 128; j++) {
+                        for (uint32_t j = 0; j < 128; j++) {
                             lcopy(0x40000U + (j << 9), (unsigned long)sector_buffer, 512);
 #ifdef USE_MULTIBLOCK_WRITE
                             if (!j)

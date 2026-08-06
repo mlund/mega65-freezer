@@ -181,9 +181,8 @@ void clear_screen(unsigned char lines) {
 }
 
 void copy_line_to_screen(long dest, char* src, unsigned int length) {
-    unsigned int i;
 
-    for (i = 0; i < length && src[i] != 0; i++) {
+    for (unsigned int i = 0; i < length && src[i] != 0; i++) {
         POKE(dest + (i << 1) + 0, petscii_to_screen(src[i]));
         POKE(dest + (i << 1) + 1, 0);
     }
@@ -427,7 +426,6 @@ unsigned char freeze_load_romarea(void) {
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".tcr")) {
                         unsigned char cg_7a_set = 0, cg_7a_mask = 0xff;
                         unsigned char cg_54_set = 0, cg_54_mask = 0xff;
-                        unsigned short i;
 
                         // Load CHARSET to chargen WOM
                         read_file_from_sdcard(rom_name_return, 0x40000L);
@@ -439,7 +437,7 @@ unsigned char freeze_load_romarea(void) {
 
                         if (freeze_region_flags & FREEZE_REGION_HAS_CHARGEN) {
                             // only put that into the slot, if HYPPO supports it!
-                            for (i = 0; i < 8; i++) {
+                            for (unsigned short i = 0; i < 8; i++) {
                                 lcopy(0x40000L + 512L * i, (long)sector_buffer, 512);
                                 freeze_store_sector(CHARGEN_ADDRESS + 512L * i, NULL);
                             }

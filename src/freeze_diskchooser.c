@@ -167,12 +167,11 @@ static unsigned char current_side = 0;
 static unsigned char entry_buffer[18] __attribute__((nonstring)) = "\"                 ";
 
 void display_error() {
-    unsigned char i;
     char* errstr;
 
     VICIV.bordercol = 2;
     errstr = hyppoerror_to_screen(mega65_geterrorcode());
-    for (i = 0; i < 19 && errstr[i]; i++) {
+    for (unsigned char i = 0; i < 19 && errstr[i]; i++) {
         POKE(SCREEN_ADDRESS + (21 * 2) + (i * 2), petscii_to_screen(errstr[i]));
         lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + (i * 2), 0x02); // errors are red
     }
@@ -181,9 +180,8 @@ void display_error() {
 }
 
 void draw_directory_entry(unsigned char screen_row) {
-    unsigned char i;
 
-    for (i = 0; i < 18; i++) {
+    for (unsigned char i = 0; i < 18; i++) {
         POKE(
             SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2) + (i * 2), entry_buffer[i]);
     }
@@ -239,13 +237,12 @@ unsigned char next_directory_entry(void) {
 }
 
 void draw_entries(void) {
-    unsigned char i;
 
     // next_sector = 255 -> first entry of sector to be read
     // next_sector = 254 -> first already read, no valid dir pointer
     // next_sector < 41  -> next dir sector
     next_sector = 255;
-    for (i = 0; i < entries; i++) {
+    for (unsigned char i = 0; i < entries; i++) {
         if (next_directory_entry()) {
             draw_directory_entry(cur_row);
             cur_row++;
