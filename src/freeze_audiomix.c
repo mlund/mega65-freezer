@@ -378,11 +378,11 @@ void change_db(unsigned char row, unsigned char change) {
         }
     }
     v = MINUS_DB_TABLE[db];
-    audioxbar_setcoefficient(c + 0, v & 0xff);
-    audioxbar_setcoefficient(c + 1, v >> 8);
+    audioxbar_setcoefficient(c + 0, (uint8_t)(v & 0xff));
+    audioxbar_setcoefficient(c + 1, (uint8_t)(v >> 8));
     // change LFT/RGT (audio jack) to the same value in simple mixer!
-    audioxbar_setcoefficient(c - 0xc0, v & 0xff);
-    audioxbar_setcoefficient(c - 0xc0 + 1, v >> 8);
+    audioxbar_setcoefficient(c - 0xc0, (uint8_t)(v & 0xff));
+    audioxbar_setcoefficient(c - 0xc0 + 1, (uint8_t)(v >> 8));
 
     if (row == 0) {
         set_amplifier(0, v);
@@ -397,10 +397,10 @@ void swap_coefficients(unsigned char a, unsigned char b) {
     v |= audioxbar_getcoefficient(a + 1) << 8;
     v2 = audioxbar_getcoefficient(b);
     v2 |= audioxbar_getcoefficient(b + 1) << 8;
-    audioxbar_setcoefficient(a, v2 & 0xff);
-    audioxbar_setcoefficient(b, v & 0xff);
-    audioxbar_setcoefficient(a + 1, v2 >> 8);
-    audioxbar_setcoefficient(b + 1, v >> 8);
+    audioxbar_setcoefficient(a, (uint8_t)(v2 & 0xff));
+    audioxbar_setcoefficient(b, (uint8_t)(v & 0xff));
+    audioxbar_setcoefficient(a + 1, (uint8_t)(v2 >> 8));
+    audioxbar_setcoefficient(b + 1, (uint8_t)(v >> 8));
 }
 
 void stereo_swap(void) {
@@ -440,38 +440,38 @@ void stereo_toggle(void) {
             // Left side output
 
             // Left SID
-            audioxbar_setcoefficient(0x00 + i, v & 0xff);
-            audioxbar_setcoefficient(0x01 + i, v >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(v & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(v >> 8));
             // Right SID
-            audioxbar_setcoefficient(0x02 + i, v2 & 0xff);
-            audioxbar_setcoefficient(0x03 + i, v2 >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(v2 & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(v2 >> 8));
             // Left Digi
-            audioxbar_setcoefficient(0x10 + i, v & 0xff);
-            audioxbar_setcoefficient(0x11 + i, v >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(v & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(v >> 8));
             // Right Digi
-            audioxbar_setcoefficient(0x12 + i, v2 & 0xff);
-            audioxbar_setcoefficient(0x13 + i, v2 >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(v2 & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(v2 >> 8));
             // OPL SFX FM
-            audioxbar_setcoefficient(0x1c + i, v & 0xff);
-            audioxbar_setcoefficient(0x1d + i, v >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(v & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(v >> 8));
         } else {
             // Right side output
 
             // Left SID
-            audioxbar_setcoefficient(0x00 + i, v2 & 0xff);
-            audioxbar_setcoefficient(0x01 + i, v2 >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(v2 & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(v2 >> 8));
             // Right SID
-            audioxbar_setcoefficient(0x02 + i, v & 0xff);
-            audioxbar_setcoefficient(0x03 + i, v >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(v & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(v >> 8));
             // Left Digi
-            audioxbar_setcoefficient(0x10 + i, v2 & 0xff);
-            audioxbar_setcoefficient(0x11 + i, v2 >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(v2 & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(v2 >> 8));
             // Right Digi
-            audioxbar_setcoefficient(0x12 + i, v & 0xff);
-            audioxbar_setcoefficient(0x13 + i, v >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(v & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(v >> 8));
             // OPL SFX FM
-            audioxbar_setcoefficient(0x1c + i, v & 0xff);
-            audioxbar_setcoefficient(0x1d + i, v >> 8);
+            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(v & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(v >> 8));
         }
     }
 }

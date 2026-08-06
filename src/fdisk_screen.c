@@ -9,14 +9,14 @@ char screen_column = 0;
 
 /* Writes eight hex digits to a buffer. */
 static void hex_to_buf(char* out, const long value) {
-    out[0] = nybl_to_screen(value >> 28);
-    out[1] = nybl_to_screen(value >> 24);
-    out[2] = nybl_to_screen(value >> 20);
-    out[3] = nybl_to_screen(value >> 16);
-    out[4] = nybl_to_screen(value >> 12);
-    out[5] = nybl_to_screen(value >> 8);
-    out[6] = nybl_to_screen(value >> 4);
-    out[7] = nybl_to_screen(value >> 0);
+    out[0] = nybl_to_screen((uint8_t)(value >> 28));
+    out[1] = nybl_to_screen((uint8_t)(value >> 24));
+    out[2] = nybl_to_screen((uint8_t)(value >> 20));
+    out[3] = nybl_to_screen((uint8_t)(value >> 16));
+    out[4] = nybl_to_screen((uint8_t)(value >> 12));
+    out[5] = nybl_to_screen((uint8_t)(value >> 8));
+    out[6] = nybl_to_screen((uint8_t)(value >> 4));
+    out[7] = nybl_to_screen((uint8_t)(value >> 0));
 }
 
 void screen_hex(unsigned int addr, long value) {

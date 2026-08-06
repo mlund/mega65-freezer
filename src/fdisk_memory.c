@@ -57,9 +57,9 @@ __attribute__((noinline)) void lcopy(
     }
     dmalist.option_0b = 0x0b;
     dmalist.option_80 = 0x80;
-    dmalist.source_mb = source_address >> 20;
+    dmalist.source_mb = (uint8_t)(source_address >> 20);
     dmalist.option_81 = 0x81;
-    dmalist.dest_mb = (destination_address >> 20);
+    dmalist.dest_mb = (uint8_t)(destination_address >> 20);
     dmalist.end_of_options = 0x00;
 
     dmalist.command = 0x00; // copy
@@ -88,7 +88,7 @@ __attribute__((noinline)) void lfill(
     dmalist.option_80 = 0x80;
     dmalist.source_mb = 0x00;
     dmalist.option_81 = 0x81;
-    dmalist.dest_mb = destination_address >> 20;
+    dmalist.dest_mb = (uint8_t)(destination_address >> 20);
     dmalist.end_of_options = 0x00;
 
     dmalist.command = 0x03; // fill
