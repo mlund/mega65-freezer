@@ -196,10 +196,10 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(dma PROPERTIES TIMEOUT 60)
         endif()
 
-        # The tools are launched from the freeze menu, which has set up the VIC
-        # before it hands over.  Dropped in with `-prg` they never start at all,
-        # so this boots FREEZER and presses the menu key, the way a person does.
-        # Needs Python for the keyboard driver.
+        # Covers the freezer's launch path -- region list, find, load, run --
+        # which `-prg` cannot reach because a tool dropped into memory cold
+        # never starts.  The tool that comes up is the SD image's rather than
+        # ours; see test/verify_launch.py.  Needs Python for the keyboard.
         if(XEMU AND Python3_FOUND)
             add_test(NAME launch_monitor
                 COMMAND ${Python3_EXECUTABLE}

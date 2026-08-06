@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
-"""Start a tool the way the freezer does, and check it drew.
+"""Check that the freezer can find, load and start a tool.
 
-These tools are launched from the freeze menu, which has already set up the VIC
+Tools are launched from the freeze menu, which has already set up the VIC
 before it hands over.  Dropped straight into memory with `-prg` they never
 start -- the BASIC command sits unexecuted at the prompt -- so a cold harness
-says nothing about them.  This one boots the freezer, presses the menu key, and
-looks for a line only the tool draws.
+says nothing about that path.  This boots the freezer, presses the menu key,
+and looks for a line the launched tool draws.
+
+What it covers is the *freezer's* side: reading the region list, finding the
+file, loading and running it.  The tool that appears is the SD image's, not
+this project's build -- Xemu's own image carries stock MEGA65 binaries, and
+`-virtsd -sdimg <dir>` is not enough to replace them because a
+directory-backed FAT32 has no system partition for the freeze slots.  So a
+failure here means the freezer stopped being able to launch anything, not that
+our monitor regressed.
 
     python3 test/verify_launch.py --emulator xmega65 --prg FREEZER.M65 \\
             --keys m --expect "PC   IRQ  NMI"
