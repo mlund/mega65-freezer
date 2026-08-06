@@ -98,3 +98,14 @@ add_m65(MAKEDISK makedisk.c fdisk_fat32.c charset.c)
 add_m65(ROMLOAD  romload.c freeze_romload.c charset.c)
 add_m65(SPRITED  sprited.c freeze_sprited.c charset.c)
 add_m65(MEGAINFO megainfo.c freeze_megainfo.c charset.c cc65compat.c)
+
+# Xemu test targets.  Plain c64 PRGs, not .M65: they are launched with Xemu's
+# `-prg`, so they want the platform's own BASIC stub rather than freezemenu.ld's
+# $080D trampoline.  mega65-libc supplies assert_eq/xemu_exit/debug_msg, so the
+# tests only build when it is linked.
+if(LINK_LIBC)
+    add_executable(test_dma ${CMAKE_SOURCE_DIR}/test/test_dma.c fdisk_memory.c)
+    target_compile_options(test_dma PRIVATE $<$<COMPILE_LANGUAGE:C>:-mcpu=${C_MCPU}>)
+    target_link_libraries(test_dma mega65libc)
+    set_target_properties(test_dma PROPERTIES OUTPUT_NAME test_dma.prg)
+endif()

@@ -176,6 +176,26 @@ if(Python3_FOUND AND LLVM_MC_EXE)
         # not ours to redistribute, so point at your own copy with
         # -DMEGA65_ROM=/path/to/MEGA65.ROM or the MEGA65_ROM environment
         # variable; without one the test simply does not exist.
+        # Xemu tests.  The program checks its own invariants and quits the
+        # emulator with the failing check's number, so the exit status is the
+        # verdict -- nothing is parsed.  `-testing` is what makes that $D6CF
+        # write work; without it the program cannot report anything.
+        #
+        # Locator from mega65-libc's tests/CMakeLists.txt so the two projects
+        # agree, plus HINTS: on macOS Xemu installs as an app bundle and is
+        # never on PATH, so a bare find_program silently registers no tests.
+        find_program(XEMU NAMES xmega65 xmega65.native xmega65.exe xemu-xmega65 xemu-xmega65.exe
+                     HINTS $ENV{HOME}/bin /Applications/xmega65.app/Contents/MacOS)
+        if(XEMU AND TARGET test_dma)
+            add_test(NAME dma
+                COMMAND ${XEMU} -headless -sleepless -testing -model 3
+                        -hyperserialascii -besure
+                        -prg $<TARGET_FILE:test_dma>)
+            # It exits by itself in about a second; the timeout is only so a
+            # hang is reported as one rather than stalling the suite.
+            set_tests_properties(dma PROPERTIES TIMEOUT 60)
+        endif()
+
         set(MEGA65_ROM "$ENV{MEGA65_ROM}" CACHE FILEPATH
             "MEGA65.ROM image for the disassembler's real-code test")
         if(MEGA65_ROM AND EXISTS ${MEGA65_ROM})
