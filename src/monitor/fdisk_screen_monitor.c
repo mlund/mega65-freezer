@@ -19,9 +19,9 @@ char stemp[80];
 
 /* Via stemp because neither end can be converted in place: callers pass string
  * literals, and screen RAM reads back as ROM when BASIC is banked in. */
-static void to_stemp(const char* s, char length) {
+static void to_stemp(const char* text, char length) {
     for (char i = 0; i < length; i++) {
-        char c = s[i];
+        char c = text[i];
         if (c >= 'a' && c <= 'z') {
             c -= 0x60;
         } else if (c >= 'A' && c <= 'Z') {
@@ -31,12 +31,12 @@ static void to_stemp(const char* s, char length) {
     }
 }
 
-void write_line_len(const char* s, char col, char length) {
+void write_line_len(const char* text, char column, char length) {
     if (length > (char)sizeof(stemp)) {
         length = (char)sizeof(stemp);
     }
-    to_stemp(s, length);
-    write_line_raw(stemp, col, length);
+    to_stemp(text, length);
+    write_line_raw(stemp, column, length);
 }
 
 /* Step to the next line, scrolling when the last one is used up. */
@@ -51,24 +51,24 @@ void next_line(void) {
     }
 }
 
-void write_line_raw(char* s, char col, char length) {
-    lcopy((long)&s[0], screen_line_address + col, length);
+void write_line_raw(char* text, char column, char length) {
+    lcopy((long)&text[0], screen_line_address + column, length);
     next_line();
 }
 
 /* Text on the current line without advancing, so the caller can read input
  * starting after it. */
-void write_prompt(const char* s, char length) {
-    to_stemp(s, length);
+void write_prompt(const char* text, char length) {
+    to_stemp(text, length);
     lcopy((long)stemp, screen_line_address, length);
 }
 
-void write_line(const char* s, char col) {
-    char len = 0;
-    while (s[len] && len < 78) {
-        len++;
+void write_line(const char* text, char column) {
+    char length = 0;
+    while (text[length] && length < 78) {
+        length++;
     }
-    write_line_len(s, col, len);
+    write_line_len(text, column, length);
 }
 
 /* Recolour one field of the line just written, for callers that colour a line
@@ -91,7 +91,7 @@ void display_footer(unsigned char index) {
 }
 
 void setup_screen(void) {
-    unsigned char v;
+    unsigned char cia2_port_a;
 
     m65_io_enable();
 
@@ -109,10 +109,10 @@ void setup_screen(void) {
     VICIV.ctrl2 = 0xC9;
     VICIV.addr =
         (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
-    v = CIA2.pra;
-    v &= 0xfc;
-    v |= 0x01; // VIC RAM bank to $8000-$BFFF
-    CIA2.pra = v;
+    cia2_port_a = CIA2.pra;
+    cia2_port_a &= 0xfc;
+    cia2_port_a |= 0x01; // VIC RAM bank to $8000-$BFFF
+    CIA2.pra = cia2_port_a;
 
     // Screen colours
     VICIV.bordercol = 0;
@@ -148,11 +148,11 @@ void fatal_error(const unsigned char* filename, unsigned int line_number) {
     }
 }
 
-void set_screen_attributes(long p, unsigned char count, unsigned char attr) {
+void set_screen_attributes(long screen_address, unsigned char count, unsigned char attr) {
     // This involves setting colour RAM values, so we need to either LPOKE, or
     // map the 2KB colour RAM in at $D800 and work with it there.
     // XXX - For now we are LPOKING
-    long addr = COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + p;
+    long addr = COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + screen_address;
     for (unsigned char i = 0; i < count; i++) {
         lpoke(addr, lpeek(addr) | attr);
         addr++;
@@ -161,14 +161,14 @@ void set_screen_attributes(long p, unsigned char count, unsigned char attr) {
 
 /* Read-modify-write the colour-RAM attribute byte of column `col` on the line
  * being edited: keep the `keep` bits of the current value and OR in `set`. */
-static void set_attr(unsigned char col, unsigned char keep, unsigned char set) {
-    long a = col + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS;
-    lpoke(a, (lpeek(a) & keep) | set);
+static void set_attr(unsigned char column, unsigned char keep_mask, unsigned char set_mask) {
+    long colour_address = column + screen_line_address + COLOUR_RAM_ADDRESS - SCREEN_ADDRESS;
+    lpoke(colour_address, (lpeek(colour_address) & keep_mask) | set_mask);
 }
 
-char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
-    char len = 0;
-    /* The trailing key-clear reads this, and a maxlen of 0 never enters the
+char read_line(char* buffer, unsigned char max_length, unsigned char column) {
+    char length = 0;
+    /* The trailing key-clear reads this, and a max_length of 0 never enters the
      * loop that assigns it. */
     char c = 0;
     char reverse = 0x90;
@@ -180,11 +180,11 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
         ASCIIKEY = 0;
     }
 
-    while (len < maxlen) {
+    while (length < max_length) {
         c = ASCIIKEY;
 
         // Show cursor
-        set_attr(column + len, 0xf, reverse);
+        set_attr(column + length, 0xf, reverse);
 
         if ((PEEK(0xD611U) & 0x0b) >= 0x09) {
             // C= + shift, so toggle case
@@ -203,23 +203,23 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
                 VICIV.addr = VICIV.addr ^ 0x02;
             } else if (c == 0x14) {
                 // DELETE
-                if (len) {
+                if (length) {
                     // Remove blink attribute from this char
-                    set_attr(column + len, 0xf, 0);
+                    set_attr(column + length, 0xf, 0);
 
                     // Go back one and erase
-                    len--;
-                    lpoke(screen_line_address + column + len, ' ');
+                    length--;
+                    lpoke(screen_line_address + column + length, ' ');
 
                     // Re-enable blink for cursor
-                    set_attr(column + len, 0xff, reverse);
-                    buffer[len] = 0;
+                    set_attr(column + length, 0xff, reverse);
+                    buffer[length] = 0;
                 }
             } else if (c == 0x0d) {
-                buffer[len] = 0;
+                buffer[length] = 0;
 
                 // Hide cursor
-                set_attr(column + len, 0xf, 0);
+                set_attr(column + length, 0xf, 0);
 
                 /* Acknowledge RETURN as the character branch below does: a
                  * caller that reads again promptly would otherwise see it still
@@ -227,18 +227,18 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
                 while (ASCIIKEY) {
                     ASCIIKEY = 1;
                 }
-                return len;
+                return length;
             } else {
 
                 // Remove blink attribute from this char
-                set_attr(column + len, 0xf, 0);
-                buffer[len++] = c;
+                set_attr(column + length, 0xf, 0);
+                buffer[length++] = c;
 
                 // Mask char so that it looks right using screen codes instead of ASCII codes
                 if (c > 0x40) {
                     c &= 0x1f;
                 }
-                lpoke(screen_line_address + column + len - 1, c);
+                lpoke(screen_line_address + column + length - 1, c);
             }
 
             // Clear keys from hardware keyboard scanner
@@ -252,12 +252,12 @@ char read_line(char* buffer, unsigned char maxlen, unsigned char column) {
     }
 
     // Hide cursor
-    set_attr(column + len, 0xf, 0);
+    set_attr(column + length, 0xf, 0);
 
     // clear char from queue
     while (c && (ASCIIKEY == c)) {
         ASCIIKEY = 1;
     }
 
-    return len;
+    return length;
 }
