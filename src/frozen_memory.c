@@ -1,3 +1,4 @@
+#include "errors.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -131,8 +132,9 @@ unsigned char freeze_peek(uint32_t addr) {
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
-        // Invalid / unfrozen memory
-        return 0x55;
+        /* FreezerNotFrozen's value, but this function returns data, so a real
+         * byte of $55 is indistinguishable from the failure. */
+        return FreezerNotFrozen;
     }
 
     offset = freeze_slot_offset & 0x1ff;
@@ -147,14 +149,14 @@ unsigned char freeze_peek(uint32_t addr) {
     return sector_buffer[offset & 0x1ff];
 }
 
-unsigned char freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
+enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
-        return 0x55;
+        return FreezerNotFrozen;
     }
 
     offset = freeze_slot_offset & 0x1ff;
@@ -170,22 +172,22 @@ unsigned char freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
         lcopy((long)&sector_buffer[offset], (long)buffer, 512 - offset);
     }
 
-    return 0;
+    return FreezerOk;
 }
 
-unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count) {
+enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
-        return 0x55;
+        return FreezerNotFrozen;
     }
 
     if (count > 512) {
         // sector size exceeded
-        return 0x56;
+        return FreezerCountTooLarge;
     }
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
@@ -198,17 +200,17 @@ unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t
     // Copy fetched data to dest address
     lcopy((long)&sector_buffer[offset], dest, count);
 
-    return 0;
+    return FreezerOk;
 }
 
-unsigned char freeze_store_sector(uint32_t addr, unsigned char* buffer) {
+enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
-        return 0x55;
+        return FreezerNotFrozen;
     }
 
     offset = freeze_slot_offset & 0x1ff;
@@ -229,10 +231,10 @@ unsigned char freeze_store_sector(uint32_t addr, unsigned char* buffer) {
     // Write the sector
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 
-    return 0;
+    return FreezerOk;
 }
 
-unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count) {
+enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count) {
 
     // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
@@ -240,12 +242,12 @@ unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t 
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         // Invalid / unfrozen memory
-        return 0x55;
+        return FreezerNotFrozen;
     }
 
     if (count > 512) {
         // sector size exceeded
-        return 0x56;
+        return FreezerCountTooLarge;
     }
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
@@ -261,7 +263,7 @@ unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t 
     // Write the sector
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 
-    return 0;
+    return FreezerOk;
 }
 
 void freeze_poke(uint32_t addr, unsigned char v) {

@@ -891,7 +891,7 @@ void fix_chargen_area(unsigned char flags) {
     // debug_region_list();
 
     if (!(flags & ChargenNoCheck)) {
-        if (!freeze_fetch_sector(CHARGEN_ADDRESS, NULL)) {
+        if (freeze_fetch_sector(CHARGEN_ADDRESS, NULL) == FreezerOk) {
             // check if everything is zero
             for (i = 0; i < 512 && !sector_buffer[i]; i++) {
                 ;

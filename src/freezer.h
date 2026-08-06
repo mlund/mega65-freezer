@@ -1,5 +1,7 @@
 #pragma once
 
+#include "errors.h"
+
 #include <ctype.h>
 #include <mega65/dirent.h>
 #include <mega65/fileio.h>
@@ -24,10 +26,10 @@ uint32_t address_to_freeze_slot_offset(uint32_t address);
 uint32_t find_thumbnail_offset(void);
 unsigned char freeze_peek(uint32_t addr);
 void freeze_poke(uint32_t addr, unsigned char v);
-unsigned char freeze_fetch_sector(uint32_t addr, unsigned char* buffer);
-unsigned char freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count);
-unsigned char freeze_store_sector(uint32_t addr, unsigned char* buffer);
-unsigned char freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count);
+enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer);
+enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count);
+enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer);
+enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count);
 void do_audio_mixer(void);
 void do_sprite_editor(void);
 unsigned char do_rom_loader(void);

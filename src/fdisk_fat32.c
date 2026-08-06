@@ -1,3 +1,5 @@
+#include "fdisk_fat32.h"
+
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
@@ -209,16 +211,16 @@ void getrtc(struct M65Tm* tm) {
     }
 }
 
-unsigned char fat32_open_file_system(void) {
+enum FreezerError fat32_open_file_system(void) {
     sdcard_readsector(0);
     if ((sector_buffer[0x1fe] != 0x55) || (sector_buffer[0x1ff] != 0xAA)) {
-        return 255;
+        return FreezerBadFilesystem;
     } else {
         for (unsigned char i = 0; i < 4; i++) {
             parse_partition_entry(i);
         }
     }
-    return 0;
+    return FreezerOk;
 }
 
 uint32_t fat32_follow_cluster(uint32_t cluster) {
