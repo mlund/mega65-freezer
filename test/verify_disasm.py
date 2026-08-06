@@ -26,7 +26,7 @@ Four passes:
 
 Run via CTest, or directly:
 
-    python3 tools/verify_disasm.py --llvm-mc ~/llvm-mos-patched/bin/llvm-mc \
+    python3 test/verify_disasm.py --llvm-mc ~/llvm-mos-patched/bin/llvm-mc \
         --rom /path/to/MEGA65.ROM
 """
 
@@ -39,8 +39,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-TOOLS = Path(__file__).resolve().parent
-SRC = TOOLS.parent / "src"
+TEST = Path(__file__).resolve().parent
+SRC = TEST.parent / "src" / "monitor"
+TOOLS = TEST.parent / "tools"
 
 sys.path.insert(0, str(TOOLS))
 # Share only the llvm-mc invocation, so a change to the triple or CPU name
@@ -102,7 +103,7 @@ def build_harness(workdir: Path, host_cc: str) -> Path:
             "-Wextra",
             "-Werror",
             f"-I{SRC}",
-            str(TOOLS / "disasm_host_harness.c"),
+            str(TEST / "disasm_host_harness.c"),
             str(SRC / "disasm.c"),
             "-o",
             str(binary),

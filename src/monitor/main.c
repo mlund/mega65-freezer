@@ -1,6 +1,7 @@
 /*
   Based on mega65-fdisk program as a starting point.
 
+  MEGA65 only: hardware registers and the freeze slot.
 */
 
 #include "fdisk_fat32.h"

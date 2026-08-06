@@ -1,5 +1,7 @@
 #pragma once
 
+/* MEGA65 only: writes the VIC-IV screen directly. */
+
 void setup_screen(void);
 void display_footer(unsigned char index);
 void write_line(const char* s, char col);

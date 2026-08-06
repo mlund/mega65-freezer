@@ -1,3 +1,5 @@
+/* MEGA65 only: writes the VIC-IV screen directly. */
+
 #include "fdisk_screen_monitor.h"
 
 #include "fdisk_memory.h"

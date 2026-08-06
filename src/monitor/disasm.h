@@ -4,6 +4,10 @@
  *
  * The opcode tables come from llvm-mos (see tools/gen_disasm_tables.py); the
  * three instruction prefixes are decoded here.
+ *
+ * Host-compilable: no MEGA65 dependency, and test/verify_disasm.py builds it
+ * for the host to diff against llvm-mc.  disasm_read_byte() is the whole
+ * platform interface.
  */
 
 #include <stdbool.h>

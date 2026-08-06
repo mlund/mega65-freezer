@@ -6,8 +6,11 @@
 
   We can also allow viewing/modification of the raw freeze slot data itself.
 
+  MEGA65 only: hardware registers and the freeze slot.  The decoding and
+  block logic it drives lives in disasm.c and blockmove.c, which are not.
 */
 
+#include "blockmove.h"
 #include "disasm.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
@@ -133,7 +136,7 @@ static void cache_sector(uint32_t freeze_slot_offset) {
 
 /* Change one byte of frozen memory, leaving the write for flush_sector(): a
  * fill would otherwise write the same sector once per byte. */
-static bool write_frozen_byte(uint32_t address, unsigned char value) {
+bool block_write_byte(uint32_t address, unsigned char value) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(address);
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         return false;
@@ -559,7 +562,7 @@ void fill_memory(void) {
     }
 
     for (address = start; address < end; address++) {
-        if (!write_frozen_byte(address, (unsigned char)hex_value)) {
+        if (!block_write_byte(address, (unsigned char)hex_value)) {
             flush_sector();
             report_unmapped();
             return;
@@ -669,7 +672,7 @@ void compare_memory(void) {
 
     uint32_t remaining = end - start;
     while (remaining > 0 && differences < HUNT_HITS_MAX) {
-        uint16_t got = read_chunk(start, remaining);
+        uint16_t got = block_read(start, remaining);
         if (got == 0) {
             report_unmapped();
             return;
@@ -680,7 +683,7 @@ void compare_memory(void) {
                 report_unmapped();
                 return;
             }
-            if (chunk_buffer[i] != there) {
+            if (block_buffer[i] != there) {
                 write_address_line(start + i);
                 differences++;
             }
@@ -693,19 +696,6 @@ void compare_memory(void) {
     report_hit_count(differences, remaining > 0, "NO DIFFERENCES.", "MORE DIFFERENCES FOLLOW.");
 }
 
-/* True if the whole chunk moved. */
-static bool move_chunk(uint32_t from, uint32_t to, uint16_t wanted) {
-    if (read_chunk(from, wanted) < wanted) {
-        return false;
-    }
-    for (uint16_t i = 0; i < wanted; i++) {
-        if (!write_frozen_byte(to + i, chunk_buffer[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
 /* T start end destination */
 void transfer_memory(void) {
     uint32_t start;
@@ -715,28 +705,12 @@ void transfer_memory(void) {
     if (!parse_range(&start, &end) || !parse_required_hex(&destination)) {
         return;
     }
-
-    /* Move the chunk nearest the overlap last: forwards into a destination
-     * inside the range would overwrite source bytes still unread. */
-    bool backwards = destination > start;
-    uint32_t remaining = end - start;
-    uint32_t done = 0;
-
-    while (remaining > 0) {
-        uint16_t chunk = (remaining > CHUNK_MAX) ? CHUNK_MAX : (uint16_t)remaining;
-        remaining -= chunk;
-        /* The two countdowns are the two offsets: remaining is the trailing
-         * chunk's, done the leading one's. */
-        uint32_t offset = backwards ? remaining : done;
-        if (!move_chunk(start + offset, destination + offset, chunk)) {
-            flush_sector();
-            report_unmapped();
-            return;
-        }
-        done += chunk;
-    }
+    bool moved = block_move(start, destination, end - start);
     flush_sector();
-
+    if (!moved) {
+        report_unmapped();
+        return;
+    }
     mon_address = destination;
     show_memory();
 }
@@ -791,9 +765,9 @@ void set_registers(void) {
 
     for (index = 0; index < REGISTER_COUNT && parse_hex(); index++) {
         uint32_t address = 0xFFD3640UL + REGISTER_OFFSET[index];
-        if (!write_frozen_byte(address, (unsigned char)hex_value) ||
+        if (!block_write_byte(address, (unsigned char)hex_value) ||
             (REGISTER_IS_PAIR[index] &&
-                !write_frozen_byte(address + 1, (unsigned char)(hex_value >> 8)))) {
+                !block_write_byte(address + 1, (unsigned char)(hex_value >> 8)))) {
             flush_sector();
             report_error("? FROZEN REGISTERS NOT FOUND  ERROR");
             return;
@@ -856,7 +830,7 @@ void assemble_memory(void) {
         }
 
         unsigned char written = 0;
-        while (written < length && write_frozen_byte(mon_address + written, bytes[written])) {
+        while (written < length && block_write_byte(mon_address + written, bytes[written])) {
             written++;
         }
         flush_sector();

@@ -136,17 +136,17 @@ find_program(LLVM_MC_EXE NAMES llvm-mc HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PAT
 if(Python3_FOUND AND LLVM_MC_EXE)
     add_custom_target(disasm-tables
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_disasm_tables.py
-                --llvm-mc ${LLVM_MC_EXE} -o ${SRC}/disasm_tables.inc
+                --llvm-mc ${LLVM_MC_EXE} -o ${SRC}/monitor/disasm_tables.inc
         COMMENT "Regenerating 45GS02 disassembler tables")
 
-    # Compiles src/disasm.c for the host and diffs every opcode/prefix
+    # Compiles src/monitor/disasm.c for the host and diffs every opcode/prefix
     # combination against llvm-mc, so a toolchain bump cannot silently change
     # the tables.  Needs a host compiler as well, so it is registered only when
     # one is present rather than failing the configure.
     find_program(HOST_C_COMPILER NAMES cc clang gcc)
     if(HOST_C_COMPILER)
         add_test(NAME disasm
-            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_disasm.py
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_disasm.py
                     --llvm-mc ${LLVM_MC_EXE} --cc ${HOST_C_COMPILER})
 
         # Walking a real ROM covers what synthetic opcodes cannot: our decoder
@@ -159,7 +159,7 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             "MEGA65.ROM image for the disassembler's real-code test")
         if(MEGA65_ROM AND EXISTS ${MEGA65_ROM})
             add_test(NAME disasm_rom
-                COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/verify_disasm.py
+                COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_disasm.py
                         --llvm-mc ${LLVM_MC_EXE} --cc ${HOST_C_COMPILER}
                         --rom ${MEGA65_ROM})
         endif()

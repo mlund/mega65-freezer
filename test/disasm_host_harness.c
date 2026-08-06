@@ -1,4 +1,4 @@
-/* Host driver for the 45GS02 disassembler, used only by tools/verify_disasm.py.
+/* Host driver for the 45GS02 disassembler, used only by test/verify_disasm.py.
  *
  * Compiling the same disasm.c for the host is what lets the test diff real
  * decoder output against llvm-mc, rather than testing a Python reimplementation

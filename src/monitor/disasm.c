@@ -6,6 +6,8 @@
  * One translation unit for both directions: a separate assembler measured 66
  * bytes larger.  Not because the tables would be duplicated -- LTO merges
  * identical statics, so including them twice costs nothing.
+ *
+ * Host-compilable -- see disasm.h.
  */
 
 #include "disasm.h"
