@@ -44,6 +44,11 @@ SHIFTED = {"!": "1", '"': "2", "#": "3", "$": "4", "%": "5",
            "(": "8", ")": "9", "?": "/", "<": ",", ">": "."}
 
 # Named keys, for things a character cannot express.
+#
+# HELP and F9-F14 are not here.  VIRTKEY1 is seven bits -- bit 7 is OSKEN, the
+# on-screen keyboard -- so a position above $7E cannot be sent this way, and
+# Xemu's C65_KEYBOARD_EXTRA_POS ($80) is its own numbering rather than a
+# matrix position.  At the keyboard Xemu puts HELP on Page Up.
 NAMED = {"return": 0x01, "f3": 0x05, "f5": 0x06, "f7": 0x03,
          "down": 0x07, "right": 0x02, "delete": 0x00, "stop": 0x3F}
 
