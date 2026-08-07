@@ -308,7 +308,6 @@ void predraw_freeze_menu(void)
 /* Which parts of the menu draw_freeze_menu() redraws, OR-ed together. */
 enum : uint8_t {
     UpdateTop = 0x01,
-    UpdateRom = 0x02,
     UpdateFreq = 0x04,
     UpdateUpper = 0x0f,
     UpdateProcess = 0x10,
@@ -393,12 +392,6 @@ void draw_freeze_menu(unsigned char part) {
             lcopy((uint32_t)" PAL50", (uint32_t)&freeze_menu[VIDEO_MODE_OFFSET], 6);
         }
     }
-
-    // ROM version
-    /*
-    if (part & UpdateRom)
-      lcopy((long)detect_rom(), (uint32_t)&freeze_menu[ROM_NAME_OFFSET], 11);
-    */
 
     // CPU frequency
     if (part & UpdateFreq) {
