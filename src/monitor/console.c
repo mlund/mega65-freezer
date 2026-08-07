@@ -2,9 +2,9 @@
 
 #include "console.h"
 
-#include "color_scheme.h"
+#include "colours.h"
+#include "common.h"
 #include "dma.h"
-#include "freezer_common.h"
 #include "mega65_regs.h"
 #include "screen.h"
 

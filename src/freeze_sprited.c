@@ -66,9 +66,9 @@
     * Consider SPRBPMEN for 16-color sprites
  */
 #include "cc65compat.h"
-#include "color_scheme.h"
+#include "colours.h"
 #include "dma.h"
-#include "freezer.h"
+#include "slot.h"
 
 #include <mega65.h>
 #include <mega65/conio.h>

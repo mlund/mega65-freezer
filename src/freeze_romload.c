@@ -1,11 +1,11 @@
-#include "color_scheme.h"
+#include "colours.h"
+#include "common.h"
 #include "dma.h"
 #include "fat32.h"
-#include "freezer.h"
-#include "freezer_common.h"
 #include "mega65_regs.h"
 #include "screen.h"
 #include "sdcard.h"
+#include "slot.h"
 
 // Same listing buffer and 64-byte stride as the disk chooser: at most
 // 0xffff/64 = 1023 entries, and 1023 << 6 = 65472 fits an unsigned 16-bit

@@ -1,8 +1,8 @@
 #include "screen.h"
 
-#include "color_scheme.h"
+#include "colours.h"
+#include "common.h"
 #include "dma.h"
-#include "freezer_common.h"
 #include "mega65_regs.h"
 
 uint16_t screen_line_address = SCREEN_ADDRESS;

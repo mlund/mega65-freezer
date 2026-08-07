@@ -1,11 +1,11 @@
-#include "color_scheme.h"
+#include "colours.h"
+#include "common.h"
 #include "dma.h"
 #include "fat32.h"
-#include "freezer.h"
-#include "freezer_common.h"
 #include "mega65_regs.h"
 #include "screen.h"
 #include "sdcard.h"
+#include "slot.h"
 
 #include <mega65.h>
 #include <stdio.h>

@@ -1,8 +1,9 @@
+#include "slot.h"
+
+#include "common.h"
 #include "dma.h"
 #include "errors.h"
 #include "fat32.h"
-#include "freezer.h"
-#include "freezer_common.h"
 #include "screen.h"
 #include "sdcard.h"
 #include "trace.h"

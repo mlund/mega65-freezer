@@ -75,8 +75,8 @@ set(LTO_ZP 210 CACHE STRING "Zero-page bytes the LTO allocator may use")
 add_link_options(-mlto-zp=${LTO_ZP} -Wl,--gc-sections)
 
 set(COMMON
-    frozen_memory.c dma.c screen.c
-    sdcard.c freezer_common.c
+    slot.c dma.c screen.c
+    sdcard.c common.c
     helper.S version.c
 )
 

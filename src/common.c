@@ -1,9 +1,9 @@
-#include "freezer_common.h"
+#include "common.h"
 
-#include "color_scheme.h"
+#include "colours.h"
 #include "dma.h"
-#include "freezer.h"
 #include "mega65_regs.h"
+#include "slot.h"
 
 #include <mega65.h>
 #include <string.h>
