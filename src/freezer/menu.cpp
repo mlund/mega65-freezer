@@ -15,9 +15,10 @@ namespace {
  * copy, and storing four rows of them as fragments would cost 176 bytes against
  * a stream whose whole text is under 500.  They are painted with lfill_skip. */
 constexpr auto FIXED = menu::stream(
-    // Title and credit.
-    menu::fragment(6, 0, SchemeText, "MEGA65 FREEZE MENU V0.4.1DEV"),
-    menu::fragment(2, 1, SchemeText, "(C) MUSEUM OF ELECTRONIC GAMES & ART"),
+    /* Dimmed: they name the program rather than saying anything about the
+     * machine you froze. */
+    menu::fragment(6, 0, SchemeTextDim, "MEGA65 FREEZE MENU V0.4.1DEV"),
+    menu::fragment(2, 1, SchemeTextDim, "(C) MUSEUM OF ELECTRONIC GAMES & ART"),
 
     // The machine's settings.  Each value is written by its own Update path.
     menu::fragment(1, 5, SchemeText, "(C)PU MODE:"),

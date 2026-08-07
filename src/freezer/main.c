@@ -268,10 +268,11 @@ static void clear_menu_row(uint8_t y) {
 }
 
 /* A rule is forty copies of one glyph, so it is a fill rather than stored
- * text: as fragments the four rows would cost 176 bytes. */
+ * text: as fragments the four rows would cost 176 bytes.  Dimmed, like the
+ * title: a divider separates without saying anything itself. */
 static void draw_menu_rule(uint16_t cell) {
     lfill_skip(SCREEN_ADDRESS + cell, MENU_RULE_GLYPH, 40, SCREEN_CELL_BYTES);
-    lfill_skip(COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), SchemeText, 40,
+    lfill_skip(COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), SchemeTextDim, 40,
         SCREEN_CELL_BYTES);
 }
 
