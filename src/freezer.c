@@ -459,9 +459,9 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     if (part & UpdateDisk) {
-        // Draw drive numbers for internal drive
-        lfill((uint32_t)&freeze_menu[DRIVE0_NUM_OFFSET], 0, 2);
-        lfill((uint32_t)&freeze_menu[DRIVE1_NUM_OFFSET], 0, 2);
+        /* No pre-blank: screen_decimal() writes all five columns every time,
+         * padding with spaces, so a NUL could never survive to truncate
+         * copy_convert_to_screen()'s scan. */
         screen_decimal((uint16_t)&freeze_menu[DRIVE0_NUM_OFFSET], freeze_peek(0x10113L));
         screen_decimal((uint16_t)&freeze_menu[DRIVE1_NUM_OFFSET], freeze_peek(0x10114L));
 
