@@ -96,7 +96,7 @@ function(add_m65 name)
                 -P ${CMAKE_SOURCE_DIR}/cmake/checksize.cmake)
 endfunction()
 
-add_m65(FREEZER  freezer/main.c freezer/diskchooser.c)
+add_m65(FREEZER  freezer/main.c freezer/diskchooser.c freezer/menu.cpp)
 add_m65(AUDIOMIX audiomix/main.c audiomix/mixer.c charset.c)
 add_m65(MONITOR  monitor/main.c monitor/commands.c monitor/disasm.c
                  monitor/blockmove.c monitor/console.c charset.c)

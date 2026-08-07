@@ -76,3 +76,66 @@ enum : uint8_t {
     AttribUnderline = 0x80,
     AttribHighlight = 0x40,
 };
+
+/* C++-only: the builders that turn menu text into the stream above.  Same
+ * arrangement as helper.h, which serves C and the assembler from one file --
+ * keeping the format's two halves together is the point, so a builder and the
+ * walker in screen.c cannot drift apart.
+ *
+ * charset.h is stricter than the runtime conversion it replaces, usefully: a
+ * plain "cccc" is rejected, because the block graphic the rules are drawn with
+ * is not the letter c.  Spell it U"\U0001FB78". */
+#ifdef __cplusplus
+
+#include <charset.h>
+#include <stddef.h>
+
+namespace menu {
+
+template <size_t N> struct Bytes {
+    uint8_t data[N];
+};
+
+/* N counts the literal's terminating NUL, which a fragment does not store, so
+ * the record is four header bytes plus N - 1 of text.  Taking the literal by
+ * array reference is what deduces N, and is why the stored length cannot
+ * disagree with the text. */
+template <size_t N>
+consteval Bytes<N + 3> fragment(uint8_t x, uint8_t y, uint8_t colour, const char (&text)[N]) {
+    const charset_impl::UnshiftedVideoString<N> codes{text};
+    Bytes<N + 3> f{{uint8_t(N - 1), x, y, colour}};
+    for (size_t i = 0; i < N - 1; ++i) {
+        f.data[i + 4] = uint8_t(codes.Str[i]);
+    }
+    return f;
+}
+
+/* The same for U"..." literals, which is how a graphic is named. */
+template <size_t N>
+consteval Bytes<N + 3> fragment(uint8_t x, uint8_t y, uint8_t colour, const char32_t (&text)[N]) {
+    const charset_impl::UnshiftedVideoString<N> codes{text};
+    Bytes<N + 3> f{{uint8_t(N - 1), x, y, colour}};
+    for (size_t i = 0; i < N - 1; ++i) {
+        f.data[i + 4] = uint8_t(codes.Str[i]);
+    }
+    return f;
+}
+
+/* Concatenates the fragments and appends the zero length that ends the walk. */
+template <size_t... Ns> consteval Bytes<(Ns + ... + 0) + 1> stream(Bytes<Ns>... parts) {
+    Bytes<(Ns + ... + 0) + 1> out{};
+    size_t at = 0;
+    (
+        [&] {
+            for (size_t i = 0; i < Ns; ++i) {
+                out.data[at++] = parts.data[i];
+            }
+        }(),
+        ...);
+    out.data[at] = 0;
+    return out;
+}
+
+} // namespace menu
+
+#endif // __cplusplus

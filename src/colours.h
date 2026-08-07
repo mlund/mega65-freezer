@@ -91,6 +91,9 @@ constexpr uint16_t SCHEME_HANDOFF_INDEX_ADDR = 0x03C2;
 constexpr uint8_t SCHEME_HANDOFF_MAGIC = 0x5C;
 
 // clang-format off
+/* C-only: designated array initialisers are not C++, and the one C++ file in
+ * the project needs the roles below, not the table. */
+#ifndef __cplusplus
 constexpr struct ColourScheme SCHEMES[SchemeCount] __attribute__((section(".rodata"))) = {
     [SchemeGruvbox] = {
         /* Gruvbox dark. */
@@ -134,6 +137,7 @@ constexpr struct ColourScheme SCHEMES[SchemeCount] __attribute__((section(".roda
         .text_bright = SCHEME_RGB(0xb8, 0xb8, 0xb8),
     },
 };
+#endif
 // clang-format on
 
 /* Which palette entry each role draws in.  Fixed across schemes: a scheme
