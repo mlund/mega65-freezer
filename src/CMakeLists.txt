@@ -106,6 +106,16 @@ add_m65(ROMLOAD  romload/main.c romload/chooser.c charset.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c charset.c)
 add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c)
 
+# Bytes per character cell, and so the DMA destination step for both planes.
+# SCREEN_ROW_BYTES is 80 in every tool and means two different things; this is
+# the number that tells them apart.  See src/screen.h.
+foreach(t FREEZER AUDIOMIX MAKEDISK ROMLOAD)
+    target_compile_definitions(${t} PRIVATE SCREEN_CELL_BYTES=2)
+endforeach()
+foreach(t MONITOR MEGAINFO SPRITED)
+    target_compile_definitions(${t} PRIVATE SCREEN_CELL_BYTES=1)
+endforeach()
+
 # Xemu test targets.  Plain c64 PRGs, not .M65: they are launched with Xemu's
 # `-prg`, so they want the platform's own BASIC stub rather than freezemenu.ld's
 # $080D trampoline.  mega65-libc supplies assert_eq/xemu_exit/debug_msg, so the

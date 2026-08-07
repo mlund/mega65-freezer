@@ -112,6 +112,23 @@ void screen_decimal(uint16_t addr, uint16_t v) {
     }
 }
 
+void draw_fragment(uint8_t x, uint8_t y, uint8_t colour, const uint8_t* codes, uint8_t length) {
+    const uint16_t cell = (uint16_t)(y * SCREEN_ROW_BYTES + x * SCREEN_CELL_BYTES);
+
+    lcopy_skip((Addr28)(uint16_t)codes, SCREEN_ADDRESS + cell, length, SCREEN_CELL_BYTES);
+    lfill_skip(
+        COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), colour, length, SCREEN_CELL_BYTES);
+}
+
+void draw_fragments(const uint8_t* stream) {
+    uint8_t length;
+
+    while ((length = stream[0]) != 0) {
+        draw_fragment(stream[1], stream[2], stream[3], stream + 4, length);
+        stream += 4 + length;
+    }
+}
+
 void setup_menu_screen_base(void) {
     /* Written before the base registers below, so the hot-register
      * recalculation that lands is the one the second write triggers. */

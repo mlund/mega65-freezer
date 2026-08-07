@@ -6,7 +6,6 @@
 #include "dma.h"
 
 #include "mega65_regs.h"
-#include "screen.h"
 
 #include <mega65.h>
 

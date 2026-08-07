@@ -20,6 +20,29 @@ constexpr uint16_t SCREEN_BYTES = SCREEN_ROW_BYTES * SCREEN_ROWS;
 
 constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
 
+/* Bytes per character cell: 2 in the 16-bit text mode, 1 in the 80-column mode.
+ * Set per target in src/CMakeLists.txt, because this file is shared and
+ * SCREEN_ROW_BYTES is 80 either way -- 40 cells of two bytes, or 80 of one.
+ * It is also the DMA destination step for both planes, which is what lets one
+ * renderer serve both geometries. */
+#ifndef SCREEN_CELL_BYTES
+#error "SCREEN_CELL_BYTES must be defined per target"
+#endif
+
+/* A menu is a stream of positioned fragments:
+ *
+ *     [len] [x] [y] [colour] [len screen codes ...]  ... [0]
+ *
+ * The run length is the text length, so the two cannot disagree, and a single
+ * zero byte ends the stream.  The codes are already screen codes -- the
+ * conversion happens at compile time -- so nothing here folds case.
+ *
+ * In the 16-bit mode the character is the low byte of its cell and the colour
+ * is the high byte of the colour cell, hence the SCREEN_CELL_BYTES - 1 offset
+ * into colour RAM; in the 8-bit mode both are simply the cell. */
+void draw_fragment(uint8_t x, uint8_t y, uint8_t colour, const uint8_t* codes, uint8_t length);
+void draw_fragments(const uint8_t* stream);
+
 /* Only MONITOR links monitor/console.c, and it shows just these two.  The
  * sprite editor draws its own footer, so a message for it here was never
  * reachable -- and display_footer() indexes the table at runtime, so an unused
