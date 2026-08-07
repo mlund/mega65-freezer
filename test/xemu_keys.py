@@ -45,10 +45,14 @@ SHIFTED = {"!": "1", '"': "2", "#": "3", "$": "4", "%": "5",
 
 # Named keys, for things a character cannot express.
 #
-# HELP and F9-F14 are not here.  VIRTKEY1 is seven bits -- bit 7 is OSKEN, the
-# on-screen keyboard -- so a position above $7E cannot be sent this way, and
-# Xemu's C65_KEYBOARD_EXTRA_POS ($80) is its own numbering rather than a
-# matrix position.  At the keyboard Xemu puts HELP on Page Up.
+# HELP and F9-F14 are not here, and not because they are out of range: the
+# matrix is 72 keys, and mega65-core's matrix_to_ascii.vhdl gives position 67
+# as HELP ($1F).  Xemu's table agrees, and its virtkey() repacks row*8+col into
+# row*16+col, which is how 67 becomes the $83 that appears in its own headers.
+# But sending 67 to a freeze menu loads AUDIOMIX, as though it were `A`, and
+# sending 10 for `a` does nothing -- so something between the register and the
+# key queue is not what these tables describe, and it is not understood.
+# At the keyboard Xemu has HELP on Page Up, and CLR on Home.
 NAMED = {"return": 0x01, "f3": 0x05, "f5": 0x06, "f7": 0x03,
          "down": 0x07, "right": 0x02, "delete": 0x00, "stop": 0x3F}
 
