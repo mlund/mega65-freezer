@@ -16,13 +16,11 @@
 #include <stdio.h>
 #include <string.h>
 
+/* Only the parts setup_screen() does not do: it selects the text mode, sets
+ * the bases and clears both planes, but leaves the border width and the
+ * sprites alone. */
 void setup_menu_screen(void) {
     setup_menu_screen_base();
-
-    VICIV.ctrlc = (VICIV.ctrlc & VIC4_CTRLC_MODE_MASK) | VIC4_CTRLC_16BIT_FULL_COLOUR;
-    VICIV.linestep = SCREEN_ROW_BYTES;
-
-    clear_colour_ram();
 }
 
 int main(void) {
