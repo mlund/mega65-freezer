@@ -19,6 +19,12 @@ constexpr uint8_t BORDER_SIGNAL_ROM_CHANGED = 0x83;
 #define NO_DISK_DRIVE "- NO DISK -"
 #define INTERNAL_DRIVE_0 "- INTERNAL 3.5\" -"
 #define INTERNAL_DRIVE_1 "- 1565 DRIVE 1 -"
+/* The disk chooser leaves these for MAKEDISK, which mega65_dos_exechelper()
+ * loads over it.  Placed by src/freezemenu.ld, which owns the low-memory map.
+ * volatile because the reader is a different program. */
+extern volatile uint8_t tool_density[1]; /* 0 = DD, 1 = HD */
+extern volatile uint8_t tool_drive_id[1];
+
 char* freeze_select_disk_image(unsigned char drive_id);
 
 void request_freeze_region_list(void);

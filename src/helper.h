@@ -30,10 +30,6 @@
 #define NAME_BUF_EXEC 0x0100
 #define NAME_BUF_DOS 0x0400
 
-// Scratch page for the loader stub, which must survive the load it performs.
-#define LOADER_STUB 0x0340
-#define LOADER_STUB_SIZE 0x80
-
 // PRG conventions: files load at $07FF and are entered via the BASIC stub.
 #define LOAD_ADDR_LO 0xFF
 #define LOAD_ADDR_HI 0x07
@@ -88,7 +84,7 @@
 
 /* Implemented in helper.S.  leaf promises the callee does not re-enter C, so
  * callers keep their statically allocated frames instead of the soft stack.
- * It holds here: helper.s only ever transfers to LOADER_STUB and
+ * It holds here: helper.s only ever transfers to the loader stub and
  * PROGRAM_ENTRY, neither of which is C. */
 #define HELPER_ASM __attribute__((leaf))
 

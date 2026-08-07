@@ -99,20 +99,10 @@ template <size_t N> struct Bytes {
 /* N counts the literal's terminating NUL, which a fragment does not store, so
  * the record is four header bytes plus N - 1 of text.  Taking the literal by
  * array reference is what deduces N, and is why the stored length cannot
- * disagree with the text. */
-template <size_t N>
-consteval Bytes<N + 3> fragment(uint8_t x, uint8_t y, uint8_t colour, const char (&text)[N]) {
-    const charset_impl::UnshiftedVideoString<N> codes{text};
-    Bytes<N + 3> f{{uint8_t(N - 1), x, y, colour}};
-    for (size_t i = 0; i < N - 1; ++i) {
-        f.data[i + 4] = uint8_t(codes.Str[i]);
-    }
-    return f;
-}
-
-/* The same for U"..." literals, which is how a graphic is named. */
-template <size_t N>
-consteval Bytes<N + 3> fragment(uint8_t x, uint8_t y, uint8_t colour, const char32_t (&text)[N]) {
+ * disagree with the text.  Ch is deduced too, so "..." and U"..." -- the way a
+ * block graphic is named -- both land here; charset.h converts either. */
+template <typename Ch, size_t N>
+consteval Bytes<N + 3> fragment(uint8_t x, uint8_t y, uint8_t colour, const Ch (&text)[N]) {
     const charset_impl::UnshiftedVideoString<N> codes{text};
     Bytes<N + 3> f{{uint8_t(N - 1), x, y, colour}};
     for (size_t i = 0; i < N - 1; ++i) {

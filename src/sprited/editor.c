@@ -241,7 +241,10 @@ constexpr uint8_t EDITOR_SPRITES =
  * stub at $0340, which has finished by the time this runs and which helper.S
  * copies there afresh on every load. */
 constexpr uint32_t MOUSE_POINTER_DATA = 0x0380;
-constexpr uint32_t EDIT_CURSOR_DATA = 0x03C0;
+/* Placed by src/freezemenu.ld, which asserts it stays 64-byte aligned: the
+ * VIC-IV sprite pointer is an address divided by 64. */
+extern uint8_t sprite_cursor[];
+#define EDIT_CURSOR_DATA ((Addr28)(uint16_t)sprite_cursor)
 
 /* A hires sprite is 24x21 pixels, three bytes to the row. */
 constexpr uint8_t SPRITE_ROWS = 21;

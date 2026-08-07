@@ -80,14 +80,14 @@ enum Scheme : uint8_t {
  * picks where that cycle begins.  No other tool binds a key to it. */
 constexpr uint8_t SCHEME_BOOT = SchemeGruvbox;
 
-/* A tool leaves its choice here for the next one it launches.  $03C1-$03FF is
- * unused and survives mega65_dos_exechelper(), the same way $033C and $03C0
- * carry MAKEDISK's parameters.  This is not storage that lasts: hyppo reloads
- * the freezer over low memory on every freeze, so what is here afterwards is
- * the frozen program's own bytes -- hence the magic, which fails and returns
- * the boot scheme. */
-constexpr uint16_t SCHEME_HANDOFF_MAGIC_ADDR = 0x03C1;
-constexpr uint16_t SCHEME_HANDOFF_INDEX_ADDR = 0x03C2;
+/* A tool leaves its choice here for the next one it launches, because
+ * mega65_dos_exechelper() loads that tool over this one and no variable
+ * survives.  The magic byte is what distinguishes our two bytes from whatever
+ * the frozen program left there; without it the boot scheme is used. */
+/* Placed by src/freezemenu.ld, which owns the whole low-memory map so that no
+ * two tools can claim the same bytes.  volatile because the reader is a
+ * different program: the write must reach memory before this one is replaced. */
+extern volatile uint8_t scheme_handoff[2];
 constexpr uint8_t SCHEME_HANDOFF_MAGIC = 0x5C;
 
 // clang-format off

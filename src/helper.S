@@ -107,12 +107,12 @@ mega65_dos_exechelper:
 	ldx #$00
 .Lex_copy:
 	lda loadfile_routine,x
-	sta LOADER_STUB,x
+	sta loader_stub,x
 	inx
-	cpx #LOADER_STUB_SIZE
+	cpx #(loadfile_routine_end - loadfile_routine)
 	bne .Lex_copy
 
-	jsr LOADER_STUB
+	jsr loader_stub
 
 	;; un-successful? Then try loading freezer instead
 	ldz #$00
@@ -156,7 +156,7 @@ loadfile_routine:
 load_succeeded:
 	ldz #$00
 	jmp PROGRAM_ENTRY
-	rts
+loadfile_routine_end:
 
 	.section .bss.attachDrive,"aw",@nobits
 attachDrive:

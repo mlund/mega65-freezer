@@ -696,10 +696,10 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                         // (this is like exec()/fork(), so there is no return value
 
                         // give MAKEDISK the drive we are mounting the image to
-                        POKE(0x3c0, drive_id);
+                        tool_drive_id[0] = drive_id;
 
                         // Tell MAKEDISK if we want a D81 or a D65 image
-                        POKE(0x33c, disk_name_return[7] == '8' ? 0 : 1); // 0=DD, 1=HD
+                        tool_density[0] = disk_name_return[7] == '8' ? 0 : 1; // 0=DD, 1=HD
 
                         mega65_dos_exechelper("MAKEDISK.M65");
                         // we never return to here...

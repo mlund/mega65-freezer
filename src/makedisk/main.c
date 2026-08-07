@@ -416,7 +416,7 @@ int main(void) {
 
     request_freeze_region_list();
 
-    do_make_disk_image(PEEK(0x33C) ? 1 : 0, PEEK(0x3C0) ? 1 : 0); // 0=DD, 1=HD
+    do_make_disk_image(tool_density[0] ? 1 : 0, tool_drive_id[0] ? 1 : 0);
 
     mega65_dos_exechelper("FREEZER.M65");
 }

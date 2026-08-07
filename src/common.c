@@ -23,8 +23,8 @@ void apply_scheme(uint8_t scheme) {
         scheme = 0;
     }
     current_scheme = scheme;
-    POKE(SCHEME_HANDOFF_MAGIC_ADDR, SCHEME_HANDOFF_MAGIC);
-    POKE(SCHEME_HANDOFF_INDEX_ADDR, scheme);
+    scheme_handoff[0] = SCHEME_HANDOFF_MAGIC;
+    scheme_handoff[1] = scheme;
 
     /* One address computed here, then a walk in order, so no index is
      * multiplied per entry. */
@@ -54,9 +54,7 @@ void set_palette(void) {
 
     /* The tool that launched us leaves its choice in low memory; the magic
      * tells a real choice from whatever the frozen program had there. */
-    apply_scheme(PEEK(SCHEME_HANDOFF_MAGIC_ADDR) == SCHEME_HANDOFF_MAGIC
-            ? PEEK(SCHEME_HANDOFF_INDEX_ADDR)
-            : SCHEME_BOOT);
+    apply_scheme(scheme_handoff[0] == SCHEME_HANDOFF_MAGIC ? scheme_handoff[1] : SCHEME_BOOT);
 }
 
 char* detect_rom(void) {
