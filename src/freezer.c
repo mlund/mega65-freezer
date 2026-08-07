@@ -576,7 +576,9 @@ void draw_freeze_menu(unsigned char part) {
             // Work out where the screen data begins
             screen_data_start = lpeek(0x5203dL) + (lpeek(0x5203eL) << 8);
             screen_data_start += 0x52000L + 0x40L;
-            for (y = 0; y < 13; y++) {
+            /* Rows 13 to 24 is twelve, not thirteen: a thirteenth pass starts
+             * at $BFD0, the first byte past the 2000-byte screen. */
+            for (y = 0; y < 12; y++) {
                 // Copy row of screen data
                 lcopy(screen_data_start + (y << 6),
                     SCREEN_ADDRESS + (13 * SCREEN_ROW_BYTES) + (y * SCREEN_ROW_BYTES),
