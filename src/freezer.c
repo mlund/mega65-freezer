@@ -5,6 +5,7 @@
 
 #include "freezer.h"
 
+#include "color_scheme.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -83,33 +84,43 @@ void to_petscii_upper(char* text, int length);
 
 static unsigned char colour_table[256];
 
+/* Thumbnail bytes are RGB332, and palette entries 16-255 hold that same value
+ * expanded 3-3-2 to 4-4-4, so a byte is already its own entry.  Only the lowest
+ * sixteen need diverting: they belong to the colour scheme, and entry 0 is
+ * transparent besides. */
 void make_colour_lookup(void) {
     unsigned char colour;
 
-    // Make colour lookup table
     colour = 0;
     do {
         colour_table[colour] = colour;
     } while (++colour);
 
-    // Now map C64 colours directly
-    colour_table[0x00] =
-        0x20; // black   ($00 = transparent colour, so we have to use very-dim red instead)
-    colour_table[0xff] = 0x01; // white
-    colour_table[0xe0] = 0x02; // red
-    colour_table[0x1f] = 0x03; // cyan
-    colour_table[0xe3] = 0x04; // purple
-    colour_table[0x1c] = 0x05; // green
-    colour_table[0x03] = 0x06; // blue
-    colour_table[0xfc] = 0x07; // yellow
-    colour_table[0xec] = 0x08; // orange
-    colour_table[0xa8] = 0x09; // brown
-    colour_table[0xad] = 0x0a; // pink
-    colour_table[0x49] = 0x0b; // grey1
-    colour_table[0x92] = 0x0c; // grey2
-    colour_table[0x9e] = 0x0d; // lt.green
-    colour_table[0x93] = 0x0e; // lt.blue
-    colour_table[0xb6] = 0x0f; // grey3
+    if (SCHEME_IS_C64_PALETTE) {
+        // Exact entries beat the cube for the C64's own shades
+        colour_table[0x00] = 0x20; // black: entry 0 is transparent, so very-dim red
+        colour_table[0xff] = 0x01; // white
+        colour_table[0xe0] = 0x02; // red
+        colour_table[0x1f] = 0x03; // cyan
+        colour_table[0xe3] = 0x04; // purple
+        colour_table[0x1c] = 0x05; // green
+        colour_table[0x03] = 0x06; // blue
+        colour_table[0xfc] = 0x07; // yellow
+        colour_table[0xec] = 0x08; // orange
+        colour_table[0xa8] = 0x09; // brown
+        colour_table[0xad] = 0x0a; // pink
+        colour_table[0x49] = 0x0b; // grey1
+        colour_table[0x92] = 0x0c; // grey2
+        colour_table[0x9e] = 0x0d; // lt.green
+        colour_table[0x93] = 0x0e; // lt.blue
+        colour_table[0xb6] = 0x0f; // grey3
+    } else {
+        // One step up in RGB332's red field: the cube holds nothing darker,
+        // so these share their entries with the shades just above them
+        for (colour = 0; colour < 16; colour++) {
+            colour_table[colour] = colour | 0x20;
+        }
+    }
 }
 
 // clang-format off
@@ -157,7 +168,7 @@ void setup_menu_screen(void) {
     // Colour RAM at offset $0000
 
     // Fill colour RAM with sensible value at the start
-    lfill(0xff80000U, 1, SCREEN_BYTES);
+    clear_colour_ram();
 }
 
 unsigned char next_cpu_speed(void) {
@@ -293,16 +304,16 @@ static char thumb_frame_name[][13] = {
 void predraw_freeze_menu(void)
 {
   // Clear screen, blue background, white text, like Action Replay
-  VICIV.bordercol = 6;
-  VICIV.screencol = 6;
+  VICIV.bordercol = SchemeBorder;
+  VICIV.screencol = SchemeBackground;
 
-  lfill(0xFF80000L, 1, SCREEN_BYTES);
+  clear_colour_ram();
   // Make disk image names different colour to avoid confusion
   for (uint16_t i = 40; i < 80; i += 2) {
-    lpoke(0xff80000 + 21 * SCREEN_ROW_BYTES + 1 + i, 0xe);
-    lpoke(0xff80000 + 24 * SCREEN_ROW_BYTES + 1 + i, 0xe);
+    lpoke(COLOUR_RAM_28BIT + 21 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
+    lpoke(COLOUR_RAM_28BIT + 24 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
     if (i > 50) { // ROM VERSION
-      lpoke(0xff80000 + 15 * SCREEN_ROW_BYTES + 1 + i, 0xf);
+      lpoke(COLOUR_RAM_28BIT + 15 * SCREEN_ROW_BYTES + 1 + i, SchemeTextBright);
 }
   }
 
@@ -651,7 +662,7 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     // restore border colour (fdisk/sd stuff still twiddles with it)
-    VICIV.bordercol = 6;
+    VICIV.bordercol = SchemeBorder;
 }
 
 void to_petscii_upper(char* text, int length) {
@@ -927,11 +938,11 @@ void fix_chargen_area(unsigned char flags) {
             }
         } else {
             // failed to load font, flash screen
-            VICIV.bordercol = 2;
-            VICIV.screencol = 2;
+            VICIV.bordercol = SchemeError;
+            VICIV.screencol = SchemeError;
             usleep(150000L);
-            VICIV.bordercol = 6;
-            VICIV.screencol = 6;
+            VICIV.bordercol = SchemeBorder;
+            VICIV.screencol = SchemeBackground;
         }
     }
 }
@@ -985,7 +996,7 @@ int main(void) {
     // C65 UART, ethernet etc
 
     // check border for return codes from other helpers
-    if (VICIV.bordercol == 0x83) {
+    if (VICIV.bordercol == BORDER_SIGNAL_ROM_CHANGED) {
         rom_changed = 1;
     }
 
@@ -1317,11 +1328,11 @@ int main(void) {
 
                     // can't save to slot 0
                     if (slot_number == 0) {
-                        VICIV.bordercol = 2;
-                        VICIV.screencol = 2;
+                        VICIV.bordercol = SchemeError;
+                        VICIV.screencol = SchemeError;
                         usleep(150000L);
-                        VICIV.bordercol = 6;
-                        VICIV.screencol = 6;
+                        VICIV.bordercol = SchemeBorder;
+                        VICIV.screencol = SchemeBackground;
                         continue;
                     }
 
@@ -1336,12 +1347,12 @@ int main(void) {
                     // Process in 64KB blocks, so that we can do multi-sector writes
                     // and generally be about 10x faster than otherwise.
                     for (uint32_t i = 0; i < 1024; i += 128) {
-                        VICIV.bordercol = 0x0e;
+                        VICIV.bordercol = SchemeAccent;
                         for (uint32_t j = 0; j < 128; j++) {
                             sdcard_readsector(freeze_slot_start_sector + i + j);
                             lcopy((uint32_t)sector_buffer, 0x40000U + (j << 9), 512);
                         }
-                        VICIV.bordercol = 0x00;
+                        VICIV.bordercol = SchemeBorderBusy;
                         for (uint32_t j = 0; j < 128; j++) {
                             lcopy(0x40000U + (j << 9), (uint32_t)sector_buffer, 512);
 #ifdef USE_MULTIBLOCK_WRITE
@@ -1361,7 +1372,7 @@ int main(void) {
                     // stop giving visual feedback
                     sdcard_visual_feedback(0);
 
-                    VICIV.bordercol = 6;
+                    VICIV.bordercol = SchemeBorder;
 
                     draw_freeze_menu(UpdateTop | UpdateProcess | UpdateThumb);
                 } break;
@@ -1407,11 +1418,11 @@ int main(void) {
                 default:
                 invalid_function:
                     // For invalid or unimplemented functions flash the border and screen
-                    VICIV.bordercol = 1;
-                    VICIV.screencol = 1;
+                    VICIV.bordercol = SchemeReject;
+                    VICIV.screencol = SchemeReject;
                     usleep(150000L);
-                    VICIV.bordercol = 6;
-                    VICIV.screencol = 6;
+                    VICIV.bordercol = SchemeBorder;
+                    VICIV.screencol = SchemeBackground;
                     break;
             }
         }

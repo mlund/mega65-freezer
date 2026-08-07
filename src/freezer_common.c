@@ -1,5 +1,6 @@
 #include "freezer_common.h"
 
+#include "color_scheme.h"
 #include "fdisk_memory.h"
 #include "freezer.h"
 #include "mega65_regs.h"
@@ -15,38 +16,17 @@ enum Mega65Rom mega65_rom_type = Mega65RomUnknown;
  * [12] and [13] to identify the ROM. */
 char mega65_rom_name[20];
 
-// clang-format off
-static unsigned char c64_palette[64]={
-  0x00, 0x00, 0x00, 0x00,
-  0xff, 0xff, 0xff, 0x00,
-  0xba, 0x13, 0x62, 0x00,
-  0x66, 0xad, 0xff, 0x00,
-  0xbb, 0xf3, 0x8b, 0x00,
-  0x55, 0xec, 0x85, 0x00,
-  0xd1, 0xe0, 0x79, 0x00,
-  0xae, 0x5f, 0xc7, 0x00,
-  0x9b, 0x47, 0x81, 0x00,
-  0x87, 0x37, 0x00, 0x00,
-  0xdd, 0x39, 0x78, 0x00,
-  0xb5, 0xb5, 0xb5, 0x00,
-  0xb8, 0xb8, 0xb8, 0x00,
-  0x0b, 0x4f, 0xca, 0x00,
-  0xaa, 0xd9, 0xfe, 0x00,
-  0x8b, 0x8b, 0x8b, 0x00
-};
-// clang-format on
-
 void set_palette(void) {
     unsigned char c;
 
     // set palette selector
     VICIV.palsel = 0xFF;
 
-    // First set the 16 C64 colours
+    // First set the scheme's 16 colours
     for (c = 0; c < 16; c++) {
-        PALETTE.red[c] = c64_palette[c * 4 + 0];
-        PALETTE.green[c] = c64_palette[c * 4 + 1];
-        PALETTE.blue[c] = c64_palette[c * 4 + 2];
+        PALETTE.red[c] = SCHEME_PALETTE[c * SCHEME_PALETTE_STRIDE + 0];
+        PALETTE.green[c] = SCHEME_PALETTE[c * SCHEME_PALETTE_STRIDE + 1];
+        PALETTE.blue[c] = SCHEME_PALETTE[c * SCHEME_PALETTE_STRIDE + 2];
     }
 
     // Then prepare a colour cube in the rest of the palette

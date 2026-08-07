@@ -15,6 +15,7 @@
   of a disk.
 */
 
+#include "color_scheme.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -49,10 +50,11 @@ char diskchooser_instructions[] = "  SELECT DISK IMAGE, THEN PRESS RETURN  "
                                   "UNMOUNT CURRENT  ";
 
 // use DMA lcopy overlap trick to save space!
-unsigned char normal_row[4] = {0, 1, 0, 1};
-unsigned char error_row[4] = {0, 2, 0, 2};
-unsigned char highlight_row[4] = {0, 0x21, 0, 0x21};
-unsigned char dir_line_colour[4] = {0, 0xe, 0, 0xe};
+unsigned char normal_row[4] = {0, SchemeText, 0, SchemeText};
+unsigned char error_row[4] = {0, SchemeError, 0, SchemeError};
+unsigned char highlight_row[4] = {
+    0, SchemeSelected | AttribReverse, 0, SchemeSelected | AttribReverse};
+unsigned char dir_line_colour[4] = {0, SchemeAccent, 0, SchemeAccent};
 
 char disk_name_return[33];
 char old_disk_name[33];
@@ -172,11 +174,11 @@ static unsigned char entry_buffer[18] __attribute__((nonstring)) = "\"          
 void display_error(void) {
     char* errstr;
 
-    VICIV.bordercol = 2;
+    VICIV.bordercol = SchemeError;
     errstr = hyppoerror_to_screen(mega65_geterrorcode());
     for (unsigned char i = 0; i < 19 && errstr[i]; i++) {
         POKE(SCREEN_ADDRESS + (21 * 2) + (i * 2), petscii_to_screen(errstr[i]));
-        lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + (i * 2), 0x02); // errors are red
+        lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + (i * 2), SchemeError);
     }
     lcopy((long)error_row, COLOUR_RAM_ADDRESS + (21 * 2), 4);
     lcopy(COLOUR_RAM_ADDRESS + (21 * 2), COLOUR_RAM_ADDRESS + (21 * 2) + 4, 19 * 2 - 4);
@@ -311,14 +313,14 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         disk_name_return[x] = 0;
     }
 
-    // Try to mount it, with border black while working
-    VICIV.bordercol = 0;
+    // Try to mount it, with the border marked busy while working
+    VICIV.bordercol = SchemeBorderBusy;
     if (mega65_dos_attach(disk_name_return, drive_id)) {
         // Mounting the image failed
         display_error();
         return 1;
     }
-    VICIV.bordercol = 6;
+    VICIV.bordercol = SchemeBorder;
 
     // Exit if a key has been pressed
     if (ASCIIKEY) {
@@ -428,7 +430,7 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     POKE(SCREEN_ADDRESS + 38 * 2, '"');
     // reverse for disk title
     for (i = 0; i < 18; i++) {
-        lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + i * 2, 0x2e);
+        lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + i * 2, SchemeAccent | AttribReverse);
     }
 
     // user impatient?
@@ -521,9 +523,9 @@ void draw_disk_image_list(void) {
     POKE(SCREEN_ADDRESS + 3, 0);
     lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 40 * 2 * 23 - 4);
     lpoke(COLOUR_RAM_ADDRESS + 0, 0);
-    lpoke(COLOUR_RAM_ADDRESS + 1, 1);
+    lpoke(COLOUR_RAM_ADDRESS + 1, SchemeText);
     lpoke(COLOUR_RAM_ADDRESS + 2, 0);
-    lpoke(COLOUR_RAM_ADDRESS + 3, 1);
+    lpoke(COLOUR_RAM_ADDRESS + 3, SchemeText);
     lcopy(COLOUR_RAM_ADDRESS, COLOUR_RAM_ADDRESS + 4, 40 * 2 * 23 - 4);
 
     // Draw instructions
@@ -571,7 +573,7 @@ void draw_disk_image_list(void) {
             76);
         addr += (40 * 2);
     }
-    VICIV.bordercol = 6;
+    VICIV.bordercol = SchemeBorder;
 }
 
 void scan_directory(unsigned char drive_id) {
@@ -755,8 +757,8 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                     }
                 }
 
-                // Try to mount it, with border black while working
-                VICIV.bordercol = 0;
+                // Try to mount it, with the border marked busy while working
+                VICIV.bordercol = SchemeBorderBusy;
                 if (disk_name_return[0] == '/') {
                     // Its a directory
                     mega65_dos_chdir((unsigned char*)&disk_name_return[1]);

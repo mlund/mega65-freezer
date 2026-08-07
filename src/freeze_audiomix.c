@@ -1,3 +1,4 @@
+#include "color_scheme.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -101,11 +102,11 @@ void draw_advanced_mixer(void) {
     uint16_t offset;
     uint8_t colour;
 
-    // debug output gray
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 5, 12);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 7, 12);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 11, 12);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 13, 12);
+    // debug output
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 5, SchemeTextDim);
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 7, SchemeTextDim);
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 11, SchemeTextDim);
+    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 13, SchemeTextDim);
     audio_menu[3 * 40 + 2] = nybl_to_screen(select_column);
     audio_menu[3 * 40 + 3] = nybl_to_screen(select_row);
 
@@ -132,18 +133,18 @@ void draw_advanced_mixer(void) {
         // highlight colour for the currently selected coefficient
         // (or just reverse video)
 
-        colour = 12;
+        colour = SchemeTextDim;
         if (((c & 0x1e) >> 1) == select_row) {
-            colour = 13;
+            colour = SchemeHighlight;
         }
         if ((c >> 5) == select_column) {
-            if (colour == 13) {
-                colour = 1;
+            if (colour == SchemeHighlight) {
+                colour = SchemeText;
             } else {
-                colour = 13;
+                colour = SchemeHighlight;
             }
         }
-        if (colour == 1) {
+        if (colour == SchemeText) {
             // debug output
             audio_menu[3 * 40 + 5] = nybl_to_screen(c >> 4);
             audio_menu[3 * 40 + 6] = nybl_to_screen(c);
@@ -335,11 +336,11 @@ void set_amplifier(unsigned char left_right, uint16_t first_coefficient) {
     break;
   }
   if (c == 99) {
-    VICIV.bordercol = 2;
-    VICIV.screencol = 2;
+    VICIV.bordercol = SchemeError;
+    VICIV.screencol = SchemeError;
     usleep(100000L);
-    VICIV.bordercol = 6;
-    VICIV.screencol = 6;
+    VICIV.bordercol = SchemeBorder;
+    VICIV.screencol = SchemeBackground;
   }
 #endif
 }
@@ -731,7 +732,7 @@ void do_advanced_mixer(void) {
     select_column = 0;
 
     // reset colour ram
-    lfill(0xff80000U, 1, SCREEN_BYTES);
+    clear_colour_ram();
 
     draw_advanced_mixer();
 
@@ -755,7 +756,7 @@ void do_advanced_mixer(void) {
                 case 0x03:
                 case 0xf3: // RUN/STOP or F3 to exit
                     // reset colour ram
-                    lfill(0xff80000U, 1, SCREEN_BYTES);
+                    clear_colour_ram();
                     return;
                 case 0x11:
                     select_row++;
@@ -817,11 +818,11 @@ void do_advanced_mixer(void) {
                     break;
                 default:
                     // For invalid or unimplemented functions flash the border and screen
-                    VICIV.bordercol = 1;
-                    VICIV.screencol = 1;
+                    VICIV.bordercol = SchemeReject;
+                    VICIV.screencol = SchemeReject;
                     usleep(150000L);
-                    VICIV.bordercol = 6;
-                    VICIV.screencol = 6;
+                    VICIV.bordercol = SchemeBorder;
+                    VICIV.screencol = SchemeBackground;
                     key = 0;
                     break;
             }
@@ -837,19 +838,19 @@ void do_audio_mixer(void) {
 
     for (i = 0; i < 80; i += 2) {
         if (i >= 22 && i < 46) {
-            db_bar_highlight[i + 1] = 5;
-            db_bar_lowlight[i + 1] = 13;
+            db_bar_highlight[i + 1] = SchemeMeterLow;
+            db_bar_lowlight[i + 1] = SchemeMeterLowDim;
         } else if (i >= 46 && i < 54) {
-            db_bar_highlight[i + 1] = 8;
-            db_bar_lowlight[i + 1] = 7;
+            db_bar_highlight[i + 1] = SchemeMeterMid;
+            db_bar_lowlight[i + 1] = SchemeMeterMidDim;
         } else if (i >= 54 && i < 68) {
-            db_bar_highlight[i + 1] = 2;
-            db_bar_lowlight[i + 1] = 10;
+            db_bar_highlight[i + 1] = SchemeMeterHigh;
+            db_bar_lowlight[i + 1] = SchemeMeterHighDim;
         } else {
             db_bar_highlight[i + 0] = 0;
             db_bar_lowlight[i + 0] = 0;
-            db_bar_highlight[i + 1] = 1;
-            db_bar_lowlight[i + 1] = 12;
+            db_bar_highlight[i + 1] = SchemeText;
+            db_bar_lowlight[i + 1] = SchemeTextDim;
         }
     }
 
@@ -947,11 +948,11 @@ void do_audio_mixer(void) {
                     break;
                 default:
                     // For invalid or unimplemented functions flash the border and screen
-                    VICIV.bordercol = 1;
-                    VICIV.screencol = 1;
+                    VICIV.bordercol = SchemeReject;
+                    VICIV.screencol = SchemeReject;
                     usleep(150000L);
-                    VICIV.bordercol = 6;
-                    VICIV.screencol = 6;
+                    VICIV.bordercol = SchemeBorder;
+                    VICIV.screencol = SchemeBackground;
                     key = 0;
                     break;
             }

@@ -3,6 +3,7 @@
 
 */
 
+#include "color_scheme.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -285,22 +286,22 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
      * is never reset, so on a second call it would otherwise still hold the
      * previous card's value. */
     if (fat32_open_file_system() != FreezerOk || !fat1_sector) {
-        draw_box(10, 8, 30, 13, 2, 1);
-        write_text(11, 9, 7, "COULD NOT FIND SD CARD");
+        draw_box(10, 8, 30, 13, SchemeError, 1);
+        write_text(11, 9, SchemeNotice, "COULD NOT FIND SD CARD");
         while (!ASCIIKEY) {
         }
         ASCIIKEY = 0;
         return;
     }
 
-    draw_box(10, 8, 30, 14, 14, 1);
-    write_text(11, 9, 14, "ENTER NAME FOR");
+    draw_box(10, 8, 30, 14, SchemeAccent, 1);
+    write_text(11, 9, SchemeAccent, "ENTER NAME FOR");
     if (is_d65) {
-        write_text(11, 10, 14, "HD (D65) IMAGE:");
+        write_text(11, 10, SchemeAccent, "HD (D65) IMAGE:");
     } else {
-        write_text(11, 10, 14, "DD (D81) IMAGE:");
+        write_text(11, 10, SchemeAccent, "DD (D81) IMAGE:");
     }
-    input_text(11, 12, 8, 1, filename);
+    input_text(11, 12, 8, SchemeText, filename);
     for (filename_len = 0; filename[filename_len]; filename_len++) {
         // Convert to upper case and work out length of string
         if (filename[filename_len] >= 0x61 && filename[filename_len] <= 0x7a) {
@@ -326,8 +327,8 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
     filename[filename_len] = 0;
     lcopy((long)filename, 0x0400, 16);
 
-    draw_box(10, 8, 30, 14, 7, 1);
-    write_text(11, 9, 7, "CREATING IMAGE...");
+    draw_box(10, 8, 30, 14, SchemeNotice, 1);
+    write_text(11, 9, SchemeNotice, "CREATING IMAGE...");
 
     // Actually create the file
     //  while(!ASCIIKEY) VICIV.bordercol = VICIV.bordercol+1; ASCIIKEY = 0;
@@ -338,9 +339,9 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
         fat2_sector);
     if (!file_sector) {
         // Error making file
-        draw_box(10, 8, 30, 14, 2, 1);
-        write_text(11, 9, 2, "Error creating file");
-        write_text(11, 12, 1, "Press almost any key...");
+        draw_box(10, 8, 30, 14, SchemeError, 1);
+        write_text(11, 9, SchemeError, "Error creating file");
+        write_text(11, 12, SchemeText, "Press almost any key...");
         while (!ASCIIKEY) {
         }
         ASCIIKEY = 0;
@@ -348,18 +349,18 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
         // File creation succeeded
 
         // Write header, BAM and zero out directory track
-        write_text(11, 10, 14, "FORMATTING IMAGE...");
+        write_text(11, 10, SchemeAccent, "FORMATTING IMAGE...");
         format_disk_image(file_sector, diskname, is_d65);
 
-        draw_box(8, 8, 32, 14, 13, 1);
-        write_text(9, 9, 13, "Created disk image");
+        draw_box(8, 8, 32, 14, SchemeHighlight, 1);
+        write_text(9, 9, SchemeHighlight, "Created disk image");
 
         // now mount the new image on the drive_id we got
         mega65_dos_attach(filename, drive_id);
         // store mount to freeze slot
         copy_imageproc_to_freezeregion(drive_id, 0);
 
-        write_text(9, 12, 1, "Press almost any key...");
+        write_text(9, 12, SchemeText, "Press almost any key...");
 
         while (!ASCIIKEY) {
         }

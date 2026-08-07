@@ -49,27 +49,3 @@ enum : uint8_t {
     AttribUnderline = 0x80,
     AttribHighlight = 0x40,
 };
-
-/* The sixteen palette entries.  Several have more than one common name. */
-enum Colour : uint8_t {
-    ColourBlack = 0,
-    ColourWhite = 1,
-    ColourRed = 2,
-    ColourCyan = 3,
-    ColourPurple = 4,
-    ColourGreen = 5,
-    ColourBlue = 6,
-    ColourYellow = 7,
-    ColourOrange = 8,
-    ColourBrown = 9,
-    ColourPink = 10,
-    ColourGrey1 = 11,
-    ColourDarkGrey = 11,
-    ColourGrey2 = 12,
-    ColourGrey = 12,
-    ColourMediumGrey = 12,
-    ColourLightGreen = 13,
-    ColourLightBlue = 14,
-    ColourGrey3 = 15,
-    ColourLightGrey = 15,
-};

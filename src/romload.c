@@ -3,6 +3,7 @@
 
 */
 
+#include "color_scheme.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -74,9 +75,9 @@ int main(void) {
 
     // communicate changed ROM by setting specific border color
     if (do_rom_loader()) {
-        VICIV.bordercol = 0x83;
+        VICIV.bordercol = BORDER_SIGNAL_ROM_CHANGED;
     } else {
-        VICIV.bordercol = 0x06;
+        VICIV.bordercol = SchemeBorder;
     }
 
     mega65_dos_exechelper("FREEZER.M65");

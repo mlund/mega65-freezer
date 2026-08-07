@@ -1,4 +1,5 @@
 #include "cc65compat.h"
+#include "color_scheme.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -46,7 +47,10 @@ static uint8_t m65submodel;
 static uint8_t code_buffer[512];
 static uint8_t ymd[3];
 
-/* Bit 8 of colour requests the reverse-video attribute. */
+/* Selects the inverse glyph -- bit 7 of the screen code -- not the colour-RAM
+ * AttribReverse.  Kept above the colour byte so a role can be OR-ed with it. */
+constexpr uint16_t WRITE_TEXT_INVERSE_GLYPH = 0x100;
+
 static void write_text_mapped(unsigned char x,
     unsigned char y,
     uint16_t colour,
@@ -64,7 +68,7 @@ static void write_text_mapped(unsigned char x,
         } else if (c == '~') { // ~ become pi
             c = 94;
         }
-        if (colour & 0x100 && c < 128) {
+        if (colour & WRITE_TEXT_INVERSE_GLYPH && c < 128) {
             c |= 0x80;
         }
         lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x + i, c);
@@ -616,23 +620,30 @@ unsigned char get_rtc_stats(unsigned char reinit) {
  * sets buffer+0 to the colour code 0-15
  */
 void format_extrtc_status(unsigned char status) {
+    unsigned char colour = SchemeUnknown;
+
     switch (status) {
         case 0:
-            strcpy(buffer, "\10NO RTC AVAILABLE  ");
+            colour = SchemeAttention;
+            strcpy(buffer + 1, "NO RTC AVAILABLE  ");
             break;
         case 1:
-            strcpy(buffer, "\7INTERNAL          ");
+            colour = SchemeValue;
+            strcpy(buffer + 1, "INTERNAL          ");
             break;
         case 2:
-            strcpy(buffer, "\10EXTERNAL, INACTIVE");
+            colour = SchemeAttention;
+            strcpy(buffer + 1, "EXTERNAL, INACTIVE");
             break;
         case 3:
-            strcpy(buffer, "\7EXTERNAL, ACTIVE  ");
+            colour = SchemeValue;
+            strcpy(buffer + 1, "EXTERNAL, ACTIVE  ");
             break;
         default:
-            strcpy(buffer, "\11UNKNOWN           ");
+            strcpy(buffer + 1, "UNKNOWN           ");
             break;
     }
+    buffer[0] = colour;
 }
 
 /*
@@ -664,16 +675,16 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                             strcpy(buffer, "SLOW TICK               ");
                             offs = 9;
                         }
-                        colour = 10;
+                        colour = SchemeWarning;
                     } else {
                         strcpy(buffer, "TICKING                 ");
                         offs = 7;
-                        colour = 7;
+                        colour = SchemeValue;
                     }
                 } else {
                     strcpy(buffer, "NOT TICKING             ");
                     offs = 11;
-                    colour = 10;
+                    colour = SchemeWarning;
                 }
                 // No terminator is copied, and none is needed: every strcpy
                 // above writes exactly 24 characters plus a NUL at index 24,
@@ -690,7 +701,7 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                 // NOLINTEND(bugprone-not-null-terminated-result)
                 write_text(x, y + 1, colour, buffer);
             } else {
-                write_text(x, y + 1, 7, "CHECKING                ");
+                write_text(x, y + 1, SchemeValue, "CHECKING                ");
             }
         }
         if (!rtc_check) {
@@ -702,9 +713,9 @@ void display_rtc_status(unsigned char x, unsigned char y) {
                 rtc_buf[8] & 0x3f,
                 rtc_buf[7] & 0x7f,
                 rtc_buf[6]);
-            write_text(x, y + 2, 12, buffer);
+            write_text(x, y + 2, SchemeTextDim, buffer);
         } else {
-            write_text(x, y + 2, 12, "                    ");
+            write_text(x, y + 2, SchemeTextDim, "                    ");
         }
     }
 }
@@ -758,73 +769,76 @@ void draw_screen(void) {
     lfill(SCREEN_ADDRESS, 0x20, SCREEN_BYTES);
 
     // write header
-    write_text(0, 0, 1, "MEGA65 INFORMATION");
-    write_text(54, 0, 12, "(C) 2022 MEGA - MUSEUM OF");
-    write_text(54, 1, 12, "   ELECTRONIC GAMES & ART");
-    write_text(0, 1, 1, "cccccccccccccccccc");
-    write_text(62, 24, 1, "F3-EXIT F5-RESTART");
+    write_text(0, 0, SchemeHeading, "MEGA65 INFORMATION");
+    write_text(54, 0, SchemeTextDim, "(C) 2022 MEGA - MUSEUM OF");
+    write_text(54, 1, SchemeTextDim, "   ELECTRONIC GAMES & ART");
+    write_text(0, 1, SchemeHeading, "cccccccccccccccccc");
+    write_text(62, 24, SchemeHeading, "F3-EXIT F5-RESTART");
 
     // get Hardware information
     copy_hw_version();
 
     // write model
-    write_text(0, 3, 1, "MEGA65 MODEL:");
-    write_text(15, 3, 7, format_mega_model());
-    write_text(40, 3, 1, "SCREEN MODE:");
+    write_text(0, 3, SchemeText, "MEGA65 MODEL:");
+    write_text(15, 3, SchemeValue, format_mega_model());
+    write_text(40, 3, SchemeText, "SCREEN MODE:");
     if (is_ntsc) {
-        write_text(54, 3, 7, "NTSC");
+        write_text(54, 3, SchemeValue, "NTSC");
     } else {
-        write_text(54, 3, 7, "PAL");
+        write_text(54, 3, SchemeValue, "PAL");
     }
 
     // output fpga versions
-    write_text(0, 5, 1, "ARTIX VERSION:");
-    write_text(15, 5, 7, format_fpga_hash(8, 0));
-    write_text(25, 5, 7, format_datestamp(8, 0xff));
+    write_text(0, 5, SchemeText, "ARTIX VERSION:");
+    write_text(15, 5, SchemeValue, format_fpga_hash(8, 0));
+    write_text(25, 5, SchemeValue, format_datestamp(8, 0xff));
     // save artix date for hickup date check
     artix_ymd[0] = ymd[0];
     artix_ymd[1] = ymd[1];
     artix_ymd[2] = ymd[2];
     if (ymd[0] < 22 || (ymd[0] == 22 && (ymd[1] < 6 || (ymd[1] == 6 && ymd[2] < 23)))) {
         no_extrtc = 1;
-        write_text(19, 1, 256 + 24, "UPDATE CORE FOR EXTERNAL RTC SUPPORT!");
+        write_text(19,
+            1,
+            WRITE_TEXT_INVERSE_GLYPH | AttribBlink | SchemeAttention,
+            "UPDATE CORE FOR EXTERNAL RTC SUPPORT!");
     }
 
-    write_text(0, 6, 1, "KEYBD VERSION:");
-    write_text(15, 6, 7, format_fpga_hash(2, 0));
-    write_text(25, 6, 7, format_datestamp(2, 0xff));
+    write_text(0, 6, SchemeText, "KEYBD VERSION:");
+    write_text(15, 6, SchemeValue, format_fpga_hash(2, 0));
+    write_text(25, 6, SchemeValue, format_datestamp(2, 0xff));
 
     if (m65model > 0x00 && m65model < 0x04) {
         // only mega65r1-3 have a MAX10 FPGA, it was removed for mega65r4
-        write_text(0, 7, 1, "MAX10 VERSION:");
-        write_text(15, 7, 7, format_fpga_hash(14, 1));
-        write_text(25, 7, 7, format_datestamp(14, 0x3f));
+        write_text(0, 7, SchemeText, "MAX10 VERSION:");
+        write_text(15, 7, SchemeValue, format_fpga_hash(14, 1));
+        write_text(25, 7, SchemeValue, format_datestamp(14, 0x3f));
     }
 
     // RTC (labels only, rest is done in mainloop)
-    write_text(40, 5, 1, "RTC STATUS:");
+    write_text(40, 5, SchemeText, "RTC STATUS:");
 
     // HYPPO/HDOS Version
-    write_text(0, 9, 1, "HYPPO/HDOS:");
-    write_text(15, 9, 7, format_hyppo_version());
+    write_text(0, 9, SchemeText, "HYPPO/HDOS:");
+    write_text(15, 9, SchemeValue, format_hyppo_version());
 
     // check for HICKUP
-    write_text(40, 9, 1, "HYPPO STATUS:");
+    write_text(40, 9, SchemeText, "HYPPO STATUS:");
     if (read_file_from_sdcard("HICKUP.M65", 0x40000L)) {
-        write_text(54, 9, 7, "NORMAL");
+        write_text(54, 9, SchemeValue, "NORMAL");
     } else {
         fail = format_hickup_version(0x40000L, artix_ymd);
-        write_text_upper(41, 10, 7 + fail * 3, buffer);
+        write_text_upper(41, 10, fail ? SchemeWarning : SchemeValue, buffer);
         if (fail) {
-            write_text(54, 9, 10, "OUT OF DATE HICKUP.M65");
+            write_text(54, 9, SchemeWarning, "OUT OF DATE HICKUP.M65");
         } else {
-            write_text(54, 9, 10, "LOCKED BY HICKUP.M65");
+            write_text(54, 9, SchemeWarning, "LOCKED BY HICKUP.M65");
         }
     }
 
     // ROM version
-    write_text(0, 10, 1, "ROM VERSION:");
-    write_text(15, 10, 7, format_rom_version());
+    write_text(0, 10, SchemeText, "ROM VERSION:");
+    write_text(15, 10, SchemeValue, format_rom_version());
 
     // Utility versions (need to load file to parse...)
     row = 12;
@@ -833,12 +847,12 @@ void draw_screen(void) {
         fail = read_file_from_sdcard(s_dessentials[i], 0x40000L);
         strcpy(buffer, s_dessentials[i]);
         strcat(buffer, ":");
-        write_text(col, row, 1, buffer);
+        write_text(col, row, SchemeText, buffer);
         if (fail) {
-            write_text(col + 14, row, 10, "FILE NOT FOUND");
+            write_text(col + 14, row, SchemeWarning, "FILE NOT FOUND");
         } else {
             fail = format_util_version(0x40000L, artix_ymd);
-            write_text_upper(col + 14, row, 7 + fail * 3, buffer);
+            write_text_upper(col + 14, row, fail ? SchemeWarning : SchemeValue, buffer);
         }
         if (!col) {
             col = 40;

@@ -1,3 +1,4 @@
+#include "color_scheme.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
 #include "fdisk_memory.h"
@@ -42,22 +43,20 @@ char rom_reset_screen[] = "YOU HAVE LOADED THE ROM FILE            "
                           "        RESET SYSTEM NOW? (Y/N)         ";
 
 // clang-format off
-unsigned char normal_row[40] = {
-  0, 1, 0, 1, 0, 1, 0, 1,
-  0, 1, 0, 1, 0, 1, 0, 1,
-  0, 1, 0, 1, 0, 1, 0, 1,
-  0, 1, 0, 1, 0, 1, 0, 1,
-  0, 1, 0, 1, 0, 1, 0, 1 };
+/* One colour-RAM pair -- attribute byte, colour byte -- per screen column, so
+ * the count is columns and the array is twice that many bytes.  A macro because
+ * an initialiser cannot call a function. */
+#define COLOUR_PAIRS_10(c) \
+  0, (c), 0, (c), 0, (c), 0, (c), 0, (c), \
+  0, (c), 0, (c), 0, (c), 0, (c), 0, (c)
+#define COLOUR_PAIRS_20(c) COLOUR_PAIRS_10(c), COLOUR_PAIRS_10(c)
 
-unsigned char highlight_row[40] = {
-  0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21,
-  0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21,
-  0, 0x21, 0, 0x21, 0, 0x21, 0, 0x21 };
+unsigned char normal_row[40] = { COLOUR_PAIRS_20(SchemeText) };
+unsigned char highlight_row[40] = { COLOUR_PAIRS_20(SchemeSelected | AttribReverse) };
+unsigned char dir_line_colour[40] = { COLOUR_PAIRS_20(SchemeAccent) };
 
-unsigned char dir_line_colour[40] = {
-  0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe,
-  0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe,
-  0, 0xe, 0, 0xe, 0, 0xe, 0, 0xe };
+#undef COLOUR_PAIRS_20
+#undef COLOUR_PAIRS_10
 // clang-format on
 
 char rom_name_return[32];
@@ -175,9 +174,9 @@ void clear_screen(unsigned char lines) {
     POKE(SCREEN_ADDRESS + 3, 0);
     lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 40 * 2 * lines - 4);
     lpoke(COLOUR_RAM_ADDRESS + 0, 0);
-    lpoke(COLOUR_RAM_ADDRESS + 1, 1);
+    lpoke(COLOUR_RAM_ADDRESS + 1, SchemeText);
     lpoke(COLOUR_RAM_ADDRESS + 2, 0);
-    lpoke(COLOUR_RAM_ADDRESS + 3, 1);
+    lpoke(COLOUR_RAM_ADDRESS + 3, SchemeText);
     lcopy(COLOUR_RAM_ADDRESS, COLOUR_RAM_ADDRESS + 4, 40 * 2 * lines - 4);
 }
 
@@ -398,7 +397,7 @@ unsigned char freeze_load_romarea(void) {
                     draw_file_list();
                 } else {
                     // XXX - Actually do loading of ROM / ROM diff file
-                    VICIV.bordercol = 0;
+                    VICIV.bordercol = SchemeBorderBusy;
                     if (!strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".ROM") ||
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".BIN") ||
                         !strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".rom") ||
@@ -420,7 +419,7 @@ unsigned char freeze_load_romarea(void) {
                             lcopy(0x40000L + 512L * (long)s, (long)buffer, 512);
                             freeze_store_sector(0x20000L + ((long)s) * 512L, buffer);
                         }
-                        VICIV.bordercol = 6;
+                        VICIV.bordercol = SchemeBorder;
 
                         return 1;
                     }

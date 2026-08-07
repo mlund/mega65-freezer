@@ -1,5 +1,6 @@
 #include "fdisk_screen.h"
 
+#include "color_scheme.h"
 #include "fdisk_memory.h"
 #include "freezer_common.h"
 #include "mega65_regs.h"
@@ -128,5 +129,5 @@ void setup_menu_screen_base(void) {
 /* Super-Extended Attribute Mode reads the high nibble as attributes, so the
  * fill has to stay a plain colour. */
 void clear_colour_ram(void) {
-    lfill(COLOUR_RAM_28BIT, ColourWhite, SCREEN_BYTES);
+    lfill(COLOUR_RAM_28BIT, SchemeText, SCREEN_BYTES);
 }

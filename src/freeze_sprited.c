@@ -66,6 +66,7 @@
     * Consider SPRBPMEN for 16-color sprites
  */
 #include "cc65compat.h"
+#include "color_scheme.h"
 #include "fdisk_memory.h"
 #include "freezer.h"
 
@@ -173,8 +174,9 @@ constexpr uint8_t SCREEN_ROWS = 25;
 constexpr uint8_t SCREEN_COLS = 80;
 
 constexpr uint8_t SPRITE_MAX_COUNT = 8;
-constexpr uint8_t DEFAULT_BORDER_COLOR = 6;
-constexpr uint8_t DEFAULT_SCREEN_COLOR = 6;
+/* A sprite colour, not chrome: it stands in for the frozen VIC's own value
+ * until one is read.  The index is fixed, but entry 11 belongs to the scheme,
+ * so what it draws as still follows the palette. */
 constexpr uint8_t DEFAULT_BACK_COLOR = 11;
 
 constexpr uint8_t TRANS_CHARACTER = 230;
@@ -727,23 +729,6 @@ static const uint8_t EDIT_CURSORS[] = {
 // clang-format on
 // clang-format on
 
-static const uint8_t EDIT_CURSOR_COLOR_MAP[16] = {COLOUR_BLACK,
-    COLOUR_BLUE,
-    COLOUR_BROWN,
-    COLOUR_GREY1,
-    COLOUR_GREY2,
-    COLOUR_GREY3,
-    COLOUR_LIGHTGREEN,
-    COLOUR_WHITE,
-    COLOUR_WHITE,
-    COLOUR_LIGHTGREEN,
-    COLOUR_GREY3,
-    COLOUR_GREY2,
-    COLOUR_GREY1,
-    COLOUR_RED,
-    COLOUR_BROWN,
-    COLOUR_BLUE};
-
 static void set_rect(RECT* rc, uint8_t left, uint8_t top, uint8_t right, uint8_t bottom) {
     rc->left = left;
     rc->right = right;
@@ -777,8 +762,8 @@ static void initialize(void) {
     setextendedattrib(1);
     setscreensize(SCREEN_COLS, SCREEN_ROWS);
     setscreenaddr(SCREEN_RAM_ADDRESS);
-    bordercolor(DEFAULT_BORDER_COLOR);
-    bgcolor(DEFAULT_SCREEN_COLOR);
+    bordercolor(SchemeBorder);
+    bgcolor(SchemeBackground);
 
     // --- Charset setup ----
 
@@ -816,8 +801,8 @@ static void initialize(void) {
     VICIV.spr_pos[EDIT_CURSOR_NUM].x = 0;
     VICIV.spr_pos[EDIT_CURSOR_NUM].y = 0;
 
-    VICIV.spr_color[MOUSE_POINTER_NUM] = COLOUR_YELLOW;
-    VICIV.spr_color[EDIT_CURSOR_NUM] = COLOUR_WHITE;
+    VICIV.spr_color[MOUSE_POINTER_NUM] = SchemePointer;
+    VICIV.spr_color[EDIT_CURSOR_NUM] = SchemeCursor;
     /* The preview sits in the sidebar, past X=255. */
     VICIV.spr_hi_x = 1 << PREVIEW_SPRITE_NUM;
     VICIV.spr_mcolor = 0; // All mono/hires sprites
@@ -1219,7 +1204,7 @@ void update_sprite_parameters(bool f_fetch_slot) {
         (SIDEBAR_COLUMN / 2) - (g_state.sprite_width * g_state.cells_per_pixel / 2);
 
     // Restore border affected by previous SD Card I/O
-    bordercolor(DEFAULT_BORDER_COLOR);
+    bordercolor(SchemeBorder);
 
     update_sprite_preview();
 
@@ -1242,7 +1227,7 @@ static void update_color_regs(void) {
     reg_poke(reg_sprite_color(g_state.sprite_number), g_state.color[ColorFore]);
     reg_poke(REG_SPRITE_MULTICOL1, g_state.color[ColorMc1]);
     reg_poke(REG_SPRITE_MULTICOL2, g_state.color[ColorMc2]);
-    bordercolor(COLOUR_BLUE);
+    bordercolor(SchemeBorder);
 
     VICIV.spr_color[PREVIEW_SPRITE_NUM] = g_state.color[ColorFore];
     VICIV.spr_mcolors[0] = g_state.color[ColorMc1];
@@ -1255,7 +1240,7 @@ static void erase_canvas_space(void) {
     rc.left = 0;
     rc.right = SIDEBAR_COLUMN - 1;
     rc.bottom = 23;
-    fillrect(&rc, ' ', 1);
+    fillrect(&rc, ' ', SchemeText);
 }
 
 static void draw_canvas(void) {
@@ -1304,7 +1289,7 @@ static void draw_header(void) {
          * _cprintf(0, s) and does not convert. */
         gohome();
         revers(1);
-        textcolor(COLOUR_LIGHTGREEN);
+        textcolor(SchemeBanner);
         screen_puts(HEADER_TEXT);
         revers(0);
     }
@@ -1314,7 +1299,7 @@ static void draw_color_selector(void) {
     RECT rc;
     if (g_state.redraw_flags & RedrawSidebarColor) {
         set_rect(&rc, SIDEBAR_COLUMN, 5, 80, 7);
-        fillrect(&rc, ' ', DEFAULT_SCREEN_COLOR);
+        fillrect(&rc, ' ', SchemeBackground);
 
         switch (g_state.sprite_color_mode) {
             case SpriteColorModeMono:
@@ -1324,10 +1309,12 @@ static void draw_color_selector(void) {
                 textcolor(g_state.color[ColorFore]);
                 screen_putsxy(SIDEBAR_COLUMN + 8, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
 
-                textcolor(g_state.current_color_idx == ColorBack ? 1 : COLOUR_DARKGREY);
+                textcolor(
+                    g_state.current_color_idx == ColorBack ? SchemeSelected : SchemeUnselected);
                 screen_putsxy(SIDEBAR_COLUMN + 2, 6, "BK");
 
-                textcolor(g_state.current_color_idx == ColorFore ? 1 : COLOUR_DARKGREY);
+                textcolor(
+                    g_state.current_color_idx == ColorFore ? SchemeSelected : SchemeUnselected);
                 screen_putsxy(SIDEBAR_COLUMN + 8 + 2, 6, "FG");
 
                 break;
@@ -1338,7 +1325,7 @@ static void draw_color_selector(void) {
                     5,
                     "\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0");
 
-                textcolor(1);
+                textcolor(SchemeText);
                 screen_putsxy(SIDEBAR_COLUMN + 2,
                     6,
                     g_state.color[ColorFore] == 0 ? "BACKGROUND" : "FOREGROUND");
@@ -1354,13 +1341,13 @@ static void draw_color_selector(void) {
                 textcolor(g_state.color[ColorMc2]);
                 screen_putsxy(SIDEBAR_COLUMN + 4 * 3, 5, "\xe0\xe0\xe0");
 
-                textcolor(COLOUR_DARKGREY);
+                textcolor(SchemeUnselected);
                 screen_putsxy(SIDEBAR_COLUMN + 1, 6, "BK");
                 screen_putsxy(SIDEBAR_COLUMN + 5, 6, "FG");
                 screen_putsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
                 screen_putsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
 
-                textcolor(1);
+                textcolor(SchemeSelected);
                 switch (g_state.current_color_idx) {
                     case ColorBack:
                         screen_putsxy(SIDEBAR_COLUMN + 1, 6, "BK");
@@ -1392,9 +1379,9 @@ static void draw_toolbox(void) {
     if (g_state.redraw_flags & RedrawSidebarTools) {
         for (i = 0; i < num_buttons; ++i) {
             if (g_state.drawing_tool == i) {
-                textcolor(COLOUR_WHITE);
+                textcolor(SchemeSelected);
             } else {
-                textcolor(COLOUR_DARKGREY);
+                textcolor(SchemeUnselected);
             }
 
             cputcxy(SIDEBAR_COLUMN + i * 2, SCREEN_ROWS - 4, TOOLBOX_CHARSET_BASE_IDX + i * 2);
@@ -1413,7 +1400,7 @@ static void draw_toolbox(void) {
 
 static void draw_side_bar_sprite_info(void) {
     if (g_state.redraw_flags & RedrawSidebarInfo) {
-        textcolor(1);
+        textcolor(SchemeText);
         gotoxy(SIDEBAR_COLUMN, 2);
         screen_puts("SPRITE ");
         cputdec(g_state.sprite_number, 0, 0);
@@ -1421,17 +1408,17 @@ static void draw_side_bar_sprite_info(void) {
                 ? " MONO    "
                 : (g_state.sprite_color_mode == SpriteColorModeMulti ? " MULTI   " : " 16-COL"));
         gotoxy(SIDEBAR_COLUMN, 3);
-        textcolor(3);
+        textcolor(SchemeAddress);
         cputhex(g_state.sprite_data_addr, 7);
         gotoxy(SIDEBAR_COLUMN, 8);
         textcolor(
             is_sprite_xwidth(g_state.sprite_number) || is_sprite_16color(g_state.sprite_number)
-                ? COLOUR_LIGHTBLUE
-                : COLOUR_DARKGREY);
+                ? SchemeAccent
+                : SchemeUnselected);
         screen_puts("XWIDE");
-        textcolor(is_sprite_hexpand(g_state.sprite_number) ? COLOUR_LIGHTBLUE : COLOUR_DARKGREY);
+        textcolor(is_sprite_hexpand(g_state.sprite_number) ? SchemeAccent : SchemeUnselected);
         screen_puts(" HEXP");
-        textcolor(is_sprite_vexpand(g_state.sprite_number) ? COLOUR_LIGHTBLUE : COLOUR_DARKGREY);
+        textcolor(is_sprite_vexpand(g_state.sprite_number) ? SchemeAccent : SchemeUnselected);
         screen_puts(" VEXP");
     }
 }
@@ -1440,7 +1427,7 @@ static void draw_coordinates(void) {
     if (g_state.redraw_flags & RedrawSidebarCoords) {
         cputncxy(SIDEBAR_COLUMN, SCREEN_ROWS - 1, SIDEBAR_WIDTH, ' ');
         gotoxy(SIDEBAR_COLUMN, SCREEN_ROWS - 1);
-        textcolor(COLOUR_CYAN);
+        textcolor(SchemeAddress);
         cputc('(');
         cputdec(g_state.cursor_x, 0, 0);
         cputc(',');
@@ -1480,12 +1467,12 @@ static bool answered_yes(const uint8_t* answer) {
 static void ask(const char* question, uint8_t* into, uint8_t max_length) {
     gotoy(SCREEN_ROWS - 1);
     revers(1);
-    textcolor(COLOUR_PINK);
+    textcolor(SchemeBar);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
     screen_putsxy(0, SCREEN_ROWS - 1, question);
     cinput(into, max_length + 1, CINPUT_ACCEPT_ALL);
     revers(0);
-    textcolor(COLOUR_BLUE);
+    textcolor(SchemeBackground);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
     g_state.redraw_flags |= RedrawSidebarCoords;
 }
@@ -1494,10 +1481,10 @@ static void print_key_group(const char* list[], uint8_t count, uint8_t x, uint8_
     register uint8_t i = 0;
     gotoxy(x, y);
     revers(1);
-    textcolor(COLOUR_PINK);
+    textcolor(SchemeBar);
     screen_puts(list[0]);
     revers(0);
-    textcolor(COLOUR_WHITE);
+    textcolor(SchemeText);
 
     for (i = 1; i < count; ++i) {
         gotoxy(x, y + i);
@@ -1583,7 +1570,7 @@ static void show_help(void) {
     print_key_group(display_keys, ARRAY_SIZE(display_keys), 42, 2);
     print_key_group(tips_ntricks, ARRAY_SIZE(tips_ntricks), 42, 16);
 
-    textcolor(COLOUR_CYAN);
+    textcolor(SchemeCredits);
     revers(1);
     cputncxy(22, SCREEN_ROWS - 4, SCREEN_COLS - 22, 32);
     screen_putsxy(
@@ -1599,14 +1586,14 @@ static void show_help(void) {
 }
 
 static void do_exit(void) {
-    textcolor(14);
-    bordercolor(14);
-    bgcolor(6);
+    textcolor(SchemeAccent);
+    bordercolor(SchemeAccent);
+    bgcolor(SchemeBackground);
     clrscr();
 }
 
 static void draw_screen(void) {
-    bgcolor(DEFAULT_SCREEN_COLOR);
+    bgcolor(SchemeBackground);
     clrscr();
     draw_header();
     draw_canvas();
@@ -1662,7 +1649,7 @@ static void main_loop(void) {
         const uint8_t raster = VICIV.rasterline;
         if (raster < previous_raster && --colour_countdown == 0) {
             colour_countdown = CURSOR_COLOUR_TICKS;
-            VICIV.spr_color[EDIT_CURSOR_NUM] = EDIT_CURSOR_COLOR_MAP[edit_color_index++ & 0x0F];
+            VICIV.spr_color[EDIT_CURSOR_NUM] = SCHEME_CURSOR_RAMP[edit_color_index++ & 0x0F];
         }
         previous_raster = raster;
 
@@ -1748,7 +1735,7 @@ static void main_loop(void) {
                 show_help();
                 erase_canvas_space();
                 set_redraw_full_canvas();
-                textcolor(COLOUR_BLUE);
+                textcolor(SchemeBackground);
                 cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
                 g_state.redraw_flags = RedrawAll;
                 break;
@@ -1896,10 +1883,10 @@ static void main_loop(void) {
                         // Display error if bytes do not match
                         copy_sprite_data(sprite_data_addr(to_sprite));
                     } else {
-                        bordercolor(COLOUR_RED);
+                        bordercolor(SchemeError);
                         cgetc();
                     }
-                    bordercolor(DEFAULT_BORDER_COLOR);
+                    bordercolor(SchemeBorder);
                 }
                 break;
 
@@ -1907,7 +1894,7 @@ static void main_loop(void) {
                 VICIV.spr_exp_y ^= 1 << PREVIEW_SPRITE_NUM;
                 reg_poke(REG_SPR_VEXPAND,
                     (uint8_t)(reg_peek(REG_SPR_VEXPAND) ^ (1 << g_state.sprite_number)));
-                bordercolor(DEFAULT_BORDER_COLOR);
+                bordercolor(SchemeBorder);
                 update_sprite_preview();
                 g_state.redraw_flags = RedrawSidebarInfo;
                 break;
@@ -1916,7 +1903,7 @@ static void main_loop(void) {
                 VICIV.spr_exp_x ^= 1 << PREVIEW_SPRITE_NUM;
                 reg_poke(REG_SPR_HEXPAND,
                     (uint8_t)(reg_peek(REG_SPR_HEXPAND) ^ (1 << g_state.sprite_number)));
-                bordercolor(DEFAULT_BORDER_COLOR);
+                bordercolor(SchemeBorder);
                 update_sprite_preview();
                 g_state.redraw_flags = RedrawSidebarInfo;
                 break;
@@ -1958,7 +1945,7 @@ static void main_loop(void) {
                 cputdec(c_spr_pal_bank, 0, 4);
                 reg_poke(REG_SPRPALSEL,
                     (uint8_t)((c_bank_reg & ~0xC) | (((c_spr_pal_bank + 1) % 4) << 2)));
-                bordercolor(DEFAULT_BORDER_COLOR);
+                bordercolor(SchemeBorder);
                 setup_text_palette();
             } break;
 
@@ -1996,7 +1983,7 @@ static void main_loop(void) {
 
             case 0xFB: // F11 Save to slot
                 put_sprite_data_to_slot();
-                bordercolor(DEFAULT_BORDER_COLOR);
+                bordercolor(SchemeBorder);
                 break;
 
             case 14: // CTRL-N

@@ -14,6 +14,10 @@
 
 void freeze_monitor(void);
 
+/* ROMLOAD leaves this in the border for the freezer to read after the launch.
+ * Outside the sixteen entries a scheme owns, so no role can collide with it. */
+constexpr uint8_t BORDER_SIGNAL_ROM_CHANGED = 0x83;
+
 #define SELDISK_INTERNAL (char*)0xFFFF
 #define SELDISK_NODISK (char*)0xFFFE
 #define NO_DISK_DRIVE "- NO DISK -"

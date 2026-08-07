@@ -2,6 +2,7 @@
 
 #include "fdisk_screen_monitor.h"
 
+#include "color_scheme.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
 #include "mega65_regs.h"
@@ -47,7 +48,7 @@ void next_line(void) {
         lcopy(SCREEN_ADDRESS + SCREEN_ROW_BYTES, SCREEN_ADDRESS, 23 * SCREEN_ROW_BYTES);
         lcopy(COLOUR_RAM_ADDRESS + SCREEN_ROW_BYTES, COLOUR_RAM_ADDRESS, 23 * SCREEN_ROW_BYTES);
         lfill(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES, ' ', SCREEN_ROW_BYTES);
-        lfill(COLOUR_RAM_ADDRESS + 23 * SCREEN_ROW_BYTES, 1, SCREEN_ROW_BYTES);
+        lfill(COLOUR_RAM_ADDRESS + 23 * SCREEN_ROW_BYTES, SchemeText, SCREEN_ROW_BYTES);
     }
 }
 
@@ -117,14 +118,13 @@ void setup_screen(void) {
     CIA2.pra = cia2_port_a;
 
     // Screen colours
-    VICIV.bordercol = 0;
-    VICIV.screencol = 6;
+    VICIV.bordercol = SchemeBorderDark;
+    VICIV.screencol = SchemeBackground;
 
     // Clear screen RAM
     lfill(SCREEN_ADDRESS, 0x20, SCREEN_BYTES);
 
-    // Clear colour RAM: white text
-    lfill(0x1f800, 0x01, SCREEN_BYTES);
+    clear_colour_ram();
 
     // Copy ASCII charset into place
     lcopy((int)&charset[0], CHARSET_ADDRESS, 0x800);
@@ -145,7 +145,7 @@ void fatal_error(const unsigned char* filename, uint16_t line_number) {
     POKE(FOOTER_ADDRESS + 44 + i, ':');
     i++;
     screen_decimal(FOOTER_ADDRESS + 44 + i, line_number);
-    lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS, 2 | AttribReverse, 80);
+    lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS, SchemeError | AttribReverse, 80);
     for (;;) {
     }
 }

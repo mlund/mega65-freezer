@@ -11,6 +11,7 @@
 */
 
 #include "blockmove.h"
+#include "color_scheme.h"
 #include "disasm.h"
 #include "fdisk_fat32.h"
 #include "fdisk_hal.h"
@@ -216,7 +217,7 @@ void show_memory(void) {
 
 static void report_error(const char* message) {
     write_line(message, 0);
-    recolour_last_line(2);
+    recolour_last_line(SchemeError);
 }
 
 /* The failure every command that walks frozen memory can reach. */
@@ -227,15 +228,9 @@ static void report_unmapped(void) {
 /* A screenful, matching show_memory()'s sixteen lines. */
 constexpr uint8_t DISASSEMBLY_LINES = 16;
 
-/* Colour-RAM indices for the fields of a disassembled line.  Chosen to stay
- * legible on a dark background: MONITOR never calls set_palette(), so it
- * inherits whatever palette the frozen program left behind and no exact hue can
- * be relied on. */
-constexpr uint8_t COLOUR_ADDRESS = 3; /* cyan */
-constexpr uint8_t COLOUR_BYTES = 12;  /* medium grey: deliberately dim */
-constexpr uint8_t COLOUR_OPERAND = 5; /* green */
 /* Indexed by DisasmMnemonicClass: plain, control flow, MEGA65-only. */
-static const unsigned char MNEMONIC_CLASS_COLOUR[] = {1, 7, 13};
+static const unsigned char MNEMONIC_CLASS_COLOUR[] = {
+    SchemeAsmPlain, SchemeAsmControlFlow, SchemeAsmMega65};
 
 /* Colour the fields of the line just written.  `attribute` is OR'd into every
  * field so a whole-line marker such as AttribReverse leaves no gaps; the
@@ -244,14 +239,15 @@ static void colour_disassembly_line(const DisassemblyLayout* layout, unsigned ch
     unsigned char mnemonic_colour = MNEMONIC_CLASS_COLOUR[layout->mnemonic_class];
     unsigned char operand_column = layout->mnemonic_column + DISASM_MNEMONIC_FIELD_WIDTH;
 
-    recolour_last_line_segment(0, DISASM_BYTE_COLUMN, COLOUR_ADDRESS | attribute);
-    recolour_last_line_segment(
-        DISASM_BYTE_COLUMN, layout->mnemonic_column - DISASM_BYTE_COLUMN, COLOUR_BYTES | attribute);
+    recolour_last_line_segment(0, DISASM_BYTE_COLUMN, SchemeAddress | attribute);
+    recolour_last_line_segment(DISASM_BYTE_COLUMN,
+        layout->mnemonic_column - DISASM_BYTE_COLUMN,
+        SchemeAsmBytes | attribute);
     recolour_last_line_segment(
         layout->mnemonic_column, DISASM_MNEMONIC_FIELD_WIDTH, mnemonic_colour | attribute);
     if (layout->text_length > operand_column) {
         recolour_last_line_segment(
-            operand_column, layout->text_length - operand_column, COLOUR_OPERAND | attribute);
+            operand_column, layout->text_length - operand_column, SchemeAsmOperand | attribute);
     }
 }
 
@@ -385,7 +381,7 @@ void set_memory(void) {
                     break;
                 default:
                     write_line("? SYNTAX  ERROR", 0);
-                    recolour_last_line(2);
+                    recolour_last_line(SchemeError);
                     return;
             }
         }
@@ -430,7 +426,7 @@ void show_registers(void) {
      * shifted value can never equal it and the guard would never fire. */
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
         write_line("? FROZEN REGISTERS NOT FOUND  ERROR", 0);
-        recolour_last_line(2);
+        recolour_last_line(SchemeError);
     } else {
         freeze_slot_offset = freeze_slot_offset >> 9L;
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
@@ -606,7 +602,7 @@ static void report_hit_count(
         write_line(none, 0);
     } else if (truncated) {
         write_line(more, 0);
-        recolour_last_line(7);
+        recolour_last_line(SchemeNotice);
     }
 }
 
@@ -790,9 +786,9 @@ unsigned char parse_address(void) {
     unsigned char digits = parse_hex();
     if (digits > 7) {
         write_line("? ADDRESS TOO LONG  ERROR", 0);
-        recolour_last_line(2);
+        recolour_last_line(SchemeError);
         write_line("(Addresses should consist of 1 - 7 hex digits).", 0);
-        recolour_last_line(7);
+        recolour_last_line(SchemeNotice);
         return 1;
     }
     if (digits) {
@@ -1004,7 +1000,7 @@ void freeze_monitor(void) {
                 break;
             default:
                 write_line("Unknown command.", 0);
-                recolour_last_line(0x02);
+                recolour_last_line(SchemeError);
                 break;
         }
     }
