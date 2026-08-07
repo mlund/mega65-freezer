@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 #define WITH_AUDIOMIXER
-// #define WITH_TOUCH
 
 #include "helper.h"
 

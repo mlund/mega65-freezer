@@ -76,9 +76,6 @@ unsigned char freeze_root_warn[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
 
 static unsigned char rom_changed = 0;
 unsigned char not_in_root = 0;
-#ifdef WITH_TOUCH
-signed char swipe_dir = 0;
-#endif
 
 void to_petscii_upper(char* text, int length);
 
@@ -640,171 +637,6 @@ void to_petscii_upper(char* text, int length) {
     }
 }
 
-#ifdef WITH_JOYSTICK
-// TODO: this is very old and generates keystrokes we don't have anymore
-// Left/right do left/right
-// fire = F3
-// down = disk menu
-// up = toggle PAL/NTSC ?
-static unsigned char joy_to_key[32] = {
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0xF3, // With fire pressed
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0x1d,
-    0,
-    0,
-    0,
-    0x9d,
-    0,
-    'd',
-    'v',
-    0 // without fire
-};
-
-unsigned char read_joystick(void) {
-    unsigned char key;
-    // TODO: this is very broken, keypresses will generate F3(FIRE) on DC01
-    // We use a simple lookup table to do this
-    key = joy_to_key[CIA1.pra & CIA1.prb & 0x1f];
-    // Then wait for joystick to release
-    while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
-        continue;
-    return key;
-}
-#endif /* WITH_JOYSTICK */
-
-#ifdef WITH_TOUCH
-// clang-format off
-static unsigned char touch_keys[2][9] = {
-  { 0xF3, 0x00, 'c', 'r', 'f', 0x00, 'm', 'a', 'd' },
-  { 0xF7, 0x00, 'j', 't', 'v', 0x00, 'e', 'k', 'x' } };
-// clang-format on
-
-static unsigned char last_touch = 0;
-static unsigned char last_x;
-
-unsigned char poll_touch_panel(void) {
-    unsigned char key = 0;
-    uint16_t x, y;
-
-    if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
-        x = TOUCH1_X_LSB + ((TOUCH1_MSB & TOUCH1_X_MSB_MASK) << 8);
-        y = TOUCH1_Y_LSB + ((TOUCH1_MSB & TOUCH1_Y_MSB_MASK) << 4);
-        x = x >> 4;
-        y = y >> 4;
-    } else {
-        x = 0;
-        y = 0;
-    }
-
-    if ((last_touch & TOUCH_STATUS_EV1_VALID) && (!(TOUCH_STATUS & TOUCH_STATUS_EV1_VALID))) {
-        if (y > 8 && y < 17) {
-            if (x < 26)
-                x = 0;
-            else
-                x = 1;
-            key = touch_keys[x][y - 9];
-            // Wait for touch to be released
-            // XXX - Records touch event as where your finger was when you touched, not released.
-            while (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID)
-                continue;
-        }
-    }
-
-    // Set speaker volume by placing finger along top edge of screen.
-    // (We now also support setting the amplifier gain from in the audio mixer,
-    // including setting the gain for stereo speakers.  This little hack below
-    // will likely disappear when we add touch support to the audio mixer)
-    if (y > 0 && y < 7) {
-        if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
-            if (x > 5)
-                x -= 5;
-            else
-                x = 0;
-            if (x > 39)
-                x = 39;
-            for (y = 0; y < x * 2; y += 2)
-                lpoke(SCREEN_ADDRESS + y, 0xA0);
-            for (; y < 80; y += 2)
-                lpoke(SCREEN_ADDRESS + y, 0x20);
-            y = 0;
-            lpoke(0xFFD7035L, 0xff - (x * 5));
-        }
-    }
-
-    // Check for side/side swiping
-    // (In theory the touch panel supports gestures, but we have not got them working.
-    // so we will just infer them.  Move sideways more than 3 characters within a short
-    // period of time will be deemed to be a side swipe).
-    if (y > 17) {
-        if (TOUCH_STATUS & TOUCH_STATUS_EV1_VALID) {
-            if (x > last_x && swipe_dir < 0)
-                swipe_dir = 1;
-            if (x > last_x && swipe_dir >= 0)
-                swipe_dir++;
-            if (x > last_x) {
-                // Swipe screen to the right
-
-                // Copy is overlapping, so copy it somewhere else first, then copy it down
-                lcopy(
-                    SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13), 0x40000L, 12 * SCREEN_ROW_BYTES - 2);
-                lcopy(0x40000,
-                    SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) + 2,
-                    12 * SCREEN_ROW_BYTES - 2);
-            }
-
-            if ((x < last_x) && (swipe_dir > 0))
-                swipe_dir = -1;
-            if ((x < last_x))
-                swipe_dir--;
-            if (x < last_x) {
-                // Swipe screen to the left
-                lcopy(SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13),
-                    SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) - 2,
-                    12 * SCREEN_ROW_BYTES - 2);
-            }
-
-            if (swipe_dir == -5) {
-                key = 0x1d;
-                swipe_dir = 0;
-            }
-            if (swipe_dir == 5) {
-                key = 0x9d;
-                swipe_dir = 0;
-            }
-
-            last_x = x;
-        } else {
-            if (last_touch & TOUCH_STATUS_EV1_VALID) {
-            }
-        }
-    }
-    last_touch = TOUCH_STATUS;
-
-    return key;
-}
-#endif
-
 void change_mounted_disk_image(uint8_t diskid) {
     char* ret;
     ret = freeze_select_disk_image(diskid);
@@ -1034,16 +866,6 @@ int main(void) {
             // Flush char from input buffer
             ASCIIKEY = 0;
         }
-#ifdef WITH_JOYSTICK
-        // Joystick Support is old and needs to be overhauled!
-        if (!key)
-            key = read_joystick();
-#endif
-#ifdef WITH_TOUCH
-        // This is just for MEGAPHONE and is probably not working (like joystick)!
-        if (!key)
-            key = poll_touch_panel();
-#endif
 
         // Process char
         if (key) {

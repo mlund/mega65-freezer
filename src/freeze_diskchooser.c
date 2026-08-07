@@ -60,43 +60,6 @@ char disk_name_return[33];
 char old_disk_name[33];
 uint8_t old_disk_flags, old_disk_len;
 
-#ifdef WITH_JOYSTICK
-unsigned char joy_to_key_disk[32] = {
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0x0d, // With fire pressed
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0x9d,
-    0,
-    0,
-    0,
-    0x1d,
-    0,
-    0x11,
-    0x91,
-    0 // without fire
-};
-#endif
-
 static char default_error[] = "ERROR CODE XX";
 char* hyppoerror_to_screen(unsigned char error) {
     // don't add to many errors, this is lot of space!
@@ -638,16 +601,6 @@ char* freeze_select_disk_image(unsigned char drive_id) {
             // Clear read key
             ASCIIKEY = 0;
         }
-
-#ifdef WITH_JOYSTICK
-        if (!x) {
-            // We use a simple lookup table to do this
-            x = joy_to_key_disk[CIA1.pra & CIA1.prb & 0x1f];
-            // Then wait for joystick to release
-            while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
-                continue;
-        }
-#endif
 
         if (!x) {
             idle_time++;

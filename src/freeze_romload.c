@@ -61,43 +61,6 @@ unsigned char dir_line_colour[40] = { COLOUR_PAIRS_20(SchemeAccent) };
 
 char rom_name_return[32];
 
-#ifdef WITH_JOYSTICK
-unsigned char joy_to_key_disk[32] = {
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0x0d, // With fire pressed
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0x9d,
-    0,
-    0,
-    0,
-    0x1d,
-    0,
-    0x11,
-    0x91,
-    0 // without fire
-};
-#endif
-
 char draw_directory_entry(unsigned char screen_row) {
     char type;
     char firsta0 = 1;
@@ -346,16 +309,6 @@ unsigned char freeze_load_romarea(void) {
             ASCIIKEY = 0;
         }
 
-#ifdef WITH_JOYSTICK
-        if (!x) {
-            // We use a simple lookup table to do this
-            x = joy_to_key_disk[CIA1.pra & CIA1.prb & 0x1f];
-            // Then wait for joystick to release
-            while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
-                continue;
-        }
-#endif
-
         switch (x) {
             case 0x03: // RUN-STOP = make no change
             case 0x1b: // ESC
@@ -531,21 +484,6 @@ void user_reset_prompt(void) {
         if (x) {
             ASCIIKEY = 0;
         }
-
-#ifdef WITH_JOYSTICK
-        if (!x) {
-            // We use a simple lookup table to do this
-            x = joy_to_key_disk[CIA1.pra & CIA1.prb & 0x1f];
-            // Then wait for joystick to release
-            while ((CIA1.pra & CIA1.prb & 0x1f) != 0x1f)
-                continue;
-            // translate joystick to keys
-            if (x == 0xd) // fire is Y
-                x = 'Y';
-            else if (x == 0x9d) // left is abort
-                x = 'N';
-        }
-#endif
     }
 
     if (x == 'y' || x == 'Y') {
