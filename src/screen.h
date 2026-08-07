@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dma.h"
+#include "format.h"
 
 #include <stdint.h>
 
@@ -60,11 +61,8 @@ void draw_text(uint16_t cell, uint8_t colour, const char* text, uint8_t length);
  * entry costs its full 80 columns that --gc-sections cannot reclaim. */
 
 void screen_hex(uint16_t addr, long value);
-constexpr uint8_t DECIMAL_COLUMNS = 5;
 void screen_decimal(uint16_t addr, uint16_t value);
 void draw_decimal(uint16_t cell, uint8_t colour, uint16_t value);
-
-void format_hex(char* out, const long value, const char columns);
 
 extern uint16_t screen_line_address;
 extern char screen_column;

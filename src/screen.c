@@ -3,58 +3,17 @@
 #include "colours.h"
 #include "common.h"
 #include "dma.h"
+#include "format.h"
 #include "mega65_regs.h"
 
 uint16_t screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
 
-/* Writes eight hex digits to a buffer. */
-static void hex_to_buf(char* out, const long value) {
-    out[0] = nybl_to_screen((uint8_t)(value >> 28));
-    out[1] = nybl_to_screen((uint8_t)(value >> 24));
-    out[2] = nybl_to_screen((uint8_t)(value >> 20));
-    out[3] = nybl_to_screen((uint8_t)(value >> 16));
-    out[4] = nybl_to_screen((uint8_t)(value >> 12));
-    out[5] = nybl_to_screen((uint8_t)(value >> 8));
-    out[6] = nybl_to_screen((uint8_t)(value >> 4));
-    out[7] = nybl_to_screen((uint8_t)(value >> 0));
-}
-
 void screen_hex(uint16_t addr, long value) {
     char dec[8];
-    hex_to_buf(dec, value);
+    format_hex(dec, value, 8);
     for (char i = 0; i < 8; i++) {
         POKE(addr + i, dec[i]);
-    }
-}
-
-/* Writes the low `columns` digits.  out is a plain buffer, so take a pointer:
- * an address passed as an integer hides the stores from the compiler. */
-void format_hex(char* out, const long value, const char columns) {
-    char dec[8];
-    hex_to_buf(dec, value);
-
-    for (char i = 0; i < columns; i++) {
-        out[i] = dec[i + 8 - columns];
-    }
-}
-
-static const uint16_t DECIMAL_POWERS[DECIMAL_COLUMNS] = {10000, 1000, 100, 10, 1};
-
-/* Repeated subtraction, most significant power first: five compares and at most
- * nine subtractions each, against a ten-byte table. */
-static void format_decimal(char* out, uint16_t v) {
-    uint8_t leading = 1;
-    for (uint8_t i = 0; i < DECIMAL_COLUMNS; i++) {
-        uint8_t d = 0;
-        while (v >= DECIMAL_POWERS[i]) {
-            v -= DECIMAL_POWERS[i];
-            d++;
-        }
-        if (d) {
-            leading = 0;
-        }
-        out[i] = (leading && i < DECIMAL_COLUMNS - 1) ? ' ' : (char)('0' + d);
     }
 }
 

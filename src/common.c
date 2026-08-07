@@ -202,20 +202,6 @@ unsigned char detect_cpu_speed(void) {
     return 1;
 }
 
-/*
- * uint8_t nybl_to_screen(uint8_t v)
- *
- * converts the lower 4 bits of a byte to a screen code
- * hexadecimal number digit.
- */
-uint8_t nybl_to_screen(uint8_t v) {
-    v &= 0xf;
-    if (v < 0xa) {
-        return 0x30 + v;
-    }
-    return v - 0x9;
-}
-
 unsigned char petscii_to_screen(unsigned char petscii) {
     // control characters => space
     if ((petscii & 0x7f) < 0x20) {

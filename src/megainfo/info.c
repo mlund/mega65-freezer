@@ -10,42 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Everything this tool formats is zero-padded hex or a small decimal, so it
- * composes them directly rather than linking a printf.  format_hex() is
- * screen.c's, and writes `columns` digits with no terminator, which is what
- * lets these chain. */
-static char* append_str(char* at, const char* text) {
-    while (*text) {
-        *at++ = *text++;
-    }
-    return at;
-}
-
-static char* append_hex(char* at, long value, uint8_t columns) {
-    format_hex(at, value, (char)columns);
-    return at + columns;
-}
-
-static char* append_dec(char* at, uint16_t value) {
-    char digits[5];
-    uint8_t n = 0;
-    do {
-        digits[n++] = (char)('0' + value % 10);
-        value /= 10;
-    } while (value);
-    while (n) {
-        *at++ = digits[--n];
-    }
-    return at;
-}
-
-/* Exactly two digits, as a date wants. */
-static char* append_dec2(char* at, uint8_t value) {
-    *at++ = (char)('0' + value / 10);
-    *at++ = (char)('0' + value % 10);
-    return at;
-}
-
 /*
  * Constants
  */

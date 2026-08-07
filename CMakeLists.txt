@@ -174,6 +174,12 @@ if(Python3_FOUND AND LLVM_MC_EXE)
         # host build drives it against a flat array.  The overlap cases are
         # the point: a forward copy into a destination inside the source range
         # corrupts only the tail, which reads as working on hardware.
+        # The formatting is pure, so it is checked on the host against Python's
+        # own -- no emulator, and it covers what nothing else does.
+        add_test(NAME format
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_format.py
+                    --cc ${HOST_C_COMPILER})
+
         add_test(NAME blockmove
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_blockmove.py
                     --cc ${HOST_C_COMPILER})

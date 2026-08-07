@@ -43,7 +43,6 @@ extern uint8_t current_scheme;
 
 char* detect_rom(void);
 unsigned char detect_cpu_speed(void);
-uint8_t nybl_to_screen(uint8_t v);
 unsigned char petscii_to_screen(unsigned char petscii);
 void screen_of_death(const char* msg);
 
