@@ -153,6 +153,16 @@ endif()
 # this project builds with, not from a stock llvm-mc that happens to be on PATH.
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(LLVM_MC_EXE NAMES llvm-mc HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
+find_program(HOST_C_COMPILER NAMES cc clang gcc)
+
+# The number formatting is pure, so the host checks it against Python's own --
+# no assembler, no emulator.  Guarded on its own needs rather than on the
+# disassembler's, or a machine without llvm-mc silently runs no tests at all.
+if(Python3_FOUND AND HOST_C_COMPILER)
+    add_test(NAME format
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_format.py
+                --cc ${HOST_C_COMPILER})
+endif()
 
 if(Python3_FOUND AND LLVM_MC_EXE)
     add_custom_target(disasm-tables
@@ -164,7 +174,6 @@ if(Python3_FOUND AND LLVM_MC_EXE)
     # combination against llvm-mc, so a toolchain bump cannot silently change
     # the tables.  Needs a host compiler as well, so it is registered only when
     # one is present rather than failing the configure.
-    find_program(HOST_C_COMPILER NAMES cc clang gcc)
     if(HOST_C_COMPILER)
         add_test(NAME disasm
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_disasm.py
@@ -174,12 +183,6 @@ if(Python3_FOUND AND LLVM_MC_EXE)
         # host build drives it against a flat array.  The overlap cases are
         # the point: a forward copy into a destination inside the source range
         # corrupts only the tail, which reads as working on hardware.
-        # The formatting is pure, so it is checked on the host against Python's
-        # own -- no emulator, and it covers what nothing else does.
-        add_test(NAME format
-            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_format.py
-                    --cc ${HOST_C_COMPILER})
-
         add_test(NAME blockmove
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_blockmove.py
                     --cc ${HOST_C_COMPILER})

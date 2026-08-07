@@ -237,16 +237,13 @@ constexpr uint8_t PREVIEW_SPRITE_NUM = 2;
 constexpr uint8_t EDITOR_SPRITES =
     (1 << MOUSE_POINTER_NUM) | (1 << EDIT_CURSOR_NUM) | (1 << PREVIEW_SPRITE_NUM);
 
-/* Where the first two live.  $0380 overlaps the tail of the freezer's loader
- * stub at $0340, which has finished by the time this runs and which helper.S
- * copies there afresh on every load. */
-/* Sprite data only has to be 64-byte aligned -- a sprite pointer is an address
- * divided by 64 -- and is never handed to another tool, so the compiler places
- * these.  SPRITE_BUFFER at $40000 shows sprite data need not be in low memory. */
+/* A sprite pointer is an address divided by 64, so the alignment below is
+ * load-bearing: without it the division truncates and the VIC-IV reads the
+ * wrong data.  Nothing else constrains where these sit -- they are never handed
+ * to another tool -- so the compiler places them, as SPRITE_BUFFER at $40000
+ * already shows sprite data need not be in low memory. */
 static uint8_t mouse_pointer[64] __attribute__((aligned(64)));
 #define MOUSE_POINTER_DATA ((Addr28)(uint16_t)mouse_pointer)
-/* Placed by src/freezemenu.ld, which asserts it stays 64-byte aligned: the
- * VIC-IV sprite pointer is an address divided by 64. */
 static uint8_t sprite_cursor[64] __attribute__((aligned(64)));
 #define EDIT_CURSOR_DATA ((Addr28)(uint16_t)sprite_cursor)
 

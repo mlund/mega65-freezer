@@ -65,10 +65,12 @@ def main() -> int:
                 commands.append(f"hex {v} {columns}")
                 expected.append(f"{v:0{columns}X}"[-columns:])
 
-        # Five columns, space padded: the freezer's slot and drive numbers.
+        # Five columns, left-aligned with the padding after: the freezer writes
+        # these straight after their labels, so a digit must land in the
+        # field's first column, not its last.
         for v in [0, 1, 9, 10, 99, 100, 999, 1000, 9999, 10000, 65535]:
             commands.append(f"dec {v}")
-            expected.append(f"{v:5d}")
+            expected.append(f"{v:<5d}")
 
         # The appending forms, which compose MEGAINFO's lines.
         for v in [0, 1, 9, 10, 99, 100, 1000, 2024, 65535]:

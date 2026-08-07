@@ -47,6 +47,7 @@ static const uint16_t DECIMAL_POWERS[DECIMAL_COLUMNS] = {10000, 1000, 100, 10, 1
 /* Repeated subtraction, most significant power first: five compares and at most
  * nine subtractions each, against a ten-byte table. */
 void format_decimal(char* out, uint16_t v) {
+    uint8_t written = 0;
     uint8_t leading = 1;
     for (uint8_t i = 0; i < DECIMAL_COLUMNS; i++) {
         uint8_t d = 0;
@@ -57,7 +58,14 @@ void format_decimal(char* out, uint16_t v) {
         if (d) {
             leading = 0;
         }
-        out[i] = (leading && i < DECIMAL_COLUMNS - 1) ? ' ' : (char)('0' + d);
+        /* Left-aligned: the digits start at the field's first column and the
+         * padding follows, so a value sits against the label that names it. */
+        if (!leading || i == DECIMAL_COLUMNS - 1) {
+            out[written++] = (char)('0' + d);
+        }
+    }
+    while (written < DECIMAL_COLUMNS) {
+        out[written++] = ' ';
     }
 }
 
