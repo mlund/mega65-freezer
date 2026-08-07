@@ -366,10 +366,6 @@ void draw_freeze_menu(unsigned char part) {
     unsigned char x;
     unsigned char y;
 
-#if 0
-  // DEBUG
-  freeze_menu[0] = hdos_new_attach ? '1' : '0';
-#endif
 
     if (part & UpdateChgSlot) {
         freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
@@ -565,13 +561,6 @@ void draw_freeze_menu(unsigned char part) {
     // (in fact, most of memory contains what the frozen program had. Only our freezer program
     // itself has been loaded to replace some of RAM).
     copy_convert_to_screen(freeze_menu, 0);
-#if 0
-  // DEBUG
-  POKE(SCREEN_ADDRESS + 4, nybl_to_screen(process_descriptor.d81_image0_flags >> 4));
-  POKE(SCREEN_ADDRESS + 6, nybl_to_screen(process_descriptor.d81_image0_flags));
-  POKE(SCREEN_ADDRESS + 10, nybl_to_screen(process_descriptor.d81_image1_flags >> 4));
-  POKE(SCREEN_ADDRESS + 12, nybl_to_screen(process_descriptor.d81_image1_flags));
-#endif
 
     // Draw the thumbnail surround area
     if (part & UpdateThumb) {
@@ -853,40 +842,6 @@ void change_mounted_disk_image(uint8_t diskid) {
     draw_freeze_menu(UpdateAll | UpdateChgSlot);
 }
 
-#if 0
-void debug_region_list(void)
-{
-  // display region list on screen
-  uint32_t test;
-  for (uint16_t j = 0; j < freeze_region_count; j++) {
-    test = freeze_region_list[j].address_base;
-    POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 60 - 16, 32);
-    for (i = 0; i < 8; i++) {
-      POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 60 - i*2, nybl_to_screen((uint8_t)test));
-      test >>= 4;
-    }
-    POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 78 - 16, 32);
-    test = freeze_region_list[j].region_length;
-    for (i = 0; i < 8; i++) {
-      POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 78 - i*2, nybl_to_screen((uint8_t)test));
-      test >>= 4;
-    }
-  }
-  test = address_to_freeze_slot_offset(CHARGEN_ADDRESS);
-  for (i = 0; i < 8; i++) {
-    POKE(SCREEN_ADDRESS + j* SCREEN_ROW_BYTES + 78 - i*2, nybl_to_screen((uint8_t)test));
-    test >>= 4;
-  }
-
-  // wait for a key
-  while (ASCIIKEY)
-    ASCIIKEY = 0;
-  while (!ASCIIKEY)
-    usleep(1000);
-  ASCIIKEY = 0;
-  VICIV.bordercol = 6;
-}
-#endif
 
 /* Flags for fix_chargen_area(), OR-ed together. */
 enum : uint8_t {
@@ -1178,12 +1133,6 @@ int main(void) {
                     draw_freeze_menu(UpdateTop);
                     break;
 
-#if 0
-      case 'P': case 'p': // Toggle ROM area write-protect
-  freeze_poke(0xFFD367dL,freeze_peek(0xFFD367dL)^0x04);
-  draw_freeze_menu();
-  break;
-#endif
 
                 case 'c':
                 case 'C': // Toggle CPU mode

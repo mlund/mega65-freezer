@@ -229,40 +229,14 @@ unsigned char petscii_to_screen(unsigned char petscii) {
 // static char* deadly_haiku[3] = { "Error consumes all", "As sand erodes rock and stone", "Now also
 // your mind" };
 
+/* Nothing is trustworthy enough to draw with here, so the border is the whole
+ * report.  The asm keeps the spin: a loop with no side effect is undefined and
+ * the optimiser may delete it. */
 void screen_of_death(const char* msg) {
-    // TODO: This is broken, obviously...
-#if 0
-  POKE(0,0x41);
-  VICIV.key = VIC4_KNOCK_1; VICIV.key = VIC4_KNOCK_2;
-
-  // Reset video mode
-  POKE(0xD05DU,0x01); VICIV.ctrl1 = 0x1b; VICIV.ctrl2 = 0xc8;
-  VICIV.addr = 0x17; // lower case
-  VICIV.rasline0 = 0x80; // NTSC 60Hz mode for monitor compatibility?
-  POKE(0xD06AU,0x00); // Charset from bank 0
-
-  // No sprites
-  VICIV.spr_ena = 0x00;
-
-  // Normal video mode (but preserve CRT emulation etc)
-  VICIV.ctrlc = VICIV.ctrlc&0xA8;
-
-  // Reset colour palette to normal for black and white
-  POKE(0xD100U,0x00);  POKE(0xD200U,0x00);  POKE(0xD300U,0x00);
-  POKE(0xD101U,0xFF);  POKE(0xD201U,0xFF);  POKE(0xD301U,0xFF);
-
-  VICIV.bordercol = 0; VICIV.screencol = 0;
-
-  // Reset CPU IO ports
-  POKE(1,0x3f); POKE(0,0x3F);
-  lfill(0x0400U,' ',1000);
-  lfill(0xd800U,1,1000);
-
-  for(i=0;deadly_haiku[0][i];i++) POKE(0x0400+10*40+11+i,ascii_to_screencode(deadly_haiku[0][i]));
-  for(i=0;deadly_haiku[1][i];i++) POKE(0x0400+12*40+11+i,ascii_to_screencode(deadly_haiku[1][i]));
-  for(i=0;deadly_haiku[2][i];i++) POKE(0x0400+14*40+11+i,ascii_to_screencode(deadly_haiku[2][i]));
-#endif
-    while (1 || msg) {
+    (void)msg;
+    VICIV.bordercol = SchemeError;
+    for (;;) {
+        __asm__ volatile("");
     }
 }
 

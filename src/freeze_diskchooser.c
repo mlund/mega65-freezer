@@ -363,56 +363,6 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         goto exit_with_motor_off;
     }
 
-#if 0
-  // Directory sector debugger (instead of entry renderer)
-  // displays sequential 256 byte dir sectors
-  // press q to exit, any other key advances one sector
-  // display below is track/side/sector/block
-  {
-    unsigned char block;
-    while (1) {
-      block = 1;
-      while (block < 3) {
-        x = 0;
-        do {
-          c = F011_DATA;
-          if (c >= 'A' && c <= 'Z')
-            c &= 0x1f;
-          if (c >= 'a' && c <= 'z')
-            c &= 0x1f;
-          if (x % 16 == 0) {
-            POKE(SCREEN_ADDRESS + 21 * 2 + ((x >> 4) * SCREEN_ROW_BYTES), nybl_to_screen(x >> 4));
-            POKE(SCREEN_ADDRESS + 22 * 2 + ((x >> 4) * SCREEN_ROW_BYTES), nybl_to_screen(x));
-          }
-          POKE(SCREEN_ADDRESS + ((24 + (x%16)) * 2) + ((x >> 4) * SCREEN_ROW_BYTES), c & 0x7f);
-        } while (++x);
-        POKE(SCREEN_ADDRESS + 21 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(dir_track >> 4));
-        POKE(SCREEN_ADDRESS + 22 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(dir_track));
-        POKE(SCREEN_ADDRESS + 24 * 2 + 17 * SCREEN_ROW_BYTES, current_side + 0x30);
-        POKE(SCREEN_ADDRESS + 26 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(current_sector >> 4));
-        POKE(SCREEN_ADDRESS + 27 * 2 + 17 * SCREEN_ROW_BYTES, nybl_to_screen(current_sector));
-        POKE(SCREEN_ADDRESS + 30 * 2 + 17 * SCREEN_ROW_BYTES, block);
-        while ((x = ASCIIKEY) == 0);
-        ASCIIKEY = 0;
-        if (x == 'q')
-          goto exit_with_motor_off;
-        block++;
-      }
-      current_sector++;
-      if (current_sector > 10) {
-        if (current_side == 1) {
-          current_side = 0;
-          dir_track++;
-        }
-        else
-          current_side = 1;
-        current_sector = 1;
-      }
-      if (!read_sector_with_cancel())
-        goto exit_with_motor_off;
-    }
-  }
-#else
     // skip start of sector until we reach the disk title
     for (j = 0; j < skip_bytes; j++) {
         (void)F011_DATA;
@@ -504,7 +454,6 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         // once more, then we have the 22 entries we can display
         draw_entries();
     } while (cur_row < 23 && next_sector < 254);
-#endif
     // Turn floppy LED and motor back off
 exit_with_motor_off:
     F011_CONTROL = 0;
@@ -599,11 +548,6 @@ void scan_directory(unsigned char drive_id) {
     }
     lcopy((uint32_t)"- NEW D81 DD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
     file_count++;
-
-#if 0
-  lcopy((uint32_t)"- NEW D65 HD IMAGE -", DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 20);
-  file_count++;
-#endif
 
     min_dir_entry = file_count;
 

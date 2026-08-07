@@ -310,39 +310,6 @@ void set_amplifier(unsigned char left_right, uint16_t first_coefficient) {
     if (left_right == first_coefficient) {
         return;
     }
-
-#if 0
-  unsigned char amp_value = 0x20 + (first_coefficient / 293);
-
-  // Do we have an amplifier, and if so, where is it?
-  switch (M65MODEL) {
-  case 0x03: // MEGA65R3
-    // $FFD71DC
-    // try 20 times, no endless loop please!
-    for (c = 0; c < 99 && lpeek(0xffd71e1 + leftRight) != amp_value; c++) {
-      lpoke(0xffd71e1 + leftRight, amp_value);
-      usleep(10000U);
-    }
-    break;
-  case 0x21: // MEGAphone R1
-  case 0x22: // MEGAphone R2
-  case 0x23: // MEGAphone R3
-    // $FFD7030
-    // try 20 times, no endless loop please!
-    for (c = 0; c < 99 && lpeek(0xffd7035 + leftRight) != amp_value; c++) {
-      lpoke(0xffd7035 + leftRight, amp_value);
-      usleep(10000U);
-    }
-    break;
-  }
-  if (c == 99) {
-    VICIV.bordercol = SchemeError;
-    VICIV.screencol = SchemeError;
-    usleep(100000L);
-    VICIV.bordercol = SchemeBorder;
-    VICIV.screencol = SchemeBackground;
-  }
-#endif
 }
 
 void change_db(unsigned char row, unsigned char change) {
