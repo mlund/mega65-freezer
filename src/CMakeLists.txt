@@ -104,14 +104,7 @@ target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
 add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c charset.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c charset.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c charset.c)
-# printf built from the SDK's own source rather than taken from libc.a, so the
-# code that formats MEGAINFO's numbers is compiled here and can be inspected.
-# The library's definitions are weak, so these override them.
-add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c printf_sdk.cc)
-# Not ours to fix: the SDK builds it with looser warnings than this directory
-# sets, and the point is to compile its code unchanged.
-set_source_files_properties(printf_sdk.cc PROPERTIES COMPILE_OPTIONS
-    "-Wno-error;-Wno-vla-cxx-extension;-Wno-reorder-ctor;-Wno-unused-parameter")
+add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c)
 
 # Bytes per character cell, and so the DMA destination step for both planes.
 # SCREEN_ROW_BYTES is 80 in every tool and means two different things; this is

@@ -10,6 +10,42 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Everything this tool formats is zero-padded hex or a small decimal, so it
+ * composes them directly rather than linking a printf.  format_hex() is
+ * screen.c's, and writes `columns` digits with no terminator, which is what
+ * lets these chain. */
+static char* append_str(char* at, const char* text) {
+    while (*text) {
+        *at++ = *text++;
+    }
+    return at;
+}
+
+static char* append_hex(char* at, long value, uint8_t columns) {
+    format_hex(at, value, (char)columns);
+    return at + columns;
+}
+
+static char* append_dec(char* at, uint16_t value) {
+    char digits[5];
+    uint8_t n = 0;
+    do {
+        digits[n++] = (char)('0' + value % 10);
+        value /= 10;
+    } while (value);
+    while (n) {
+        *at++ = digits[--n];
+    }
+    return at;
+}
+
+/* Exactly two digits, as a date wants. */
+static char* append_dec2(char* at, uint8_t value) {
+    *at++ = (char)('0' + value / 10);
+    *at++ = (char)('0' + value % 10);
+    return at;
+}
+
 /*
  * Constants
  */
@@ -145,9 +181,13 @@ char* format_mega_model(void) {
             return "QMTECH WUKONG BOARD";
         case 0xfe:
             return "SIMULATED MEGA65";
-        default:
-            snprintf(tempstr32, 31, "UNKNOWN MODEL $%02X.%01X", m65model, m65submodel);
-            break;
+        default: {
+            char* at = append_str(tempstr32, "UNKNOWN MODEL $");
+            at = append_hex(at, m65model, 2);
+            *at++ = '.';
+            at = append_hex(at, m65submodel, 1);
+            *at = '\0';
+        } break;
     }
     return tempstr32;
 }
@@ -196,7 +236,14 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
   if (m==11 && ds>30) { m++; ds-=30;}
     // clang-format on
 
-    snprintf(buffer, BUFFER_LENGTH, "%u-%02u-%02u", y, (unsigned)m, ds);
+    {
+        char* at = append_dec(buffer, y);
+        *at++ = '-';
+        at = append_dec2(at, m);
+        *at++ = '-';
+        at = append_dec2(at, (uint8_t)ds);
+        *at = '\0';
+    }
 
     // save date for external use
     ymd[0] = (unsigned char)(y - RTC_YEAR_EPOCH);
@@ -220,21 +267,12 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
  * get_hw_version must have been called to fill code_buffer
  */
 char* format_fpga_hash(unsigned char offset, unsigned char reverse) {
-    if (reverse) {
-        sprintf(buffer,
-            "%02X%02X%02X%02X",
-            code_buffer[offset + 2],
-            code_buffer[offset + 3],
-            code_buffer[offset + 4],
-            code_buffer[offset + 5]);
-    } else {
-        sprintf(buffer,
-            "%02X%02X%02X%02X",
-            code_buffer[offset + 5],
-            code_buffer[offset + 4],
-            code_buffer[offset + 3],
-            code_buffer[offset + 2]);
+    char* at = buffer;
+    for (uint8_t i = 0; i < 4; i++) {
+        const uint8_t from = reverse ? (uint8_t)(offset + 2 + i) : (uint8_t)(offset + 5 - i);
+        at = append_hex(at, code_buffer[from], 2);
     }
+    *at = '\0';
 
     return buffer;
 }
@@ -273,13 +311,14 @@ char* format_hyppo_version(void) {
         v.hdos_minor == 0xff) {
         strcpy(buffer, "?.? / ?.?");
     } else {
-        snprintf(buffer,
-            BUFFER_LENGTH,
-            "%u.%u / %u.%u",
-            (unsigned)v.hyppo_major,
-            (unsigned)v.hyppo_minor,
-            (unsigned)v.hdos_major,
-            (unsigned)v.hdos_minor);
+        char* at = append_dec(buffer, v.hyppo_major);
+        *at++ = '.';
+        at = append_dec(at, v.hyppo_minor);
+        at = append_str(at, " / ");
+        at = append_dec(at, v.hdos_major);
+        *at++ = '.';
+        at = append_dec(at, v.hdos_minor);
+        *at = '\0';
     }
 
     return buffer;
@@ -325,9 +364,11 @@ unsigned char format_util_version(long addr, const unsigned char* date) {
             buffer[p * 2 + 1] <= '9') {
             temp = (buffer[p * 2] - '0') * 10 + buffer[p * 2 + 1] - '0';
             /*
-            snprintf(tempstr32, 5, "%02X", temp);
+            format_hex(tempstr32, temp, 2);
+                    tempstr32[2] = '\0';
             write_text(10+p*3, 20, 12, tempstr32);
-            snprintf(tempstr32, 5, "%02X", date[p]);
+            format_hex(tempstr32, date[p], 2);
+                    tempstr32[2] = '\0';
             write_text(10+p*3, 21, 12, tempstr32);
             */
             if (temp > date[p]) {
@@ -423,9 +464,11 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
                     buffer[j + p * 2 + 1] >= '0' && buffer[j + p * 2 + 1] <= '9') {
                     temp = (buffer[j + p * 2] - '0') * 10 + buffer[j + p * 2 + 1] - '0';
                     /*
-                    snprintf(tempstr32, 5, "%02X", temp);
+                    format_hex(tempstr32, temp, 2);
+                    tempstr32[2] = '\0';
                     write_text(p*3, 20, 12, tempstr32);
-                    snprintf(tempstr32, 5, "%02X", date[p]);
+                    format_hex(tempstr32, date[p], 2);
+                    tempstr32[2] = '\0';
                     write_text(p*3, 21, 12, tempstr32);
                     */
                     if (temp > date[p]) {
@@ -683,14 +726,19 @@ void display_rtc_status(unsigned char x, unsigned char y) {
             }
         }
         if (!rtc_check) {
-            sprintf(buffer,
-                "20%02X-%02X-%02X %02X:%02X:%02X",
-                rtc_buf[11],
-                rtc_buf[10] & 0x1f,
-                rtc_buf[9] & 0x3f,
-                rtc_buf[8] & 0x3f,
-                rtc_buf[7] & 0x7f,
-                rtc_buf[6]);
+            char* at = append_str(buffer, "20");
+            at = append_hex(at, rtc_buf[11], 2);
+            *at++ = '-';
+            at = append_hex(at, rtc_buf[10] & 0x1f, 2);
+            *at++ = '-';
+            at = append_hex(at, rtc_buf[9] & 0x3f, 2);
+            *at++ = ' ';
+            at = append_hex(at, rtc_buf[8] & 0x3f, 2);
+            *at++ = ':';
+            at = append_hex(at, rtc_buf[7] & 0x7f, 2);
+            *at++ = ':';
+            at = append_hex(at, rtc_buf[6], 2);
+            *at = '\0';
             write_text(x, y + 2, SchemeTextDim, buffer);
         } else {
             write_text(x, y + 2, SchemeTextDim, "                    ");
@@ -701,17 +749,25 @@ void display_rtc_status(unsigned char x, unsigned char y) {
 void display_rtc_debug(unsigned char x, unsigned char y, unsigned char colour, unsigned char mode) {
     // DEBUG output in the bottom line
     switch (mode) {
-        case 1:
-            sprintf(buffer,
-                " RTC %02X:%02X %04X TOD %02X:%02X %04X DIFF %04X PMU %02X",
-                rtc_buf[7] & 0x7f,
-                rtc_buf[6],
-                rtc_ticks,
-                tod_buf[6] & 0x7f,
-                tod_buf[5],
-                tod_ticks,
-                rtc_diff,
-                rtc_pmu);
+        case 1: {
+            char* at = append_str(buffer, " RTC ");
+            at = append_hex(at, rtc_buf[7] & 0x7f, 2);
+            *at++ = ':';
+            at = append_hex(at, rtc_buf[6], 2);
+            at = append_str(at, " ");
+            at = append_hex(at, rtc_ticks, 4);
+            at = append_str(at, " TOD ");
+            at = append_hex(at, tod_buf[6] & 0x7f, 2);
+            *at++ = ':';
+            at = append_hex(at, tod_buf[5], 2);
+            at = append_str(at, " ");
+            at = append_hex(at, tod_ticks, 4);
+            at = append_str(at, " DIFF ");
+            at = append_hex(at, rtc_diff, 4);
+            at = append_str(at, " PMU ");
+            at = append_hex(at, rtc_pmu, 2);
+            *at = '\0';
+        }
             if (rtc_state == 1) {
                 buffer[0] = 'I';
             } else if (rtc_state == 2 || rtc_state == 3) {

@@ -104,10 +104,6 @@ add_subdirectory(src)
 # existed, so both targets passed while the files being changed went unread.
 file(GLOB_RECURSE TIDY_SOURCES ${SRC}/*.c ${SRC}/*.cpp)
 file(GLOB_RECURSE FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.cpp ${SRC}/*.h)
-# Taken from the SDK unchanged, so it is not ours to format or to lint: the
-# whole point is that it is the library's own source.  See printf_sdk.cc.
-list(FILTER TIDY_SOURCES EXCLUDE REGEX "/(printf_sdk\\.cc)$")
-list(FILTER FORMAT_SOURCES EXCLUDE REGEX "/(printf_sdk\\.cc|util\\.h|varint\\.h)$")
 
 find_program(CLANG_TIDY_EXE   NAMES clang-tidy   HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
