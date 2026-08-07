@@ -19,5 +19,12 @@ typedef long Addr28;
 void lcopy(Addr28 source_address, Addr28 destination_address, uint16_t count);
 void lfill(Addr28 destination_address, unsigned char value, uint16_t count);
 
+/* As above, but stepping the destination `skip` bytes at a time, which is what
+ * writing one plane of a two-byte cell needs.  `count` still counts bytes
+ * written, not bytes of destination spanned.  The DMAgic restores a step of one
+ * at the end of every chain, so a strided job cannot leak into the next. */
+void lcopy_skip(Addr28 source_address, Addr28 destination_address, uint16_t count, uint8_t skip);
+void lfill_skip(Addr28 destination_address, uint8_t value, uint16_t count, uint8_t skip);
+
 /* The SDK's PEEK/POKE are volatile, which hardware access requires. */
 #include <peekpoke.h>
