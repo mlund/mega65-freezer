@@ -67,7 +67,7 @@
  */
 #include "cc65compat.h"
 #include "color_scheme.h"
-#include "fdisk_memory.h"
+#include "dma.h"
 #include "freezer.h"
 
 #include <mega65.h>

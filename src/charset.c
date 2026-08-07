@@ -8,6 +8,6 @@ static const unsigned char CHARSET_DATA[] = {
 #embed "ascii8x8.bin"
 };
 
-/* Non-const to match the extern declaration in fdisk_screen_monitor.c; the
+/* Non-const to match the extern declaration in monitor/screen.c; the
  * data is only ever read, and lcopy()'d to CHARSET_ADDRESS. */
 unsigned char* charset = (unsigned char*)CHARSET_DATA;

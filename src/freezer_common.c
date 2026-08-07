@@ -1,7 +1,7 @@
 #include "freezer_common.h"
 
 #include "color_scheme.h"
-#include "fdisk_memory.h"
+#include "dma.h"
 #include "freezer.h"
 #include "mega65_regs.h"
 

@@ -1,7 +1,7 @@
-#include "fdisk_screen.h"
+#include "screen.h"
 
 #include "color_scheme.h"
-#include "fdisk_memory.h"
+#include "dma.h"
 #include "freezer_common.h"
 #include "mega65_regs.h"
 

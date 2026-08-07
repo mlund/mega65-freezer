@@ -1,12 +1,12 @@
 #include "cc65compat.h"
 #include "color_scheme.h"
-#include "fdisk_fat32.h"
-#include "fdisk_hal.h"
-#include "fdisk_memory.h"
-#include "fdisk_screen.h"
+#include "dma.h"
+#include "fat32.h"
 #include "freezer.h"
 #include "freezer_common.h"
 #include "mega65_regs.h"
+#include "screen.h"
+#include "sdcard.h"
 
 #include <stdio.h>
 #include <stdlib.h>

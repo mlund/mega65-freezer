@@ -1,7 +1,8 @@
-#include "fdisk_hal.h"
-#include "fdisk_memory.h"
-#include "fdisk_screen.h"
+#include "sdcard.h"
+
+#include "dma.h"
 #include "mega65_regs.h"
+#include "screen.h"
 
 #include <mega65.h>
 #include <stdio.h>

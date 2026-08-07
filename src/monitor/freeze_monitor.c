@@ -12,14 +12,14 @@
 
 #include "blockmove.h"
 #include "color_scheme.h"
+#include "console.h"
 #include "disasm.h"
-#include "fdisk_fat32.h"
-#include "fdisk_hal.h"
-#include "fdisk_memory.h"
-#include "fdisk_screen.h"
-#include "fdisk_screen_monitor.h"
+#include "dma.h"
+#include "fat32.h"
 #include "freezer.h"
 #include "mega65_regs.h"
+#include "screen.h"
+#include "sdcard.h"
 #include "trace.h"
 
 #include <mega65.h>

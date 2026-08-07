@@ -1,9 +1,9 @@
-#include "fdisk_fat32.h"
+#include "fat32.h"
 
-#include "fdisk_hal.h"
-#include "fdisk_memory.h"
-#include "fdisk_screen.h"
+#include "dma.h"
 #include "mega65_regs.h"
+#include "screen.h"
+#include "sdcard.h"
 #include "trace.h"
 
 #include <mega65.h>

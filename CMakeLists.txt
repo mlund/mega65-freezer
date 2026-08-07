@@ -114,7 +114,7 @@ if(CLANG_TIDY_EXE)
     # Enumerates every #define that could be a typed constant.  Advisory, and not in
     # .clang-tidy's Checks, for three reasons: the check always proposes an enum, where the
     # convention here is constexpr for scalars and enums only for closed sets; helper.h's 39
-    # macros are #included by helper.S and the assembler needs real macros; and fdisk_screen.h
+    # macros are #included by helper.S and the assembler needs real macros; and screen.h
     # keeps four as untyped literals so 28-bit address arithmetic promotes.  As an enforced
     # check it would demand NOLINT on all of those.
     add_custom_target(tidy-macros

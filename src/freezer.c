@@ -6,12 +6,12 @@
 #include "freezer.h"
 
 #include "color_scheme.h"
-#include "fdisk_fat32.h"
-#include "fdisk_hal.h"
-#include "fdisk_memory.h"
-#include "fdisk_screen.h"
+#include "dma.h"
+#include "fat32.h"
 #include "freezer_common.h"
 #include "mega65_regs.h"
+#include "screen.h"
+#include "sdcard.h"
 
 #include <mega65.h>
 #include <stdio.h>
@@ -620,7 +620,7 @@ void draw_freeze_menu(unsigned char part) {
         }
     }
 
-    // restore border colour (fdisk/sd stuff still twiddles with it)
+    // restore border colour (the SD card code still twiddles with it)
     VICIV.bordercol = SchemeBorder;
 }
 

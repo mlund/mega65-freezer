@@ -16,13 +16,13 @@
 */
 
 #include "color_scheme.h"
-#include "fdisk_fat32.h"
-#include "fdisk_hal.h"
-#include "fdisk_memory.h"
-#include "fdisk_screen.h"
+#include "dma.h"
+#include "fat32.h"
 #include "freezer.h"
 #include "freezer_common.h"
 #include "mega65_regs.h"
+#include "screen.h"
+#include "sdcard.h"
 
 // The directory listing is built at $40000, one 64-byte name per entry.
 // DIR_ENTRY_INDEX widens before shifting, so an index past 511 cannot overflow

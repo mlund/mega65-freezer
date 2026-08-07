@@ -1,6 +1,6 @@
 /*
  * Exercises this project's own lcopy() and lfill() -- the DMAgic-driven ones in
- * src/fdisk_memory.c.  Nothing on the host can reach them: they populate a DMA
+ * src/dma.c.  Nothing on the host can reach them: they populate a DMA
  * list and hand it to hardware, so they need a machine or an emulator.
  *
  * Run by CTest under Xemu.  Each check has a number and failure quits the
@@ -17,7 +17,7 @@
  * the same in the emulator and on hardware.
  */
 
-#include "fdisk_memory.h"
+#include "dma.h"
 
 #include <mega65/debug.h>
 
@@ -49,9 +49,9 @@ constexpr Addr28 SCRATCH2 = 0xFF85000L;
 constexpr uint16_t SPAN = 512;
 
 int main(void) {
-    /* Ours, from fdisk_memory.h.  <mega65/memory.h> is deliberately not
+    /* Ours, from dma.h.  <mega65/memory.h> is deliberately not
      * included either: it declares lcopy/lfill with uint32_t where
-     * fdisk_memory.c defines them with Addr28. */
+     * dma.c defines them with Addr28. */
     m65_io_enable();
 
     debug_msg("TEST: lfill");

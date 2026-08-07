@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fdisk_memory.h"
+#include "dma.h"
 
 #include <ctype.h>
 #include <mega65/hal.h>

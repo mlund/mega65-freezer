@@ -1,10 +1,10 @@
+#include "dma.h"
 #include "errors.h"
-#include "fdisk_fat32.h"
-#include "fdisk_hal.h"
-#include "fdisk_memory.h"
-#include "fdisk_screen.h"
+#include "fat32.h"
 #include "freezer.h"
 #include "freezer_common.h"
+#include "screen.h"
+#include "sdcard.h"
 #include "trace.h"
 
 #include <stdio.h>

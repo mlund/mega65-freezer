@@ -18,7 +18,7 @@ constexpr uint16_t SCREEN_BYTES = SCREEN_ROW_BYTES * SCREEN_ROWS;
 
 constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
 
-/* Only MONITOR links fdisk_screen_monitor.c, and it shows just these two.  The
+/* Only MONITOR links monitor/screen.c, and it shows just these two.  The
  * sprite editor draws its own footer, so a message for it here was never
  * reachable -- and display_footer() indexes the table at runtime, so an unused
  * entry costs its full 80 columns that --gc-sections cannot reclaim. */

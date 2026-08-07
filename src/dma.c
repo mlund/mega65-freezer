@@ -3,10 +3,10 @@
   through the DMAgic rather than through banking.
 */
 
-#include "fdisk_memory.h"
+#include "dma.h"
 
-#include "fdisk_screen.h"
 #include "mega65_regs.h"
+#include "screen.h"
 
 #include <mega65.h>
 

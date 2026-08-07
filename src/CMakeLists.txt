@@ -75,8 +75,8 @@ set(LTO_ZP 210 CACHE STRING "Zero-page bytes the LTO allocator may use")
 add_link_options(-mlto-zp=${LTO_ZP} -Wl,--gc-sections)
 
 set(COMMON
-    frozen_memory.c fdisk_memory.c fdisk_screen.c
-    fdisk_hal_mega65.c freezer_common.c
+    frozen_memory.c dma.c screen.c
+    sdcard.c freezer_common.c
     helper.S version.c
 )
 
@@ -99,9 +99,9 @@ endfunction()
 add_m65(FREEZER  freezer.c freeze_diskchooser.c)
 add_m65(AUDIOMIX audiomix.c freeze_audiomix.c charset.c)
 add_m65(MONITOR  monitor/main.c monitor/freeze_monitor.c monitor/disasm.c
-                 monitor/blockmove.c monitor/fdisk_screen_monitor.c charset.c)
+                 monitor/blockmove.c monitor/console.c charset.c)
 target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
-add_m65(MAKEDISK makedisk.c fdisk_fat32.c charset.c)
+add_m65(MAKEDISK makedisk.c fat32.c charset.c)
 add_m65(ROMLOAD  romload.c freeze_romload.c charset.c)
 add_m65(SPRITED  sprited.c freeze_sprited.c charset.c)
 add_m65(MEGAINFO megainfo.c freeze_megainfo.c charset.c cc65compat.c)
@@ -111,7 +111,7 @@ add_m65(MEGAINFO megainfo.c freeze_megainfo.c charset.c cc65compat.c)
 # $080D trampoline.  mega65-libc supplies assert_eq/xemu_exit/debug_msg, so the
 # tests only build when it is linked.
 if(LINK_LIBC)
-    add_executable(test_dma ${CMAKE_SOURCE_DIR}/test/test_dma.c fdisk_memory.c)
+    add_executable(test_dma ${CMAKE_SOURCE_DIR}/test/test_dma.c dma.c)
     target_compile_options(test_dma PRIVATE $<$<COMPILE_LANGUAGE:C>:-mcpu=${C_MCPU}>)
     target_link_libraries(test_dma mega65libc)
     set_target_properties(test_dma PROPERTIES OUTPUT_NAME test_dma.prg)
