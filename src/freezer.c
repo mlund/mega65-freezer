@@ -286,10 +286,10 @@ void predraw_freeze_menu(void)
 
   // Make disk image names different colour to avoid confusion
   for (uint16_t i = 40; i < 80; i += 2) {
-    lpoke(COLOUR_RAM_28BIT + 21 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
-    lpoke(COLOUR_RAM_28BIT + 24 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
+    lpoke(COLOUR_RAM_ADDRESS + 21 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
+    lpoke(COLOUR_RAM_ADDRESS + 24 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
     if (i > 50) { // ROM VERSION
-      lpoke(COLOUR_RAM_28BIT + 15 * SCREEN_ROW_BYTES + 1 + i, SchemeTextBright);
+      lpoke(COLOUR_RAM_ADDRESS + 15 * SCREEN_ROW_BYTES + 1 + i, SchemeTextBright);
 }
   }
 
