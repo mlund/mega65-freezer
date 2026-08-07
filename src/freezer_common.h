@@ -14,7 +14,7 @@
 
 extern uint16_t slot_number;
 
-constexpr uint32_t CHARGEN_ADDRESS = 0xFF7E000;
+constexpr Addr28 CHARGEN_ADDRESS = 0xFF7E000;
 
 /* Which ROM the frozen program is running. */
 enum Mega65Rom : uint8_t {

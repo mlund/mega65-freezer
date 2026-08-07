@@ -1,5 +1,7 @@
 #pragma once
 
+#include "dma.h"
+
 #include <stdint.h>
 
 constexpr uint16_t SCREEN_ADDRESS = 0xB800;
@@ -9,7 +11,7 @@ constexpr uint16_t CHARSET_ADDRESS = 0x9000;
  * It does not follow the VIC-IV's colour start ($D064/$D065), so it is the
  * displayed colour only while that offset is zero.  Wider than 16 bits, so it
  * carries the whole expression it appears in into 32-bit arithmetic. */
-constexpr uint32_t COLOUR_RAM_ADDRESS = 0x1f800;
+constexpr Addr28 COLOUR_RAM_ADDRESS = 0x1f800;
 // 16-bit text mode: 40 columns of two bytes, 25 rows.  No SCREEN_COLS here --
 // freeze_sprited.c defines that as 80 for its own layout.
 constexpr uint8_t SCREEN_ROW_BYTES = 80;
