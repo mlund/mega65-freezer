@@ -85,7 +85,7 @@ function(add_m65 name)
     add_dependencies(${name} version_stamp)
     # See C_MCPU in the top-level CMakeLists.  Per target so that lowering it
     # leaves mega65-libc alone; C only, as the ASM rule keeps mos45gs02.
-    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C>:-mcpu=${C_MCPU}>)
+    target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     if(LINK_LIBC)
         target_link_libraries(${name} mega65libc)
     endif()
@@ -112,7 +112,7 @@ add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c)
 # tests only build when it is linked.
 if(LINK_LIBC)
     add_executable(test_dma ${CMAKE_SOURCE_DIR}/test/test_dma.c dma.c)
-    target_compile_options(test_dma PRIVATE $<$<COMPILE_LANGUAGE:C>:-mcpu=${C_MCPU}>)
+    target_compile_options(test_dma PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_link_libraries(test_dma mega65libc)
     set_target_properties(test_dma PROPERTIES OUTPUT_NAME test_dma.prg)
 endif()

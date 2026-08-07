@@ -6,12 +6,16 @@ cmake_minimum_required(VERSION 3.14)
 # -mcpu and mega65-libc on top, as the cc65 build did with -t c64.
 set(LLVM_MOS_PLATFORM c64)
 find_package(llvm-mos-sdk REQUIRED)
-project(freezemenu LANGUAGES C ASM)
+project(freezemenu LANGUAGES C CXX ASM)
 
 # charset.c uses #embed, which is C23; without this the build warns on every
 # translation unit that includes it.
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
+# The SDK's charset.h is C++20: its constexpr constructors are what turn the
+# menu text into screen codes at compile time.  Only the menu tables are C++.
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Standalone llvm-mos build of the MEGA65 freezemenu.  Nothing is shared with
 # the cc65 build in the parent directory; src/ holds its own copy of every
@@ -45,6 +49,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # soft stack.  Nothing here is re-entered: interrupts are masked throughout
 # and helper.s's NMI handler is a bare rti.
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -mcpu=mos45gs02 -D__MEGA65__ -fnonreentrant")
+# Mirrors CMAKE_C_FLAGS.  -fno-exceptions and -fno-rtti because nothing here
+# throws: charset.h compiles clean under them and still rejects a bad character
+# at compile time.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=mos45gs02 -D__MEGA65__ -fnonreentrant -fno-exceptions -fno-rtti")
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=mos45gs02")
 
 # This build assumes a patched llvm-mos.  Stock clang 23 miscompiles 16-bit loop
@@ -94,8 +102,8 @@ add_subdirectory(src)
 # are reached through them.
 # GLOB_RECURSE, not GLOB: src/monitor/ was silently unchecked from the moment it
 # existed, so both targets passed while the files being changed went unread.
-file(GLOB_RECURSE TIDY_SOURCES ${SRC}/*.c)
-file(GLOB_RECURSE FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.h)
+file(GLOB_RECURSE TIDY_SOURCES ${SRC}/*.c ${SRC}/*.cpp)
+file(GLOB_RECURSE FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.cpp ${SRC}/*.h)
 
 find_program(CLANG_TIDY_EXE   NAMES clang-tidy   HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
