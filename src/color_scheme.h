@@ -1,26 +1,29 @@
 #pragma once
 
-/* The seven tools' colours, named for what they mark rather than for a hue.  A
- * scheme is sixteen palette entries, the handful of roles it places differently,
- * and its own cursor ramp; selected at compile time by COLOR_SCHEME in
- * src/CMakeLists.txt.
+/* The seven tools' colours, named for what they mark rather than for a hue.
  *
- * Roles are enum constants, so a themed call site costs exactly what the bare
- * index it carries costs, and the table is read once by set_palette().  Two
- * roles may share an index without being the same role: what decides is whether
- * a scheme could give them different colours.
+ * Colour RAM holds a four-bit index, not a colour, and so do VICIV.bordercol
+ * and VICIV.screencol.  Rewriting the sixteen palette entries therefore
+ * repaints everything already on screen on the next frame, with nothing
+ * redrawn -- which is what lets a scheme be switched while the tools run.
+ *
+ * That only holds while every scheme puts a role on the same palette entry, so
+ * the role-to-entry mapping below is fixed and a scheme chooses only the
+ * sixteen colours those entries hold.  Roles are enum constants, so a themed
+ * call site costs exactly what the bare index it carries costs.
  *
  * Redefining the palette is safe because hyppo's freeze.asm saves and restores
  * all four palette banks and $D070, so the frozen program gets its own colours
  * back on resume.
  *
- * Two parts of the display depict the frozen machine rather than decorating our
- * interface, and only one of them can be kept out of a scheme's reach.  The
- * freezer's thumbnail carries RGB332 and routes through the colour cube, so it
- * is independent.  The sprite editor's canvas cannot be: it draws palette
- * indices taken from the frozen VIC's registers against whatever palette is
- * loaded, so it misreports a sprite's colour under every scheme, this one
- * included.  Only reading the frozen palette out of the freeze slot fixes that.
+ * Two parts of the display show the frozen machine rather than our own menus,
+ * and only one can be kept clear of a scheme.  The freezer's thumbnail stores
+ * each pixel as three bits of red, three of green and two of blue, and reaches
+ * the palette entries above the sixteen, so it is unaffected.  The sprite
+ * editor's canvas cannot be: it draws palette indices taken from the frozen
+ * VIC's own registers, against whatever palette is loaded, so it misreports a
+ * sprite's colour under every scheme.  Only reading the frozen palette out of
+ * the freeze slot fixes that.
  */
 
 #include <stdint.h>
@@ -30,132 +33,132 @@
  * constexpr objects but not constexpr functions, and an initialiser cannot call
  * one. */
 #define SCHEME_SWAP(v) ((uint8_t)((((v) & 0x0f) << 4) | (((v) >> 4) & 0x0f)))
-/* One palette entry: three channels and a pad, so the stride is a shift. */
-#define SCHEME_RGB(r, g, b) SCHEME_SWAP(r), SCHEME_SWAP(g), SCHEME_SWAP(b), 0x00
+#define SCHEME_RGB(r, g, b) {SCHEME_SWAP(r), SCHEME_SWAP(g), SCHEME_SWAP(b)}
 
-/* Bytes per SCHEME_PALETTE entry. */
-constexpr uint8_t SCHEME_PALETTE_STRIDE = 4;
+struct SchemeSlot {
+    uint8_t red, green, blue;
+};
 
-#if defined(COLOR_SCHEME_CLASSIC)
+/* The sixteen palette entries, each named for a role that lands on it and
+ * listing the others that share it.  The array view is the same sixteen in the
+ * same order, so set_palette() can walk them without knowing the names. */
+struct ColourScheme {
+    union {
+        struct {
+            struct SchemeSlot shade;       /*  0  BorderBusy, BorderDark                */
+            struct SchemeSlot text;        /*  1  Text, Heading, Selected, Reject,      */
+                                           /*     AsmPlain, Cursor                      */
+            struct SchemeSlot error;       /*  2  Error, MeterHigh                      */
+            struct SchemeSlot address;     /*  3  Address, Credits                      */
+            struct SchemeSlot spare;       /*  4  no role; sprite data still reaches it */
+            struct SchemeSlot operand;     /*  5  AsmOperand, MeterLow                  */
+            struct SchemeSlot background;  /*  6  Background, Border                    */
+            struct SchemeSlot value;       /*  7  Value, Notice, AsmControlFlow,        */
+                                           /*     MeterMidDim, Pointer                  */
+            struct SchemeSlot attention;   /*  8  Attention, MeterMid                   */
+            struct SchemeSlot unknown;     /*  9  Unknown                               */
+            struct SchemeSlot warning;     /* 10  Warning, MeterHighDim, Bar            */
+            struct SchemeSlot unselected;  /* 11  Unselected                            */
+            struct SchemeSlot text_dim;    /* 12  TextDim, AsmBytes                     */
+            struct SchemeSlot highlight;   /* 13  Highlight, AsmMega65, MeterLowDim,    */
+                                           /*     Banner                                */
+            struct SchemeSlot accent;      /* 14  Accent                               */
+            struct SchemeSlot text_bright; /* 15  TextBright                           */
+        };
+        struct SchemeSlot entry[16];
+    };
+};
 
-/* The C64's sixteen. */
+enum Scheme : uint8_t {
+    SchemeGruvbox = 0,
+    SchemeClassic = 1,
+    SchemeCount = 2,
+};
+
+/* Which scheme a tool starts in.  Not a build option: every scheme is compiled
+ * in and F1 cycles them, so this only picks where that cycle begins. */
+constexpr uint8_t SCHEME_BOOT = SchemeGruvbox;
+
+/* A tool leaves its choice here for the next one it launches.  $03C1-$03FF is
+ * unused and survives mega65_dos_exechelper(), the same way $033C and $03C0
+ * carry MAKEDISK's parameters.  This is not storage that lasts: hyppo reloads
+ * the freezer over low memory on every freeze, so what is here afterwards is
+ * the frozen program's own bytes -- hence the magic, which fails and returns
+ * the boot scheme. */
+constexpr uint16_t SCHEME_HANDOFF_MAGIC_ADDR = 0x03C1;
+constexpr uint16_t SCHEME_HANDOFF_INDEX_ADDR = 0x03C2;
+constexpr uint8_t SCHEME_HANDOFF_MAGIC = 0x5C;
+
 // clang-format off
-static const uint8_t SCHEME_PALETTE[16 * SCHEME_PALETTE_STRIDE] = {
-    SCHEME_RGB(0x00, 0x00, 0x00), /*  0 black      */
-    SCHEME_RGB(0xff, 0xff, 0xff), /*  1 white      */
-    SCHEME_RGB(0xab, 0x31, 0x26), /*  2 red        */
-    SCHEME_RGB(0x66, 0xda, 0xff), /*  3 cyan       */
-    SCHEME_RGB(0xbb, 0x3f, 0xb8), /*  4 purple     */
-    SCHEME_RGB(0x55, 0xce, 0x58), /*  5 green      */
-    SCHEME_RGB(0x1d, 0x0e, 0x97), /*  6 blue       */
-    SCHEME_RGB(0xea, 0xf5, 0x7c), /*  7 yellow     */
-    SCHEME_RGB(0xb9, 0x74, 0x18), /*  8 orange     */
-    SCHEME_RGB(0x78, 0x73, 0x00), /*  9 brown      */
-    SCHEME_RGB(0xdd, 0x93, 0x87), /* 10 pink       */
-    SCHEME_RGB(0x5b, 0x5b, 0x5b), /* 11 dark grey  */
-    SCHEME_RGB(0x8b, 0x8b, 0x8b), /* 12 grey       */
-    SCHEME_RGB(0xb0, 0xf4, 0xac), /* 13 lt. green  */
-    SCHEME_RGB(0xaa, 0x9d, 0xef), /* 14 lt. blue   */
-    SCHEME_RGB(0xb8, 0xb8, 0xb8), /* 15 lt. grey   */
+constexpr struct ColourScheme SCHEMES[SchemeCount] __attribute__((section(".rodata"))) = {
+    [SchemeGruvbox] = {
+        /* Gruvbox dark. */
+        .shade       = SCHEME_RGB(0x1d, 0x20, 0x21),
+        .text        = SCHEME_RGB(0xeb, 0xdb, 0xb2),
+        .error       = SCHEME_RGB(0xfb, 0x49, 0x34),
+        .address     = SCHEME_RGB(0x8e, 0xc0, 0x7c),
+        .spare       = SCHEME_RGB(0xd3, 0x86, 0x9b),
+        .operand     = SCHEME_RGB(0x98, 0x97, 0x1a),
+        .background  = SCHEME_RGB(0x28, 0x28, 0x28),
+        .value       = SCHEME_RGB(0xfa, 0xbd, 0x2f),
+        .attention   = SCHEME_RGB(0xfe, 0x80, 0x19),
+        .unknown     = SCHEME_RGB(0xd6, 0x5d, 0x0e),
+        /* Pale, so the meter's high zone reads selected against unselected the
+         * way its green and orange zones do. */
+        .warning     = SCHEME_RGB(0xf3, 0x92, 0x73),
+        .unselected  = SCHEME_RGB(0x66, 0x5c, 0x54),
+        .text_dim    = SCHEME_RGB(0x92, 0x83, 0x74),
+        .highlight   = SCHEME_RGB(0xb8, 0xbb, 0x26),
+        .accent      = SCHEME_RGB(0x83, 0xa5, 0x98),
+        .text_bright = SCHEME_RGB(0xfb, 0xf1, 0xc7),
+    },
+    [SchemeClassic] = {
+        /* The C64's sixteen, in the C64's own order -- which is why `spare` is
+         * purple and `background` is blue. */
+        .shade       = SCHEME_RGB(0x00, 0x00, 0x00),
+        .text        = SCHEME_RGB(0xff, 0xff, 0xff),
+        .error       = SCHEME_RGB(0xab, 0x31, 0x26),
+        .address     = SCHEME_RGB(0x66, 0xda, 0xff),
+        .spare       = SCHEME_RGB(0xbb, 0x3f, 0xb8),
+        .operand     = SCHEME_RGB(0x55, 0xce, 0x58),
+        .background  = SCHEME_RGB(0x1d, 0x0e, 0x97),
+        .value       = SCHEME_RGB(0xea, 0xf5, 0x7c),
+        .attention   = SCHEME_RGB(0xb9, 0x74, 0x18),
+        .unknown     = SCHEME_RGB(0x78, 0x73, 0x00),
+        .warning     = SCHEME_RGB(0xdd, 0x93, 0x87),
+        .unselected  = SCHEME_RGB(0x5b, 0x5b, 0x5b),
+        .text_dim    = SCHEME_RGB(0x8b, 0x8b, 0x8b),
+        .highlight   = SCHEME_RGB(0xb0, 0xf4, 0xac),
+        .accent      = SCHEME_RGB(0xaa, 0x9d, 0xef),
+        .text_bright = SCHEME_RGB(0xb8, 0xb8, 0xb8),
+    },
 };
 // clang-format on
 
-/* The five roles this scheme places for itself; see SchemeRole below. */
-#define SCHEME_HEADING 1
-#define SCHEME_WARNING 10
-#define SCHEME_ATTENTION 8
-#define SCHEME_UNKNOWN 9
-#define SCHEME_BAR 10
-
-/* The freezer's thumbnail is RGB332 and expands identity into the colour cube
- * at entries 16-255, so it needs nothing from a scheme -- except that pointing
- * the C64's own sixteen shades at exact entries is closer than the cube gets,
- * which holds only while entries 0-15 *are* those shades. */
-constexpr bool SCHEME_IS_C64_PALETTE = true;
-
-/* One step per pass of the sprite editor's main loop, so its cursor cycles.
- * Not quite a symmetric pulse: index 13 is red where the descent would
- * otherwise mirror the climb. */
-// clang-format off
-static const uint8_t SCHEME_CURSOR_RAMP[16] = {
-    0, 6, 9, 11, 12, 15, 13, 1,
-    1, 13, 15, 12, 11, 2, 9, 6,
-};
-// clang-format on
-
-#elif defined(COLOR_SCHEME_GRUVBOX)
-
-/* Gruvbox dark, in the slot order `classic` uses -- black, white, red, cyan,
- * purple, green, background, yellow, orange, dark orange, pale red, dark grey,
- * grey, light green, light blue, light grey -- so that an index no role names
- * still lands on a sensible hue. */
-// clang-format off
-static const uint8_t SCHEME_PALETTE[16 * SCHEME_PALETTE_STRIDE] = {
-    SCHEME_RGB(0x1d, 0x20, 0x21), /*  0 bg0_hard       */
-    SCHEME_RGB(0xeb, 0xdb, 0xb2), /*  1 fg1            */
-    SCHEME_RGB(0xfb, 0x49, 0x34), /*  2 bright red     */
-    SCHEME_RGB(0x8e, 0xc0, 0x7c), /*  3 bright aqua    */
-    SCHEME_RGB(0xd3, 0x86, 0x9b), /*  4 bright purple  */
-    SCHEME_RGB(0x98, 0x97, 0x1a), /*  5 neutral green  */
-    SCHEME_RGB(0x28, 0x28, 0x28), /*  6 bg0            */
-    SCHEME_RGB(0xfa, 0xbd, 0x2f), /*  7 bright yellow  */
-    SCHEME_RGB(0xfe, 0x80, 0x19), /*  8 bright orange  */
-    SCHEME_RGB(0xd6, 0x5d, 0x0e), /*  9 neutral orange */
-    SCHEME_RGB(0xf3, 0x92, 0x73), /* 10 pale red       */
-    SCHEME_RGB(0x66, 0x5c, 0x54), /* 11 bg3            */
-    SCHEME_RGB(0x92, 0x83, 0x74), /* 12 gray           */
-    SCHEME_RGB(0xb8, 0xbb, 0x26), /* 13 bright green   */
-    SCHEME_RGB(0x83, 0xa5, 0x98), /* 14 bright blue    */
-    SCHEME_RGB(0xfb, 0xf1, 0xc7), /* 15 fg0            */
-};
-// clang-format on
-
-#define SCHEME_HEADING 3
-/* Orange rather than a second red, so warning and error separate at a glance. */
-#define SCHEME_WARNING 8
-/* Adjacent to SchemeWarning's orange on purpose -- the two never appear side by
- * side, unlike a meter's highlight and lowlight. */
-#define SCHEME_ATTENTION 9
-#define SCHEME_UNKNOWN 4
-#define SCHEME_BAR 4
-
-constexpr bool SCHEME_IS_C64_PALETTE = false;
-
-// clang-format off
-static const uint8_t SCHEME_CURSOR_RAMP[16] = {
-    0, 6, 11, 12, 9, 8, 7, 15,
-    15, 7, 8, 9, 12, 11, 6, 0,
-};
-// clang-format on
-
-#else
-#error "No colour scheme selected -- see COLOR_SCHEME in src/CMakeLists.txt"
-#endif
-
-/* Every role, in one type so that any two can meet in one expression.  Most
- * carry a slot no scheme has wanted to move; the five spelled SCHEME_* come
- * from the block above, so a scheme that forgets one fails to compile. */
+/* Which palette entry each role draws in.  Fixed across schemes: a scheme
+ * recolours an entry rather than moving a role to another one, which is what
+ * keeps a switch to a palette write with nothing redrawn. */
 enum SchemeRole : uint8_t {
-    SchemeBackground = 6,               /* the screen behind everything                */
-    SchemeBorder = 6,                   /* the border, at rest                         */
-    SchemeBorderBusy = 0,               /* the border while the card is being read     */
-    SchemeBorderDark = 0,               /* a border deliberately darker than the screen*/
-    SchemeText = 1,                     /* ordinary text and labels                    */
-    SchemeHeading = SCHEME_HEADING,     /* a title, and the key legend        */
-    SchemeTextDim = 12,                 /* text that is present but not to be read     */
-    SchemeTextBright = 15,              /* text picked out from its neighbours         */
-    SchemeValue = 7,                    /* a value read from the machine               */
-    SchemeNotice = 7,                   /* a remark about what just happened           */
-    SchemeAccent = 14,                  /* a name, a prompt for one, a flag that is set*/
-    SchemeHighlight = 13,               /* something that has just succeeded           */
-    SchemeSelected = 1,                 /* the chosen row or label                     */
-    SchemeUnselected = 11,              /* an option available but not chosen          */
-    SchemeError = 2,                    /* the operation failed                        */
-    SchemeWarning = SCHEME_WARNING,     /* it worked, but look at this    */
-    SchemeAttention = SCHEME_ATTENTION, /* absent, inactive, out of date  */
-    SchemeUnknown = SCHEME_UNKNOWN,     /* a state the tool cannot name   */
-    SchemeReject = 1,                   /* the flash for a key that does nothing       */
-    SchemeAddress = 3,                  /* an address or a coordinate                  */
+    SchemeBackground = 6,  /* the screen behind everything                */
+    SchemeBorder = 6,      /* the border, at rest                         */
+    SchemeBorderBusy = 0,  /* the border while the card is being read     */
+    SchemeBorderDark = 0,  /* a border deliberately darker than the screen*/
+    SchemeText = 1,        /* ordinary text and labels                    */
+    SchemeHeading = 1,     /* a title, and the key legend                 */
+    SchemeTextDim = 12,    /* text that is present but not to be read     */
+    SchemeTextBright = 15, /* text picked out from its neighbours         */
+    SchemeValue = 7,       /* a value read from the machine               */
+    SchemeNotice = 7,      /* a remark about what just happened           */
+    SchemeAccent = 14,     /* a name, a prompt for one, a flag that is set*/
+    SchemeHighlight = 13,  /* something that has just succeeded           */
+    SchemeSelected = 1,    /* the chosen row or label                     */
+    SchemeUnselected = 11, /* an option available but not chosen          */
+    SchemeError = 2,       /* the operation failed                        */
+    SchemeWarning = 10,    /* it worked, but look at this                 */
+    SchemeAttention = 8,   /* absent, inactive, or out of date            */
+    SchemeUnknown = 9,     /* a state the tool cannot identify            */
+    SchemeReject = 1,      /* the flash for a key that does nothing       */
+    SchemeAddress = 3,     /* an address or a coordinate                  */
 
     /* Disassembly, from colour_disassembly_line(); the address column takes
      * SchemeAddress. */
@@ -175,9 +178,18 @@ enum SchemeRole : uint8_t {
     SchemeMeterHighDim = 10,
 
     /* The sprite editor's own furniture. */
-    SchemeBanner = 13,      /* the title bar                */
-    SchemeBar = SCHEME_BAR, /* a section heading or prompt bar */
-    SchemeCredits = 3,      /* the help screen's credit bar */
-    SchemePointer = 7,      /* the mouse pointer sprite     */
-    SchemeCursor = 1,       /* the edit cursor sprite       */
+    SchemeBanner = 13, /* the title bar                   */
+    SchemeBar = 10,    /* a section heading or prompt bar */
+    SchemeCredits = 3, /* the help screen's credit bar    */
+    SchemePointer = 7, /* the mouse pointer sprite        */
+    SchemeCursor = 1,  /* the edit cursor sprite          */
 };
+
+/* One step per pass of the sprite editor's main loop, so its cursor cycles.
+ * Entry numbers rather than colours, so it follows whichever scheme is loaded. */
+// clang-format off
+static const uint8_t SCHEME_CURSOR_RAMP[16] __attribute__((section(".rodata"))) = {
+    0, 6, 9, 11, 12, 15, 13, 1,
+    1, 13, 15, 12, 11, 2, 9, 6,
+};
+// clang-format on

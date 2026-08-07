@@ -168,6 +168,10 @@ constexpr uint8_t CIA_ICR_DISABLE_ALL = 0x7F;
 
 // UARTMISC modifier key state, read live rather than through the queue: a bit
 // is set while its key is held.
+/* ASCIIKEY code for F1.  The tools dispatch on the function keys because a
+ * letter is typed text in the monitor's line editor. */
+constexpr uint8_t KEY_F1 = 0xF1;
+
 #define MODKEY MMIO8(0xD611)
 constexpr uint8_t MODKEY_LSHIFT = 0x01; // UARTMISC:MLSHFT
 constexpr uint8_t MODKEY_RSHIFT = 0x02; // UARTMISC:MRSHFT

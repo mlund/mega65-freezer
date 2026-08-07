@@ -84,42 +84,20 @@ void to_petscii_upper(char* text, int length);
 
 static unsigned char colour_table[256];
 
-/* Thumbnail bytes are RGB332, and palette entries 16-255 hold that same value
- * expanded 3-3-2 to 4-4-4, so a byte is already its own entry.  Only the lowest
- * sixteen need diverting: they belong to the colour scheme, and entry 0 is
- * transparent besides. */
+/* A thumbnail byte stores three bits of red, three of green and two of blue,
+ * and palette entry N holds exactly the colour N names in that form, so a byte
+ * is the number of its own entry.  Only the lowest sixteen need diverting: the
+ * colour scheme owns those, and entry 0 is transparent besides. */
 void make_colour_lookup(void) {
-    unsigned char colour;
-
-    colour = 0;
+    uint8_t colour = 0;
     do {
         colour_table[colour] = colour;
     } while (++colour);
 
-    if (SCHEME_IS_C64_PALETTE) {
-        // Exact entries beat the cube for the C64's own shades
-        colour_table[0x00] = 0x20; // black: entry 0 is transparent, so very-dim red
-        colour_table[0xff] = 0x01; // white
-        colour_table[0xe0] = 0x02; // red
-        colour_table[0x1f] = 0x03; // cyan
-        colour_table[0xe3] = 0x04; // purple
-        colour_table[0x1c] = 0x05; // green
-        colour_table[0x03] = 0x06; // blue
-        colour_table[0xfc] = 0x07; // yellow
-        colour_table[0xec] = 0x08; // orange
-        colour_table[0xa8] = 0x09; // brown
-        colour_table[0xad] = 0x0a; // pink
-        colour_table[0x49] = 0x0b; // grey1
-        colour_table[0x92] = 0x0c; // grey2
-        colour_table[0x9e] = 0x0d; // lt.green
-        colour_table[0x93] = 0x0e; // lt.blue
-        colour_table[0xb6] = 0x0f; // grey3
-    } else {
-        // One step up in RGB332's red field: the cube holds nothing darker,
-        // so these share their entries with the shades just above them
-        for (colour = 0; colour < 16; colour++) {
-            colour_table[colour] = colour | 0x20;
-        }
+    /* One step up in red, which is as close to black as the entries above the
+     * sixteen come; they share those entries with the shades just above. */
+    for (colour = 0; colour < 16; colour++) {
+        colour_table[colour] = colour | 0x20;
     }
 }
 
@@ -308,6 +286,7 @@ void predraw_freeze_menu(void)
   VICIV.screencol = SchemeBackground;
 
   clear_colour_ram();
+
   // Make disk image names different colour to avoid confusion
   for (uint16_t i = 40; i < 80; i += 2) {
     lpoke(COLOUR_RAM_28BIT + 21 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
@@ -365,7 +344,6 @@ void draw_freeze_menu(unsigned char part) {
     uint16_t i;
     unsigned char x;
     unsigned char y;
-
 
     if (part & UpdateChgSlot) {
         freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
@@ -842,7 +820,6 @@ void change_mounted_disk_image(uint8_t diskid) {
     draw_freeze_menu(UpdateAll | UpdateChgSlot);
 }
 
-
 /* Flags for fix_chargen_area(), OR-ed together. */
 enum : uint8_t {
     ChargenFixMem = 0x01,  // write char data to chargen memory
@@ -1132,7 +1109,6 @@ int main(void) {
                     freeze_poke(0xFFD367dL, freeze_peek(0xFFD367dL) ^ 0x01);
                     draw_freeze_menu(UpdateTop);
                     break;
-
 
                 case 'c':
                 case 'C': // Toggle CPU mode

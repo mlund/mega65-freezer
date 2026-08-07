@@ -5,6 +5,7 @@
 #include "color_scheme.h"
 #include "fdisk_memory.h"
 #include "fdisk_screen.h"
+#include "freezer_common.h"
 #include "mega65_regs.h"
 
 #include <mega65.h>
@@ -202,7 +203,12 @@ char read_line(char* buffer, unsigned char max_length, unsigned char column) {
 
         if (c) {
 
-            if (c == 0x0e) {
+            if (c == KEY_F1) {
+                /* Next colour scheme.  Nothing is redrawn and the line being
+                 * typed is untouched: colour RAM holds palette entry numbers,
+                 * so rewriting the entries repaints what is already there. */
+                apply_scheme((uint8_t)(current_scheme + 1));
+            } else if (c == 0x0e) {
                 // Toggle upper/lower case font
                 VICIV.addr = VICIV.addr ^ 0x02;
             } else if (c == 0x14) {

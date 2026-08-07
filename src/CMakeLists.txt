@@ -26,18 +26,6 @@ if(FREEZER_TRACE)
     add_compile_definitions(FREEZER_TRACE)
 endif()
 
-# Which colour scheme the seven tools are built with; see src/color_scheme.h.
-# `classic` is what ships.  Scoped to this directory, as FREEZER_TRACE is, so
-# mega65-libc is not rebuilt for it.
-set(COLOR_SCHEME classic CACHE STRING "Colour scheme (classic, gruvbox)")
-set(COLOR_SCHEMES classic gruvbox)
-set_property(CACHE COLOR_SCHEME PROPERTY STRINGS ${COLOR_SCHEMES})
-if(NOT COLOR_SCHEME IN_LIST COLOR_SCHEMES)
-    message(FATAL_ERROR "COLOR_SCHEME must be one of: ${COLOR_SCHEMES}")
-endif()
-string(TOUPPER ${COLOR_SCHEME} COLOR_SCHEME_UPPER)
-add_compile_definitions(COLOR_SCHEME_${COLOR_SCHEME_UPPER})
-
 add_compile_options(
     # -Oz over -Os: smaller on every target, and nothing here is speed-critical.
     -Oz

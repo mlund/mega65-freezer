@@ -27,7 +27,16 @@ enum Mega65Rom : uint8_t {
 extern enum Mega65Rom mega65_rom_type; // set by detect_rom()
 extern char mega65_rom_name[];
 
+/* Fills all 256 palette entries and applies the scheme the freezer last chose.
+ * Every tool calls this once at startup. */
 void set_palette(void);
+/* Rewrites the sixteen entries a scheme owns, and records the choice where the
+ * next tool will find it.  Everything on screen changes on the next frame,
+ * because colour RAM holds entry numbers rather than colours. */
+void apply_scheme(uint8_t scheme);
+/* The scheme currently loaded; index into SCHEMES[]. */
+extern uint8_t current_scheme;
+
 char* detect_rom(void);
 unsigned char detect_cpu_speed(void);
 uint8_t nybl_to_screen(uint8_t v);

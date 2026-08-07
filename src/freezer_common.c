@@ -16,21 +16,34 @@ enum Mega65Rom mega65_rom_type = Mega65RomUnknown;
  * [12] and [13] to identify the ROM. */
 char mega65_rom_name[20];
 
-void set_palette(void) {
-    unsigned char c;
+uint8_t current_scheme = SCHEME_BOOT;
 
+void apply_scheme(uint8_t scheme) {
+    if (scheme >= SchemeCount) {
+        scheme = 0;
+    }
+    current_scheme = scheme;
+    POKE(SCHEME_HANDOFF_MAGIC_ADDR, SCHEME_HANDOFF_MAGIC);
+    POKE(SCHEME_HANDOFF_INDEX_ADDR, scheme);
+
+    /* One address computed here, then a walk in order, so no index is
+     * multiplied per entry. */
+    const struct SchemeSlot* slot = SCHEMES[scheme].entry;
+    for (uint8_t c = 0; c < 16; c++) {
+        PALETTE.red[c] = slot[c].red;
+        PALETTE.green[c] = slot[c].green;
+        PALETTE.blue[c] = slot[c].blue;
+    }
+}
+
+void set_palette(void) {
     // set palette selector
     VICIV.palsel = 0xFF;
 
-    // First set the scheme's 16 colours
-    for (c = 0; c < 16; c++) {
-        PALETTE.red[c] = SCHEME_PALETTE[c * SCHEME_PALETTE_STRIDE + 0];
-        PALETTE.green[c] = SCHEME_PALETTE[c * SCHEME_PALETTE_STRIDE + 1];
-        PALETTE.blue[c] = SCHEME_PALETTE[c * SCHEME_PALETTE_STRIDE + 2];
-    }
-
-    // Then prepare a colour cube in the rest of the palette
-    for (c = 16; c; c++) {
+    /* Entries 16-255 never change: entry N holds the colour N itself names when
+     * read as three bits of red, three of green and two of blue.  That is the
+     * format the freezer's thumbnail stores, so its pixels index themselves. */
+    for (uint8_t c = 16; c; c++) {
         // 3 bits for red
         PALETTE.red[c] = (c >> 4) & 0xe;
         // 3 bits for green
@@ -38,6 +51,12 @@ void set_palette(void) {
         // 2 bits for blue
         PALETTE.blue[c] = (c << 2) & 0xf;
     }
+
+    /* The tool that launched us leaves its choice in low memory; the magic
+     * tells a real choice from whatever the frozen program had there. */
+    apply_scheme(PEEK(SCHEME_HANDOFF_MAGIC_ADDR) == SCHEME_HANDOFF_MAGIC
+            ? PEEK(SCHEME_HANDOFF_INDEX_ADDR)
+            : SCHEME_BOOT);
 }
 
 char* detect_rom(void) {

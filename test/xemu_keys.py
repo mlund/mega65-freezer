@@ -53,7 +53,7 @@ SHIFTED = {"!": "1", '"': "2", "#": "3", "$": "4", "%": "5",
 # sending 10 for `a` does nothing -- so something between the register and the
 # key queue is not what these tables describe, and it is not understood.
 # At the keyboard Xemu has HELP on Page Up, and CLR on Home.
-NAMED = {"return": 0x01, "f3": 0x05, "f5": 0x06, "f7": 0x03,
+NAMED = {"return": 0x01, "f1": 0x04, "f3": 0x05, "f5": 0x06, "f7": 0x03,
          "down": 0x07, "right": 0x02, "delete": 0x00, "stop": 0x3F}
 
 
