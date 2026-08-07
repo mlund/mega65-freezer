@@ -16,3 +16,6 @@ __pycache__/
 *.ROM
 *.d81
 *.D81
+
+# Claude Code local settings.
+.claude/settings.local.json
