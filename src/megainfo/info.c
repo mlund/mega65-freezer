@@ -10,40 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The llvm-mos libc has no itoa, and this is its only caller. */
-static char* utoa(unsigned value, char* s, int radix) {
-    static const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-    char buf[17];
-    unsigned char n = 0;
-    char* p = s;
-
-    do {
-        buf[n++] = digits[value % (unsigned)radix];
-        value /= (unsigned)radix;
-    } while (value);
-
-    while (n) {
-        *p++ = buf[--n];
-    }
-    *p = '\0';
-    return s;
-}
-
-static char* itoa(int value, char* s, int radix) {
-    char* p = s;
-    uint16_t u;
-
-    if (radix == 10 && value < 0) {
-        *p++ = '-';
-        u = (uint16_t)-value;
-    } else {
-        u = (uint16_t)value;
-    }
-
-    utoa(u, p, radix);
-    return s;
-}
-
 /*
  * Constants
  */
@@ -230,23 +196,7 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
   if (m==11 && ds>30) { m++; ds-=30;}
     // clang-format on
 
-    // snprintf can't do %d!
-    itoa(y, tempstr32, 10);
-    strcpy(buffer, tempstr32);
-    if (m > 9) {
-        strcat(buffer, "-");
-    } else {
-        strcat(buffer, "-0");
-    }
-    itoa(m, tempstr32, 10);
-    strcat(buffer, tempstr32);
-    if (ds > 9) {
-        strcat(buffer, "-");
-    } else {
-        strcat(buffer, "-0");
-    }
-    itoa(ds, tempstr32, 10);
-    strcat(buffer, tempstr32);
+    snprintf(buffer, BUFFER_LENGTH, "%u-%02u-%02u", y, (unsigned)m, ds);
 
     // save date for external use
     ymd[0] = (unsigned char)(y - RTC_YEAR_EPOCH);
@@ -323,17 +273,13 @@ char* format_hyppo_version(void) {
         v.hdos_minor == 0xff) {
         strcpy(buffer, "?.? / ?.?");
     } else {
-        itoa(v.hyppo_major, tempstr32, 10);
-        strcpy(buffer, tempstr32);
-        strcat(buffer, ".");
-        itoa(v.hyppo_minor, tempstr32, 10);
-        strcat(buffer, tempstr32);
-        strcat(buffer, " / ");
-        itoa(v.hdos_major, tempstr32, 10);
-        strcat(buffer, tempstr32);
-        strcat(buffer, ".");
-        itoa(v.hdos_minor, tempstr32, 10);
-        strcat(buffer, tempstr32);
+        snprintf(buffer,
+            BUFFER_LENGTH,
+            "%u.%u / %u.%u",
+            (unsigned)v.hyppo_major,
+            (unsigned)v.hyppo_minor,
+            (unsigned)v.hdos_major,
+            (unsigned)v.hdos_minor);
     }
 
     return buffer;
