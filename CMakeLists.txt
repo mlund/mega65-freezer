@@ -39,7 +39,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set before CPMAddPackage so mega65-libc's own sources build for this CPU;
 # the c64 platform would otherwise default to 6502.
-# -fnonreentrant: freeze_sprited.c dispatches through a struct of function
+# -fnonreentrant: sprited/editor.c dispatches through a struct of function
 # pointers, and an indirect call defeats the call-graph analysis that places
 # stack frames statically, so everything reachable falls back to the slow
 # soft stack.  Nothing here is re-entered: interrupts are masked throughout

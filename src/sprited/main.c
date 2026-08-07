@@ -47,7 +47,7 @@ int main(void) {
 
     set_palette();
 
-    // done in freeze_sprited.c:Initialize
+    // done in sprited/editor.c:Initialize
     // Now find the start sector of the slot, and make a copy for safe keeping
     // slot_number = 0;
     // find_freeze_slot_start_sector(slot_number);
@@ -60,7 +60,7 @@ int main(void) {
         sdhc_card = 0;
     }
 
-    // done in freeze_sprited.c:Initialize
+    // done in sprited/editor.c:Initialize
     // request_freeze_region_list();
 
     // Back to 40 column, 8-bit text mode

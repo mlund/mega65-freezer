@@ -1731,7 +1731,7 @@ static void main_loop(void) {
 
                 /* ------------------------------------ HELP ----------------------------------- */
 
-            case 31: // HELP
+            case KEY_HELP:
                 show_help();
                 erase_canvas_space();
                 set_redraw_full_canvas();
@@ -1799,8 +1799,7 @@ static void main_loop(void) {
                 }
                 break;
 
-            case 20: // DEL
-            {
+            case KEY_DELETE: {
                 const enum ColorIndex c_index = g_state.current_color_idx;
                 set_rect(&g_state.redraw_rect,
                     g_state.cursor_x,
@@ -1875,7 +1874,7 @@ static void main_loop(void) {
                 // update_sprite_preview();
                 break;
 
-            case 3: // CTRL-C
+            case KEY_RUN_STOP: // also CTRL-C
                 ask("COPY SPRITE TO (0-7)? ", buf, 1);
                 if (buf[0] >= '0' && buf[0] <= '7') {
                     uint8_t to_sprite = buf[0] - 48;
@@ -1965,23 +1964,23 @@ static void main_loop(void) {
 
                 /* --------------------------- FILE GROUP ----------------------------- */
 
-            case 0xF3: // F3
+            case KEY_F3:
                 ask("EXIT SPRITE EDITOR: ARE YOU SURE (YES/NO)? ", buf, 3);
                 if (answered_yes(buf)) {
                     return;
                 }
                 break;
 
-            case 0xF5: // F5, load
-            case 0xF7: // F7, save
+            case KEY_F5: // load
+            case KEY_F7: // save
                 // TODO: implement
                 break;
 
-            case 0xF9: // F9 Fetch from slot
+            case KEY_F9: // fetch from slot
                 update_and_full_redraw(true);
                 break;
 
-            case 0xFB: // F11 Save to slot
+            case KEY_F11: // save to slot
                 put_sprite_data_to_slot();
                 bordercolor(SchemeBorder);
                 break;

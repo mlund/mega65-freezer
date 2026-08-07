@@ -96,18 +96,10 @@ constexpr uint8_t F011_CTRL_MOTOR_LED = 0x60; // motor and drive LED on; OR in t
 constexpr uint8_t F011_STATUS_AT_TRACK0 = 0x01;
 constexpr uint8_t F011_STATUS_READ_ERROR = 0x18; // sector read failed
 
-// SD controller and touch panel.
+// SD controller.
 #define SD_COMMAND MMIO8(0xD680)
 #define SD_STATUS MMIO8(0xD680) // same register; reads status
 constexpr uint8_t SD_STATUS_SDHC = 0x10;
-#define TOUCH_STATUS MMIO8(0xD6B0)
-constexpr uint8_t TOUCH_STATUS_EV1_VALID = 0x01;
-// TOUCH:TOUCH1XLSB / TOUCH1YLSB, with both MSB pairs sharing $D6BB.
-#define TOUCH1_X_LSB MMIO8(0xD6B9)
-#define TOUCH1_Y_LSB MMIO8(0xD6BA)
-#define TOUCH1_MSB MMIO8(0xD6BB)
-constexpr uint8_t TOUCH1_X_MSB_MASK = 0x03; // bits 0-1
-constexpr uint8_t TOUCH1_Y_MSB_MASK = 0x30; // bits 4-5
 
 // $D689 carries several unrelated signals; only the buffer select is used
 // here.  SD:BUFSEL, 1 = the SD card's sector buffer, 0 = the F011/FDC's.
@@ -174,8 +166,8 @@ constexpr uint8_t KEY_RETURN = 0x0D;
 constexpr uint8_t KEY_CURSOR_DOWN = 0x11;
 constexpr uint8_t KEY_HOME = 0x13;
 constexpr uint8_t KEY_DELETE = 0x14;
-constexpr uint8_t KEY_CURSOR_RIGHT = 0x1D;
 constexpr uint8_t KEY_ESC = 0x1B;
+constexpr uint8_t KEY_CURSOR_RIGHT = 0x1D;
 constexpr uint8_t KEY_HELP = 0x1F;
 constexpr uint8_t KEY_LEFT_ARROW = 0x5F; // the one above CTRL, not a cursor key
 constexpr uint8_t KEY_CURSOR_UP = 0x91;
@@ -186,6 +178,8 @@ constexpr uint8_t KEY_F3 = 0xF3;
 constexpr uint8_t KEY_F4 = 0xF4;
 constexpr uint8_t KEY_F5 = 0xF5;
 constexpr uint8_t KEY_F7 = 0xF7;
+constexpr uint8_t KEY_F9 = 0xF9;
+constexpr uint8_t KEY_F11 = 0xFB;
 constexpr uint8_t KEY_F14 = 0xFE;
 
 // UARTMISC modifier key state, read live rather than through the queue: a bit

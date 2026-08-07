@@ -1,6 +1,6 @@
 # Generates version.h from version.h.in, defining BUILD_VERSION.
 #
-# The format is load-bearing: freeze_megainfo.c's format_util_version() scans
+# The format is load-bearing: megainfo/info.c's format_util_version() scans
 # memory for "v:20", skips those four bytes and parses the remainder as
 # YYMMDD.HH-branch-commit, and displays only the rightmost 25 characters.
 # Produced by this directory's gitversion.sh -- a copy of the cc65 build's, so

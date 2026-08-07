@@ -15,13 +15,6 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Only the parts setup_screen() does not do: it selects the text mode, sets
- * the bases and clears both planes, but leaves the border width and the
- * sprites alone. */
-void setup_menu_screen(void) {
-    setup_menu_screen_base();
-}
-
 int main(void) {
     /* Performs the $D02F knock; without it every later write to a VIC-IV
      * register such as $D054 is silently ignored and the screen mode is
@@ -62,7 +55,9 @@ int main(void) {
         sdhc_card = 0;
     }
 
-    setup_menu_screen();
+    /* Only the border width and the sprites: console.c's setup_screen(),
+     * called moments later, sets the text mode and clears both planes. */
+    setup_menu_screen_base();
 
     request_freeze_region_list();
 

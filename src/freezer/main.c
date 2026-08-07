@@ -306,14 +306,13 @@ void predraw_freeze_menu(void)
 /* Which parts of the menu draw_freeze_menu() redraws, OR-ed together. */
 enum : uint8_t {
     UpdateTop = 0x01,
-    UpdateFreq = 0x04,
-    UpdateUpper = 0x0f,
-    UpdateProcess = 0x10,
-    UpdateDisk = 0x20,
-    UpdateThumb = 0x40,
-    UpdateLower = 0x70,
-    UpdateAll = 0x7f,
-    UpdateChgSlot = 0x80,
+    UpdateFreq = 0x02,
+    UpdateProcess = 0x04,
+    UpdateDisk = 0x08,
+    UpdateThumb = 0x10,
+    /* Derived, so deleting a field cannot leave it claiming a bit. */
+    UpdateAll = UpdateTop | UpdateFreq | UpdateProcess | UpdateDisk | UpdateThumb,
+    UpdateChgSlot = 0x20,
 };
 // clang-format on
 

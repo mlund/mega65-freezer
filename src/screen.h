@@ -13,14 +13,14 @@ constexpr uint16_t CHARSET_ADDRESS = 0x9000;
  * carries the whole expression it appears in into 32-bit arithmetic. */
 constexpr Addr28 COLOUR_RAM_ADDRESS = 0x1f800;
 // 16-bit text mode: 40 columns of two bytes, 25 rows.  No SCREEN_COLS here --
-// freeze_sprited.c defines that as 80 for its own layout.
+// sprited/editor.c defines that as 80 for its own layout.
 constexpr uint8_t SCREEN_ROW_BYTES = 80;
 constexpr uint8_t SCREEN_ROWS = 25;
 constexpr uint16_t SCREEN_BYTES = SCREEN_ROW_BYTES * SCREEN_ROWS;
 
 constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
 
-/* Only MONITOR links monitor/screen.c, and it shows just these two.  The
+/* Only MONITOR links monitor/console.c, and it shows just these two.  The
  * sprite editor draws its own footer, so a message for it here was never
  * reachable -- and display_footer() indexes the table at runtime, so an unused
  * entry costs its full 80 columns that --gc-sections cannot reclaim. */

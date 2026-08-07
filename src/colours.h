@@ -76,7 +76,8 @@ enum Scheme : uint8_t {
 };
 
 /* Which scheme a tool starts in.  Not a build option: every scheme is compiled
- * in and F1 cycles them, so this only picks where that cycle begins. */
+ * in, and the monitor's F1 cycles them and hands the choice on, so this only
+ * picks where that cycle begins.  No other tool binds a key to it. */
 constexpr uint8_t SCHEME_BOOT = SchemeGruvbox;
 
 /* A tool leaves its choice here for the next one it launches.  $03C1-$03FF is

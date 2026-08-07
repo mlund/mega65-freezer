@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mega65_regs.h" // ASCIIKEY and KEY_* below
 #include "sdcard.h"
 
 #include <stdint.h>

@@ -1,15 +1,12 @@
 #pragma once
 
 #include "errors.h"
+#include "helper.h"
 
 #include <ctype.h>
 #include <mega65/dirent.h>
 #include <mega65/fileio.h>
 #include <stdint.h>
-
-#define WITH_AUDIOMIXER
-
-#include "helper.h"
 
 void freeze_monitor(void);
 

@@ -10,8 +10,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef WITH_AUDIOMIXER
-
 /* Arrays, not pointers to literals: draw_db_bar() and friends POKE into these
  * to build the display.  Writing through a string literal is undefined
  * behaviour, and the two share a long prefix so clang may merge them. */
@@ -929,5 +927,3 @@ void do_audio_mixer(void) {
         }
     }
 }
-
-#endif

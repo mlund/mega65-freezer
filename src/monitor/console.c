@@ -104,9 +104,9 @@ void setup_screen(void) {
      * 8-bit characters and 160 for 16-bit. */
 
     // Normal 8-bit text mode
-    VICIV.ctrlc = (VICIV.ctrlc & 0xa8) | 0x00;
+    VICIV.ctrlc = VICIV.ctrlc & VIC4_CTRLC_MODE_MASK;
 
-    VICIV.ctrlb = 0xe0; // 80-column, fast CPU, extended attributes
+    VICIV.ctrlb = VIC4_CTRLB_80_COLUMN;
     // 80 columns requires $D016 = $C9 to be properly positioned: bit 0 is the
     // H640 X-scroll correction.  Not $C8 -- that is the value the exit path
     // restores for 40 columns.
@@ -114,8 +114,8 @@ void setup_screen(void) {
     VICIV.addr =
         (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
     cia2_port_a = CIA2.pra;
-    cia2_port_a &= 0xfc;
-    cia2_port_a |= 0x01; // VIC RAM bank to $8000-$BFFF
+    cia2_port_a &= CIA2_VIC_BANK_MASK;
+    cia2_port_a |= CIA2_VIC_BANK_8000;
     CIA2.pra = cia2_port_a;
 
     // Screen colours
@@ -211,7 +211,7 @@ char read_line(char* buffer, unsigned char max_length, unsigned char column) {
             } else if (c == 0x0e) {
                 // Toggle upper/lower case font
                 VICIV.addr = VICIV.addr ^ 0x02;
-            } else if (c == 0x14) {
+            } else if (c == KEY_DELETE) {
                 // DELETE
                 if (length) {
                     // Remove blink attribute from this char
@@ -225,7 +225,7 @@ char read_line(char* buffer, unsigned char max_length, unsigned char column) {
                     set_attr(column + length, 0xff, reverse);
                     buffer[length] = 0;
                 }
-            } else if (c == 0x0d) {
+            } else if (c == KEY_RETURN) {
                 buffer[length] = 0;
 
                 // Hide cursor
