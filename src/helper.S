@@ -142,6 +142,7 @@ mega65_dos_exechelper:
 	ldz #$00
 	rts
 
+.global loadfile_routine
 loadfile_routine:
 	lda #HYPPO_LOADFILE
 	ldx #LOAD_ADDR_LO
@@ -156,6 +157,7 @@ loadfile_routine:
 load_succeeded:
 	ldz #$00
 	jmp PROGRAM_ENTRY
+.global loadfile_routine_end
 loadfile_routine_end:
 
 	.section .bss.attachDrive,"aw",@nobits

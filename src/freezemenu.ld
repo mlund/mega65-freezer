@@ -34,8 +34,11 @@ ASSERT(ADDR(.entrytramp) == 0x080d,
 
 /* Low memory the seven tools share.
  *
- * These are not part of any image -- the tools load at $07FF and run upwards,
- * so everything below is free while the freezer is running.  Hyppo's
+ * Only what must outlive the program holding it: mega65_dos_exechelper() loads
+ * the next tool over this one, so a value handed across that boundary cannot
+ * live in either image.  The tools load at $07FF and run upwards, so these sit
+ * below that.  Anything a tool merely needs at a particular alignment is an
+ * ordinary aligned object and the compiler places it.  Hyppo's
  * freeze_mem_list saves all 384KB of RAM from $0000000 to the freeze slot
  * before the freezer starts and restores it on resume (mega65-core,
  * src/hyppo/freeze.asm), so the frozen program's own bytes here are safe from
@@ -53,10 +56,10 @@ tool_drive_id      = 0x033D;  /* disk chooser -> MAKEDISK: which drive     */
 tool_drive_id_size = 0x0001;
 scheme_handoff      = 0x033E; /* 2 bytes, magic then scheme index          */
 scheme_handoff_size = 0x0002;
-loader_stub      = 0x0340;    /* the code that survives the load it does   */
-loader_stub_size = 0x0080;
-sprite_cursor      = 0x03C0;  /* the sprite editor's edit-cursor image     */
-sprite_cursor_size = 0x003F;
+/* The code that performs the load, which cannot live in the image being
+ * overwritten. */
+loader_stub      = 0x0340;
+loader_stub_size = 0x0040;
 
 ASSERT(tool_density + tool_density_size <= tool_drive_id,
     "low memory: the density byte runs into the drive id")
@@ -64,13 +67,11 @@ ASSERT(tool_drive_id + tool_drive_id_size <= scheme_handoff,
     "low memory: the drive id runs into the scheme handoff")
 ASSERT(scheme_handoff + scheme_handoff_size <= loader_stub,
     "low memory: the scheme handoff runs into the loader stub")
-ASSERT(loader_stub + loader_stub_size <= sprite_cursor,
-    "low memory: the loader stub runs into the sprite cursor")
-ASSERT(sprite_cursor + sprite_cursor_size <= 0x0400,
-    "low memory: the sprite cursor runs past $03FF")
-/* The VIC-IV sprite pointer is an address divided by 64, so the cursor image
- * can only start on a 64-byte boundary. */
-ASSERT((sprite_cursor & 0x3F) == 0, "sprite cursor is not 64-byte aligned")
+ASSERT(loader_stub + loader_stub_size <= 0x0400,
+    "low memory: the loader stub runs past $03FF")
+/* helper.S copies the routine into the reservation, so the routine must fit. */
+ASSERT(loadfile_routine_end - loadfile_routine <= loader_stub_size,
+    "the loader stub routine outgrew its reservation in low memory")
 
 __stack = 0xd000;
 
