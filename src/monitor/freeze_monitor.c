@@ -172,6 +172,15 @@ static void hex_to_screen_codes(unsigned char count) {
     }
 }
 
+/* The marker plus seven hex digits every listing line opens with. */
+constexpr uint8_t ADDRESS_FIELD_WIDTH = 8;
+
+/* The marker and seven digits every listing starts with, coloured as the
+ * disassembly colours its own address column. */
+static void colour_address_field(void) {
+    recolour_last_line_segment(0, ADDRESS_FIELD_WIDTH, SchemeAddress);
+}
+
 void show_memory_line(uint32_t addr) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
 
@@ -206,6 +215,7 @@ void show_memory_line(uint32_t addr) {
     hex_to_screen_codes(8 + 16 * 3);
 
     write_line_raw(output_buffer, 0, 8 + 16 * 3 + 2 + 16);
+    colour_address_field();
 }
 
 void show_memory(void) {
@@ -592,7 +602,8 @@ static void begin_address_line(char marker, uint32_t address) {
 /* One listed address, as H and C both report them. */
 static void write_address_line(uint32_t address) {
     begin_address_line(':', address);
-    write_line_len(output_buffer, 0, 8);
+    write_line_len(output_buffer, 0, ADDRESS_FIELD_WIDTH);
+    colour_address_field();
 }
 
 /* The trailer H and C share: nothing found, or the cap cut the list short. */
@@ -738,6 +749,9 @@ void show_bitmaps(void) {
             }
             hex_to_screen_codes(8);
             write_line_raw(output_buffer, 0, 80);
+            if (pixel_row == 0) {
+                colour_address_field();
+            }
         }
         mon_address += (uint32_t)BITMAP_CELLS * 8;
     }
