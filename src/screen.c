@@ -56,7 +56,7 @@ static const unsigned char SCREEN_DECIMAL_DIGITS[16][5] = {{0, 0, 0, 0, 1},
     {1, 6, 3, 8, 4},
     {3, 2, 7, 6, 8}};
 
-void screen_decimal(uint16_t addr, uint16_t v) {
+static void format_decimal(char* out, uint16_t v) {
     // XXX - We should do this off-screen and copy into place later, to avoid glitching
     // on display.
     unsigned char digits[5];
@@ -106,10 +106,27 @@ void screen_decimal(uint16_t addr, uint16_t v) {
         digits[4] = ' ';
     }
 
-    // Copy to screen
     for (j = 0; j < 5; j++) {
-        POKE(addr + j, digits[j]);
+        out[j] = (char)digits[j];
     }
+}
+
+/* Five columns, space-padded on the left.  The monitor's footer is 8-bit text,
+ * so its cells are consecutive bytes and POKE reaches them directly. */
+void screen_decimal(uint16_t addr, uint16_t v) {
+    char digits[DECIMAL_COLUMNS];
+    format_decimal(digits, v);
+    for (uint8_t i = 0; i < DECIMAL_COLUMNS; i++) {
+        POKE(addr + i, (uint8_t)digits[i]);
+    }
+}
+
+/* The same value placed by cell rather than by address, for the 16-bit text
+ * mode where a cell is two bytes. */
+void draw_decimal(uint8_t x, uint8_t y, uint8_t colour, uint16_t v) {
+    char digits[DECIMAL_COLUMNS];
+    format_decimal(digits, v);
+    draw_text(x, y, colour, digits, DECIMAL_COLUMNS);
 }
 
 void draw_fragment(uint8_t x, uint8_t y, uint8_t colour, const uint8_t* codes, uint8_t length) {
@@ -118,6 +135,27 @@ void draw_fragment(uint8_t x, uint8_t y, uint8_t colour, const uint8_t* codes, u
     lcopy_skip((Addr28)(uint16_t)codes, SCREEN_ADDRESS + cell, length, SCREEN_CELL_BYTES);
     lfill_skip(
         COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), colour, length, SCREEN_CELL_BYTES);
+}
+
+/* Screen RAM is directly addressable, so the characters go out with POKE; the
+ * colour plane is above 64K and needs the DMAgic, but a run is one colour, so
+ * that is a single strided fill rather than a job per character. */
+void draw_text(uint8_t x, uint8_t y, uint8_t colour, const char* text, uint8_t length) {
+    uint16_t cell = (uint16_t)(y * SCREEN_ROW_BYTES + x * SCREEN_CELL_BYTES);
+
+    lfill_skip(
+        COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), colour, length, SCREEN_CELL_BYTES);
+
+    for (uint8_t i = 0; i < length; i++) {
+        char c = text[i];
+        if ((c >= 'A') && (c <= 'Z')) {
+            c -= 0x40;
+        } else if ((c >= 'a') && (c <= 'z')) {
+            c -= 0x20;
+        }
+        POKE(SCREEN_ADDRESS + cell, (uint8_t)c);
+        cell += SCREEN_CELL_BYTES;
+    }
 }
 
 void draw_fragments(const uint8_t* stream) {

@@ -43,13 +43,20 @@ constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
 void draw_fragment(uint8_t x, uint8_t y, uint8_t colour, const uint8_t* codes, uint8_t length);
 void draw_fragments(const uint8_t* stream);
 
+/* The same, for text that is not known until run time -- a value read from the
+ * machine, a name out of the process descriptor, a formatted number.  Converts
+ * as it goes, where a fragment's codes were converted when it was compiled. */
+void draw_text(uint8_t x, uint8_t y, uint8_t colour, const char* text, uint8_t length);
+
 /* Only MONITOR links monitor/console.c, and it shows just these two.  The
  * sprite editor draws its own footer, so a message for it here was never
  * reachable -- and display_footer() indexes the table at runtime, so an unused
  * entry costs its full 80 columns that --gc-sections cannot reclaim. */
 
 void screen_hex(uint16_t addr, long value);
+constexpr uint8_t DECIMAL_COLUMNS = 5;
 void screen_decimal(uint16_t addr, uint16_t value);
+void draw_decimal(uint8_t x, uint8_t y, uint8_t colour, uint16_t value);
 
 void format_hex(char* out, const long value, const char columns);
 
