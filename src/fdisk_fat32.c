@@ -25,11 +25,12 @@ void mega65_serial_monitor_write(char* s) {
         POKE(0x380, *s);
         /* One block, not three: the value travels from lda to sta in A, and
          * separate asm statements declare nothing, so the compiler is free to
-         * use A in between.  CLC fills the spare slot after the hypervisor
-         * trap, where a NOP might be optimised away. */
+         * use A in between.  The byte after a hypervisor trap is sometimes
+         * skipped, so CLV fills that slot: one byte, and V is the flag no trap
+         * returns its status in. */
         __asm__ volatile("lda $0380\n\t"
                          "sta $d643\n\t"
-                         "clc" ::
+                         "clv" ::
                              : "a", "p");
         s++;
     }
