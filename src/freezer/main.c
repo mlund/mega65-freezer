@@ -18,55 +18,34 @@
 unsigned char freeze_menu_bar[] = "F3-RESUME    F5-RESET      HELP-MEGAINFO"
                                   "F3-LOAD SLOT F7-SAVE SLOT  HELP-MEGAINFO";
 
-unsigned char freeze_menu[] = "      MEGA65 FREEZE MENU V0.4.1DEV      "
-                              "  (C) MUSEUM OF ELECTRONIC GAMES & ART  "
-                              "cccccccccccccccccccccccccccccccccccccccc"
-#define LOAD_RESUME_OFFSET (3 * 40)
-                              "F3-RESUME    F5-RESET      HELP-MEGAINFO"
-                              "cccccccccccccccccccccccccccccccccccccccc"
-#define CPU_MODE_OFFSET (5 * 40 + 13)
-#define JOY_SWAP_OFFSET (5 * 40 + 36)
-                              " (C)PU MODE:   4510  (J)OY SWAP:    YES "
-#define CPU_FREQ_OFFSET (6 * 40 + 13)
-#define CART_ENABLE_OFFSET (6 * 40 + 36)
-                              " CPU (F)REQ: 40 MHZ  CAR(T) ENABLE: YES "
-// #define ROM_NAME_OFFSET (7 * 40 + 8)
-#define CRTEMU_MODE_OFFSET (7 * 40 + 16)
-#define VIDEO_MODE_OFFSET (7 * 40 + 33)
-                              " C(R)T EMU:     OFF  (V)IDEO:    NTSC60 "
-                              "cccccccccccccccccccccccccccccccccccccccc"
-#define TOOLS_MENU_OFFSET (9 * 40)
-                              " M - MONITOR         L - LOAD ROM/CHAR  "
-                              " A - AUDIO & VOLUME                     "
-                              " S - SPRITE EDITOR                      "
-                              "cccccccccccccccccccccccccccccccccccccccc"
-                              "~~~~~~~~~~~~~~~~~~~~                    "
-#define PROCESS_NAME_OFFSET (14 * 40 + 21)
-                              "~~~~~~~~~~~~~~~~~~~~                    "
-#define PROCESS_ROM_OFFSET (15 * 40 + 26)
-                              "~~~~~~~~~~~~~~~~~~~~ ROM:               "
-#define PROCESS_ID_OFFSET (16 * 40 + 34)
-#define SLOT_NUMBER_OFFSET (17 * 40 + 34)
-                              "~~~~~~~~~~~~~~~~~~~~ TASK ID:           "
-#define FREEZE_SLOT_OFFSET (17 * 40 + 20)
-                              "~~~~~~~~~~~~~~~~~~~~ FREEZE SLOT:       "
-                              "~~~~~~~~~~~~~~~~~~~~                    "
+/* Where each changing field sits.  The fixed text around them is a stream of
+ * fragments in freezer/menu.cpp; these are the holes it leaves. */
+constexpr uint8_t KEY_BAR_X = 0, KEY_BAR_Y = 3;
+constexpr uint8_t SETTINGS_TOP_Y = 5; /* three rows: mode, frequency, video */
+constexpr uint8_t CPU_MODE_X = 13, CPU_FREQ_X = 13;
+constexpr uint8_t CRTEMU_MODE_X = 16, VIDEO_MODE_X = 33;
+constexpr uint8_t RIGHT_VALUE_X = 36; /* joystick swap, cartridge enable */
+constexpr uint8_t PROCESS_NAME_X = 21, PROCESS_NAME_Y = 14;
+constexpr uint8_t PROCESS_ROM_X = 26, PROCESS_ROM_Y = 15;
+constexpr uint8_t TASK_ID_X = 34, TASK_ID_Y = 16;
+/* The slot label and the number in it are one field written in two parts. */
+constexpr uint8_t SLOT_LABEL_X = 20, SLOT_LABEL_Y = 17, SLOT_NUMBER_X = 34;
+constexpr uint8_t DRIVE_NUM_X = 35, DRIVE0_NUM_Y = 20, DRIVE1_NUM_Y = 23;
+constexpr uint8_t D81_NAME_X = 22, D81_IMAGE0_NAME_Y = 21, D81_IMAGE1_NAME_Y = 24;
 
-                              "~~~~~~~~~~~~~~~~~~~~ (0) INTERNAL DRIVE:"
-#define DRIVE0_NUM_OFFSET (20 * 40 + 35)
-                              "~~~~~~~~~~~~~~~~~~~~     (8) UNIT #     "
-#define D81_IMAGE0_NAME_OFFSET (21 * 40 + 22)
-                              "~~~~~~~~~~~~~~~~~~~~                    "
-                              "~~~~~~~~~~~~~~~~~~~~ (1) EXTERNAL 1565: "
-#define DRIVE1_NUM_OFFSET (23 * 40 + 35)
-                              "~~~~~~~~~~~~~~~~~~~~     (9) UNIT #     "
-#define D81_IMAGE1_NAME_OFFSET (24 * 40 + 22)
-                              "~~~~~~~~~~~~~~~~~~~~                    "
-                              "\0";
-unsigned char freeze_root_warn[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
-                                   " START TOOL! THIS WILL BREAK DISK IMAGE "
-                                   " MOUNTS FROM SUBDIRS!    PROCEED (Y/N)? "
-                                   "\0";
+/* HORIZONTAL ONE EIGHTH BLOCK-4. */
+constexpr uint8_t MENU_RULE_GLYPH = 0x43;
+constexpr uint8_t ROOT_WARN_Y = 9;
+constexpr uint8_t ROOT_WARN_ROWS = 3;
+
+/* Wide enough to blank the longest field drawn over. */
+static const char BLANK_18[] = "                  ";
+
+/* Three rows painted over the tools list, drawn by row rather than scanned to
+ * a terminator. */
+static const char ROOT_WARN[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
+                                " START TOOL! THIS WILL BREAK DISK IMAGE "
+                                " MOUNTS FROM SUBDIRS!    PROCEED (Y/N)? ";
 
 // name of the file that is loaded by charset restore F14
 #define DEFAULT_CHARSET "CHARSET.M65"
@@ -76,6 +55,10 @@ static unsigned char rom_changed = 0;
 unsigned char not_in_root = 0;
 
 void to_petscii_upper(char* text, int length);
+
+/* freezer/menu.cpp, the one C++ translation unit: the fixed text as a stream
+ * of fragments, converted to screen codes when it was compiled. */
+const uint8_t* menu_fixed_stream(void);
 
 static unsigned char colour_table[256];
 
@@ -274,6 +257,35 @@ static char thumb_frame_name[][13] = {
   "C64THUMB.M65"
 };
 
+/* Blanks a whole row, both planes.  The fixed parts are runs of text with gaps
+ * between them, so anything drawn over a whole row has to be cleared rather
+ * than merely drawn over. */
+static void clear_menu_row(uint8_t y) {
+    const uint16_t cell = SCREEN_CELL(0, y);
+    lfill_skip(SCREEN_ADDRESS + cell, ' ', 40, SCREEN_CELL_BYTES);
+    lfill_skip(COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), SchemeText, 40,
+        SCREEN_CELL_BYTES);
+}
+
+/* A rule is forty copies of one glyph, so it is a fill rather than stored
+ * text: as fragments the four rows would cost 176 bytes. */
+static void draw_menu_rule(uint16_t cell) {
+    lfill_skip(SCREEN_ADDRESS + cell, MENU_RULE_GLYPH, 40, SCREEN_CELL_BYTES);
+    lfill_skip(COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), SchemeText, 40,
+        SCREEN_CELL_BYTES);
+}
+
+/* Everything that does not change: the stream from freezer/menu.cpp, plus the
+ * rules.  Its own entry point because the root-directory warning paints over
+ * rows 9-11 and must restore them when dismissed. */
+void draw_menu_fixed(void) {
+    draw_fragments(menu_fixed_stream());
+    draw_menu_rule(SCREEN_CELL(0, 2));
+    draw_menu_rule(SCREEN_CELL(0, 4));
+    draw_menu_rule(SCREEN_CELL(0, 8));
+    draw_menu_rule(SCREEN_CELL(0, 12));
+}
+
 void predraw_freeze_menu(void)
 {
   // Clear screen, blue background, white text, like Action Replay
@@ -281,15 +293,6 @@ void predraw_freeze_menu(void)
   VICIV.screencol = SchemeBackground;
 
   clear_colour_ram();
-
-  // Make disk image names different colour to avoid confusion
-  for (uint16_t i = 40; i < 80; i += 2) {
-    lpoke(COLOUR_RAM_ADDRESS + 21 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
-    lpoke(COLOUR_RAM_ADDRESS + 24 * SCREEN_ROW_BYTES + 1 + i, SchemeAccent);
-    if (i > 50) { // ROM VERSION
-      lpoke(COLOUR_RAM_ADDRESS + 15 * SCREEN_ROW_BYTES + 1 + i, SchemeTextBright);
-}
-  }
 
   // Clear 16-bit text mode screen using DMA copy to copy the
   // manually cleared first couple of chars (we need two, because
@@ -299,6 +302,8 @@ void predraw_freeze_menu(void)
   lpoke(SCREEN_ADDRESS + 2, 0x20);
   lpoke(SCREEN_ADDRESS + 3, 0x00);
   lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, SCREEN_BYTES - 4);
+
+  draw_menu_fixed();
 
   last_thumb_frame = -1;
 }
@@ -316,23 +321,6 @@ enum : uint8_t {
 };
 // clang-format on
 
-void copy_convert_to_screen(const unsigned char* data, short offset) {
-    offset <<= 1;
-
-    for (uint16_t i = 0; data[i]; i++) {
-        if (data[i] != '~') { // skip thumb area
-            if ((data[i] >= 'A') && (data[i] <= 'Z')) {
-                POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i] - 0x40);
-            } else if ((data[i] >= 'a') && (data[i] <= 'z')) {
-                POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i] - 0x20);
-            } else {
-                POKE(SCREEN_ADDRESS + i * 2 + 0 + offset, data[i]);
-            }
-            POKE(SCREEN_ADDRESS + i * 2 + 1 + offset, 0);
-        }
-    }
-}
-
 void draw_freeze_menu(unsigned char part) {
     uint16_t i;
     unsigned char x;
@@ -346,69 +334,75 @@ void draw_freeze_menu(unsigned char part) {
     if (part & UpdateTop) {
 
         if (slot_number) {
-            lcopy((uint32_t)freeze_menu_bar + 40, (uint32_t)&freeze_menu[LOAD_RESUME_OFFSET], 40);
-            lcopy((uint32_t)" FREEZE SLOT:      ", (uint32_t)&freeze_menu[FREEZE_SLOT_OFFSET], 19);
-            // Display slot ID as decimal
-            screen_decimal((uint16_t)&freeze_menu[SLOT_NUMBER_OFFSET], slot_number);
+            draw_text(SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y),
+                SchemeText,
+                (const char*)freeze_menu_bar + 40,
+                40);
+            draw_text(
+                SCREEN_CELL(SLOT_LABEL_X, SLOT_LABEL_Y), SchemeText, " FREEZE SLOT:      ", 19);
+            draw_decimal(SCREEN_CELL(SLOT_NUMBER_X, SLOT_LABEL_Y), SchemeText, slot_number);
         } else {
-            lcopy((uint32_t)freeze_menu_bar, (uint32_t)&freeze_menu[LOAD_RESUME_OFFSET], 40);
+            draw_text(
+                SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, (const char*)freeze_menu_bar, 40);
             if (rom_changed) {
-                lfill((uint32_t)&freeze_menu[LOAD_RESUME_OFFSET], ' ', 9);
+                draw_text(SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, "         ", 9);
             }
 
-            // Display "- PAUSED STATE -"
-            lcopy((uint32_t)" - PAUSED STATE -   ", (uint32_t)&freeze_menu[FREEZE_SLOT_OFFSET], 19);
+            draw_text(
+                SCREEN_CELL(SLOT_LABEL_X, SLOT_LABEL_Y), SchemeText, " - PAUSED STATE -   ", 19);
         }
 
         // CPU MODE
-        if (freeze_peek(0xffd367dL) & 0x20) {
-            lcopy((uint32_t)"  4502", (uint32_t)&freeze_menu[CPU_MODE_OFFSET], 6);
-        } else {
-            lcopy((uint32_t)"  AUTO", (uint32_t)&freeze_menu[CPU_MODE_OFFSET], 6);
-        }
+        draw_text(SCREEN_CELL(CPU_MODE_X, SETTINGS_TOP_Y),
+            SchemeText,
+            (freeze_peek(0xffd367dL) & 0x20) ? "  4502" : "  AUTO",
+            6);
 
         // Joystick 1/2 swap
-        lcopy((uint32_t)((UART_MISC & UART_MISC_JOYSWAP) ? "YES" : " NO"),
-            (uint32_t)&freeze_menu[JOY_SWAP_OFFSET],
+        draw_text(SCREEN_CELL(RIGHT_VALUE_X, SETTINGS_TOP_Y),
+            SchemeText,
+            (UART_MISC & UART_MISC_JOYSWAP) ? "YES" : " NO",
             3);
 
         // Cartridge enable
-        lcopy((uint32_t)((freeze_peek(0xffd367dL) & 0x01) ? "YES" : " NO"),
-            (uint32_t)&freeze_menu[CART_ENABLE_OFFSET],
+        draw_text(SCREEN_CELL(RIGHT_VALUE_X, SETTINGS_TOP_Y + 1),
+            SchemeText,
+            (freeze_peek(0xffd367dL) & 0x01) ? "YES" : " NO",
             3);
 
-        if (freeze_peek(0xFFD3054L) & 0x20) { // PALEMU
-            lcopy((uint32_t)" ON", (uint32_t)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
-        } else { // PAL50
-            lcopy((uint32_t)"OFF", (uint32_t)&freeze_menu[CRTEMU_MODE_OFFSET], 3);
-        }
+        // PALEMU
+        draw_text(SCREEN_CELL(CRTEMU_MODE_X, SETTINGS_TOP_Y + 2),
+            SchemeText,
+            (freeze_peek(0xFFD3054L) & 0x20) ? " ON" : "OFF",
+            3);
 
-        if (freeze_peek(0xffd306fL) & 0x80) { // NTSC60
-            lcopy((uint32_t)"NTSC60", (uint32_t)&freeze_menu[VIDEO_MODE_OFFSET], 6);
-        } else { // PAL50
-            lcopy((uint32_t)" PAL50", (uint32_t)&freeze_menu[VIDEO_MODE_OFFSET], 6);
-        }
+        draw_text(SCREEN_CELL(VIDEO_MODE_X, SETTINGS_TOP_Y + 2),
+            SchemeText,
+            (freeze_peek(0xffd306fL) & 0x80) ? "NTSC60" : " PAL50",
+            6);
     }
 
     // CPU frequency
     if (part & UpdateFreq) {
+        const char* speed;
         switch (detect_cpu_speed()) {
             case 1:
-                lcopy((uint32_t)"  1", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                speed = "  1";
                 break;
             case 2:
-                lcopy((uint32_t)"  2", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                speed = "  2";
                 break;
             case 3:
-                lcopy((uint32_t)"3.5", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                speed = "3.5";
                 break;
             case 40:
-                lcopy((uint32_t)" 40", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                speed = " 40";
                 break;
             default:
-                lcopy((uint32_t)"???", (uint32_t)&freeze_menu[CPU_FREQ_OFFSET], 3);
+                speed = "???";
                 break;
         }
+        draw_text(SCREEN_CELL(CPU_FREQ_X, SETTINGS_TOP_Y + 1), SchemeText, speed, 3);
     }
 
     if ((part & UpdateProcess) || (part & UpdateThumb)) {
@@ -435,8 +429,7 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     if (part & UpdateProcess) {
-        // Display process ID as decimal
-        screen_decimal((uint16_t)&freeze_menu[PROCESS_ID_OFFSET], process_descriptor.task_id);
+        draw_decimal(SCREEN_CELL(TASK_ID_X, TASK_ID_Y), SchemeText, process_descriptor.task_id);
 
         // Process name: only display if no unprintable PETSCII chars
         for (i = 0; i < 16; i++) {
@@ -444,26 +437,23 @@ void draw_freeze_menu(unsigned char part) {
                 break;
             }
         }
-        if (i == 16) {
-            lcopy((uint32_t)process_descriptor.process_name,
-                (uint32_t)&freeze_menu[PROCESS_NAME_OFFSET],
-                16);
-        } else {
-            lcopy((uint32_t)"UNNAMED TASK    ", (uint32_t)&freeze_menu[PROCESS_NAME_OFFSET], 16);
-        }
+        draw_text(SCREEN_CELL(PROCESS_NAME_X, PROCESS_NAME_Y),
+            SchemeText,
+            (i == 16) ? process_descriptor.process_name : "UNNAMED TASK    ",
+            16);
 
-        lcopy((uint32_t)mega65_rom_name, (uint32_t)&freeze_menu[PROCESS_ROM_OFFSET], 11);
+        draw_text(SCREEN_CELL(PROCESS_ROM_X, PROCESS_ROM_Y), SchemeTextBright, mega65_rom_name, 11);
     }
 
     if (part & UpdateDisk) {
-        /* No pre-blank: screen_decimal() writes all five columns every time,
-         * padding with spaces, so a NUL could never survive to truncate
-         * copy_convert_to_screen()'s scan. */
-        screen_decimal((uint16_t)&freeze_menu[DRIVE0_NUM_OFFSET], freeze_peek(0x10113L));
-        screen_decimal((uint16_t)&freeze_menu[DRIVE1_NUM_OFFSET], freeze_peek(0x10114L));
+        draw_decimal(SCREEN_CELL(DRIVE_NUM_X, DRIVE0_NUM_Y), SchemeText, freeze_peek(0x10113L));
+        draw_decimal(SCREEN_CELL(DRIVE_NUM_X, DRIVE1_NUM_Y), SchemeText, freeze_peek(0x10114L));
 
-        lfill((uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET], ' ', 18);
-        lfill((uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET], ' ', 18);
+        /* The name fields are drawn over, not into a cleared buffer, so each
+         * needs its own blank first: a shorter name would leave the tail of a
+         * longer one behind. */
+        draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y), SchemeAccent, BLANK_18, 18);
+        draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y), SchemeAccent, BLANK_18, 18);
 
         if ((process_descriptor.d81_image0_flags & PdImgFlagsMounted) &&
             process_descriptor.d81_image0_namelen) {
@@ -475,19 +465,22 @@ void draw_freeze_menu(unsigned char part) {
             if (i == process_descriptor.d81_image0_namelen) {
                 to_petscii_upper(
                     process_descriptor.d81_image0_name, process_descriptor.d81_image0_namelen);
-                lcopy((uint32_t)process_descriptor.d81_image0_name,
-                    (uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
+                draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y),
+                    SchemeAccent,
+                    process_descriptor.d81_image0_name,
                     process_descriptor.d81_image0_namelen < 18
                         ? process_descriptor.d81_image0_namelen
                         : 18);
             }
         } else if (process_descriptor.d81_image0_flags & PdImgFlagsNoReal) {
-            lcopy((uint32_t)NO_DISK_DRIVE,
-                (uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
+            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y),
+                SchemeAccent,
+                NO_DISK_DRIVE,
                 sizeof(NO_DISK_DRIVE) - 1);
         } else {
-            lcopy((uint32_t)INTERNAL_DRIVE_0,
-                (uint32_t)&freeze_menu[D81_IMAGE0_NAME_OFFSET],
+            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y),
+                SchemeAccent,
+                INTERNAL_DRIVE_0,
                 sizeof(INTERNAL_DRIVE_0) - 1);
         }
 
@@ -501,19 +494,22 @@ void draw_freeze_menu(unsigned char part) {
             if (i == process_descriptor.d81_image1_namelen) {
                 to_petscii_upper(
                     process_descriptor.d81_image1_name, process_descriptor.d81_image1_namelen);
-                lcopy((uint32_t)process_descriptor.d81_image1_name,
-                    (uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
+                draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y),
+                    SchemeAccent,
+                    process_descriptor.d81_image1_name,
                     process_descriptor.d81_image1_namelen < 18
                         ? process_descriptor.d81_image1_namelen
                         : 18);
             }
         } else if (process_descriptor.d81_image1_flags & PdImgFlagsNoReal) {
-            lcopy((uint32_t)NO_DISK_DRIVE,
-                (uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
+            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y),
+                SchemeAccent,
+                NO_DISK_DRIVE,
                 sizeof(NO_DISK_DRIVE) - 1);
         } else {
-            lcopy((uint32_t)INTERNAL_DRIVE_1,
-                (uint32_t)&freeze_menu[D81_IMAGE1_NAME_OFFSET],
+            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y),
+                SchemeAccent,
+                INTERNAL_DRIVE_1,
                 sizeof(INTERNAL_DRIVE_1) - 1);
         }
     }
@@ -521,11 +517,6 @@ void draw_freeze_menu(unsigned char part) {
     // wait till raster leaves screen
     while (VICIV.rasterline < 0xf8) {
     }
-
-    // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
-    // (in fact, most of memory contains what the frozen program had. Only our freezer program
-    // itself has been loaded to replace some of RAM).
-    copy_convert_to_screen(freeze_menu, 0);
 
     // Draw the thumbnail surround area
     if (part & UpdateThumb) {
@@ -605,15 +596,16 @@ void draw_freeze_menu(unsigned char part) {
         // This sits in the region below the menu where we will also have left and right arrows,
         // the program name etc, so you can easily browse through the freeze slots.
         draw_thumbnail();
-        for (x = 0; x < 9; x++) {
-            for (y = 0; y < 6; y++) {
-                POKE(SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) + ((thumb_xoff + x) * 2) +
-                        ((thumb_yoff + y) * SCREEN_ROW_BYTES) + 0,
-                    x * 6 + y); // $50000 base address
-                POKE(SCREEN_ADDRESS + (SCREEN_ROW_BYTES * 13) + ((thumb_xoff + x) * 2) +
-                        ((thumb_yoff + y) * SCREEN_ROW_BYTES) + 1,
-                    0x14); // $50000 base address
+        /* Rows advance by adding: a row term inside the loop would be a 16-bit
+         * multiply per cell, which the 6502 pays for with a call. */
+        uint16_t row = SCREEN_ADDRESS + SCREEN_CELL(thumb_xoff, 13 + thumb_yoff);
+        for (y = 0; y < 6; y++) {
+            for (x = 0; x < 9; x++) {
+                const uint16_t cell = row + (uint16_t)(x * SCREEN_CELL_BYTES);
+                POKE(cell + 0, x * 6 + y); // $50000 base address
+                POKE(cell + 1, 0x14);
             }
+            row += SCREEN_ROW_BYTES;
         }
     }
 
@@ -708,7 +700,9 @@ void start_freezer_tool(char* toolfile) {
     char start_tool = 0;
 
     if (not_in_root) {
-        copy_convert_to_screen(freeze_root_warn, TOOLS_MENU_OFFSET);
+        for (uint8_t row = 0; row < ROOT_WARN_ROWS; row++) {
+            draw_text(SCREEN_CELL(0, ROOT_WARN_Y + row), SchemeWarning, &ROOT_WARN[row * 40], 40);
+        }
 
         while (!start_tool) {
             while (!(x = ASCIIKEY)) {
@@ -725,6 +719,13 @@ void start_freezer_tool(char* toolfile) {
                 case 'N':
                 case KEY_ESC:
                 case KEY_RUN_STOP:
+                    /* The warning covers whole rows; the fixed parts only
+                     * cover their own runs, so blank the rows before redrawing
+                     * or the gaps between fragments keep the warning's text. */
+                    for (uint8_t row = 0; row < ROOT_WARN_ROWS; row++) {
+                        clear_menu_row(ROOT_WARN_Y + row);
+                    }
+                    draw_menu_fixed();
                     draw_freeze_menu(UpdateTop);
                     return;
                 default:

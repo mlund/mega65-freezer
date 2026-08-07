@@ -31,22 +31,28 @@ constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
 
 /* A menu is a stream of positioned fragments:
  *
- *     [len] [x] [y] [colour] [len screen codes ...]  ... [0]
+ *     [len] [cell lo] [cell hi] [colour] [len screen codes ...]  ... [0]
  *
  * The run length is the text length, so the two cannot disagree, and a single
  * zero byte ends the stream.  The codes are already screen codes -- the
  * conversion happens at compile time -- so nothing here folds case.
  *
+ * The position is stored as a byte offset from the top left rather than as a
+ * column and a row, because it is known when the fragment is built: y * 80 + x
+ * * 2 is a multiply the 6502 would otherwise open-code on every draw, and it
+ * occupies the same two bytes either way.
+ *
  * In the 16-bit mode the character is the low byte of its cell and the colour
  * is the high byte of the colour cell, hence the SCREEN_CELL_BYTES - 1 offset
  * into colour RAM; in the 8-bit mode both are simply the cell. */
-void draw_fragment(uint8_t x, uint8_t y, uint8_t colour, const uint8_t* codes, uint8_t length);
+#define SCREEN_CELL(x, y) ((uint16_t)((y) * SCREEN_ROW_BYTES + (x) * SCREEN_CELL_BYTES))
+void draw_fragment(uint16_t cell, uint8_t colour, const uint8_t* codes, uint8_t length);
 void draw_fragments(const uint8_t* stream);
 
 /* The same, for text that is not known until run time -- a value read from the
  * machine, a name out of the process descriptor, a formatted number.  Converts
- * as it goes, where a fragment's codes were converted when it was compiled. */
-void draw_text(uint8_t x, uint8_t y, uint8_t colour, const char* text, uint8_t length);
+ * as it goes, where a fragment carries codes converted at compile time. */
+void draw_text(uint16_t cell, uint8_t colour, const char* text, uint8_t length);
 
 /* Only MONITOR links monitor/console.c, and it shows just these two.  The
  * sprite editor draws its own footer, so a message for it here was never
@@ -56,7 +62,7 @@ void draw_text(uint8_t x, uint8_t y, uint8_t colour, const char* text, uint8_t l
 void screen_hex(uint16_t addr, long value);
 constexpr uint8_t DECIMAL_COLUMNS = 5;
 void screen_decimal(uint16_t addr, uint16_t value);
-void draw_decimal(uint8_t x, uint8_t y, uint8_t colour, uint16_t value);
+void draw_decimal(uint16_t cell, uint8_t colour, uint16_t value);
 
 void format_hex(char* out, const long value, const char columns);
 
@@ -111,7 +117,8 @@ template <size_t N> struct Bytes {
 template <typename Ch, size_t N>
 consteval Bytes<N + 3> fragment(uint8_t x, uint8_t y, uint8_t colour, const Ch (&text)[N]) {
     const charset_impl::UnshiftedVideoString<N> codes{text};
-    Bytes<N + 3> f{{uint8_t(N - 1), x, y, colour}};
+    const uint16_t cell = SCREEN_CELL(x, y);
+    Bytes<N + 3> f{{uint8_t(N - 1), uint8_t(cell & 0xff), uint8_t(cell >> 8), colour}};
     for (size_t i = 0; i < N - 1; ++i) {
         f.data[i + 4] = uint8_t(codes.Str[i]);
     }

@@ -45,7 +45,8 @@ constexpr auto FIXED = menu::stream(
 /* The bytes the tables are supposed to produce, checked where a mistake would
  * be a wrong glyph rather than a build failure. */
 static_assert(FIXED.data[0] == 28, "title length");
-static_assert(FIXED.data[1] == 6 && FIXED.data[2] == 0, "title position");
+/* Column 6 of row 0, as a cell offset: 0 * 80 + 6 * 2. */
+static_assert(FIXED.data[1] == 12 && FIXED.data[2] == 0, "title position");
 static_assert(FIXED.data[4] == 0x0D, "M");
 static_assert(FIXED.data[5] == 0x05, "E");
 static_assert(FIXED.data[9] == 0x35, "5, a digit, unchanged");
