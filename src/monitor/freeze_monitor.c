@@ -747,7 +747,8 @@ void show_bitmaps(void) {
  * order the R line prints them, and which of those are 16-bit pairs.  MAP, the
  * CPU port and the megabyte registers are deliberately absent: changing them
  * changes what every other address means, which wants its own command. */
-static const unsigned char REGISTER_OFFSET[]  __attribute__((section(".rodata"))) = {0x08, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x07};
+static const unsigned char REGISTER_OFFSET[]
+    __attribute__((section(".rodata"))) = {0x08, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x07};
 static const unsigned char REGISTER_IS_PAIR[] = {1, 0, 0, 0, 0, 0, 1, 0};
 constexpr uint8_t REGISTER_COUNT = 8;
 
@@ -809,7 +810,7 @@ unsigned char parse_address(void) {
 }
 
 /* Indexed by AssembleStatus. */
-static const char* const ASSEMBLE_ERROR[]  __attribute__((section(".rodata"))) = {
+static const char* const ASSEMBLE_ERROR[] __attribute__((section(".rodata"))) = {
     [AssembleOk] = nullptr,
     [AssembleUnknownMnemonic] = "? UNKNOWN INSTRUCTION  ERROR",
     [AssembleBadOperand] = "? SYNTAX  ERROR",

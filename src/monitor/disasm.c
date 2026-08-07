@@ -52,10 +52,10 @@ static const char HEX_DIGITS[] RODATA = "0123456789ABCDEF";
 constexpr uint8_t QUAD_IRREGULAR_COUNT = 5;
 constexpr uint8_t QUAD_IRREGULAR_STRIDE = 2 * DISASM_MNEMONIC_WIDTH;
 static const char QUAD_IRREGULAR[] RODATA = "ORAORQ"
-                                     "INCINQ"
-                                     "DECDEQ"
-                                     "STASTQ"
-                                     "LDALDQ";
+                                            "INCINQ"
+                                            "DECDEQ"
+                                            "STASTQ"
+                                            "LDALDQ";
 
 static char* put_hex(char* cursor, uint32_t value, uint8_t digits) {
     while (digits-- > 0) {
