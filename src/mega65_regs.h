@@ -172,6 +172,14 @@ constexpr uint8_t CIA_ICR_DISABLE_ALL = 0x7F;
  * letter is typed text in the monitor's line editor. */
 constexpr uint8_t KEY_F1 = 0xF1;
 
+/* The PETSCII codes the tools navigate by.  Named rather than taken from
+ * mega65-libc, whose conio.h:79-82 at 49f2f11 declares ASC_CRSR_UP and its
+ * three neighbours with no value at all. */
+constexpr uint8_t KEY_CURSOR_UP = 0x91;
+constexpr uint8_t KEY_CURSOR_DOWN = 0x11;
+constexpr uint8_t KEY_CURSOR_LEFT = 0x9D;
+constexpr uint8_t KEY_CURSOR_RIGHT = 0x1D;
+
 #define MODKEY MMIO8(0xD611)
 constexpr uint8_t MODKEY_LSHIFT = 0x01; // UARTMISC:MLSHFT
 constexpr uint8_t MODKEY_RSHIFT = 0x02; // UARTMISC:MRSHFT

@@ -65,9 +65,9 @@
     TODO:
     * Consider SPRBPMEN for 16-color sprites
  */
-#include "cc65compat.h"
 #include "colours.h"
 #include "dma.h"
+#include "mega65_regs.h"
 #include "slot.h"
 
 #include <mega65.h>
@@ -1693,22 +1693,22 @@ static void main_loop(void) {
                         case 0x7: // RIGHT
                             joy_delay_countdown = JOY_DELAY;
                             fire_lock = 0;
-                            key = CH_CURS_RIGHT;
+                            key = KEY_CURSOR_RIGHT;
                             break;
                         case 0xB: // LEFT
                             fire_lock = 0;
                             joy_delay_countdown = JOY_DELAY;
-                            key = CH_CURS_LEFT;
+                            key = KEY_CURSOR_LEFT;
                             break;
                         case 0xE: // UP
                             fire_lock = 0;
                             joy_delay_countdown = JOY_DELAY;
-                            key = CH_CURS_UP;
+                            key = KEY_CURSOR_UP;
                             break;
                         case 0xD: // DOWN
                             fire_lock = 0;
                             joy_delay_countdown = JOY_DELAY;
-                            key = CH_CURS_DOWN;
+                            key = KEY_CURSOR_DOWN;
                             break;
                         default:
                             key = 0;
@@ -1742,7 +1742,7 @@ static void main_loop(void) {
 
                 /* ------------------------- CURSOR MOVEMENT GROUP ----------------------------- */
 
-            case CH_CURS_DOWN:
+            case KEY_CURSOR_DOWN:
                 g_state.draw_shape_fn(g_state.draw_cell_fn);
                 g_state.cursor_y =
                     (g_state.cursor_y == g_state.sprite_height - 1) ? 0 : (g_state.cursor_y + 1);
@@ -1750,7 +1750,7 @@ static void main_loop(void) {
                 g_state.update_cursor_y_fn();
                 break;
 
-            case CH_CURS_UP:
+            case KEY_CURSOR_UP:
                 g_state.draw_shape_fn(g_state.draw_cell_fn);
                 g_state.cursor_y =
                     (g_state.cursor_y == 0) ? (g_state.sprite_height - 1) : (g_state.cursor_y - 1);
@@ -1758,7 +1758,7 @@ static void main_loop(void) {
                 g_state.update_cursor_y_fn();
                 break;
 
-            case CH_CURS_LEFT:
+            case KEY_CURSOR_LEFT:
                 g_state.draw_shape_fn(g_state.draw_cell_fn);
                 g_state.cursor_x =
                     (g_state.cursor_x == 0) ? (g_state.sprite_width - 1) : (g_state.cursor_x - 1);
@@ -1766,7 +1766,7 @@ static void main_loop(void) {
                 g_state.update_cursor_x_fn();
                 break;
 
-            case CH_CURS_RIGHT:
+            case KEY_CURSOR_RIGHT:
                 g_state.draw_shape_fn(g_state.draw_cell_fn);
                 g_state.cursor_x =
                     (g_state.cursor_x == g_state.sprite_width - 1) ? 0 : (g_state.cursor_x + 1);

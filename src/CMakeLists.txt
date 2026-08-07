@@ -104,7 +104,7 @@ target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
 add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c charset.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c charset.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c charset.c)
-add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c cc65compat.c)
+add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c)
 
 # Xemu test targets.  Plain c64 PRGs, not .M65: they are launched with Xemu's
 # `-prg`, so they want the platform's own BASIC stub rather than freezemenu.ld's
