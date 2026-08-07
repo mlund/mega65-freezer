@@ -94,6 +94,47 @@ int main(void) {
     lfill(SCRATCH2, 0xEE, 0);
     check(12, lpeek(SCRATCH2), 0x77);
 
+    /* The strided pair, which writes every skip'th byte.  Filling with a stride
+     * of 2 must leave the odd bytes alone, which is exactly what a colour plane
+     * in the 16-bit text mode needs. */
+    debug_msg("TEST: lfill_skip");
+    lfill(SCRATCH2, 0x00, SPAN);
+    lfill_skip(SCRATCH2, 0xC3, 4, 2);
+    check(13, lpeek(SCRATCH2 + 0), 0xC3);
+    check(14, lpeek(SCRATCH2 + 1), 0x00);
+    check(15, lpeek(SCRATCH2 + 2), 0xC3);
+    check(16, lpeek(SCRATCH2 + 6), 0xC3);
+    check(17, lpeek(SCRATCH2 + 8), 0x00); /* count is bytes written, not spanned */
+
+    debug_msg("TEST: lcopy_skip");
+    lpoke(SCRATCH + 0, 0x11);
+    lpoke(SCRATCH + 1, 0x22);
+    lpoke(SCRATCH + 2, 0x33);
+    lfill(SCRATCH2, 0x00, SPAN);
+    lcopy_skip(SCRATCH, SCRATCH2, 3, 2);
+    check(18, lpeek(SCRATCH2 + 0), 0x11);
+    check(19, lpeek(SCRATCH2 + 1), 0x00);
+    check(20, lpeek(SCRATCH2 + 2), 0x22);
+    check(21, lpeek(SCRATCH2 + 4), 0x33);
+
+    /* The claim dma.h rests on: the DMAgic restores a step of one at the end of
+     * every chain, so a strided job cannot leak into the next.  If it did, this
+     * plain fill would scatter every second byte and leave the gaps at 0xC3. */
+    debug_msg("TEST: the stride does not leak into the next job");
+    lfill(SCRATCH2, 0xC3, SPAN);
+    lfill_skip(SCRATCH2, 0x5A, 4, 2);
+    lfill(SCRATCH2, 0x7E, 8);
+    check(22, lpeek(SCRATCH2 + 0), 0x7E);
+    check(23, lpeek(SCRATCH2 + 1), 0x7E);
+    check(24, lpeek(SCRATCH2 + 7), 0x7E);
+
+    debug_msg("TEST: strided zero count is a no-op");
+    lpoke(SCRATCH2, 0x99);
+    lfill_skip(SCRATCH2, 0x00, 0, 2);
+    check(25, lpeek(SCRATCH2), 0x99);
+    lcopy_skip(SCRATCH, SCRATCH2, 0, 2);
+    check(26, lpeek(SCRATCH2), 0x99);
+
     debug_msg("PASS");
     finish(0);
 }

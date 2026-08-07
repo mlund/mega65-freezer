@@ -152,8 +152,14 @@ static void skiplist_prepare(Addr28 destination_address, uint8_t skip) {
 
     skiplist.sub_cmd = 0;
     skiplist.modulo = 0;
+    skiplist.source_bank = 0x00;
     skiplist.dest_addr = destination_address & 0xffff;
     skiplist.dest_bank = (destination_address >> 16) & 0x0f;
+    /* Bit 7 selects I/O rather than RAM, as in lcopy/lfill above.  The list is
+     * static, so a field left unset would keep the previous job's value. */
+    if (destination_address >= 0xd000 && destination_address < 0xe000) {
+        skiplist.dest_bank |= 0x80;
+    }
 }
 
 __attribute__((noinline)) void lfill_skip(
@@ -180,6 +186,9 @@ __attribute__((noinline)) void lcopy_skip(
     skiplist.source_mb = (uint8_t)(source_address >> 20);
     skiplist.source_addr = source_address & 0xffff;
     skiplist.source_bank = (source_address >> 16) & 0x0f;
+    if (source_address >= 0xd000 && source_address < 0xe000) {
+        skiplist.source_bank |= 0x80;
+    }
 
     do_skip_dma();
 }

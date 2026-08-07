@@ -11,9 +11,9 @@
 
 namespace {
 
-/* The horizontal rules are not here: forty copies of one glyph is a fill, and
- * storing four of them as fragments would cost 176 bytes.  draw_menu_rule()
- * paints them. */
+/* The horizontal rules are not here: forty copies of one glyph is a fill, not a
+ * copy, and storing four rows of them as fragments would cost 176 bytes against
+ * a stream whose whole text is under 500.  They are painted with lfill_skip. */
 constexpr auto FIXED = menu::stream(
     // Title and credit.
     menu::fragment(6, 0, SchemeText, "MEGA65 FREEZE MENU V0.4.1DEV"),
