@@ -309,10 +309,10 @@ unsigned char freeze_load_romarea(void) {
         }
 
         switch (x) {
-            case 0x03: // RUN-STOP = make no change
-            case 0x1b: // ESC
+            case KEY_RUN_STOP: // RUN-STOP = make no change
+            case KEY_ESC:      // ESC
                 return 0;
-            case 0x5f: // <- key at top left of key board
+            case KEY_LEFT_ARROW: // <- key at top left of key board
                 // Go back up one directory
 
                 mega65_dos_chdir((unsigned char*)"..");
@@ -323,7 +323,7 @@ unsigned char freeze_load_romarea(void) {
                 draw_file_list();
 
                 break;
-            case 0x0d:
+            case KEY_RETURN:
             case 0x21: // Return = select this file.
                 // Copy name out
                 lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number),
@@ -422,23 +422,23 @@ unsigned char freeze_load_romarea(void) {
                 }
                 break;
 
-            case 0x13: // HOME
+            case KEY_HOME: // HOME
                 selection_number = 0;
                 break;
-            case 0x93: // Shift-HOME
+            case KEY_SHIFT_HOME: // Shift-HOME
                 selection_number = file_count - 1;
                 break;
-            case 0x1d: // Cursor right, next page
+            case KEY_CURSOR_RIGHT: // Cursor right, next page
                 selection_number += 22;
-            case 0x11: // Cursor down, one down
+            case KEY_CURSOR_DOWN: // Cursor down, one down
                 selection_number++;
                 if (selection_number >= file_count) {
                     selection_number = file_count - 1;
                 }
                 break;
-            case 0x9d: // Cursor left, prev page
+            case KEY_CURSOR_LEFT: // Cursor left, prev page
                 selection_number -= 22;
-            case 0x91: // Cursor up, one up
+            case KEY_CURSOR_UP: // Cursor up, one up
                 selection_number--;
                 if (selection_number < 0) {
                     selection_number = 0;

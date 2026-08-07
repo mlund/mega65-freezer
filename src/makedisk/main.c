@@ -136,7 +136,7 @@ void input_text(unsigned char column,
             }
         } else {
             switch (character) {
-                case 0x14: // delete
+                case KEY_DELETE: // delete
                     // XXX actually copy chars down, instead of just erasing from
                     // end of line, and allow cursor left and right
                     lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 0, ' ');
@@ -149,11 +149,11 @@ void input_text(unsigned char column,
                     lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + (column + offset) * 2 + 1,
                         colour);
                     break;
-                case 0x03:
+                case KEY_RUN_STOP:
                     into[0] = 0;
                     ASCIIKEY = 0;
                     return;
-                case 0x0d:
+                case KEY_RETURN:
                     into[offset] = 0;
                     ASCIIKEY = 0;
                     return;

@@ -719,24 +719,24 @@ void do_advanced_mixer(void) {
 
             // Process char
             switch (key) {
-                case 0x03:
-                case 0xf3: // RUN/STOP or F3 to exit
+                case KEY_RUN_STOP:
+                case KEY_F3: // RUN/STOP or F3 to exit
                     // reset colour ram
                     clear_colour_ram();
                     return;
-                case 0x11:
+                case KEY_CURSOR_DOWN:
                     select_row++;
                     select_row &= 0x0f;
                     break;
-                case 0x1d:
+                case KEY_CURSOR_RIGHT:
                     select_column++;
                     select_column &= 0x7;
                     break;
-                case 0x91:
+                case KEY_CURSOR_UP:
                     select_row--;
                     select_row &= 0x0f;
                     break;
-                case 0x9d:
+                case KEY_CURSOR_LEFT:
                     select_column--;
                     select_column &= 0x7;
                     break;
@@ -834,8 +834,8 @@ void do_audio_mixer(void) {
             ASCIIKEY = 0;
 
             switch (key) {
-                case 0x03:
-                case 0xF3: // RUN/STOP / F3 = Exit
+                case KEY_RUN_STOP:
+                case KEY_F3: // RUN/STOP / F3 = Exit
                     return;
                 case 'A':
                 case 'a': // Advanced mode
@@ -851,19 +851,19 @@ void do_audio_mixer(void) {
                     change_db(0, 0); // master left
                     change_db(6, 0); // master right
                     break;
-                case 0x1d: // Right = + 1 to DB of signal
+                case KEY_CURSOR_RIGHT: // Right = + 1 to DB of signal
                     change_db(select_row, 1);
                     break;
-                case 0x9d: // Left = -1 to DB of signal
+                case KEY_CURSOR_LEFT: // Left = -1 to DB of signal
                     change_db(select_row, 0);
                     break;
-                case 0x11:
+                case KEY_CURSOR_DOWN:
                     select_row++;
                     if (select_row >= 12) {
                         select_row = 0;
                     }
                     break;
-                case 0x91:
+                case KEY_CURSOR_UP:
                     select_row--;
                     if (select_row >= 12) {
                         select_row = 11;

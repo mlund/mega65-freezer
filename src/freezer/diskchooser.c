@@ -618,7 +618,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
         }
 
         switch (x) {
-            case 0x5f: // <- key at top left of key board
+            case KEY_LEFT_ARROW: // <- key at top left of key board
                 // Go back up one directory
                 mega65_dos_chdir((unsigned char*)"..");
                 file_count = 0;
@@ -628,8 +628,9 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                 draw_disk_image_list();
 
                 break;
-            case 0x1b: // ESC
-            case 0x03: // RUN-STOP = make no change, but only if we did not mess up the drive!
+            case KEY_ESC:      // ESC
+            case KEY_RUN_STOP: // RUN-STOP = make no change, but only if we did not mess up the
+                               // drive!
                 if (messed_up) {
                     if (old_disk_flags & PdImgFlagsMounted) {
                         mega65_dos_attach(old_disk_name, drive_id);
@@ -638,7 +639,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                     }
                 }
                 return NULL;
-            case 0x0d:
+            case KEY_RETURN:
             case 0x21: // Return = select this disk.
                 // Copy name out
                 lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number),
@@ -743,23 +744,23 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                     return disk_name_return;
                 }
                 break;
-            case 0x13: // HOME
+            case KEY_HOME: // HOME
                 selection_number = 0;
                 break;
-            case 0x93: // Shift-HOME
+            case KEY_SHIFT_HOME: // Shift-HOME
                 selection_number = file_count - 1;
                 break;
-            case 0x1d: // Cursor right, next page
+            case KEY_CURSOR_RIGHT: // Cursor right, next page
                 selection_number += 22;
-            case 0x11: // Cursor down, one down
+            case KEY_CURSOR_DOWN: // Cursor down, one down
                 selection_number++;
                 if (selection_number >= file_count) {
                     selection_number = file_count - 1;
                 }
                 break;
-            case 0x9d: // Cursor left, prev page
+            case KEY_CURSOR_LEFT: // Cursor left, prev page
                 selection_number -= 22;
-            case 0x91: // Cursor up, one up
+            case KEY_CURSOR_UP: // Cursor up, one up
                 selection_number--;
                 if (selection_number < 0) {
                     selection_number = 0;

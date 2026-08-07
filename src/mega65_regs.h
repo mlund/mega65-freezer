@@ -166,20 +166,30 @@ constexpr uint8_t CIA_ICR_DISABLE_ALL = 0x7F;
 // assigning any value dequeues.  See the user guide, "Keyboard".
 #define ASCIIKEY MMIO8(0xD610)
 
+/* The codes ASCIIKEY reports for the keys the tools dispatch on.  The commands
+ * are function keys because a letter is typed text in the monitor's line
+ * editor; a shifted function key is the next code up, so F2 is KEY_F1 + 1. */
+constexpr uint8_t KEY_RUN_STOP = 0x03;
+constexpr uint8_t KEY_RETURN = 0x0D;
+constexpr uint8_t KEY_CURSOR_DOWN = 0x11;
+constexpr uint8_t KEY_HOME = 0x13;
+constexpr uint8_t KEY_DELETE = 0x14;
+constexpr uint8_t KEY_CURSOR_RIGHT = 0x1D;
+constexpr uint8_t KEY_ESC = 0x1B;
+constexpr uint8_t KEY_HELP = 0x1F;
+constexpr uint8_t KEY_LEFT_ARROW = 0x5F; // the one above CTRL, not a cursor key
+constexpr uint8_t KEY_CURSOR_UP = 0x91;
+constexpr uint8_t KEY_SHIFT_HOME = 0x93;
+constexpr uint8_t KEY_CURSOR_LEFT = 0x9D;
+constexpr uint8_t KEY_F1 = 0xF1;
+constexpr uint8_t KEY_F3 = 0xF3;
+constexpr uint8_t KEY_F4 = 0xF4;
+constexpr uint8_t KEY_F5 = 0xF5;
+constexpr uint8_t KEY_F7 = 0xF7;
+constexpr uint8_t KEY_F14 = 0xFE;
+
 // UARTMISC modifier key state, read live rather than through the queue: a bit
 // is set while its key is held.
-/* ASCIIKEY code for F1.  The tools dispatch on the function keys because a
- * letter is typed text in the monitor's line editor. */
-constexpr uint8_t KEY_F1 = 0xF1;
-
-/* The PETSCII codes the tools navigate by.  Named rather than taken from
- * mega65-libc, whose conio.h:79-82 at 49f2f11 declares ASC_CRSR_UP and its
- * three neighbours with no value at all. */
-constexpr uint8_t KEY_CURSOR_UP = 0x91;
-constexpr uint8_t KEY_CURSOR_DOWN = 0x11;
-constexpr uint8_t KEY_CURSOR_LEFT = 0x9D;
-constexpr uint8_t KEY_CURSOR_RIGHT = 0x1D;
-
 #define MODKEY MMIO8(0xD611)
 constexpr uint8_t MODKEY_LSHIFT = 0x01; // UARTMISC:MLSHFT
 constexpr uint8_t MODKEY_RSHIFT = 0x02; // UARTMISC:MRSHFT

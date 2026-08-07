@@ -943,17 +943,17 @@ void do_megainfo(void) {
         ASCIIKEY = x;
 
         switch (x) {
-            case 0xF1: // F1 - Toggle DEBUG
+            case KEY_F1: // F1 - Toggle DEBUG
                 rtc_debug = 1 - rtc_debug;
                 display_rtc_debug(0, 24, 12, rtc_debug);
                 break;
-            case 0xF5: // F5 - REFRESH
+            case KEY_F5: // F5 - REFRESH
                 init_megainfo();
                 break;
-            case 0xF3:  // F3
-            case 0x1b:  // ESC
-            case 0x03:  // RUN-STOP
-                return; // EXIT!
+            case KEY_F3:       // F3
+            case KEY_ESC:      // ESC
+            case KEY_RUN_STOP: // RUN-STOP
+                return;        // EXIT!
             default:
                 break;
         }

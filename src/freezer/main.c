@@ -724,8 +724,8 @@ void start_freezer_tool(char* toolfile) {
                     break;
                 case 'n':
                 case 'N':
-                case 0x1b:
-                case 0x03:
+                case KEY_ESC:
+                case KEY_RUN_STOP:
                     draw_freeze_menu(UpdateTop);
                     return;
                 default:
@@ -863,7 +863,7 @@ int main(void) {
         // Process char
         if (key) {
             switch (key) {
-                case 0x13: // Home
+                case KEY_HOME: // Home
                     if (slot_number) {
                         slot_number = 0;
 
@@ -872,9 +872,9 @@ int main(void) {
                     break;
                 case ',':
                     slot_number -= 90;
-                case 0x11: // Cursor down
+                case KEY_CURSOR_DOWN: // Cursor down
                     slot_number -= 9;
-                case 0x9D: // Cursor left
+                case KEY_CURSOR_LEFT: // Cursor left
                     slot_number--;
                     if (slot_number >= get_freeze_slot_count()) { // unsigned!
                         slot_number = get_freeze_slot_count() - 1;
@@ -885,9 +885,9 @@ int main(void) {
                     break;
                 case '.':
                     slot_number += 90;
-                case 0x91: // Cursor up
+                case KEY_CURSOR_UP: // Cursor up
                     slot_number += 9;
-                case 0x1D: // Cursor right
+                case KEY_CURSOR_RIGHT: // Cursor right
                     slot_number++;
                     if (slot_number >= get_freeze_slot_count()) {
                         slot_number = 0;
@@ -1022,7 +1022,7 @@ int main(void) {
                     change_mounted_disk_image(1);
                     break;
 
-                case 0xf5: // F5 = Reset
+                case KEY_F5: // F5 = Reset
                     // reset only works for slot 0!
                     if (slot_number != 0) {
                         goto invalid_function;
@@ -1042,10 +1042,10 @@ int main(void) {
                     // Turn off extended graphics mode, only keep palemu
                     freeze_poke(0xFFD3054U, freeze_peek(0xFFD3054U) & 0x20);
                     // fall through
-                case 0xf3: // F3 = resume
-                case 0xf4: // RESUME even if ROM changed
+                case KEY_F3: // F3 = resume
+                case KEY_F4: // RESUME even if ROM changed
                     // if rom changed, slot 0 resume is disabled, reset is required
-                    if (key == 0xf3 && slot_number == 0 && rom_changed) {
+                    if (key == KEY_F3 && slot_number == 0 && rom_changed) {
                         goto invalid_function;
                     }
                     // Doesn't seem to really help (probably needs to be done by the hypervisor
@@ -1062,7 +1062,7 @@ int main(void) {
 
                     break;
 
-                case 0xf7: // F7 = save to slot
+                case KEY_F7: // F7 = save to slot
                 {
                     uint32_t dest_freeze_slot_start_sector;
 
@@ -1117,7 +1117,7 @@ int main(void) {
                     draw_freeze_menu(UpdateTop | UpdateProcess | UpdateThumb);
                 } break;
 
-                case 0xfe: // F14 - restore CHARSET from FILE
+                case KEY_F14: // F14 - restore CHARSET from FILE
                 {
                     // clear screen first
                     predraw_freeze_menu();
@@ -1129,7 +1129,7 @@ int main(void) {
                     draw_freeze_menu(UpdateAll);
                 } break;
 
-                case 0x1f: // HELP MEGAINFO
+                case KEY_HELP: // HELP MEGAINFO
                     start_freezer_tool("MEGAINFO.M65");
                     break;
 
