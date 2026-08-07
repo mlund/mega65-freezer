@@ -14,6 +14,18 @@
 
 #include "disasm_tables.inc"
 
+/* Keeps a table out of zero page.  `const` does not: the LTO allocator puts
+ * const data there, and every byte it takes is one the imaginary registers do
+ * not get, which costs far more in code than the table's own size -- these
+ * three are worth 325 bytes of MONITOR.  Guarded because this file is also
+ * built for the host by test/verify_disasm.py, where section names are the
+ * host's ("segment,section" on Mach-O). */
+#if defined(__mos__)
+#define RODATA __attribute__((section(".rodata")))
+#else
+#define RODATA
+#endif
+
 static_assert(DISASM_MNEMONIC_WIDTH == 3, "mnemonic field width baked into the layout");
 static_assert(sizeof(MODE_LENGTH) == BitZeroPageRelative + 1, "MODE_LENGTH must cover every mode");
 
@@ -33,13 +45,13 @@ static_assert(DISASM_BYTE_COLUMN == 1 + ADDRESS_DIGITS + 1, "byte column follows
  * the pad below is never zero and the operand column is always derivable. */
 static_assert(DISASM_MNEMONIC_FIELD_WIDTH > DISASM_MNEMONIC_WIDTH + 1, "mnemonic field pads");
 
-static const char HEX_DIGITS[] = "0123456789ABCDEF";
+static const char HEX_DIGITS[] RODATA = "0123456789ABCDEF";
 
 /* The Q mnemonics that are not the base name plus a Q, base then replacement.
  * Flat because clang rejects a NUL-less string initialiser. */
 constexpr uint8_t QUAD_IRREGULAR_COUNT = 5;
 constexpr uint8_t QUAD_IRREGULAR_STRIDE = 2 * DISASM_MNEMONIC_WIDTH;
-static const char QUAD_IRREGULAR[] = "ORAORQ"
+static const char QUAD_IRREGULAR[] RODATA = "ORAORQ"
                                      "INCINQ"
                                      "DECDEQ"
                                      "STASTQ"
@@ -76,7 +88,7 @@ static bool has_quad_form(uint8_t opcode) {
  * Taken from the case list at gs4510.vhdl:6912, deliberately not from the
  * comment above it: the comment also names JMP ($nnnn,X) ($7C), but the code
  * does not list it, so on real silicon the prefix does not survive to $7C. */
-static const uint8_t FAR_OPCODES[] = {
+static const uint8_t FAR_OPCODES[] RODATA = {
     0x20, /* JSR $nnnn     */
     0x22, /* JSR ($nnnn)   */
     0x23, /* JSR ($nnnn,X) */
