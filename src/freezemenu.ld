@@ -42,11 +42,10 @@ ASSERT(ADDR(.entrytramp) == 0x080d,
  * us and ours are discarded when it resumes.
  *
  * What is not automatic is the tools agreeing with each other: each links
- * separately and sees only its own reservation.  So the whole map lives here,
- * in the one script all seven share, and the assertions below fail the build
- * if two reservations meet.  They did once: the scheme handoff sat inside the
- * sprite editor's cursor image, and MAKEDISK's drive-id byte sat on the same
- * byte the cursor image starts at.
+ * separately and sees only its own reservation, so an overlap between two of
+ * them is invisible to both.  The whole map therefore lives here, in the one
+ * script all seven share, and the assertions below fail the build if any two
+ * reservations meet.
  */
 tool_density      = 0x033C;   /* disk chooser -> MAKEDISK: 0 = DD, 1 = HD  */
 tool_density_size = 0x0001;

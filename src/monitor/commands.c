@@ -810,8 +810,8 @@ unsigned char parse_address(void) {
     }
     // No digits means continue from the previous address -- but only if the
     // rest of the line is blank.  These four commands take one address and
-    // nothing after it, so leftovers are a typo: `M ZZZZ` used to parse as a
-    // bare `M` and silently show the next block.
+    // nothing after it, so leftovers are a typo: without this check `M ZZZZ`
+    // parses as a bare `M` and silently shows the next block.
     while (screen_line_buffer[screen_line_offset] == ' ') {
         screen_line_offset++;
     }
