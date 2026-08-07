@@ -94,7 +94,6 @@
 
 /* C-only: helper.S never names these, so they need not be preprocessor
  * constants and the compiler can check their type. */
-#ifndef __ASSEMBLER__
 constexpr uint16_t HTRAP_SYSPART = 0xD642;
 constexpr uint8_t HYPPO_OPENDIR = 0x12;
 constexpr uint8_t HYPPO_READDIR = 0x14;
@@ -106,7 +105,6 @@ constexpr uint8_t SYSPART_SLOT_COUNT = 0x16;
 constexpr uint8_t SYSPART_GETERRORCODE = 0x38;
 constexpr uint8_t HDIRENT_NAME = 0;
 constexpr uint16_t DIRENT_NAME_MAX = 256;
-#endif
 
 /* Traps short enough to state their own clobbers live here as inline asm, so
  * the compiler places operands in the registers the trap wants instead of the

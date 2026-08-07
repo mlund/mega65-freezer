@@ -2,20 +2,21 @@
 
 #include <stdint.h>
 
-#define SCREEN_ADDRESS (0xB800U)
+constexpr uint16_t SCREEN_ADDRESS = 0xB800;
 // Use default char set, not ASCII charset
-#define CHARSET_ADDRESS (0x9000U)
+constexpr uint16_t CHARSET_ADDRESS = 0x9000;
 /* The window onto the first 2 KB of the 32 KB of colour memory at $FF80000.
  * It does not follow the VIC-IV's colour start ($D064/$D065), so it is the
- * displayed colour only while that offset is zero. */
-#define COLOUR_RAM_ADDRESS (0x1f800)
+ * displayed colour only while that offset is zero.  Wider than 16 bits, so it
+ * carries the whole expression it appears in into 32-bit arithmetic. */
+constexpr uint32_t COLOUR_RAM_ADDRESS = 0x1f800;
 // 16-bit text mode: 40 columns of two bytes, 25 rows.  No SCREEN_COLS here --
 // freeze_sprited.c defines that as 80 for its own layout.
 constexpr uint8_t SCREEN_ROW_BYTES = 80;
 constexpr uint8_t SCREEN_ROWS = 25;
-#define SCREEN_BYTES (SCREEN_ROW_BYTES * SCREEN_ROWS)
+constexpr uint16_t SCREEN_BYTES = SCREEN_ROW_BYTES * SCREEN_ROWS;
 
-#define FOOTER_ADDRESS (SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES)
+constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
 
 /* Only MONITOR links fdisk_screen_monitor.c, and it shows just these two.  The
  * sprite editor draws its own footer, so a message for it here was never
