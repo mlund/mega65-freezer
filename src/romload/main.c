@@ -3,9 +3,9 @@
 
 */
 
+#include "colours.h"
 #include "common.h"
 #include "dma.h"
-#include "fat32.h"
 #include "mega65_regs.h"
 #include "screen.h"
 #include "sdcard.h"
@@ -14,6 +14,15 @@
 #include <mega65.h>
 #include <stdio.h>
 #include <string.h>
+
+void setup_menu_screen(void) {
+    setup_menu_screen_base();
+
+    VICIV.ctrlc = (VICIV.ctrlc & VIC4_CTRLC_MODE_MASK) | VIC4_CTRLC_16BIT_FULL_COLOUR;
+    VICIV.linestep = SCREEN_ROW_BYTES;
+
+    clear_colour_ram();
+}
 
 int main(void) {
     /* Performs the $D02F knock; without it every later write to a VIC-IV
@@ -48,11 +57,9 @@ int main(void) {
 
     set_palette();
 
-    // done in freeze_sprited.c:Initialize
     // Now find the start sector of the slot, and make a copy for safe keeping
-    // slot_number = 0;
-    // find_freeze_slot_start_sector(slot_number);
-    // freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
+    slot_number = 0;
+    freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
     if (SD_STATUS & SD_STATUS_SDHC) {
@@ -61,21 +68,16 @@ int main(void) {
         sdhc_card = 0;
     }
 
-    // done in freeze_sprited.c:Initialize
-    // request_freeze_region_list();
+    setup_menu_screen();
 
-    // Back to 40 column, 8-bit text mode
-    VICIV.ctrlb = 0x00;
-    VICIV.ctrlc = (VICIV.ctrlc & 0xa8) | 0x00;
-    // Lower case
-    VICIV.addr = 0x16;
+    request_freeze_region_list();
 
-    do_sprite_editor();
-
-    // Back to 40 column mode
-    VICIV.ctrlb = 0x00;
-    // 256-colour char data from chip RAM, not expansion RAM
-    VICIV.scrnptr_mb = 0x00;
+    // communicate changed ROM by setting specific border color
+    if (do_rom_loader()) {
+        VICIV.bordercol = BORDER_SIGNAL_ROM_CHANGED;
+    } else {
+        VICIV.bordercol = SchemeBorder;
+    }
 
     mega65_dos_exechelper("FREEZER.M65");
 

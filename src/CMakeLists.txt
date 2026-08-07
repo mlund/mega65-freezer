@@ -96,15 +96,15 @@ function(add_m65 name)
                 -P ${CMAKE_SOURCE_DIR}/cmake/checksize.cmake)
 endfunction()
 
-add_m65(FREEZER  freezer.c freeze_diskchooser.c)
-add_m65(AUDIOMIX audiomix.c freeze_audiomix.c charset.c)
-add_m65(MONITOR  monitor/main.c monitor/freeze_monitor.c monitor/disasm.c
+add_m65(FREEZER  freezer/main.c freezer/diskchooser.c)
+add_m65(AUDIOMIX audiomix/main.c audiomix/mixer.c charset.c)
+add_m65(MONITOR  monitor/main.c monitor/commands.c monitor/disasm.c
                  monitor/blockmove.c monitor/console.c charset.c)
 target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
-add_m65(MAKEDISK makedisk.c fat32.c charset.c)
-add_m65(ROMLOAD  romload.c freeze_romload.c charset.c)
-add_m65(SPRITED  sprited.c freeze_sprited.c charset.c)
-add_m65(MEGAINFO megainfo.c freeze_megainfo.c charset.c cc65compat.c)
+add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c charset.c)
+add_m65(ROMLOAD  romload/main.c romload/chooser.c charset.c)
+add_m65(SPRITED  sprited/main.c sprited/editor.c charset.c)
+add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c cc65compat.c)
 
 # Xemu test targets.  Plain c64 PRGs, not .M65: they are launched with Xemu's
 # `-prg`, so they want the platform's own BASIC stub rather than freezemenu.ld's

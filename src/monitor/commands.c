@@ -15,7 +15,6 @@
 #include "console.h"
 #include "disasm.h"
 #include "dma.h"
-#include "fat32.h"
 #include "mega65_regs.h"
 #include "screen.h"
 #include "sdcard.h"

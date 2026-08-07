@@ -3,7 +3,6 @@
 #include "common.h"
 #include "dma.h"
 #include "errors.h"
-#include "fat32.h"
 #include "screen.h"
 #include "sdcard.h"
 #include "trace.h"

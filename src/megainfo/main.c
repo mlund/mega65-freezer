@@ -3,10 +3,8 @@
 
 */
 
-#include "colours.h"
 #include "common.h"
 #include "dma.h"
-#include "fat32.h"
 #include "mega65_regs.h"
 #include "screen.h"
 #include "sdcard.h"
@@ -19,8 +17,9 @@
 void setup_menu_screen(void) {
     setup_menu_screen_base();
 
-    VICIV.ctrlc = (VICIV.ctrlc & VIC4_CTRLC_MODE_MASK) | VIC4_CTRLC_16BIT_FULL_COLOUR;
+    VICIV.ctrlc = VICIV.ctrlc & VIC4_CTRLC_LEGACY_MASK;
     VICIV.linestep = SCREEN_ROW_BYTES;
+    VICIV.ctrlb = VIC4_CTRLB_80_COLUMN;
 
     clear_colour_ram();
 }
@@ -58,10 +57,6 @@ int main(void) {
 
     set_palette();
 
-    // Now find the start sector of the slot, and make a copy for safe keeping
-    slot_number = 0;
-    freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
-
     // SD or SDHC card?
     if (SD_STATUS & SD_STATUS_SDHC) {
         sdhc_card = 1;
@@ -71,15 +66,7 @@ int main(void) {
 
     setup_menu_screen();
 
-    request_freeze_region_list();
-
-    // communicate changed ROM by setting specific border color
-    if (do_rom_loader()) {
-        VICIV.bordercol = BORDER_SIGNAL_ROM_CHANGED;
-    } else {
-        VICIV.bordercol = SchemeBorder;
-    }
-
+    do_megainfo();
     mega65_dos_exechelper("FREEZER.M65");
 
     return 0;
