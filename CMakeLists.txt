@@ -104,6 +104,10 @@ add_subdirectory(src)
 # existed, so both targets passed while the files being changed went unread.
 file(GLOB_RECURSE TIDY_SOURCES ${SRC}/*.c ${SRC}/*.cpp)
 file(GLOB_RECURSE FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.cpp ${SRC}/*.h)
+# Taken from the SDK unchanged, so it is not ours to format or to lint: the
+# whole point is that it is the library's own source.  See printf_sdk.cc.
+list(FILTER TIDY_SOURCES EXCLUDE REGEX "/(printf_sdk\\.cc)$")
+list(FILTER FORMAT_SOURCES EXCLUDE REGEX "/(printf_sdk\\.cc|util\\.h|varint\\.h)$")
 
 find_program(CLANG_TIDY_EXE   NAMES clang-tidy   HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
@@ -194,6 +198,16 @@ if(Python3_FOUND AND LLVM_MC_EXE)
         # never on PATH, so a bare find_program silently registers no tests.
         find_program(XEMU NAMES xmega65 xmega65.native xmega65.exe xemu-xmega65 xemu-xmega65.exe
                      HINTS $ENV{HOME}/bin /Applications/xmega65.app/Contents/MacOS)
+        if(XEMU AND TARGET test_printf)
+            add_test(NAME printf
+                COMMAND ${XEMU} -headless -sleepless -testing -model 3
+                        -hyperserialascii -besure
+                        -prg $<TARGET_FILE:test_printf>)
+            # It exits in about a second; the timeout only turns a hang into a
+            # reported failure rather than a stalled suite.
+            set_tests_properties(printf PROPERTIES TIMEOUT 15)
+        endif()
+
         if(XEMU AND TARGET test_dma)
             add_test(NAME dma
                 COMMAND ${XEMU} -headless -sleepless -testing -model 3

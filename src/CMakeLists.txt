@@ -104,7 +104,14 @@ target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
 add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c charset.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c charset.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c charset.c)
-add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c)
+# printf built from the SDK's own source rather than taken from libc.a, so the
+# code that formats MEGAINFO's numbers is compiled here and can be inspected.
+# The library's definitions are weak, so these override them.
+add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c printf_sdk.cc)
+# Not ours to fix: the SDK builds it with looser warnings than this directory
+# sets, and the point is to compile its code unchanged.
+set_source_files_properties(printf_sdk.cc PROPERTIES COMPILE_OPTIONS
+    "-Wno-error;-Wno-vla-cxx-extension;-Wno-reorder-ctor;-Wno-unused-parameter")
 
 # Bytes per character cell, and so the DMA destination step for both planes.
 # SCREEN_ROW_BYTES is 80 in every tool and means two different things; this is
@@ -125,4 +132,11 @@ if(LINK_LIBC)
     target_compile_options(test_dma PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_link_libraries(test_dma mega65libc)
     set_target_properties(test_dma PROPERTIES OUTPUT_NAME test_dma.prg)
+
+    # Decimal conversion has no caller in the seven tools -- they format hex and
+    # hand-roll their decimals -- so this path reaches the machine only here.
+    add_executable(test_printf ${CMAKE_SOURCE_DIR}/test/test_printf.c)
+    target_compile_options(test_printf PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
+    target_link_libraries(test_printf mega65libc)
+    set_target_properties(test_printf PROPERTIES OUTPUT_NAME test_printf.prg)
 endif()
