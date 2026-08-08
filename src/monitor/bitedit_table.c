@@ -264,8 +264,18 @@ uint8_t bitedit_cursor_right(uint8_t cell) {
 
 /* Forced inline because LTO measured 15 bytes worse leaving it out of line, and
  * on the target there is only the one caller.  It lives here rather than beside
- * that caller so the host test can drive it. */
-__attribute__((always_inline)) uint8_t bitedit_wrap(
+ * that caller so the host test can drive it.
+ *
+ * The attribute is target-only: GCC, unlike clang, requires always_inline to
+ * be paired with `inline`, and `inline` here would mean `static`, which the
+ * target build cannot accept -- bitedit.c calls this across a separate
+ * translation unit, resolved only at the LTO link.  __mos__ is defined by
+ * every llvm-mos -mcpu and by nothing else, so the host build -- whichever
+ * compiler it happens to be -- just sees an ordinary function. */
+#if defined(__mos__)
+__attribute__((always_inline))
+#endif
+uint8_t bitedit_wrap(
     const char* body, uint16_t length, uint16_t at, uint8_t room) {
     const uint16_t remaining = (uint16_t)(length - at);
     if (remaining <= room) {
