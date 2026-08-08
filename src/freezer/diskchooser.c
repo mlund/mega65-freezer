@@ -129,7 +129,7 @@ enum DiskType : uint8_t {
     DiskTypeD65 = 2,
     DiskTypeD71 = 3,
 };
-static unsigned char disk_type, current_sector, dir_track, entries, cur_row, next_sector, messed_up;
+static unsigned char disk_type, current_sector, dir_track, entries, cur_row, next_sector;
 static unsigned char current_side = 0;
 /* Exactly 18 screen columns, deliberately without a terminator. */
 static unsigned char entry_buffer[18] __attribute__((nonstring)) = "\"                 ";
@@ -558,8 +558,10 @@ char* freeze_select_disk_image(unsigned char drive_id) {
     unsigned char x;
     int idle_time = 0;
     uint16_t addr;
+    /* Whether the idle-timeout preview below mounted a different image, so
+     * cancelling has to remount whatever was there before. */
+    unsigned char must_restore_disk = 0;
 
-    messed_up = 0;
     drive_id = drive_id & 1;
 
     file_count = 0;
@@ -608,8 +610,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                 // After sitting idle for 1 second, try mounting disk image and displaying directory
                 // listing
                 if (draw_directory_contents(drive_id)) {
-                    messed_up =
-                        1; // function did mount an image, so we need to remount the old image
+                    must_restore_disk = 1;
                 }
             }
             usleep(10000);
@@ -632,7 +633,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
             case KEY_ESC:      // ESC
             case KEY_RUN_STOP: // RUN-STOP = make no change, but only if we did not mess up the
                                // drive!
-                if (messed_up) {
+                if (must_restore_disk) {
                     if (old_disk_flags & PdImgFlagsMounted) {
                         mega65_dos_attach(old_disk_name, drive_id);
                     } else {
