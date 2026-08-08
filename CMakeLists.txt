@@ -68,6 +68,13 @@ set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=mos45gs02")
 # inline asm block in our C is plain 6502, so nothing here needs the wider set.
 set(C_MCPU mos45gs02 CACHE STRING "-mcpu for our C sources (mos6502 on an unpatched compiler)")
 
+# Before CPMAddPackage: mega65-libc's tests/CMakeLists.txt runs the same
+# find_program without HINTS, and whichever runs first decides the cache entry.
+# On macOS Xemu installs as an app bundle and is never on PATH, so searching
+# late leaves the dependency's five tests silently unregistered.
+find_program(XEMU NAMES xmega65 xmega65.native xmega65.exe xemu-xmega65 xemu-xmega65.exe
+             HINTS $ENV{HOME}/bin /Applications/xmega65.app/Contents/MacOS)
+
 include(cmake/CPM.cmake)
 
 # Pinned rather than tracking `development`, so a build is reproducible; bump
@@ -255,11 +262,6 @@ if(Python3_FOUND AND LLVM_MC_EXE)
         # verdict -- nothing is parsed.  `-testing` is what makes that $D6CF
         # write work; without it the program cannot report anything.
         #
-        # Locator from mega65-libc's tests/CMakeLists.txt so the two projects
-        # agree, plus HINTS: on macOS Xemu installs as an app bundle and is
-        # never on PATH, so a bare find_program silently registers no tests.
-        find_program(XEMU NAMES xmega65 xmega65.native xmega65.exe xemu-xmega65 xemu-xmega65.exe
-                     HINTS $ENV{HOME}/bin /Applications/xmega65.app/Contents/MacOS)
         if(XEMU AND TARGET test_printf)
             add_test(NAME printf
                 COMMAND ${XEMU} -headless -sleepless -testing -model 3
@@ -294,15 +296,8 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(launch_monitor PROPERTIES TIMEOUT 180)
         endif()
 
-        # Assemble in the monitor and read the bytes back off the card, which
-        # needs an SD image: the freezer loads its tools from there, and Xemu's
-        # own image carries stock MEGA65 binaries, so without one this would
-        # test upstream's monitor rather than ours.  The image is cloned before
-        # our builds go in, so yours is never written to.  None is committed --
-        # such an image contains MEGA65.ROM.  macOS only; the clone-and-inject
-        # step uses hdiutil.
-        set(MEGA65_SDIMG "$ENV{MEGA65_SDIMG}" CACHE FILEPATH
-            "SD image to clone for the monitor test, e.g. Xemu's own mega65.img")
+        # Assemble in the monitor and read the bytes back off the card.
+        include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdimage.cmake)
         if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
             add_test(NAME monitor_assemble
                 COMMAND ${Python3_EXECUTABLE}
