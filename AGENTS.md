@@ -12,7 +12,7 @@ Upon starting a new session, *always* do this:
 
 # rules
 
-- code docs never tracks history, are consice/terse/brief and focus on why over what
+- code docs never tracks history, are consice/terse/brief and focus on why over what. Functions and headers are exeptions and are allow to briefly state that they do.
 - low .M65 tool byte count is a design goal - measure rather than guess, and end commit messages with the measured byte delta. See git log for history of byte hunting.
 - commit messages should be brief, concise and do not litter with authorship banners and promotion; use plain 1990-era language, no modern jargon
 - use idiomatic, modern C23. Names are descriptive and style enforced by clang-tidy rules.
