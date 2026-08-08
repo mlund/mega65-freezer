@@ -96,6 +96,12 @@ constexpr uint8_t F011_CTRL_MOTOR_LED = 0x60; // motor and drive LED on; OR in t
 constexpr uint8_t F011_STATUS_AT_TRACK0 = 0x01;
 constexpr uint8_t F011_STATUS_READ_ERROR = 0x18; // sector read failed
 
+// Read through lpeek rather than MMIO8: these are 28-bit addresses, reachable
+// whatever is banked at $D000.  Names from mega65-core's iomap.txt.
+constexpr uint32_t M65_MODEL_ID = 0xffd3629; // UARTMISC:M65MODEL, the board revision
+constexpr uint32_t RTC_SECONDS = 0xffd7110;  // RTC:RTCSEC; minutes, hours, day,
+                                             // month and year follow in order
+
 // SD controller.
 #define SD_COMMAND MMIO8(0xD680)
 #define SD_STATUS MMIO8(0xD680) // same register; reads status

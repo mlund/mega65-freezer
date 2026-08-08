@@ -102,7 +102,7 @@ add_m65(MONITOR  monitor/main.c monitor/commands.c monitor/disasm.c
                  monitor/blockmove.c monitor/console.c monitor/bitedit.c
                  monitor/bitedit_table.c charset.c)
 target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
-add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c charset.c)
+add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c makedisk/layout.c charset.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c charset.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c charset.c)
 add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c)

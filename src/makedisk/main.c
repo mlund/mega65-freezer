@@ -7,6 +7,7 @@
 #include "common.h"
 #include "dma.h"
 #include "fat32.h"
+#include "layout.h"
 #include "mega65_regs.h"
 #include "screen.h"
 #include "sdcard.h"
@@ -16,11 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// D81 geometry, unrelated to screen geometry despite sharing the number 80.
-constexpr uint8_t D81_TRACKS = 80;
-constexpr uint8_t D81_SECTORS_PER_TRACK = 20;
-
-void setup_menu_screen(void) {
+static void setup_menu_screen(void) {
     setup_menu_screen_base();
 
     VICIV.ctrlc = (VICIV.ctrlc & VIC4_CTRLC_MODE_MASK) | VIC4_CTRLC_16BIT_FULL_COLOUR;
@@ -28,7 +25,7 @@ void setup_menu_screen(void) {
     /* Colour RAM deliberately left alone here. */
 }
 
-void draw_box(unsigned char left,
+static void draw_box(unsigned char left,
     unsigned char top,
     unsigned char right,
     unsigned char bottom,
@@ -79,7 +76,8 @@ void draw_box(unsigned char left,
     lpoke(SCREEN_ADDRESS + bottom * SCREEN_ROW_BYTES + right * 2 + 1, 0);
 }
 
-void write_text(unsigned char column, unsigned char row, unsigned char colour, const char* text) {
+static void write_text(
+    unsigned char column, unsigned char row, unsigned char colour, const char* text) {
     unsigned char screen_column;
     unsigned char character;
     for (screen_column = column; text[screen_column - column]; screen_column++) {
@@ -97,7 +95,7 @@ void write_text(unsigned char column, unsigned char row, unsigned char colour, c
     }
 }
 
-void input_text(unsigned char column,
+static void input_text(unsigned char column,
     unsigned char row,
     unsigned char width,
     unsigned char colour,
@@ -106,10 +104,10 @@ void input_text(unsigned char column,
     unsigned char screen_column;
     unsigned char character;
     for (screen_column = column; screen_column < (column + width); screen_column++) {
-        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 0, ' ');
-        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 1, 0);
-        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 0, 0x00);
-        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + column * 2 + 1, colour);
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 0, ' ');
+        lpoke(SCREEN_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 1, 0);
+        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 0, 0x00);
+        lpoke(COLOUR_RAM_ADDRESS + row * SCREEN_ROW_BYTES + screen_column * 2 + 1, colour);
     }
 
     into[0] = 0;
@@ -168,7 +166,7 @@ void input_text(unsigned char column,
 }
 
 // clang-format off
-unsigned char bam_sector1[0x100] = {
+static const uint8_t BAM_SECTOR1[0x100] = {
   0x28, 0x02, 0x44, 0xbb, 0x39, 0x38, 0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x28, 0xff, 0xff, 0xff, 0xff, 0xff, 0x28, 0xff, 0xff, 0xff, 0xff, 0xff, 0x28, 0xff, 0xff, 0xff,
   0xff, 0xff, 0x28, 0xff, 0xff, 0xff, 0xff, 0xff, 0x28, 0xff, 0xff, 0xff, 0xff, 0xff, 0x28, 0xff,
@@ -188,20 +186,18 @@ unsigned char bam_sector1[0x100] = {
 };
 // clang-format on
 
-unsigned char to_hex(unsigned char i) {
+static uint8_t to_hex(uint8_t i) {
     if (i < 10) {
         return '0' + i;
     }
     return 0x41 + i - 10;
 }
 
-void format_disk_image(uint32_t file_sector, char* diskname, unsigned char is_d65) {
+static void format_disk_image(uint32_t file_sector, char* diskname, bool is_d65) {
     unsigned char i;
-    uint16_t s;
-    uint16_t sect_count = D81_TRACKS * D81_SECTORS_PER_TRACK;
-    if (is_d65) {
-        sect_count = 85 * 64;
-    }
+    uint32_t s;
+    const struct DiskGeometry* geom = disk_geometry(is_d65);
+    const uint32_t sect_count = disk_total_sectors(geom);
 
     // Make sure entire image is empty
     clear_sector_buffer();
@@ -231,8 +227,10 @@ void format_disk_image(uint32_t file_sector, char* diskname, unsigned char is_d6
 
     // Random disk ID
     i = VICIV.rasterline;
-    sector_buffer[0x16] = to_hex(i & 0xf);
-    sector_buffer[0x17] = to_hex(i >> 4);
+    const uint8_t id_lo = to_hex(i & 0xf);
+    const uint8_t id_hi = to_hex(i >> 4);
+    sector_buffer[0x16] = id_lo;
+    sector_buffer[0x17] = id_hi;
 
     sector_buffer[0x18] = 0xa0;
 
@@ -243,23 +241,20 @@ void format_disk_image(uint32_t file_sector, char* diskname, unsigned char is_d6
     sector_buffer[0x1B] = 0xa0;
     sector_buffer[0x1C] = 0xa0;
 
-    lcopy((long)bam_sector1, (long)&sector_buffer[0x100], 0x100);
+    lcopy((long)BAM_SECTOR1, (long)&sector_buffer[0x100], 0x100);
 
     // Disk ID in BAM
-    sector_buffer[0x104] = to_hex(i & 0xf);
-    sector_buffer[0x105] = to_hex(i >> 4);
+    sector_buffer[0x104] = id_lo;
+    sector_buffer[0x105] = id_hi;
 
-    if (!is_d65) {
-        sdcard_writesector(file_sector + (39 * 10 * 2 + 0), 0);
-    } else {
-        sdcard_writesector(file_sector + (39 * 64 * 2 + 0), 0);
-    }
+    const uint32_t bam_sector = file_sector + disk_bam_sector(geom);
+    sdcard_writesector(bam_sector, 0);
 
     clear_sector_buffer();
-    lcopy((long)bam_sector1, (long)sector_buffer, 0x100);
+    lcopy((long)BAM_SECTOR1, (long)sector_buffer, 0x100);
     // Disk ID in BAM
-    sector_buffer[0x004] = to_hex(i & 0xf);
-    sector_buffer[0x005] = to_hex(i >> 4);
+    sector_buffer[0x004] = id_lo;
+    sector_buffer[0x005] = id_hi;
     sector_buffer[0x101] = 0xff;
     // Link to first sector of dir
     sector_buffer[0x000] = 0x00;
@@ -268,14 +263,10 @@ void format_disk_image(uint32_t file_sector, char* diskname, unsigned char is_d6
     sector_buffer[0x0FA] = 40;
     sector_buffer[0x0FB] = 0xff;
 
-    if (!is_d65) {
-        sdcard_writesector(file_sector + (39 * 10 * 2 + 1), 0);
-    } else {
-        sdcard_writesector(file_sector + (39 * 64 * 2 + 1), 0);
-    }
+    sdcard_writesector(bam_sector + 1, 0);
 }
 
-void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
+static void do_make_disk_image(bool is_d65, uint8_t drive_id) {
     char diskname[16 + 1];
     char filename[16 + 1];
     unsigned char filename_len;
@@ -315,28 +306,15 @@ void do_make_disk_image(unsigned char is_d65, unsigned char drive_id) {
     // Copy filename into diskname before it gets extended by the filename extension
     strcpy(diskname, filename);
 
-    filename[filename_len++] = '.';
-    filename[filename_len++] = 0x44;
-    if (is_d65) {
-        filename[filename_len++] = 0x36;
-        filename[filename_len++] = 0x35;
-    } else {
-        filename[filename_len++] = 0x38;
-        filename[filename_len++] = 0x31;
-    }
-    filename[filename_len] = 0;
-    lcopy((long)filename, 0x0400, 16);
+    const struct DiskGeometry* geom = disk_geometry(is_d65);
+    strcpy(&filename[filename_len], geom->extension);
 
     draw_box(10, 8, 30, 14, SchemeNotice, 1);
     write_text(11, 9, SchemeNotice, "CREATING IMAGE...");
 
     // Actually create the file
-    //  while(!ASCIIKEY) VICIV.bordercol = VICIV.bordercol+1; ASCIIKEY = 0;
-    file_sector = fat32_create_contiguous_file(filename,
-        is_d65 ? (85 * 64 * 2 * 512L) : (D81_TRACKS * 10L * 2 * SECTOR_SIZE),
-        root_dir_sector,
-        fat1_sector,
-        fat2_sector);
+    file_sector =
+        fat32_create_contiguous_file(filename, disk_total_sectors(geom) * (uint32_t)SECTOR_SIZE);
     if (!file_sector) {
         // Error making file
         draw_box(10, 8, 30, 14, SchemeError, 1);
@@ -406,17 +384,13 @@ int main(void) {
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (SD_STATUS & SD_STATUS_SDHC) {
-        sdhc_card = 1;
-    } else {
-        sdhc_card = 0;
-    }
+    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) != 0;
 
     setup_menu_screen();
 
     request_freeze_region_list();
 
-    do_make_disk_image(tool_density[0] ? 1 : 0, tool_drive_id[0] ? 1 : 0);
+    do_make_disk_image(tool_density[0] != 0, tool_drive_id[0] != 0);
 
     mega65_dos_exechelper("FREEZER.M65");
 }

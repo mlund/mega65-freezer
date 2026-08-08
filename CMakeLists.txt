@@ -211,6 +211,14 @@ if(Python3_FOUND AND HOST_C_COMPILER)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_format.py
                 --cc ${HOST_C_COMPILER})
 
+    # The disk geometry, the FAT records and the RTC decoding, checked against
+    # what hyppo and the 45IO27 registers require rather than against this
+    # code's own arithmetic.  A wrong image size is a disk that mounts and then
+    # reads back the wrong half.
+    add_test(NAME layout
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_layout.py
+                --cc ${HOST_C_COMPILER})
+
     # The bit editor's record stream is variable length, so an off-by-one in the
     # walk puts every name on the wrong bit -- which on hardware reads as a bad
     # database rather than a bad decoder.  MEGA65_IOMAP adds the name diff.

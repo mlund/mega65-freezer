@@ -92,10 +92,10 @@ point it did the same job as its cc65 counterpart:
 | tool       |   cc65 |  llvm |    % |
 |------------|-------:|------:|-----:|
 | `AUDIOMIX` |  23161 |  9727 |  -58 |
+| `MAKEDISK` |  22307 | 10230 |  -54 |
 | `MEGAINFO` |  21966 | 10646 |  -52 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
 | `ROMLOAD`  |  17378 |  8957 |  -48 |
-| `MAKEDISK` |  22307 | 11590 |  -48 |
 | `SPRITED`  |  31016 | 17128 |  -45 |
 | `FREEZER`  |  24700 | 19573 |  -21 |
 
@@ -113,16 +113,37 @@ Defects present in the cc65 sources:
 - Two 16-bit overflows, the second of them the same arithmetic in the ROM
   loader.
 - The thumbnail frame wrote past the end of the screen.
+- The disk image writer formatted only half of a D65. It asked the filesystem
+  for 85 tracks of 128 sectors and then cleared 85 of 64, so the back half of
+  every image kept whatever the card had held there.
+- Every file it created was dated a day early. The RTC reports the day of the
+  month from one and the FAT directory stores it from one, and the reading
+  subtracted one in between. In twelve-hour mode the same reading made noon
+  24:00 and midnight 12:00.
+- The check for a name already on the disk could never match: the name built
+  out of the directory entry was never terminated, and the trim of the padding
+  began one character past the end of it.
+- The FAT chain was written one sector too long, out of a buffer that had not
+  been cleared, so the tail carried the previous sector's bytes.
+- Two that need a card with other than 4KB clusters to show: a file's first
+  sector was worked out with a fixed eight sectors per cluster, and the
+  end-of-chain test read $0F000000 where FAT32 ends a chain at $0FFFFFF8.
+- A text entry field cleared its first cell once per character instead of
+  clearing the field.
 - Dead code: a ROM-name update flag, a chunk reader, a pre-blank of the drive
-  numbers, the touch and joystick handling.
+  numbers, the touch and joystick handling, a copy of the filename into a page
+  the attach writes itself.
 
 ### Testing
 
 `ctest` runs both halves:
 
 - Host tests build the toolchain-independent code — number formatting, block
-  moves, the disassembler, the register database, the thumbnail frames — with
-  the host compiler and check it against known-good output.
+  moves, the disassembler, the register database, the thumbnail frames, the
+  disk geometry and FAT records — with the host compiler and check it against
+  known-good output. The disk numbers are checked against what the machine
+  requires, taken from `mega65-core`: the image sizes hyppo measures to tell a
+  D65 from a D81, and the RTC fields named in `iomap.txt`.
 - Emulator tests drive Xemu over its serial monitor, typing at the freezer and
   asserting on the screen dump and, with `FREEZER_TRACE`, on the hypervisor
   serial channel. They clone the SD image rather than writing to it.
