@@ -275,8 +275,7 @@ uint8_t bitedit_cursor_right(uint8_t cell) {
 #if defined(__mos__)
 __attribute__((always_inline))
 #endif
-uint8_t bitedit_wrap(
-    const char* body, uint16_t length, uint16_t at, uint8_t room) {
+uint8_t bitedit_wrap(const char* body, uint16_t length, uint16_t at, uint8_t room) {
     const uint16_t remaining = (uint16_t)(length - at);
     if (remaining <= room) {
         return (uint8_t)remaining;
