@@ -1,1 +1,16 @@
-# stub
+- upon starting a dev new session, always load "llvm-mos" skill from https://github.com/mlund/claude-skills
+- code docs never tracks history, are consice/terse/brief and focus on why over what
+- low .M65 tool byte count is paramount - measure rather than guess, and end commit messages with the measured byte delta
+- commit messages should be brief, concise and do not litter with authorship banners and promotion; use plain 1990-era language, no modern jargon
+- force a full rebuild before quoting a byte count; a stale link reports the old number
+- use idiomatic, modern C23.
+- if possible use host side testing of C code - plenty of existing examples in project
+- use xemu with serial/hyppo testing. Also plenty of examples.
+- measure on xemu or hardware before theorising about a hardware bug
+- ask before committing or pushing; let user review
+- never commit plan documents, SD images or ROMs
+- the freeze slot is SD sectors, not memory: edits go through the monitor's one-sector cache
+- the screen is the C64 ROM charset - PETSCII screen codes, uppercase only, no lowercase
+- explicit addresses belong in the linker script, not in C
+- finish new features with code review, simplification pass, and code documentation review
+- see README.md for build and test invocation
