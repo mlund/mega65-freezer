@@ -55,7 +55,7 @@ void draw_text(uint16_t cell, uint8_t colour, const char* text, uint8_t length) 
         } else if ((c >= 'a') && (c <= 'z')) {
             c -= 0x20;
         }
-        POKE(SCREEN_ADDRESS + cell, (uint8_t)c);
+        SCREEN[cell] = (uint8_t)c;
         cell += SCREEN_CELL_BYTES;
     }
 }
@@ -68,6 +68,22 @@ void draw_fragments(const uint8_t* stream) {
             (uint16_t)(stream[1] | ((uint16_t)stream[2] << 8)), stream[3], stream + 4, length);
         stream += 4 + length;
     }
+}
+
+void draw_rule(uint16_t cell, uint8_t width) {
+    lfill_skip(SCREEN_ADDRESS + cell, MENU_RULE_GLYPH, width, SCREEN_CELL_BYTES);
+    lfill_skip(COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1),
+        SchemeTextDim,
+        width,
+        SCREEN_CELL_BYTES);
+}
+
+void blank_screen(void) {
+    lpoke(SCREEN_ADDRESS, 0x20);
+    lpoke(SCREEN_ADDRESS + 1, 0x00);
+    lpoke(SCREEN_ADDRESS + 2, 0x20);
+    lpoke(SCREEN_ADDRESS + 3, 0x00);
+    lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, SCREEN_BYTES - 4);
 }
 
 void setup_menu_screen_base(void) {

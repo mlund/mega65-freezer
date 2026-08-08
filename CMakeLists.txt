@@ -288,6 +288,18 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(launch_monitor PROPERTIES TIMEOUT 180)
         endif()
 
+        # Launch AUDIOMIX from the freeze menu and reach its advanced view.  A
+        # bare `-prg` never starts it, same as MONITOR, so this needs the SD
+        # image too; see test/verify_audiomix_xemu.py.
+        if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
+            add_test(NAME launch_audiomix
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_audiomix_xemu.py
+                        --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                        --build $<TARGET_FILE_DIR:AUDIOMIX>)
+            set_tests_properties(launch_audiomix PROPERTIES TIMEOUT 180)
+        endif()
+
         # Assemble in the monitor and read the bytes back off the card.
         if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
             add_test(NAME monitor_assemble

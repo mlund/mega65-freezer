@@ -91,7 +91,7 @@ point it did the same job as its cc65 counterpart:
 
 | tool       |   cc65 |  llvm |    % |
 |------------|-------:|------:|-----:|
-| `AUDIOMIX` |  23161 |  9727 |  -58 |
+| `AUDIOMIX` |  23161 |  8288 |  -64 |
 | `MAKEDISK` |  22307 | 10230 |  -54 |
 | `MEGAINFO` |  21966 | 10646 |  -52 |
 | `MONITOR`  |  18226 |  9353 |  -49 |

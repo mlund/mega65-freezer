@@ -47,6 +47,26 @@ constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
  * is the high byte of the colour cell, hence the SCREEN_CELL_BYTES - 1 offset
  * into colour RAM; in the 8-bit mode both are simply the cell. */
 #define SCREEN_CELL(x, y) ((uint16_t)((y) * SCREEN_ROW_BYTES + (x) * SCREEN_CELL_BYTES))
+
+/* HORIZONTAL ONE EIGHTH BLOCK-4: the glyph every menu's horizontal rule uses. */
+constexpr uint8_t MENU_RULE_GLYPH = 0x43;
+
+/* A rule is `width` copies of one glyph, dimmed -- a divider separates
+ * without saying anything itself. */
+void draw_rule(uint16_t cell, uint8_t width);
+
+/* Clears 16-bit text mode screen: manually clears the first couple of chars
+ * (two, because of the DMA engine's own pipelining) then DMA-copies that to
+ * fill the rest. */
+void blank_screen(void);
+
+/* Screen RAM, typed the way the SDK's own hardware registers are (VICIV,
+ * CIA1, SID1...) rather than reached through POKE's bare address cast.  A
+ * macro, not a fixed-address object like VICIV: the base is programmed at
+ * runtime by setup_menu_screen_base(), though every caller here only ever
+ * uses SCREEN_ADDRESS. */
+#define SCREEN ((volatile uint8_t*)SCREEN_ADDRESS)
+
 void draw_fragment(uint16_t cell, uint8_t colour, const uint8_t* codes, uint8_t length);
 void draw_fragments(const uint8_t* stream);
 

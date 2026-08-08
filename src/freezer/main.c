@@ -33,8 +33,6 @@ constexpr uint8_t SLOT_LABEL_X = 20, SLOT_LABEL_Y = 17, SLOT_NUMBER_X = 34;
 constexpr uint8_t DRIVE_NUM_X = 35, DRIVE0_NUM_Y = 20, DRIVE1_NUM_Y = 23;
 constexpr uint8_t D81_NAME_X = 22, D81_IMAGE0_NAME_Y = 21, D81_IMAGE1_NAME_Y = 24;
 
-/* HORIZONTAL ONE EIGHTH BLOCK-4. */
-constexpr uint8_t MENU_RULE_GLYPH = 0x43;
 constexpr uint8_t ROOT_WARN_Y = 9;
 constexpr uint8_t ROOT_WARN_ROWS = 3;
 
@@ -265,24 +263,15 @@ static void clear_menu_row(uint8_t y) {
         SCREEN_CELL_BYTES);
 }
 
-/* A rule is forty copies of one glyph, so it is a fill rather than stored
- * text: as fragments the four rows would cost 176 bytes.  Dimmed, like the
- * title: a divider separates without saying anything itself. */
-static void draw_menu_rule(uint16_t cell) {
-    lfill_skip(SCREEN_ADDRESS + cell, MENU_RULE_GLYPH, 40, SCREEN_CELL_BYTES);
-    lfill_skip(COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), SchemeTextDim, 40,
-        SCREEN_CELL_BYTES);
-}
-
 /* Everything that does not change: the stream from freezer/menu.cpp, plus the
  * rules.  Its own entry point because the root-directory warning paints over
  * rows 9-11 and must restore them when dismissed. */
 void draw_menu_fixed(void) {
     draw_fragments(menu_fixed_stream());
-    draw_menu_rule(SCREEN_CELL(0, 2));
-    draw_menu_rule(SCREEN_CELL(0, 4));
-    draw_menu_rule(SCREEN_CELL(0, 8));
-    draw_menu_rule(SCREEN_CELL(0, 12));
+    draw_rule(SCREEN_CELL(0, 2), 40);
+    draw_rule(SCREEN_CELL(0, 4), 40);
+    draw_rule(SCREEN_CELL(0, 8), 40);
+    draw_rule(SCREEN_CELL(0, 12), 40);
 }
 
 void predraw_freeze_menu(void)
@@ -292,16 +281,7 @@ void predraw_freeze_menu(void)
   VICIV.screencol = SchemeBackground;
 
   clear_colour_ram();
-
-  // Clear 16-bit text mode screen using DMA copy to copy the
-  // manually cleared first couple of chars (we need two, because
-  // of the pipelining in the DMA engine).
-  lpoke(SCREEN_ADDRESS, 0x20);
-  lpoke(SCREEN_ADDRESS + 1, 0x00);
-  lpoke(SCREEN_ADDRESS + 2, 0x20);
-  lpoke(SCREEN_ADDRESS + 3, 0x00);
-  lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, SCREEN_BYTES - 4);
-
+  blank_screen();
   draw_menu_fixed();
 
   last_thumb_frame = -1;

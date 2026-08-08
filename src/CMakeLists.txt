@@ -97,7 +97,7 @@ function(add_m65 name)
 endfunction()
 
 add_m65(FREEZER  freezer/main.c freezer/diskchooser.c freezer/menu.cpp)
-add_m65(AUDIOMIX audiomix/main.c audiomix/mixer.c charset.c)
+add_m65(AUDIOMIX audiomix/main.c audiomix/mixer.c audiomix/menu.cpp charset.c)
 add_m65(MONITOR  monitor/main.c monitor/commands.c monitor/disasm.c
                  monitor/blockmove.c monitor/console.c monitor/bitedit.c
                  monitor/bitedit_table.c charset.c)

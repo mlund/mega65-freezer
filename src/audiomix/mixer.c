@@ -7,65 +7,14 @@
 #include "slot.h"
 
 #include <mega65.h>
-#include <stdio.h>
-#include <string.h>
 
-/* Arrays, not pointers to literals: draw_db_bar() and friends POKE into these
- * to build the display.  Writing through a string literal is undefined
- * behaviour, and the two share a long prefix so clang may merge them. */
-unsigned char audio_menu[] = "         MEGA65 AUDIO MIXER MENU        "
-                             "  (C) FLINDERS UNI, M.E.G.A. 2018-2024  "
-                             " cccccccccccccccccccccccccccccccccccccc "
-                             "        LFT RGT PH1 PH2 BTL BTR HDL HDR "
-                             "        cccccccccccccccccccccccccccccccc"
-                             "   SIDLb                                "
-                             "   SIDRb                                "
-                             " PHONE1b                                "
-                             " PHONE2b                                "
-                             "BTOOTHLb                                "
-                             "BTOOTHRb                                "
-                             "LINEINLb                                "
-                             "LINEINRb                                "
-                             "  DIGILb                                "
-                             "  DIGIRb                                "
-                             "  MIC0Lb                                "
-                             "  MIC0Rb                                "
-                             "  MIC1Lb                                "
-                             "  MIC1Rb                                "
-                             " OPL FMb                                "
-                             " MASTERb                                "
-                             " cccccccccccccccccccccccccccccccccccccc "
-                             " T - TEST SOUND, CURSOR KEYS - NAVIGATE "
-                             " +/- ADJUST VALUE,    0/* - FAST ADJUST "
-                             " F3 - SIMPLE MODE,  M - TOGGLE MIC MUTE "
-                             "\0";
-
-unsigned char audio_menu_simple[] = "         MEGA65 AUDIO MIXER MENU        "
-                                    "  (C) FLINDERS UNI, M.E.G.A. 2018-2024  "
-                                    " cccccccccccccccccccccccccccccccccccccc "
-                                    "                                        "
-                                    "         LEFT OUTPUT CHANNEL:           "
-                                    "        cccccccccccccccccccccccccccccccc"
-                                    "    MASTERb                             "
-                                    " L SID 3+4b                             "
-                                    " R SID 1+2b                             "
-                                    " LEFT DIGIb                             "
-                                    "RIGHT DIGIb                             "
-                                    "SFX OPL FMb                             "
-                                    "                                        "
-                                    "        RIGHT OUTPUT CHANNEL:           "
-                                    "        cccccccccccccccccccccccccccccccc"
-                                    "    MASTERb                             "
-                                    " L SID 3+4b                             "
-                                    " R SID 1+2b                             "
-                                    " LEFT DIGIb                             "
-                                    "RIGHT DIGIb                             "
-                                    "SFX OPL FMb                             "
-                                    " cccccccccccccccccccccccccccccccccccccc "
-                                    " T - TEST SOUND, CURSOR KEYS - NAVIGATE "
-                                    " +/- VOL, S - STEREO/MONO, W - SWAP L/R "
-                                    " F3 - EXIT, M - MUTE, A - ADVANCED MODE "
-                                    "\0";
+/* audiomix/menu.cpp: the fixed labels, converted to screen codes when it was
+ * compiled.  Only the labels are fragments -- the coefficient matrix, the dB
+ * bars and the row-3 readouts below are a live hex/level display, so they
+ * stay runtime-drawn. */
+extern const uint8_t* audiomix_banner_stream(void);
+extern const uint8_t* audiomix_advanced_fixed_stream(void);
+extern const uint8_t* audiomix_simple_fixed_stream(void);
 
 void audioxbar_setcoefficient(uint8_t n, uint8_t value) {
     // Select the coefficient
@@ -97,96 +46,91 @@ uint8_t audioxbar_getcoefficient(uint8_t n) {
 static uint8_t select_row, select_column;
 static uint8_t mute_save[8];
 
-void draw_advanced_mixer(void) {
-    uint16_t offset;
-    uint8_t colour;
-    uint8_t c;
-    uint8_t value;
+/* Everything that does not change between keypresses.  Its own entry point,
+ * called once per view entry, so the per-keypress redraw below only ever
+ * touches the live matrix / bars / readouts.  draw_rule()/blank_screen() are
+ * shared with FREEZER's menu (src/screen.c), which has the same shape. */
+void draw_advanced_fixed(void) {
+    clear_colour_ram();
+    blank_screen();
+    draw_fragments(audiomix_banner_stream());
+    draw_rule(SCREEN_CELL(1, 2), 38);
+    draw_fragments(audiomix_advanced_fixed_stream());
+    draw_rule(SCREEN_CELL(8, 4), 32);
+    draw_rule(SCREEN_CELL(1, 21), 38);
+}
 
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 5, SchemeTextDim);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 7, SchemeTextDim);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 11, SchemeTextDim);
-    lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 13, SchemeTextDim);
-    audio_menu[3 * 40 + 2] = nybl_to_screen(select_column);
-    audio_menu[3 * 40 + 3] = nybl_to_screen(select_row);
+// Draws the simple view's title, headings and row labels.
+void draw_simple_fixed(void) {
+    clear_colour_ram();
+    blank_screen();
+    draw_fragments(audiomix_banner_stream());
+    draw_rule(SCREEN_CELL(1, 2), 38);
+    draw_fragments(audiomix_simple_fixed_stream());
+    draw_rule(SCREEN_CELL(8, 5), 32);
+    draw_rule(SCREEN_CELL(8, 14), 32);
+    draw_rule(SCREEN_CELL(1, 21), 38);
+}
+
+/* The coefficient matrix: row 3 columns 0-1 is the cursor position, columns
+ * 4-5 the currently selected coefficient's own value -- both live, redrawn
+ * here every keypress.  Row/column arithmetic is unchanged from the original:
+ * bit 4 of the coefficient index feeds both the row selector (as its top bit)
+ * and the column selector (as its bottom bit), which is what the `-2`
+ * adjustment compensates for when it is set. */
+void draw_advanced_mixer(void) {
+    uint8_t c;
+    char selected[2];
+    char readout[2];
+
+    readout[0] = (char)nybl_to_screen(select_column);
+    readout[1] = (char)nybl_to_screen(select_row);
+    draw_text(SCREEN_CELL(2, 3), SchemeAccent, readout, 2);
 
     c = 0;
     do {
+        uint8_t row_index = (c & 0x1e) >> 1;
+        uint8_t y = (uint8_t)(5 + row_index);
+        uint8_t x = (uint8_t)(8 + ((c >> 3) & 0x1e) + 2 * (c & 1));
+        uint8_t value;
+        uint8_t colour;
+        char digits[2];
 
-        // Work out address of where to draw the value
-        offset = 8 + 5 * 40;              // Start of first value location
-        offset += ((c & 0x1e) >> 1) * 40; // Low bits of number indicate Y position
-        offset += (c >> 3) & 0x1e;        // High bits pick the column
-        offset += (c & 1) + (c & 1);      // lowest bit picks LSB/MSB
         if (c & 0x10) {
-            offset -= 2; // XXX Why do we need this fudge factor?
+            x -= 2;
         }
 
-        // And get the value to display
         value = audioxbar_getcoefficient(c);
-        audio_menu[offset] = nybl_to_screen(value >> 4);
-        audio_menu[offset + 1] = nybl_to_screen(value);
+        digits[0] = (char)nybl_to_screen(value >> 4);
+        digits[1] = (char)nybl_to_screen(value);
 
-        // Now pick the colour to display
-        // We want to make it easy to find values, so we should
-        // have pairs of columns for odd and even rows, and a
-        // highlight colour for the currently selected coefficient
-        // (or just reverse video)
-
-        colour = SchemeTextDim;
-        if (((c & 0x1e) >> 1) == select_row) {
+        // Colour: dim baseline, highlight on a matching row or column, and
+        // the brighter label colour where both match -- the actively
+        // selected coefficient.
+        colour = SchemeValue;
+        if (row_index == select_row) {
             colour = SchemeHighlight;
         }
         if ((c >> 5) == select_column) {
-            if (colour == SchemeHighlight) {
-                colour = SchemeText;
-            } else {
-                colour = SchemeHighlight;
-            }
+            colour = (colour == SchemeHighlight) ? SchemeText : SchemeHighlight;
         }
         if (colour == SchemeText) {
-            audio_menu[3 * 40 + 5] = nybl_to_screen(c >> 4);
-            audio_menu[3 * 40 + 6] = nybl_to_screen(c);
+            selected[0] = (char)nybl_to_screen(c >> 4);
+            selected[1] = (char)nybl_to_screen(c);
         }
 
-        lpoke(COLOUR_RAM_ADDRESS + (offset + offset + 1), colour);
-        lpoke(COLOUR_RAM_ADDRESS + (offset + offset + 3), colour);
-
+        draw_text(SCREEN_CELL(x, y), colour, digits, 2);
     } while (++c);
 
-    // Update the coefficients in the audio_menu display, then
-    // display it after, so that we have no flicker
-
-    // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
-    // (in fact, most of memory contains what the frozen program had. Only our freezer program
-    // itself has been loaded to replace some of RAM).
-    for (uint16_t i = 0; audio_menu[i]; i++) {
-        if ((audio_menu[i] >= 'A') && (audio_menu[i] <= 'Z')) {
-            POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu[i] - 0x40);
-        } else if ((audio_menu[i] >= 'a') && (audio_menu[i] <= 'z')) {
-            POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu[i] - 0x20);
-        } else {
-            POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu[i]);
-        }
-        POKE(SCREEN_ADDRESS + i * 2 + 1, 0);
-    }
+    // row_index covers 0-15 and select_column is masked to 0-7, so some c
+    // always matches both axes and sets `selected` above.
+    draw_text(SCREEN_CELL(5, 3), SchemeAccent, selected, 2);
 }
 
-// clang-format off
-// Decimal 0..79 as text, indexed by the dB value.
-static const char* const DB_TEXT[80] = {
-  "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
-  "10", "11", "12", "13", "14", "15", "16", "17", "18", "19",
-  "20", "21", "22", "23", "24", "25", "26", "27", "28", "29",
-  "30", "31", "32", "33", "34", "35", "36", "37", "38", "39",
-  "40", "41", "42", "43", "44", "45", "46", "47", "48", "49",
-  "50", "51", "52", "53", "54", "55", "56", "57", "58", "59",
-  "60", "61", "62", "63", "64", "65", "66", "67", "68", "69",
-  "70", "71", "72", "73", "74", "75", "76", "77", "78", "79" };
-
 static const uint16_t MINUS_DB_TABLE[256] = {
+    // clang-format off
   65535L, 52026L, 41303L, 32789L, 26031, 20665, 16406, 13024,
-  10339, 8208, 6516, 5173, 4107, 3260, 2588, 2054, 
+  10339, 8208, 6516, 5173, 4107, 3260, 2588, 2054,
   1631, 1295, 1028, 816, 648, 514, 408, 324,
   257, 204, 162, 128, 102, 81, 64, 51,
   40, 32, 25, 20, 16, 12, 10, 8,
@@ -219,75 +163,73 @@ static const uint16_t MINUS_DB_TABLE[256] = {
   1, 1, 1, 1, 1, 1, 1, 0 };
 // clang-format on
 
-unsigned char db_index = 0;
-
-void level_to_db_index(uint16_t level) {
-    db_index = 0;
-    while (level < MINUS_DB_TABLE[db_index]) {
-        db_index++;
+// The dB step (0 = 0dB, 79 = -79dB) whose table entry `level` still reaches.
+static uint8_t level_to_db_index(uint16_t level) {
+    uint8_t index = 0;
+    while (level < MINUS_DB_TABLE[index]) {
+        index++;
     }
+    return index;
 }
 
-unsigned char db_text[11];
+/* Bar plus dB annotation for one row of the simple view.  The bar is filled
+ * and blanked with raw screen codes via lfill_skip() -- not draw_text(),
+ * whose ASCII case-fold would corrupt the half-block glyph (0x75 is 'u').
+ * Colour for the bar is set separately, by the whole-row lcopy in
+ * draw_simple_mixer(); only the annotation's colour is set here. */
 void draw_db_bar(unsigned char line, uint16_t level) {
-    uint16_t bar_addr = (uint16_t)audio_menu_simple + line * 40 + 11;
-    uint16_t i;
-    // Work out the approximate db_index value of the signal
-    level_to_db_index(level);
+    uint8_t db_index = level_to_db_index(level);
+    char annotation[5];
+    char* at = annotation;
 
-    // Now draw the db_index bar.  We allow upto 20 chars wide
-    // for the range 0 -- -79db = 1/4 char per dB.
-    for (i = 0; i < 20; i++) {
-        if (db_index >= 39) {
-            POKE(bar_addr + i, 0x20);
-        } else {
-            // Filled bar
-            if ((39 - db_index) > ((i * 2))) {
-                POKE(bar_addr + i, 0xa0);
-                // Empty cell
-            } else if ((39 - db_index) < (i * 2)) {
-                POKE(bar_addr + i, 0x20);
-                // 1/2
-            } else if ((39 - db_index) == ((i * 2) + 0)) {
-                POKE(bar_addr + i, 117);
-            }
-        }
-    }
-
-    // And the annotation to the right
-    bar_addr += 23;
-    if (!db_index) {
-        snprintf((char*)db_text, 10, "  0DB");
-        for (i = 0; db_text[i]; i++) {
-            POKE(bar_addr + i, db_text[i]);
-        }
+    if (db_index >= 39) {
+        lfill_skip(SCREEN_ADDRESS + SCREEN_CELL(11, line), ' ', 20, SCREEN_CELL_BYTES);
     } else {
-        i = 0;
-        if (db_index > 79) {
-            db_index = 79;
+        // Up to 20 chars wide for the range 0..-79dB = 1/4 char per dB.  diff
+        // is 1..39 here (db_index < 39), so full_count is always 1..20.
+        uint8_t diff = (uint8_t)(39 - db_index);
+        uint8_t full_count = (uint8_t)((diff + 1) / 2);
+        uint8_t drawn;
+        lfill_skip(SCREEN_ADDRESS + SCREEN_CELL(11, line), 0xa0, full_count, SCREEN_CELL_BYTES);
+        drawn = full_count;
+        if (!(diff & 1) && drawn < 20) {
+            lfill_skip(SCREEN_ADDRESS + SCREEN_CELL((uint8_t)(11 + drawn), line),
+                117,
+                1,
+                SCREEN_CELL_BYTES);
+            drawn++;
         }
-        if (db_index < 10) {
-            POKE(bar_addr, ' ');
-            bar_addr++;
-        }
-        POKE(bar_addr, '-');
-        i++;
-        for (; DB_TEXT[db_index][i - 1]; i++) {
-            POKE(bar_addr + i, DB_TEXT[db_index][i - 1]);
-        }
-        POKE(bar_addr + i, 'D');
-        i++;
-        POKE(bar_addr + i, 'B');
-        i++;
-        for (; i < 5; i++) {
-            POKE(bar_addr + i, ' ');
+        if (drawn < 20) {
+            lfill_skip(SCREEN_ADDRESS + SCREEN_CELL((uint8_t)(11 + drawn), line),
+                ' ',
+                (uint8_t)(20 - drawn),
+                SCREEN_CELL_BYTES);
         }
     }
+
+    if (!db_index) {
+        at = append_str(at, "  0DB");
+    } else {
+        uint8_t index = (db_index > 79) ? 79 : db_index;
+        if (index < 10) {
+            *at++ = ' ';
+        }
+        *at++ = '-';
+        at = append_dec(at, index);
+        at = append_str(at, "DB");
+    }
+    draw_text(SCREEN_CELL(34, line), SchemeValue, annotation, (uint8_t)(at - annotation));
 }
 
-uint16_t first_coefficient, second_coefficient;
+/* Both bytes of one coefficient, low then high -- the shape every caller
+ * below needs before it can compare or store a 16-bit level. */
+static uint16_t read_coefficient_pair(uint8_t c) {
+    uint16_t value = audioxbar_getcoefficient(c);
+    value |= (uint16_t)audioxbar_getcoefficient(c + 1) << 8;
+    return value;
+}
 
-void set_amplifier(unsigned char left_right, uint16_t first_coefficient) {
+void set_amplifier(unsigned char left_right, uint16_t coefficient) {
     /*
       Map 16-bit unsigned volume level to amplifier level.
       This is not super simple, as amplifier value $00 = +24dB,
@@ -307,16 +249,20 @@ void set_amplifier(unsigned char left_right, uint16_t first_coefficient) {
     // This does not work, disabled!
 
     // avoid compiler warning because of disabled code
-    if (left_right == first_coefficient) {
+    if (left_right == coefficient) {
         return;
     }
 }
 
+// Steps one channel's HDMI coefficient, and its jack twin, one dB up
+// (change != 0) or down.
 void change_db(unsigned char row, unsigned char change) {
     /* Every caller passes 0, 6 or select_row (masked to 0-11 in both event
      * loops), so the switch below always assigns c; the initialiser only
      * covers row values outside that range. */
     uint8_t c = 0;
+    uint16_t coefficient;
+    uint8_t db_index;
     // clang-format off
   // this is all HDL/HDR (HDMI) channels
   switch (row) {
@@ -337,9 +283,8 @@ void change_db(unsigned char row, unsigned char change) {
   }
     // clang-format on
 
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    level_to_db_index(first_coefficient);
+    coefficient = read_coefficient_pair(c);
+    db_index = level_to_db_index(coefficient);
     if (change == 0) { // minus 1
         if (db_index < 39) {
             db_index++;
@@ -349,32 +294,32 @@ void change_db(unsigned char row, unsigned char change) {
             db_index--;
         }
     }
-    first_coefficient = MINUS_DB_TABLE[db_index];
-    audioxbar_setcoefficient(c + 0, (uint8_t)(first_coefficient & 0xff));
-    audioxbar_setcoefficient(c + 1, (uint8_t)(first_coefficient >> 8));
+    coefficient = MINUS_DB_TABLE[db_index];
+    audioxbar_setcoefficient(c + 0, (uint8_t)(coefficient & 0xff));
+    audioxbar_setcoefficient(c + 1, (uint8_t)(coefficient >> 8));
     // change LFT/RGT (audio jack) to the same value in simple mixer!
-    audioxbar_setcoefficient(c - 0xc0, (uint8_t)(first_coefficient & 0xff));
-    audioxbar_setcoefficient(c - 0xc0 + 1, (uint8_t)(first_coefficient >> 8));
+    audioxbar_setcoefficient(c - 0xc0, (uint8_t)(coefficient & 0xff));
+    audioxbar_setcoefficient(c - 0xc0 + 1, (uint8_t)(coefficient >> 8));
 
     if (row == 0) {
-        set_amplifier(0, first_coefficient);
+        set_amplifier(0, coefficient);
     }
     if (row == 6) {
-        set_amplifier(1, first_coefficient);
+        set_amplifier(1, coefficient);
     }
 }
 
+// Exchanges two coefficients' 16-bit values.
 void swap_coefficients(unsigned char first, unsigned char second) {
-    first_coefficient = audioxbar_getcoefficient(first);
-    first_coefficient |= audioxbar_getcoefficient(first + 1) << 8;
-    second_coefficient = audioxbar_getcoefficient(second);
-    second_coefficient |= audioxbar_getcoefficient(second + 1) << 8;
-    audioxbar_setcoefficient(first, (uint8_t)(second_coefficient & 0xff));
-    audioxbar_setcoefficient(second, (uint8_t)(first_coefficient & 0xff));
-    audioxbar_setcoefficient(first + 1, (uint8_t)(second_coefficient >> 8));
-    audioxbar_setcoefficient(second + 1, (uint8_t)(first_coefficient >> 8));
+    uint16_t first_value = read_coefficient_pair(first);
+    uint16_t second_value = read_coefficient_pair(second);
+    audioxbar_setcoefficient(first, (uint8_t)(second_value & 0xff));
+    audioxbar_setcoefficient(second, (uint8_t)(first_value & 0xff));
+    audioxbar_setcoefficient(first + 1, (uint8_t)(second_value >> 8));
+    audioxbar_setcoefficient(second + 1, (uint8_t)(first_value >> 8));
 }
 
+// Swaps every left/right coefficient pair, both HDMI and jack outputs.
 void stereo_swap(void) {
     // Swap left and right sides
     // HDMI
@@ -391,15 +336,16 @@ void stereo_swap(void) {
     swap_coefficients(0x1c, 0x3c);
 }
 
+// Toggles between a 12dB left/right split and equal, centred SIDs/digi/FM.
 void stereo_toggle(void) {
     // very simple check if the values of HDL for the sids are the same
-    first_coefficient = audioxbar_getcoefficient(0xc0);
-    second_coefficient = audioxbar_getcoefficient(0xc2);
-    if (first_coefficient == second_coefficient) {
-        first_coefficient = MINUS_DB_TABLE[4];
-        second_coefficient = MINUS_DB_TABLE[8];
+    uint16_t first_value = audioxbar_getcoefficient(0xc0);
+    uint16_t second_value = audioxbar_getcoefficient(0xc2);
+    if (first_value == second_value) {
+        first_value = MINUS_DB_TABLE[4];
+        second_value = MINUS_DB_TABLE[8];
     } else {
-        first_coefficient = second_coefficient = MINUS_DB_TABLE[6];
+        first_value = second_value = MINUS_DB_TABLE[6];
     }
 
     // Make stereo with 12dB difference between left and right
@@ -412,125 +358,73 @@ void stereo_toggle(void) {
             // Left side output
 
             // Left SID
-            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(first_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(first_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(first_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(first_value >> 8));
             // Right SID
-            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(second_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(second_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(second_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(second_value >> 8));
             // Left Digi
-            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(first_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(first_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(first_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(first_value >> 8));
             // Right Digi
-            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(second_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(second_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(second_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(second_value >> 8));
             // OPL SFX FM
-            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(first_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(first_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(first_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(first_value >> 8));
         } else {
             // Right side output
 
             // Left SID
-            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(second_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(second_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x00 + i), (uint8_t)(second_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x01 + i), (uint8_t)(second_value >> 8));
             // Right SID
-            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(first_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(first_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x02 + i), (uint8_t)(first_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x03 + i), (uint8_t)(first_value >> 8));
             // Left Digi
-            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(second_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(second_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x10 + i), (uint8_t)(second_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x11 + i), (uint8_t)(second_value >> 8));
             // Right Digi
-            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(first_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(first_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x12 + i), (uint8_t)(first_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x13 + i), (uint8_t)(first_value >> 8));
             // OPL SFX FM
-            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(first_coefficient & 0xff));
-            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(first_coefficient >> 8));
+            audioxbar_setcoefficient((uint8_t)(0x1c + i), (uint8_t)(first_value & 0xff));
+            audioxbar_setcoefficient((uint8_t)(0x1d + i), (uint8_t)(first_value >> 8));
         }
     }
 }
 
-unsigned char db_bar_highlight[SCREEN_ROW_BYTES];
-unsigned char db_bar_lowlight[SCREEN_ROW_BYTES];
+static unsigned char db_bar_highlight[SCREEN_ROW_BYTES];
+static unsigned char db_bar_lowlight[SCREEN_ROW_BYTES];
 
+// Redraws all twelve dB bars and recolours the selected row.
 void draw_simple_mixer(void) {
-    // Update the volume bars and dB levels
-    // display it after, so that we have no flicker
-    uint8_t c;
+    uint8_t highlight_row;
 
     // Left output channel
-    c = 0xde; // Master volume control
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(6, first_coefficient);
-    c = 0xc0; // Left SIDs
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(7, first_coefficient);
-    c = 0xc2; // Right SIDs
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(8, first_coefficient);
-    c = 0xd0; // Left DIGI
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(9, first_coefficient);
-    c = 0xd2; // Right DIGI
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(10, first_coefficient);
-    c = 0xdc; // OPL2 / FM
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(11, first_coefficient);
+    draw_db_bar(6, read_coefficient_pair(0xde));  // Master volume control
+    draw_db_bar(7, read_coefficient_pair(0xc0));  // Left SIDs
+    draw_db_bar(8, read_coefficient_pair(0xc2));  // Right SIDs
+    draw_db_bar(9, read_coefficient_pair(0xd0));  // Left DIGI
+    draw_db_bar(10, read_coefficient_pair(0xd2)); // Right DIGI
+    draw_db_bar(11, read_coefficient_pair(0xdc)); // OPL2 / FM
 
     // Right output channel
-    c = 0xfe; // Master volume control
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(15, first_coefficient);
-    c = 0xe0; // Left SIDs
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(16, first_coefficient);
-    c = 0xe2; // Right SIDs
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(17, first_coefficient);
-    c = 0xf0; // Left DIGI
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(18, first_coefficient);
-    c = 0xf2; // Right DIGI
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(19, first_coefficient);
-    c = 0xfc; // OPL2 / FM
-    first_coefficient = audioxbar_getcoefficient(c);
-    first_coefficient |= audioxbar_getcoefficient(c + 1) << 8;
-    draw_db_bar(20, first_coefficient);
-
-    // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
-    // (in fact, most of memory contains what the frozen program had. Only our freezer program
-    // itself has been loaded to replace some of RAM).
-    for (uint16_t i = 0; audio_menu_simple[i]; i++) {
-        if ((audio_menu_simple[i] >= '@') && (audio_menu_simple[i] <= 'Z')) {
-            POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu_simple[i] - 0x40);
-        } else if ((audio_menu_simple[i] >= 'b') && (audio_menu_simple[i] <= 'c')) {
-            POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu_simple[i] - 0x20);
-        } else {
-            POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu_simple[i]);
-        }
-        POKE(SCREEN_ADDRESS + i * 2 + 1, 0);
-    }
+    draw_db_bar(15, read_coefficient_pair(0xfe)); // Master volume control
+    draw_db_bar(16, read_coefficient_pair(0xe0)); // Left SIDs
+    draw_db_bar(17, read_coefficient_pair(0xe2)); // Right SIDs
+    draw_db_bar(18, read_coefficient_pair(0xf0)); // Left DIGI
+    draw_db_bar(19, read_coefficient_pair(0xf2)); // Right DIGI
+    draw_db_bar(20, read_coefficient_pair(0xfc)); // OPL2 / FM
 
     // Work out the line to highlight
-
-    select_column = 6 + select_row;
+    highlight_row = 6 + select_row;
     if (select_row >= 6) {
-        select_column += 3;
+        highlight_row += 3;
     }
 
     for (uint16_t i = 6; i < 21; i++) {
-        if (i == select_column) {
+        if (i == highlight_row) {
             // Highligh colouring
             lcopy((long)db_bar_highlight,
                 COLOUR_RAM_ADDRESS + i * SCREEN_ROW_BYTES,
@@ -546,19 +440,37 @@ void draw_simple_mixer(void) {
     }
 }
 
-unsigned char frames;
-unsigned char note;
-unsigned char sid_num;
-uint16_t sid_addr;
+/* $D400, reached via its 28-bit flat alias so lfill() can zero all four SID
+ * chips' register files (0x100 bytes) in one DMA job rather than four
+ * per-chip loops. */
+constexpr Addr28 SID_ALL_28BIT = 0xffd3400;
+
+static volatile struct __sid* const SIDS[4] = {&SID1, &SID2, &SID3, &SID4};
+
 static const uint16_t NOTES[5] = {5001, 5613, 4455, 2227, 3338};
+
+/* OR mask into every colour-RAM attribute byte of one row, in test_audio()'s
+ * advanced-view highlight -- the four SIDs' rows/masks differ, the walk does
+ * not. */
+static void highlight_sid_row(uint8_t row, uint8_t mask) {
+    Addr28 row_colour =
+        COLOUR_RAM_ADDRESS + (uint16_t)(row * SCREEN_ROW_BYTES + (SCREEN_CELL_BYTES - 1));
+    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
+        Addr28 cell_addr = row_colour + i;
+        lpoke(cell_addr, lpeek(cell_addr) | mask);
+    }
+}
 
 void test_audio(unsigned char advanced_view) {
     /*
       Play notes and samples through 4 SIDs and left/right digi
     */
+    unsigned char frames;
+    unsigned char note;
+    unsigned char sid_num = 0;
 
     // Reset all sids
-    lfill(0xffd3400, 0, 0x100);
+    lfill(SID_ALL_28BIT, 0, 0x100);
 
     // Full volume on all SIDs
     SID1.amp = 0x0f;
@@ -579,45 +491,31 @@ void test_audio(unsigned char advanced_view) {
       }
         // clang-format on
 
-        sid_addr = 0xd400 + (0x20 * sid_num);
-
         // Play note
-        POKE(sid_addr + 0, NOTES[note] & 0xff);
-        POKE(sid_addr + 1, NOTES[note] >> 8);
-        POKE(sid_addr + 4, 0x10);
-        POKE(sid_addr + 5, 0x0c);
-        POKE(sid_addr + 6, 0x00);
-        POKE(sid_addr + 4, 0x11);
+        SIDS[sid_num]->v1.freq = NOTES[note];
+        SIDS[sid_num]->v1.ctrl = 0x10;
+        SIDS[sid_num]->v1.ad = 0x0c;
+        SIDS[sid_num]->v1.sr = 0x00;
+        SIDS[sid_num]->v1.ctrl = 0x11;
 
         if (advanced_view) {
             // Highlight the appropriate part of the screen
             for (uint16_t i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2) {
-                lpoke(0xff80001L + i, lpeek(0xff80001L + i) & 0x0f);
+                Addr28 cell_addr = COLOUR_RAM_ADDRESS + (uint16_t)(i + (SCREEN_CELL_BYTES - 1));
+                lpoke(cell_addr, lpeek(cell_addr) & 0x0f);
             }
             switch (sid_num) {
                 case 0:
-                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
-                        lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
-                            lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x20);
-                    }
+                    highlight_sid_row(6, 0x20);
                     break;
                 case 1:
-                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
-                        lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
-                            lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x60);
-                    }
+                    highlight_sid_row(6, 0x60);
                     break;
                 case 2:
-                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
-                        lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
-                            lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x20);
-                    }
+                    highlight_sid_row(5, 0x20);
                     break;
                 case 3:
-                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
-                        lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
-                            lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x60);
-                    }
+                    highlight_sid_row(5, 0x60);
                     break;
                 default:
                     break;
@@ -667,7 +565,8 @@ void test_audio(unsigned char advanced_view) {
     // Clear highlight
     if (advanced_view) {
         for (uint16_t i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2) {
-            lpoke(0xff80001L + i, lpeek(0xff80001L + i) & 0x0f);
+            Addr28 cell_addr = COLOUR_RAM_ADDRESS + (uint16_t)(i + (SCREEN_CELL_BYTES - 1));
+            lpoke(cell_addr, lpeek(cell_addr) & 0x0f);
         }
     } else {
         lcopy((long)db_bar_lowlight, COLOUR_RAM_ADDRESS + 9 * SCREEN_ROW_BYTES, 80);
@@ -694,25 +593,24 @@ void test_audio(unsigned char advanced_view) {
     SID4.amp = 0x0;
 
     // Reset all sids
-    lfill(0xffd3400, 0, 0x80);
+    lfill(SID_ALL_28BIT, 0, 0x80);
 }
 
-unsigned char key;
-
+// The advanced view's event loop: cursor keys move the matrix selection,
+// +/-/0/* adjust the selected coefficient, T tests, M toggles mic mute.
 void do_advanced_mixer(void) {
     uint8_t value;
     uint8_t coefficient;
+    uint8_t key;
 
     select_row = 0;
     select_column = 0;
 
-    // reset colour ram
-    clear_colour_ram();
-
+    draw_advanced_fixed();
     draw_advanced_mixer();
 
     // clear keybuffer
-    while ((key = ASCIIKEY)) {
+    while (ASCIIKEY) {
         ASCIIKEY = 0;
     }
 
@@ -730,8 +628,6 @@ void do_advanced_mixer(void) {
             switch (key) {
                 case KEY_RUN_STOP:
                 case KEY_F3: // RUN/STOP or F3 to exit
-                    // reset colour ram
-                    clear_colour_ram();
                     return;
                 case KEY_CURSOR_DOWN:
                     select_row++;
@@ -808,8 +704,12 @@ void do_advanced_mixer(void) {
     }
 }
 
+// The simple view's event loop, and AUDIOMIX's entry point: cursor keys pick
+// a row and adjust it, A enters the advanced view, T tests, W/S/M swap,
+// toggle stereo and mute.
 void do_audio_mixer(void) {
     uint8_t simple_row;
+    uint8_t key;
 
     select_row = 0;
 
@@ -831,6 +731,7 @@ void do_audio_mixer(void) {
         }
     }
 
+    draw_simple_fixed();
     draw_simple_mixer();
 
     // clear keybuffer
@@ -853,6 +754,7 @@ void do_audio_mixer(void) {
                     simple_row = select_row;
                     do_advanced_mixer();
                     select_row = simple_row;
+                    draw_simple_fixed();
                     break;
                 case '+':
                     change_db(0, 1); // master left
