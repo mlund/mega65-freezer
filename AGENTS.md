@@ -1,4 +1,6 @@
+base knowledge:
 - upon starting a dev new session, always load "llvm-mos" skill from https://github.com/mlund/claude-skills
+- ask user for paths to: `llvm-mos-sdk`, `mega65-core/`, `mega65-rom` (user may/may not have access), `mega65-user-guide/` (all three from the official mega65 gh repos).
 - code docs never tracks history, are consice/terse/brief and focus on why over what
 - low .M65 tool byte count is paramount - measure rather than guess, and end commit messages with the measured byte delta
 - commit messages should be brief, concise and do not litter with authorship banners and promotion; use plain 1990-era language, no modern jargon
