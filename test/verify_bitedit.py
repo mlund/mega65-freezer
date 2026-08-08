@@ -22,7 +22,6 @@ Run via CTest, or by hand::
 from __future__ import annotations
 
 import argparse
-import itertools
 import subprocess
 import sys
 import tempfile
@@ -204,12 +203,14 @@ def check_row_layout(binary: Path, failures: list[str]) -> None:
             codes[BIT_COLUMN + bit * BIT_STRIDE : BIT_COLUMN + bit * BIT_STRIDE + BIT_WIDTH]
             for bit in range(8)
         ]
-        # A multi-bit field is named over its highest bit and blank across the
-        # rest of its span, as the User Guide's tables merge the cell, so the
-        # same name must never appear twice in a row.
-        for left, right in itertools.pairwise(cells):
-            if left == right and left[0] != GLYPH_BIT and left[0] != ord(" "):
-                failures.append(f"{where} repeats {text(left).strip()!r} instead of merging")
+        # Set and clear are shown as the brightness of the cell's own glyphs, so
+        # a blank cell states nothing -- while the cursor still stops on that bit
+        # and space still toggles it. Every bit carries either its field's name,
+        # repeated across the field's whole span, or the circle marking one the
+        # database does not name.
+        for bit in range(8):
+            if all(c == ord(" ") for c in cells[bit]):
+                failures.append(f"{where} bit {7 - bit} is blank, so its state cannot be seen")
         for bit in range(8):
             cell = cells[bit]
             if cell[0] == GLYPH_BIT:
@@ -219,6 +220,45 @@ def check_row_layout(binary: Path, failures: list[str]) -> None:
                 failures.append(f"{where} bit {7 - bit} cell is {text(cell)!r}")
         if any(c == 0 for c in codes):
             failures.append(f"{where} row contains a NUL: {text(codes)!r}")
+
+
+def check_rows_match_database(binary: Path, addresses: list[int], failures: list[str]) -> None:
+    """Every bit of every register must show the name the database gives it.
+
+    The expected cells come from `lookup`, which reads the record itself, so
+    this pins bitedit_render's placement against the data rather than against
+    its own loop. Run over the whole database, not a handful of registers: the
+    blanking bug it replaces only showed on fields wider than one bit.
+    """
+    lookups = run(binary, [f"lookup {a & 0xFFFF:04x}" for a in addresses])
+    rows = run(binary, [f"row {0xFFD0000 | (a & 0x0FFF):x} 00 255" for a in addresses])
+
+    for position, address in enumerate(addresses):
+        head, indices, names = lookups[position * 3 : position * 3 + 3]
+        if head == "none":
+            continue
+        field_count = int(head.split()[1])
+        field_names = names.split()
+        codes = decode(rows[position].split()[1])
+        where = f"${address:04X}"
+
+        # Printed leftmost first, so index i is bit 7 - i and cell i.
+        for i, index in enumerate(int(x) for x in indices.split()):
+            cell = codes[BIT_COLUMN + i * BIT_STRIDE : BIT_COLUMN + i * BIT_STRIDE + BIT_WIDTH]
+            if index >= field_count:
+                if cell[0] != GLYPH_BIT:
+                    failures.append(
+                        f"{where} bit {7 - i} has no named field but shows {text(cell)!r}"
+                    )
+                continue
+            if index >= len(field_names):
+                failures.append(f"{where} bit {7 - i} indexes field {index}, which has no name")
+                continue
+            want = field_names[index][:BIT_WIDTH]
+            if text(cell).strip() != want:
+                failures.append(
+                    f"{where} bit {7 - i} shows {text(cell).strip()!r}, database says {want!r}"
+                )
 
 
 def check_cursor_ring(binary: Path, failures: list[str]) -> None:
@@ -344,6 +384,7 @@ def main() -> int:
         binary = build_harness(Path(tmp), args.cc)
         addresses = check_walk(binary, failures)
         check_lookups(binary, addresses, failures)
+        check_rows_match_database(binary, addresses, failures)
         check_row_layout(binary, failures)
         check_cursor_ring(binary, failures)
         check_wrap(binary, failures)

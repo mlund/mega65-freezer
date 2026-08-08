@@ -229,14 +229,11 @@ uint8_t bitedit_render(
             *cell = (char)GLYPH_BIT;
             continue;
         }
-        /* A field wider than one bit is named once, over its highest bit, and
-         * the rest of its span left blank -- the User Guide's register tables
-         * merge the cell the same way, and repeating the name reads as several
-         * separate flags.  Blank is unambiguous because an unnamed bit shows a
-         * circle, so nothing else can leave a cell empty. */
-        if (bit == 7 || info->bit_field[bit + 1] != field) {
-            bitedit_string(info->field_name[field], cell, BITEDIT_BIT_WIDTH);
-        }
+        /* Every bit of a wide field carries the name, not just its highest.
+         * The row shows set and clear as the brightness of the cell's own
+         * glyphs, so a blank cell states nothing -- and the cursor stops on
+         * those bits and space toggles them like any other. */
+        bitedit_string(info->field_name[field], cell, BITEDIT_BIT_WIDTH);
     }
     return chip;
 }
