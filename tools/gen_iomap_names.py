@@ -93,6 +93,35 @@ PER_SPRITE = {
     0xD01F: "SBC",
 }
 
+# Registers whose whole content is that writing them does something.  The 64
+# HTRAP entries at $D640-$D67F are hypervisor trap doors: they carry no named
+# bits, and in a freeze slot they are bytes nothing reads, so the browser spent
+# 704 of its 6636 bytes -- 14% of the addresses -- saying "HTRAP2C" beside eight
+# circles.  Matched against the register's own name, not the address, so a
+# renumbering upstream does not quietly reinstate them.
+DROP_REGISTERS = ("HTRAP",)
+
+# Bits iomap.txt cannot describe, because a CIA port's meaning comes from what
+# is wired to the pins rather than from the CIA: it documents $DD00 as "Port A"
+# and stops.  These are the C64's, from the Programmer's Reference Guide.
+#
+# $DC00/$DC01 are deliberately absent.  They are the keyboard matrix and the
+# joysticks at the same time -- bit 4 is "fire" or "column 4" depending on what
+# the reader is doing -- and a name that is wrong half the time is worse than a
+# circle.  $DD01 is the user port, which no fixed name describes either.
+CURATED_BITS = {
+    0xDD00: {
+        7: "DATIN",
+        6: "CLKIN",
+        5: "DATOUT",
+        4: "CLKOUT",
+        3: "ATNOUT",
+        2: "RSTXD",
+        1: "VBANK",
+        0: "VBANK",
+    },
+}
+
 LINE = re.compile(
     r"^(\S+)\s+\$([0-9A-Fa-f]+)(?:\.(\d)(?:-(\d))?)?\s+([^:\s]+):(\S+)\s*(.*)$",
 )
@@ -121,6 +150,7 @@ class Register:
 
 def parse(path: str) -> dict[int, Register]:
     registers: dict[int, Register] = defaultdict(Register)
+    dropped: set[int] = set()
     with open(path, encoding="utf-8", errors="replace") as handle:
         lines = handle.readlines()
     for line in lines:
@@ -135,6 +165,9 @@ def parse(path: str) -> dict[int, Register]:
         # tables; it names no hardware.
         if chip.upper() == "SUMMARY" or chip not in KEEP_CHIPS:
             continue
+        if signal.startswith(DROP_REGISTERS):
+            dropped.add(value)
+            continue
         rank = CHIPSET_RANK.get(chipset, 0)
         register = registers[value]
         register.offer_chip(rank, chip)
@@ -145,6 +178,10 @@ def parse(path: str) -> dict[int, Register]:
             first, last = int(high), int(low) if low else int(high)
             for bit in range(min(first, last), max(first, last) + 1):
                 register.offer_bit(rank, bit, signal)
+
+    # A drop that stops matching is a silent way to grow the table back.
+    if not dropped:
+        raise SystemExit(f"DROP_REGISTERS {DROP_REGISTERS} matched nothing in {path}")
     return dict(registers)
 
 
@@ -208,6 +245,13 @@ def describe(address: int, register: Register) -> tuple[str | None, list[str], d
     raw_bit_names = [entry[1] for _, entry in sorted(register.bit.items())]
     names, bit_index = abbreviate_bits(register)
     display = register_display_name(register, raw_bit_names)
+
+    if address in CURATED_BITS and not names:
+        # Only where upstream says nothing: if it ever documents these bits, its
+        # names win and this entry quietly stops applying.
+        curated = CURATED_BITS[address]
+        ordered = list(dict.fromkeys(curated[bit] for bit in range(7, -1, -1)))
+        return display, ordered, {bit: ordered.index(curated[bit]) for bit in range(8)}
 
     if address in PER_SPRITE and not names:
         return (
