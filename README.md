@@ -27,14 +27,10 @@ Two kinds of data are read off the card at run time and built here too:
 ## Building
 
 Currently needs a patched llvm-mos: stock clang miscompiles 16-bit loop counters on
-45GS02 with `-mlto-zp >= 8`, which hangs MAKEDISK mid-write. Both variables are
-needed — the toolchain file does not set the SDK directory, and `find_package`
-then fails.
+45GS02 with `-mlto-zp >= 8`, which hangs MAKEDISK mid-write.
 
 ```
-cmake -B build \
-  -DCMAKE_TOOLCHAIN_FILE=<prefix>/lib/cmake/llvm-mos-sdk/llvm-mos-toolchain.cmake \
-  -Dllvm-mos-sdk_DIR=<prefix>/lib/cmake/llvm-mos-sdk
+cmake -DCMAKE_PREFIX_PATH=<prefix> -B build
 cmake --build build
 ```
 

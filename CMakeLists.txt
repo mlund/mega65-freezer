@@ -17,25 +17,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Standalone llvm-mos build of the MEGA65 freezemenu.  Nothing is shared with
-# the cc65 build in the parent directory; src/ holds its own copy of every
-# source.
-#
 # Needs a patched llvm-mos -- see C_MCPU below for what stock clang 23 gets
-# wrong.  The patched install (compiler plus a matching SDK rebuild) lives at
-# /Users/mikael/llvm-mos-patched:
-#
-#   cmake -B build \
-#     -DCMAKE_TOOLCHAIN_FILE=/Users/mikael/llvm-mos-patched/lib/cmake/llvm-mos-sdk/llvm-mos-toolchain.cmake \
-#     -Dllvm-mos-sdk_DIR=/Users/mikael/llvm-mos-patched/lib/cmake/llvm-mos-sdk
-#   cmake --build build
-#   cmake --build build --target tidy      # also: format, format-check
-#
-# Both variables are needed: the toolchain file alone does not set
-# llvm-mos-sdk_DIR, and find_package then fails.  Nothing in git records which
-# toolchain a build used -- it lives only in the CMake cache.
-#
-# Set CPM_SOURCE_CACHE to a directory to avoid re-fetching mega65-libc.
+# wrong.  See README.md for the build invocation; nothing in git records which
+# toolchain a build used, that lives only in the CMake cache.
 
 # Must precede any add_executable, or the targets below are absent from the
 # database and clang-tidy sees only the dependency's entries.
