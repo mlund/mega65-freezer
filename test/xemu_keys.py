@@ -56,6 +56,10 @@ SHIFTED = {"!": "1", '"': "2", "#": "3", "$": "4", "%": "5",
 NAMED = {"return": 0x01, "f1": 0x04, "f3": 0x05, "f5": 0x06, "f7": 0x03,
          "down": 0x07, "right": 0x02, "delete": 0x00, "stop": 0x3F}
 
+# No up or left: both are the shifted form of their opposite on a CBM keyboard,
+# and SHIFT in the modifier slot does not reach the key queue -- a shifted
+# cursor-right arrives as a plain cursor-right.
+
 
 # 20ms, the interval matrix65 uses to drive real hardware.  Longer is not
 # safer: the keys are released once at the end of a run rather than between

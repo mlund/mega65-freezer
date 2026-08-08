@@ -10,6 +10,7 @@
   block logic it drives lives in disasm.c and blockmove.c, which are not.
 */
 
+#include "bitedit.h"
 #include "blockmove.h"
 #include "colours.h"
 #include "console.h"
@@ -717,7 +718,7 @@ void transfer_memory(void) {
     show_memory();
 }
 
-/* B start -- eight bytes to a character cell, eight cells across. */
+/* P start -- eight bytes to a character cell, eight cells across. */
 constexpr uint8_t BITMAP_CELLS = 8;
 constexpr uint8_t BITMAP_ROWS = 2;
 constexpr uint8_t BITMAP_COLUMN = 9;
@@ -754,6 +755,15 @@ void show_bitmaps(void) {
         }
         mon_address += (uint32_t)BITMAP_CELLS * 8;
     }
+}
+
+/* edit_bits() lives outside this file and so cannot see the two statics below
+ * it, which is why the reporting and the flush sit here rather than inside. */
+static void edit_memory_bits(void) {
+    if (!edit_bits()) {
+        report_unmapped();
+    }
+    flush_sector();
 }
 
 /* Offsets within the $D640 save area of the registers worth editing, in the
@@ -937,11 +947,11 @@ void freeze_monitor(void) {
                 break;
             case 'b':
             case 'B':
-                // Bitmaps: B start
+                // Bits: B start
                 if (parse_address()) {
                     break;
                 }
-                show_bitmaps();
+                edit_memory_bits();
                 break;
             case 'c':
             case 'C':
@@ -974,6 +984,14 @@ void freeze_monitor(void) {
                     break;
                 }
                 show_memory();
+                break;
+            case 'p':
+            case 'P':
+                // Pixels: P start
+                if (parse_address()) {
+                    break;
+                }
+                show_bitmaps();
                 break;
             case 'r':
             case 'R':

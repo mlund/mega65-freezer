@@ -158,10 +158,33 @@ find_program(HOST_C_COMPILER NAMES cc clang gcc)
 # The number formatting is pure, so the host checks it against Python's own --
 # no assembler, no emulator.  Guarded on its own needs rather than on the
 # disassembler's, or a machine without llvm-mc silently runs no tests at all.
+# iomap.txt is not ours to redistribute and the generated table is committed, so
+# a checkout without it builds normally and only loses the ability to
+# regenerate.  Same shape as MEGA65_ROM below.
+set(MEGA65_IOMAP "$ENV{MEGA65_IOMAP}" CACHE FILEPATH
+    "mega65-core iomap.txt, source for the register bit-name database")
+if(Python3_FOUND AND MEGA65_IOMAP AND EXISTS ${MEGA65_IOMAP})
+    add_custom_target(iomap-names
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_iomap_names.py
+                --iomap ${MEGA65_IOMAP} -o ${SRC}/monitor/iomap_names.inc
+        COMMENT "Regenerating I/O register bit names")
+endif()
+
 if(Python3_FOUND AND HOST_C_COMPILER)
     add_test(NAME format
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_format.py
                 --cc ${HOST_C_COMPILER})
+
+    # The bit editor's record stream is variable length, so an off-by-one in the
+    # walk puts every name on the wrong bit -- which on hardware reads as a bad
+    # database rather than a bad decoder.  MEGA65_IOMAP adds the name diff.
+    set(BITEDIT_ARGS --cc ${HOST_C_COMPILER})
+    if(MEGA65_IOMAP AND EXISTS ${MEGA65_IOMAP})
+        list(APPEND BITEDIT_ARGS --iomap ${MEGA65_IOMAP})
+    endif()
+    add_test(NAME bitedit
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_bitedit.py
+                ${BITEDIT_ARGS})
 endif()
 
 if(Python3_FOUND AND LLVM_MC_EXE)
@@ -253,6 +276,22 @@ if(Python3_FOUND AND LLVM_MC_EXE)
                         --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
                         --build $<TARGET_FILE_DIR:MONITOR>)
             set_tests_properties(monitor_assemble PROPERTIES TIMEOUT 300)
+
+            # The same round trip for `B`: toggle a named bit, type a value over
+            # it, leave, read somewhere else so the sector is displaced, and
+            # reopen -- so the byte that comes back has been off the card.  With
+            # FREEZER_TRACE the write log on the hypervisor serial channel is
+            # required too, which reports each write rather than only the result.
+            set(BITEDIT_XEMU_ARGS --emulator ${XEMU} --sdimg ${MEGA65_SDIMG})
+            if(FREEZER_TRACE)
+                list(APPEND BITEDIT_XEMU_ARGS --expect-serial)
+            endif()
+            add_test(NAME bitedit_xemu
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_bitedit_xemu.py
+                        ${BITEDIT_XEMU_ARGS}
+                        --build $<TARGET_FILE_DIR:MONITOR>)
+            set_tests_properties(bitedit_xemu PROPERTIES TIMEOUT 300)
         endif()
 
         set(MEGA65_ROM "$ENV{MEGA65_ROM}" CACHE FILEPATH
