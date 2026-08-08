@@ -23,8 +23,6 @@
 #define HYPPO_GETPROCDESC 0x48
 #define HYPPO_ATTACH 0x4A
 
-// HTRAP_SYSPART functions.
-
 // Hyppo needs its filename buffer page-aligned and in the bottom 32KB.  Two
 // are used so a pending attach name is not clobbered by an exec.
 #define NAME_BUF_EXEC 0x0100
@@ -59,13 +57,8 @@
 #define DIRENT_NAME 12  // d_name
 
 // The filename pointer is stashed alongside each buffer for post-mortem
-// inspection from the monitor.
-//
-// Deliberately unparenthesised, despite bugprone-macro-parentheses: helper.S
-// includes this header, and in 6502 assembly parentheses are the indirect
-// addressing mode rather than grouping.  Wrapping the replacement list turns
-// `sta NAME_PTR_STASH_EXEC` into an indirect store, which the assembler
-// rejects outright ("operand must be an 8-bit address").
+// inspection from the monitor.  Unparenthesised for the reason at the top of
+// this file, hence the NOLINT.
 #define NAME_PTR_STASH_EXEC NAME_BUF_EXEC + 0x40 // NOLINT(bugprone-macro-parentheses)
 #define NAME_PTR_STASH_DOS NAME_BUF_DOS + 0x40   // NOLINT(bugprone-macro-parentheses)
 

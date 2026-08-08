@@ -5,11 +5,11 @@
 
 #include <stdint.h>
 
-// Used to quickly return from functions if a navigation key has been pressed
-// (used to avoid delays when navigating through the list of freeze slots
-//
-// Clearing bit 7 folds each cursor key onto its opposite -- up reads as down,
-// left as right -- so two comparisons cover all four.
+/* Abandons a long redraw when a cursor key is waiting, so holding one down
+ * walks the freeze slots at the speed of the key rather than of the drawing.
+ *
+ * Clearing bit 7 folds each cursor key onto its opposite -- up reads as down,
+ * left as right -- so two comparisons cover all four. */
 #define NAVIGATION_KEY_CHECK()                                                                     \
     {                                                                                              \
         if (((ASCIIKEY & 0x7f) == KEY_CURSOR_DOWN) || ((ASCIIKEY & 0x7f) == KEY_CURSOR_RIGHT))     \

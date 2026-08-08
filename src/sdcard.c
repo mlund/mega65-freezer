@@ -15,21 +15,13 @@ const uint16_t SD_ADDR = 0xd681L;
 unsigned char sdhc_card = 0;
 uint8_t hal_border_flicker = 0;
 
-/*
- * sdcard_visual_feedback(do_flicker)
- *
- *   do_flicker 0 == no border change
- *              1 == only success/fail display
- *              2 == full progress
- */
+/* How much the border reports while the card is busy: 0 nothing, 1 success and
+ * failure only, 2 every step.  Anything higher is taken as 2. */
 void sdcard_visual_feedback(const uint8_t do_flicker) {
     hal_border_flicker = do_flicker < 3 ? do_flicker : 2;
 }
 
 void sdcard_reset(void) {
-    // Reset and release reset
-    //  write_line("Resetting SD card...",0);
-
     POKE(SD_CTL, 0);
     POKE(SD_CTL, 1);
 
@@ -41,8 +33,7 @@ void sdcard_reset(void) {
     }
 
     if (sdhc_card) {
-        // Set SDHC flag (else writing doesnt work for some reason)
-        //    write_line("Setting SDHC mode",0);
+        /* Writes do not take without this, though nothing says why. */
         POKE(SD_CTL, 0x41);
     }
 }
@@ -70,7 +61,6 @@ void sdcard_readsector(const uint32_t sector_number) {
         sector_address = sector_number;
     } else {
         if (sector_number >= 0x7fffff) {
-            //      write_line("ERROR: Asking for sector @ >= 4GB on SDSC card.",0);
             while (1) {
             }
         }
@@ -80,9 +70,6 @@ void sdcard_readsector(const uint32_t sector_number) {
     POKE(SD_ADDR + 1, (sector_address >> 8) & 0xff);
     POKE(SD_ADDR + 2, ((uint32_t)sector_address >> 16) & 0xff);
     POKE(SD_ADDR + 3, ((uint32_t)sector_address >> 24) & 0xff);
-
-    // write_line("Reading sector @ $",0);
-    //  screen_hex(screen_line_address-80+18,sector_address);
 
     while (tries < 10) {
 
@@ -116,7 +103,6 @@ void sdcard_readsector(const uint32_t sector_number) {
             if (!timeout) {
                 return;
             }
-            //      write_line("Waiting for read to complete",0);
             if (PEEK(SD_CTL) & 0x40) {
                 return;
             }
@@ -126,9 +112,6 @@ void sdcard_readsector(const uint32_t sector_number) {
                 return;
             }
         }
-
-        // Note result
-        // result=PEEK(sd_ctl);
 
         if (!(PEEK(SD_CTL) & 0x67)) {
             // Copy data from hardware sector buffer via DMA
@@ -192,7 +175,6 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     // Copy the read data to a buffer for verification
     lcopy(SD_SECTORBUFFER, (long)verify_buffer, 512);
 
-    // VErify that it matches the data we wrote
     for (i = 0; i < 512; i++) {
         if (sector_buffer[i] != verify_buffer[i]) {
             break;
@@ -223,8 +205,6 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
                     POKE(SD_CTL, 3); // retry write
                 }
             }
-            // Show we are doing something
-            //	POKE(0x804f,1+(PEEK(0x804f)&0x7f));
         }
 
         // Command write
@@ -252,8 +232,6 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
                     POKE(SD_CTL, 3);
                 }
             }
-            // Show we are doing something
-            //	POKE(0x809f,1+(PEEK(0x809f)&0x7f));
         }
 
         write_count++;
@@ -268,14 +246,10 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
                 VICIV.bordercol = write_count & 0x0f;
             }
 
-            // There is a bug in the SD controller: You have to read between writes, or it
-            // gets really upset.
-
-            // But sometimes even that doesn't work, and we have to reset it.
-
-            // Does it just need some time between accesses?
-
-            POKE(SD_CTL, 2); // read the sector we just wrote
+            /* The controller misbehaves unless a read follows a write, and
+             * sometimes wants a reset even then; the read below is also what
+             * verifies the write took. */
+            POKE(SD_CTL, 2);
 
             while (PEEK(SD_CTL) & 3) {
             }
@@ -283,21 +257,14 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             // Copy the read data to a buffer for verification
             lcopy(SD_SECTORBUFFER, (long)verify_buffer, 512);
 
-            // VErify that it matches the data we wrote
             for (i = 0; i < 512; i++) {
                 if (sector_buffer[i] != verify_buffer[i]) {
                     break;
                 }
             }
             if (i != 512) {
-                // VErify error has occurred
-                //	write_line("Verify error for sector $$$$$$$$",0);
                 screen_hex(screen_line_address - 80 + 24, sector_number);
             } else {
-                //      write_line("Wrote sector $$$$$$$$, result=$$",2);
-                //      screen_hex(screen_line_address-80+2+14,sector_number);
-                //      screen_hex(screen_line_address-80+2+30,result);
-
                 return;
             }
         }
@@ -306,9 +273,6 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
         }
     }
-
-    //  write_line("Write error @ $$$$$$$$$",2);
-    //  screen_hex(screen_line_address-80+2+16,sector_number);
 }
 
 void sdcard_writenextsector(void) {

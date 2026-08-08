@@ -5,12 +5,8 @@
 
 #include "format.h"
 
-/*
- * uint8_t nybl_to_screen(uint8_t v)
- *
- * converts the lower 4 bits of a byte to a screen code
- * hexadecimal number digit.
- */
+/* The low nibble as one hex digit, in screen codes rather than ASCII: the
+ * digits sit at $30 as usual, but A-F are $01-$06. */
 uint8_t nybl_to_screen(uint8_t v) {
     v &= 0xf;
     if (v < 0xa) {
@@ -19,7 +15,7 @@ uint8_t nybl_to_screen(uint8_t v) {
     return v - 0x9;
 }
 
-/* Writes eight hex digits to a buffer. */
+/* Always eight digits; format_hex() takes the tail it wants. */
 static void hex_to_buf(char* out, const long value) {
     out[0] = nybl_to_screen((uint8_t)(value >> 28));
     out[1] = nybl_to_screen((uint8_t)(value >> 24));
@@ -31,8 +27,8 @@ static void hex_to_buf(char* out, const long value) {
     out[7] = nybl_to_screen((uint8_t)(value >> 0));
 }
 
-/* Writes the low `columns` digits.  out is a plain buffer, so take a pointer:
- * an address passed as an integer hides the stores from the compiler. */
+/* Writes the low `columns` digits.  Takes a pointer rather than an address as
+ * an integer, which would hide the stores from the compiler. */
 void format_hex(char* out, const long value, const char columns) {
     char dec[8];
     hex_to_buf(dec, value);

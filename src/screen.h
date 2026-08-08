@@ -55,11 +55,6 @@ void draw_fragments(const uint8_t* stream);
  * as it goes, where a fragment carries codes converted at compile time. */
 void draw_text(uint16_t cell, uint8_t colour, const char* text, uint8_t length);
 
-/* Only MONITOR links monitor/console.c, and it shows just these two.  The
- * sprite editor draws its own footer, so a message for it here was never
- * reachable -- and display_footer() indexes the table at runtime, so an unused
- * entry costs its full 80 columns that --gc-sections cannot reclaim. */
-
 void screen_hex(uint16_t addr, long value);
 void screen_decimal(uint16_t addr, uint16_t value);
 void draw_decimal(uint16_t cell, uint8_t colour, uint16_t value);
@@ -73,7 +68,9 @@ extern char screen_column;
 void setup_menu_screen_base(void);
 void clear_colour_ram(void);
 
-/* Which footer row display_footer() shows. */
+/* Which footer row display_footer() shows.  Kept to what MONITOR actually
+ * displays: the table is indexed at run time, so an entry nothing selects still
+ * costs its full 80 columns and --gc-sections cannot reclaim it. */
 enum Footer : uint8_t {
     FooterCopyright = 0,
     FooterFatal = 1,

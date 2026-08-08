@@ -11,9 +11,8 @@
 uint8_t sector_buffer[512];
 uint16_t slot_number = 0;
 enum Mega65Rom mega65_rom_type = Mega65RomUnknown;
-/* 20, not 12: the OpenROM probe below does memcpy(name + 4, ..., 16), which
- * needs offsets 4..19.  At 12 it wrote eight bytes past the end and then read
- * [12] and [13] to identify the ROM. */
+/* 20, not 12: the OpenROM probe copies 16 bytes to name + 4 and then reads
+ * [11] to [13], so the shorter buffer it would otherwise fit does not. */
 char mega65_rom_name[20];
 
 uint8_t current_scheme = SCHEME_BOOT;
@@ -37,18 +36,14 @@ void apply_scheme(uint8_t scheme) {
 }
 
 void set_palette(void) {
-    // set palette selector
     VICIV.palsel = 0xFF;
 
     /* Entries 16-255 never change: entry N holds the colour N itself names when
      * read as three bits of red, three of green and two of blue.  That is the
      * format the freezer's thumbnail stores, so its pixels index themselves. */
     for (uint8_t c = 16; c; c++) {
-        // 3 bits for red
         PALETTE.red[c] = (c >> 4) & 0xe;
-        // 3 bits for green
         PALETTE.green[c] = (c >> 1) & 0xe;
-        // 2 bits for blue
         PALETTE.blue[c] = (c << 2) & 0xf;
     }
 
@@ -94,99 +89,16 @@ char* detect_rom(void) {
         return mega65_rom_name;
     }
 
-#define COPY_AND_RETURN_ROM(X)                                                                     \
-    {                                                                                              \
-        strcpy(mega65_rom_name, X);                                                                \
-        return mega65_rom_name;                                                                    \
-    }
-
-    /*
-      The C64 ROM part can't really work without a real C64 cpu,
-      so it is save to return UNKNOWN for now
-
-      // entering C64 region
-      mega65_rom_type = Mega65RomC64;
-
-      if (freeze_peek(0x2e47dL) == 'J') {
-        // Probably jiffy dos
-        if (freeze_peek(0x2e535L) == 0x06)
-          COPY_AND_RETURN_ROM("SX64 JIFFY ")
-        else
-          COPY_AND_RETURN_ROM("C64 JIFFY  ")
-      }
-
-      // Else guess using detection routines from detect_roms.c
-      // These were built using a combination of the ROMs from zimmers.net/pub/c64/firmware,
-      // the RetroReplay ROM collection, and the JiffyDOS ROMs
-      if (freeze_peek(0x2e449L) == 0x2e)
-        COPY_AND_RETURN_ROM("C64GS      ")
-      if (freeze_peek(0x2e119L) == 0xc9)
-        COPY_AND_RETURN_ROM("C64 REV1   ")
-      if (freeze_peek(0x2e67dL) == 0xb0)
-        COPY_AND_RETURN_ROM("C64 REV2 JP")
-      if (freeze_peek(0x2ebaeL) == 0x5b)
-        COPY_AND_RETURN_ROM("C64 REV3 DK")
-      if (freeze_peek(0x2e0efL) == 0x28)
-        COPY_AND_RETURN_ROM("C64 SCAND  ")
-      if (freeze_peek(0x2ebf3L) == 0x40)
-        COPY_AND_RETURN_ROM("C64 SWEDEN ")
-      if (freeze_peek(0x2e461L) == 0x20)
-        COPY_AND_RETURN_ROM("CYCLONE 1.0")
-      if (freeze_peek(0x2e4a4L) == 0x41)
-        COPY_AND_RETURN_ROM("DOLPHIN 1.0")
-      if (freeze_peek(0x2e47fL) == 0x52)
-        COPY_AND_RETURN_ROM("DOLPHIN 2AU")
-      if (freeze_peek(0x2eed7L) == 0x2c)
-        COPY_AND_RETURN_ROM("DOLPHIN 2P1")
-      if (freeze_peek(0x2e7d2L) == 0x6b)
-        COPY_AND_RETURN_ROM("DOLPHIN 2P2")
-      if (freeze_peek(0x2e4a6L) == 0x32)
-        COPY_AND_RETURN_ROM("DOLPHIN 2P3")
-      if (freeze_peek(0x2e0f9L) == 0xaa)
-        COPY_AND_RETURN_ROM("DOLPHIN 3.0")
-      if (freeze_peek(0x2e462L) == 0x45)
-        COPY_AND_RETURN_ROM("DOSROM V1.2")
-      if (freeze_peek(0x2e472L) == 0x20)
-        COPY_AND_RETURN_ROM("MERCRY3 PAL")
-      if (freeze_peek(0x2e16dL) == 0x84)
-        COPY_AND_RETURN_ROM("MERCRY NTSC")
-      if (freeze_peek(0x2e42dL) == 0x4c)
-        COPY_AND_RETURN_ROM("PET 4064   ")
-      if (freeze_peek(0x2e1d9L) == 0xa6)
-        COPY_AND_RETURN_ROM("SX64 CROACH")
-      if (freeze_peek(0x2eba9L) == 0x2d)
-        COPY_AND_RETURN_ROM("SX64 SCAND ")
-      if (freeze_peek(0x2e476L) == 0x2a)
-        COPY_AND_RETURN_ROM("TRBOACS 2.6")
-      if (freeze_peek(0x2e535L) == 0x07)
-        COPY_AND_RETURN_ROM("TRBOACS 3P1")
-      if (freeze_peek(0x2e176L) == 0x8d)
-        COPY_AND_RETURN_ROM("TRBOASC 3P2")
-      if (freeze_peek(0x2e42aL) == 0x72)
-        COPY_AND_RETURN_ROM("TRBOPROC US")
-      if (freeze_peek(0x2e4acL) == 0x81)
-        COPY_AND_RETURN_ROM("C64C 251913")
-      if (freeze_peek(0x2e479L) == 0x2a)
-        COPY_AND_RETURN_ROM("C64 REV2   ")
-      if (freeze_peek(0x2e535L) == 0x06)
-        COPY_AND_RETURN_ROM("SX64 REV4  ")
-    */
-
-    // set some flags
     mega65_rom_type = Mega65RomUnknown;
-    COPY_AND_RETURN_ROM("UNKNOWN    ")
+    strcpy(mega65_rom_name, "UNKNOWN    ");
+    return mega65_rom_name;
 }
 
+/* The tests are taken in order and the first that matches wins, which reads
+ * 40MHz from either flag alone.  Strictly it is FORCE or (VFAST and (FAST or
+ * 2MHZ)), so a machine with VFAST set but neither FAST nor 2MHz is reported
+ * faster than it runs. */
 unsigned char detect_cpu_speed(void) {
-    // Technically this is more correct, involving the 2 MHz flag:
-    //   FORCE || (VFAST && (FAST || 2MHZ)) -> 40 MHz
-    //
-    // if ((freeze_peek(0xffd367dL) & 0x10) ||
-    //     (freeze_peek(0xffd3054L) & 0x40) &&
-    //         ((freeze_peek(0xffd3031L) & 0x40) ||
-    //          (freeze_peek(0xffd0030L) & 0x01)))
-    //    return 40;
-
     if (freeze_peek(0xffd367dL) & 0x10) {
         return 40;
     }
@@ -225,12 +137,9 @@ unsigned char petscii_to_screen(unsigned char petscii) {
     if (petscii < 0xff) {
         return petscii & 0x7f;
     }
-    // want some pi?
+    /* $FF is pi, which sits at $5E rather than with the letters. */
     return 0x5e;
 }
-
-// static char* deadly_haiku[3] = { "Error consumes all", "As sand erodes rock and stone", "Now also
-// your mind" };
 
 /* Nothing is trustworthy enough to draw with here, so the border is the whole
  * report.  The asm keeps the spin: a loop with no side effect is undefined and

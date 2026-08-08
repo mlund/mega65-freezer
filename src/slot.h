@@ -41,14 +41,14 @@ void do_sprite_editor(void);
 unsigned char do_rom_loader(void);
 void do_megainfo(void);
 
-/* Only the lower 24 bits of region_length are valid. */
+/* Only the lower 24 bits of region_length are valid; the space a region takes
+ * in the slot is that length rounded up to a whole 512-byte sector. */
 constexpr uint32_t REGION_LENGTH_MASK = 0x7FFFFF;
 
 struct FreezeRegion {
     uint32_t address_base;
     union {
-        uint32_t region_length; // only lower 24 bits are valid, space occupied rounded up to
-                                // next 512 bytes
+        uint32_t region_length;
         struct {
             unsigned char skip[3];
             unsigned char freeze_prep;

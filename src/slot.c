@@ -16,10 +16,8 @@ unsigned char freeze_region_flags = 0;
 uint32_t freeze_slot_start_sector = 0;
 
 void request_freeze_region_list(void) {
-    // Ask hypervisor to copy out freeze region list, so we know where to look
-    // in the slot for different parts of memory.
-    // The transfer region MUST be in the lower 32KB of RAM, so we will copy it
-    // to the screen in the first instance, and then DMA copy it where we want it
+    /* The hypervisor will only deliver the list below 32KB, so it lands on the
+     * screen and is copied from there. */
     uint16_t i;
     fetch_freeze_region_list_from_hypervisor(0x0400U);
     lcopy(0x0400U, (uint32_t)&freeze_region_list, 256);
@@ -43,23 +41,15 @@ uint32_t find_thumbnail_offset(void) {
 
     for (char i = 0; i < freeze_region_count; i++) {
         region_length = freeze_region_list[i].region_length & REGION_LENGTH_MASK;
-        /* Thumbnail freezing has changed recently:
-           Previously the thumbnail was accessed indirectly, and had to be extracted to $1000 first,
-           and then frozen from there, and thus appeared to be at $1000.
-           Now the thumbnail is direct mapped at $FFD4000, and is frozen directly from there.
-           For now, we will check for both.
-        */
-        if (freeze_region_list[i].address_base == 0x1000L // older bitstreams use relocated address
-            || freeze_region_list[i].address_base == 0xffd4000L // newer bitstreams use real address
-        ) {
-            // Found it
+        /* Two addresses because a bitstream either maps the thumbnail directly
+         * at $FFD4000 or relocates it to $1000 before freezing. */
+        if (freeze_region_list[i].address_base == 0x1000L ||
+            freeze_region_list[i].address_base == 0xffd4000L) {
             return freeze_slot_offset;
         }
 
-        // Skip this region if our address is not in it
         freeze_slot_offset += region_length >> 9;
-        // If region is not an integer number of sectors long, don't forget to count the partial
-        // sector
+        /* A part-used sector still occupies a whole one. */
         if (region_length & 0x1ff) {
             freeze_slot_offset++;
         }
@@ -127,8 +117,10 @@ uint32_t read_freeze_slot_start_sector(uint16_t slot) {
     return *(volatile uint32_t*)0xD681U;
 }
 
+/* Each of these reads or writes a whole sector per byte: there is no cache
+ * here, and a caller that touches many bytes should keep one of its own, as
+ * monitor/commands.c does. */
 unsigned char freeze_peek(uint32_t addr) {
-    // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
@@ -142,22 +134,16 @@ unsigned char freeze_peek(uint32_t addr) {
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
 
-    // XXX - We should cache sectors
-
-    // Read the sector
     sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
-    // Return the byte
     return sector_buffer[offset & 0x1ff];
 }
 
 enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
-    // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
-        // Invalid / unfrozen memory
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
@@ -165,12 +151,8 @@ enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
 
-    // XXX - We should cache sectors
-
-    // Read the sector
     sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
-    // Copy the sector
     if (buffer != NULL) {
         lcopy((long)&sector_buffer[offset], (long)buffer, 512 - offset);
     }
@@ -179,42 +161,33 @@ enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
 }
 
 enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count) {
-    // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
-        // Invalid / unfrozen memory
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
 
     if (count > 512) {
-        // sector size exceeded
         TRACE("count exceeds one sector");
         return FreezerCountTooLarge;
     }
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
 
-    // XXX - We should cache sectors
-
-    // Read the sector
     sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
-    // Copy fetched data to dest address
     lcopy((long)&sector_buffer[offset], dest, count);
 
     return FreezerOk;
 }
 
 enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
-    // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
-        // Invalid / unfrozen memory
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
@@ -222,9 +195,8 @@ enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
 
-    // if this is no full sector store, we need to get that sector first
+    /* A partial store has to read what it is not replacing. */
     if (offset > 0) {
-        // Read the sector for modification
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
     }
 
@@ -234,7 +206,6 @@ enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
             512 - offset); // don't write behind the buffer!
     }
 
-    // Write the sector
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 
     return FreezerOk;
@@ -242,59 +213,47 @@ enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
 
 enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count) {
 
-    // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
-        // Invalid / unfrozen memory
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
 
     if (count > 512) {
-        // sector size exceeded
         TRACE("count exceeds one sector");
         return FreezerCountTooLarge;
     }
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
 
-    // if this is no full sector store, we need to get that sector first
+    /* A partial store has to read what it is not replacing. */
     if (count != 512 || offset != 0) {
-        // Read the sector for modification
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
     }
 
     lcopy(src, (long)&sector_buffer[offset], count);
 
-    // Write the sector
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 
     return FreezerOk;
 }
 
 void freeze_poke(uint32_t addr, unsigned char v) {
-    // Find sector
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
     if (freeze_slot_offset == 0xFFFFFFFFUL) {
-        // Invalid / unfrozen memory
         return;
     }
 
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
 
-    // XXX - We should cache sectors
-
-    // Read the sector
     sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
-    // Set the byte
     sector_buffer[offset & 0x1ff] = v;
 
-    // Write sector back
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 }
