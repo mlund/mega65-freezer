@@ -1,4 +1,4 @@
-/* The I/O register names and the row they render.  The database is IOMAP.BIN on
+/* The I/O register names and the row they render.  The database is IOMAP.M65 on
  * the card, reached only through iomap_byte(), so this file needs no MEGA65 and
  * test/verify_bitedit.py builds it for the host over a buffer. */
 

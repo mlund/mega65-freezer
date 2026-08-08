@@ -527,7 +527,7 @@ def build_binary(registers: dict[int, Register]) -> tuple[bytearray, list[str], 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iomap", required=True, help="path to mega65-core's iomap.txt")
-    parser.add_argument("-o", "--output", required=True, help="destination IOMAP.BIN")
+    parser.add_argument("-o", "--output", required=True, help="destination IOMAP.M65")
     args = parser.parse_args()
 
     registers = parse(args.iomap)

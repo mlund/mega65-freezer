@@ -2,7 +2,7 @@
 """Check the bit editor's table against its own structure, on the host.
 
 src/monitor/bitedit_table.c reaches its database only through iomap_byte(), so
-the host can hand it IOMAP.BIN in memory and run the whole decoder with no
+the host can hand it IOMAP.M65 in memory and run the whole decoder with no
 MEGA65 and no emulator.  That matters because the record stream is variable
 length -- a length byte, three bytes of packed 3-bit indices, names terminated
 by bit 7 and two-byte offsets into a shared text pool -- and an off-by-one there

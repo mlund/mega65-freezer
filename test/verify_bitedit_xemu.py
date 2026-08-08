@@ -61,7 +61,7 @@ CLOSING = f"m {TARGET}\r"
 ELSEWHERE = "m 0000400\r"
 
 # What the table must show before anything is touched.  The last of these comes
-# from IOMAP.BIN's description pool rather than its names, so it fails if the
+# from IOMAP.M65's description pool rather than its names, so it fails if the
 # database did not reach the card -- which the names alone would not catch,
 # since a missing file looks exactly like a register nobody documented.
 # The editor opens with the cursor on bit 7, so RC8 is the described bit.
@@ -160,7 +160,7 @@ def main() -> int:
     parser.add_argument(
         "--without-iomap",
         action="store_true",
-        help="leave IOMAP.BIN off the card: the editor must still work, unnamed",
+        help="leave IOMAP.M65 off the card: the editor must still work, unnamed",
     )
     parser.add_argument(
         "--screenshot",

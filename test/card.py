@@ -29,6 +29,10 @@ FAT_TYPES = (0x01, 0x04, 0x06, 0x0B, 0x0C, 0x0E)
 MBR_TABLE = 0x1BE
 SECTOR = 512
 
+# Data rather than a tool, but .M65 all the same: ROMLOAD offers every .BIN on
+# the card as a ROM to load.
+DATABASE = "IOMAP.M65"
+
 
 def partition_offset(image: str) -> int:
     """Byte offset of the first FAT partition, for mtools' `image@@offset`."""
@@ -63,12 +67,11 @@ def inject(base_image: str, work_dir: str, build_dir: str, with_iomap: bool = Tr
     with open(card, "r+b") as handle:
         fs = fat32.FAT32(handle, partition_offset(card))
         for name in sorted(os.listdir(build_dir)):
-            if not name.endswith((".M65", ".BIN")):
+            if not name.endswith(".M65"):
                 continue
-            # IOMAP.BIN is the bit editor's names; a card without it looks
-            # exactly like a database that knows nothing, which is a case worth
-            # testing.
-            if name.endswith(".BIN") and not with_iomap:
+            # A card without the bit editor's database looks exactly like a
+            # database that knows nothing, which is a case worth testing.
+            if name == DATABASE and not with_iomap:
                 continue
             built = os.path.join(build_dir, name)
             # The build's own time, so the card says when the tool was made

@@ -21,7 +21,7 @@ rest. Each tool is a separate program loaded from the SD card:
 | `MAKEDISK` | empty disk image                            |
 
 Two kinds of data are read off the card at run time and built here too:
-`IOMAP.BIN`, the I/O register names and descriptions, and `M65THUMB.M65`,
+`IOMAP.M65`, the I/O register names and descriptions, and `M65THUMB.M65`,
 `C65THUMB.M65` and `C64THUMB.M65`, the frames drawn around a slot's thumbnail.
 
 ## Building
@@ -42,7 +42,7 @@ Each `.M65` must fit 34817 bytes, which the link enforces.
 
 | variable        | what it does                                          |
 |-----------------|-------------------------------------------------------|
-| `MEGA65_IOMAP`  | path to mega65-core's iomap.txt, to regenerate `IOMAP.BIN` |
+| `MEGA65_IOMAP`  | path to mega65-core's iomap.txt, to regenerate `IOMAP.M65` |
 | `MEGA65_SDIMG`  | path to an SD image, for the emulator tests           |
 | `MEGA65_ROM`    | path to MEGA65.ROM, for the disassembler's real-code test |
 | `XEMU`          | path to the emulator, if it is not found automatically |
@@ -62,7 +62,7 @@ They point at files you already have, rather than anything downloaded:
 `iomap.txt` is generated in [mega65-core](https://github.com/MEGA65/mega65-core)
 from the `@IO:` comments in its VHDL; `MEGA65.ROM` is the machine's own ROM
 image. Neither is ours to redistribute, so neither is included here:
-`IOMAP.BIN` is committed instead, and without a ROM the disassembler's
+`IOMAP.M65` is committed instead, and without a ROM the disassembler's
 real-code test does not run.
 
 Other targets: `format`, `tidy`, `tidy-arithmetic`, `iomap-names`.

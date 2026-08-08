@@ -132,7 +132,7 @@ static void load_database(void) {
     /* The loader resolves against hyppo's working directory and MONITOR, unlike
      * the freezer, has no root check of its own. */
     mega65_dos_cdroot();
-    iomap_ready = read_file_from_sdcard("IOMAP.BIN", IOMAP_ADDRESS) == 0;
+    iomap_ready = read_file_from_sdcard("IOMAP.M65", IOMAP_ADDRESS) == 0;
     if (iomap_ready) {
         iomap_ready = bitedit_open();
     }

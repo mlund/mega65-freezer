@@ -181,14 +181,14 @@ endif()
 # rather than linked.  Committed so a checkout without iomap.txt still ships
 # names; iomap-names above regenerates it, this only stages it.
 add_custom_target(stage-iomap ALL
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/src/IOMAP.BIN
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/src/IOMAP.M65
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${SRC}/monitor/iomap.bin ${CMAKE_BINARY_DIR}/src/IOMAP.BIN
-    COMMENT "Staging IOMAP.BIN")
+            ${SRC}/monitor/iomap.bin ${CMAKE_BINARY_DIR}/src/IOMAP.M65
+    COMMENT "Staging IOMAP.M65")
 
 # The frames the freezer draws around a slot's thumbnail, picked by machine type
 # and loaded off the card at run time.  Generated rather than committed: the
-# generator is plain Python, so unlike IOMAP.BIN there is nothing to go missing.
+# generator is plain Python, so unlike IOMAP.M65 there is nothing to go missing.
 if(Python3_FOUND)
     set(THUMB_FRAMES)
     foreach(machine m65 c65 c64)

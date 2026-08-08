@@ -9,7 +9,7 @@
  * the screen, and test/verify_bitedit.py builds this file for the host with a
  * buffer standing in for the card.  bitedit.c holds the parts that cannot be. */
 
-/* Supplied by the caller: one byte of IOMAP.BIN, or 0 past the end and when no
+/* Supplied by the caller: one byte of IOMAP.M65, or 0 past the end and when no
  * file is loaded.  A zero there fails the magic check in bitedit_open(), which
  * is how a missing card file becomes a table with nothing in it rather than an
  * error. */

@@ -1,12 +1,12 @@
 /* Host driver for the bit editor's table, used only by test/verify_bitedit.py.
  *
  * bitedit_table.c reaches the database only through iomap_byte(), so on the
- * host that becomes a read from IOMAP.BIN held in memory and the whole decoder
+ * host that becomes a read from IOMAP.M65 held in memory and the whole decoder
  * runs with no MEGA65.  The source is included rather than linked because
  * `walk` steps the raw record stream to prove the length bytes are right, and
  * the file's geometry is private to the translation unit.
  *
- * Takes the path to IOMAP.BIN as its only argument.  Commands on stdin, one per
+ * Takes the path to IOMAP.M65 as its only argument.  Commands on stdin, one per
  * line; addresses and values are hex, everything else decimal, and rendered
  * rows come back as hex screen codes so the checker sees what would reach the
  * screen:
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
     char row[BITEDIT_ROW_WIDTH];
 
     if (argc < 2) {
-        fprintf(stderr, "usage: %s IOMAP.BIN\n", argv[0]);
+        fprintf(stderr, "usage: %s IOMAP.M65\n", argv[0]);
         return 2;
     }
     FILE* file = fopen(argv[1], "rb");
