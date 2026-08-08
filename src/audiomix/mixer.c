@@ -91,13 +91,17 @@ uint8_t audioxbar_getcoefficient(uint8_t n) {
     return AUDIOMIX_REGDATA;
 }
 
-static uint8_t c, value, select_row, select_column, simple_row, coefficient;
+/* The cursor position, which must survive from one call to the next: the
+ * event loops in do_advanced_mixer() and do_audio_mixer() redraw after every
+ * keypress rather than looping inside a single call. */
+static uint8_t select_row, select_column;
 static uint8_t mute_save[8];
-static uint16_t i, j;
 
 void draw_advanced_mixer(void) {
     uint16_t offset;
     uint8_t colour;
+    uint8_t c;
+    uint8_t value;
 
     lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 5, SchemeTextDim);
     lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 7, SchemeTextDim);
@@ -156,7 +160,7 @@ void draw_advanced_mixer(void) {
     // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
     // (in fact, most of memory contains what the frozen program had. Only our freezer program
     // itself has been loaded to replace some of RAM).
-    for (i = 0; audio_menu[i]; i++) {
+    for (uint16_t i = 0; audio_menu[i]; i++) {
         if ((audio_menu[i] >= 'A') && (audio_menu[i] <= 'Z')) {
             POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu[i] - 0x40);
         } else if ((audio_menu[i] >= 'a') && (audio_menu[i] <= 'z')) {
@@ -227,6 +231,7 @@ void level_to_db_index(uint16_t level) {
 unsigned char db_text[11];
 void draw_db_bar(unsigned char line, uint16_t level) {
     uint16_t bar_addr = (uint16_t)audio_menu_simple + line * 40 + 11;
+    uint16_t i;
     // Work out the approximate db_index value of the signal
     level_to_db_index(level);
 
@@ -308,6 +313,10 @@ void set_amplifier(unsigned char left_right, uint16_t first_coefficient) {
 }
 
 void change_db(unsigned char row, unsigned char change) {
+    /* Every caller passes 0, 6 or select_row (masked to 0-11 in both event
+     * loops), so the switch below always assigns c; the initialiser only
+     * covers row values outside that range. */
+    uint8_t c = 0;
     // clang-format off
   // this is all HDL/HDR (HDMI) channels
   switch (row) {
@@ -394,8 +403,8 @@ void stereo_toggle(void) {
     }
 
     // Make stereo with 12dB difference between left and right
-    for (j = 0; j < 4; j++) {
-        i = j * 0x20;
+    for (uint16_t j = 0; j < 4; j++) {
+        uint16_t i = j * 0x20;
         if (j > 1) { // HDL/HDR
             i += 0x80;
         }
@@ -445,6 +454,7 @@ unsigned char db_bar_lowlight[SCREEN_ROW_BYTES];
 void draw_simple_mixer(void) {
     // Update the volume bars and dB levels
     // display it after, so that we have no flicker
+    uint8_t c;
 
     // Left output channel
     c = 0xde; // Master volume control
@@ -501,7 +511,7 @@ void draw_simple_mixer(void) {
     // Freezer can't use printf() etc, because C64 ROM has not started, so ZP will be a mess
     // (in fact, most of memory contains what the frozen program had. Only our freezer program
     // itself has been loaded to replace some of RAM).
-    for (i = 0; audio_menu_simple[i]; i++) {
+    for (uint16_t i = 0; audio_menu_simple[i]; i++) {
         if ((audio_menu_simple[i] >= '@') && (audio_menu_simple[i] <= 'Z')) {
             POKE(SCREEN_ADDRESS + i * 2 + 0, audio_menu_simple[i] - 0x40);
         } else if ((audio_menu_simple[i] >= 'b') && (audio_menu_simple[i] <= 'c')) {
@@ -519,7 +529,7 @@ void draw_simple_mixer(void) {
         select_column += 3;
     }
 
-    for (i = 6; i < 21; i++) {
+    for (uint16_t i = 6; i < 21; i++) {
         if (i == select_column) {
             // Highligh colouring
             lcopy((long)db_bar_highlight,
@@ -581,30 +591,30 @@ void test_audio(unsigned char advanced_view) {
 
         if (advanced_view) {
             // Highlight the appropriate part of the screen
-            for (i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2) {
+            for (uint16_t i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2) {
                 lpoke(0xff80001L + i, lpeek(0xff80001L + i) & 0x0f);
             }
             switch (sid_num) {
                 case 0:
-                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2) {
+                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
                         lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x20);
                     }
                     break;
                 case 1:
-                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2) {
+                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
                         lpoke(0xff80001L + 6 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 6 * SCREEN_ROW_BYTES + i) | 0x60);
                     }
                     break;
                 case 2:
-                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2) {
+                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
                         lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x20);
                     }
                     break;
                 case 3:
-                    for (i = 0; i < SCREEN_ROW_BYTES; i += 2) {
+                    for (uint16_t i = 0; i < SCREEN_ROW_BYTES; i += 2) {
                         lpoke(0xff80001L + 5 * SCREEN_ROW_BYTES + i,
                             lpeek(0xff80001L + 5 * SCREEN_ROW_BYTES + i) | 0x60);
                     }
@@ -656,7 +666,7 @@ void test_audio(unsigned char advanced_view) {
 
     // Clear highlight
     if (advanced_view) {
-        for (i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2) {
+        for (uint16_t i = 5 * SCREEN_ROW_BYTES; i < 7 * SCREEN_ROW_BYTES; i += 2) {
             lpoke(0xff80001L + i, lpeek(0xff80001L + i) & 0x0f);
         }
     } else {
@@ -690,6 +700,9 @@ void test_audio(unsigned char advanced_view) {
 unsigned char key;
 
 void do_advanced_mixer(void) {
+    uint8_t value;
+    uint8_t coefficient;
+
     select_row = 0;
     select_column = 0;
 
@@ -763,14 +776,14 @@ void do_advanced_mixer(void) {
                 case 'm':
                 case 'M':
                     if (audioxbar_getcoefficient(0x14)) {
-                        for (i = 0x00; i < 0x100; i += 0x20) {
+                        for (uint16_t i = 0x00; i < 0x100; i += 0x20) {
                             audioxbar_setcoefficient((uint8_t)(i + 0x14), 0);
                             audioxbar_setcoefficient((uint8_t)(i + 0x15), 0);
                             audioxbar_setcoefficient((uint8_t)(i + 0x16), 0);
                             audioxbar_setcoefficient((uint8_t)(i + 0x17), 0);
                         }
                     } else {
-                        for (i = 0x00; i < 0x100; i += 0x20) {
+                        for (uint16_t i = 0x00; i < 0x100; i += 0x20) {
                             audioxbar_setcoefficient((uint8_t)(i + 0x14), 0x30);
                             audioxbar_setcoefficient((uint8_t)(i + 0x15), 0x30);
                             audioxbar_setcoefficient((uint8_t)(i + 0x16), 0x30);
@@ -796,9 +809,11 @@ void do_advanced_mixer(void) {
 }
 
 void do_audio_mixer(void) {
+    uint8_t simple_row;
+
     select_row = 0;
 
-    for (i = 0; i < 80; i += 2) {
+    for (uint16_t i = 0; i < 80; i += 2) {
         if (i >= 22 && i < 46) {
             db_bar_highlight[i + 1] = SchemeMeterLow;
             db_bar_lowlight[i + 1] = SchemeMeterLowDim;
