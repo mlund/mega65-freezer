@@ -23,6 +23,7 @@ Checks: >
   misc-*,
 
   -clang-analyzer-optin.core.FixedAddressDereference,
+  -clang-analyzer-core.FixedAddressDereference,
   -clang-analyzer-core.NullDereference,
   -clang-analyzer-security.insecureAPI.strcpy,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
@@ -40,9 +41,15 @@ Checks: >
 WarningsAsErrors: '*'
 
 # This project's own headers, and only those. Without a filter clang-tidy reports through the SDK
-# and mega65-libc headers, which are not ours to fix and which drown everything else; the earlier
-# value named files from a different project, so it matched nothing and checked no header at all.
-HeaderFilterRegex: 'llvm/src/[^/]+\.h$'
+# and mega65-libc headers, which are not ours to fix and which drown everything else.
+#
+# This has broken silently once already: an earlier value named files from a different project and
+# matched nothing, so no header was ever checked. It broke the same way a second time when this
+# repository split out of a parent tree that put these sources under llvm/src/ -- the prefix this
+# value used to need -- and became its own repository with them at src/ instead. Same failure mode
+# as the FixedAddressDereference rename above: a regex that stops matching produces silence, not an
+# error, so absence of header findings is not by itself evidence the filter is working.
+HeaderFilterRegex: 'src/[^/]+\.h$'
 
 # Rust's naming, because that is what the rest of this repository is written in and there is no
 # reason for the helper to read differently: types UpperCamelCase, functions and variables
@@ -84,13 +91,16 @@ CheckOptions:
 # Why each exclusion:
 #
 #   clang-analyzer-optin.core.FixedAddressDereference
+#   clang-analyzer-core.FixedAddressDereference
 #       Dereferencing a fixed address is the entire job. $D020 is the border colour, not a wild
 #       pointer. The SDK's own dma.hpp trips this too.
 #
-#       Note the name: clang-tidy 23 moved this check from `core.` to `optin.core.`, which made
-#       the old exclusion match nothing and the finding reappear. A renamed check fails silently
-#       — an unknown name in this list is ignored, not diagnosed — so an exclusion that suddenly
-#       has findings again is the symptom to look for after a toolchain bump.
+#       Both spellings are listed because the check's name moved between them: clang-tidy 23 has
+#       it under `optin.core.`, clang-tidy 22 (CI's stock, unpatched SDK) still has it under
+#       `core.`.  A renamed check fails silently -- an unknown name in this list is ignored, not
+#       diagnosed -- so whichever spelling the running clang-tidy does not have simply matches
+#       nothing, and the finding reappears as if unsuppressed.  Listing both covers either
+#       direction of a toolchain change, not just a bump forward.
 #
 #   clang-analyzer-core.NullDereference
 #       `POKE(0, 65)` and `POKE(0x01, 0x36)` are the 6510 port register at $00/$01 — the CPU port
