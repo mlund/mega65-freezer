@@ -1,3 +1,6 @@
+# Targets are defined here; the parent CMakeLists handles project setup and the
+# mega65-libc dependency.
+
 # version.h carries the git describe string, and is regenerated on every
 # build: .git/HEAD is a symref, so committing on a branch never touches it,
 # and no single path tracks a commit across packed refs, detached HEAD and
@@ -12,9 +15,6 @@ add_custom_target(version_stamp
     COMMENT "Stamping version"
 )
 set_source_files_properties(${VERSION_H} PROPERTIES GENERATED TRUE)
-
-# Targets are defined here; the parent CMakeLists handles project setup and
-# the mega65-libc dependency.
 
 # $9000 (charset destination) - $07ff (load address)
 set(MAX_SIZE 34817)
@@ -50,8 +50,6 @@ add_compile_options(
     # against a signed-char platform this one is not.
     -Wno-char-subscripts
 )
-# include_directories() also feeds the ASM rule, so helper.S finds helper.h
-# here too -- no separate CMAKE_ASM_FLAGS entry needed.
 # The SDK's MEGA65 register structs (VICIV, CIA, SID, PALETTE).  Headers only:
 # the platform stays c64, because the mega65 platform emits a BASIC 65 stub
 # this loader cannot enter.  LLVM_MOS_ROOT comes from the parent scope.
@@ -59,6 +57,8 @@ set(MEGA65_INCLUDE ${LLVM_MOS_ROOT}/mos-platform/mega65/include)
 if(NOT EXISTS ${MEGA65_INCLUDE}/mega65.h)
     message(FATAL_ERROR "MEGA65 register headers not found at ${MEGA65_INCLUDE}")
 endif()
+# Also feeds the ASM rule, so helper.S finds helper.h here too -- no separate
+# CMAKE_ASM_FLAGS entry needed.
 include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
 # SYSTEM: the SDK headers are not ours to fix, and <mega65.h> disables
 # -Wfixed-enum-extension, a warning this clang does not know.  Marking them

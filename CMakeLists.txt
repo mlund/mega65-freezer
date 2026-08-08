@@ -17,10 +17,6 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Needs a patched llvm-mos -- see C_MCPU below for what stock clang 23 gets
-# wrong.  See README.md for the build invocation; nothing in git records which
-# toolchain a build used, that lives only in the CMake cache.
-
 # Must precede any add_executable, or the targets below are absent from the
 # database and clang-tidy sees only the dependency's entries.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -46,8 +42,9 @@ set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=mos45gs02")
 # write-verify, and it also affects the SDK's own libc, so a patched compiler
 # needs a rebuilt SDK to match.
 #
-# -DC_MCPU=mos6502 is the escape hatch on an unpatched compiler: no INW/DEW
-# exists there, at a cost of ~3.5KB.  Applied per target rather than to the
+# Nothing in git records which toolchain a build used; that lives only in the
+# CMake cache.  -DC_MCPU=mos6502 is the way out on an unpatched compiler: no
+# INW/DEW exists there, at a cost of ~3.5KB.  Applied per target rather than to the
 # flags above, because mega65-libc's debug.c needs 65CE02 for `ldz`.  Every
 # inline asm block in our C is plain 6502, so nothing here needs the wider set.
 set(C_MCPU mos45gs02 CACHE STRING "-mcpu for our C sources (mos6502 on an unpatched compiler)")
@@ -140,15 +137,12 @@ endif()
 # after a toolchain bump, hence a non-default target -- same shape as the
 # clang-tidy and clang-format targets above.
 #
-# NO_DEFAULT_PATH is load-bearing: the tables must come from the *patched* SDK
+# NO_DEFAULT_PATH matters here: the tables must come from the *patched* SDK
 # this project builds with, not from a stock llvm-mc that happens to be on PATH.
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(LLVM_MC_EXE NAMES llvm-mc HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 find_program(HOST_C_COMPILER NAMES cc clang gcc)
 
-# The number formatting is pure, so the host checks it against Python's own --
-# no assembler, no emulator.  Guarded on its own needs rather than on the
-# disassembler's, or a machine without llvm-mc silently runs no tests at all.
 # iomap.txt is not ours to redistribute and the generated table is committed, so
 # a checkout without it builds normally and only loses the ability to
 # regenerate.  Same shape as MEGA65_ROM below.
@@ -193,6 +187,9 @@ endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdimage.cmake)
 
+# The pure code is checked on the host, against Python's own arithmetic -- no
+# assembler, no emulator.  Guarded on its own needs rather than on the
+# disassembler's, or a machine without llvm-mc silently runs no tests at all.
 if(Python3_FOUND AND HOST_C_COMPILER)
     find_program(MTOOLS_MDIR NAMES mdir)
     if(MTOOLS_MDIR AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
@@ -254,17 +251,9 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_blockmove.py
                     --cc ${HOST_C_COMPILER})
 
-        # Walking a real ROM covers what synthetic opcodes cannot: our decoder
-        # picks the instruction boundaries, so a wrong length lands the next
-        # decode mid-instruction and the disagreement cascades.  The image is
-        # not ours to redistribute, so point at your own copy with
-        # -DMEGA65_ROM=/path/to/MEGA65.ROM or the MEGA65_ROM environment
-        # variable; without one the test simply does not exist.
-        # Xemu tests.  The program checks its own invariants and quits the
-        # emulator with the failing check's number, so the exit status is the
-        # verdict -- nothing is parsed.  `-testing` is what makes that $D6CF
-        # write work; without it the program cannot report anything.
-        #
+        # These check their own invariants and quit the emulator with the
+        # failing check's number, so the exit status is the verdict -- nothing
+        # is parsed.  `-testing` is what makes that $D6CF write work.
         if(XEMU AND TARGET test_printf)
             add_test(NAME printf
                 COMMAND ${XEMU} -headless -sleepless -testing -model 3
@@ -335,6 +324,11 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(bitedit_xemu_no_database PROPERTIES TIMEOUT 300)
         endif()
 
+        # Walking a real ROM covers what synthetic opcodes cannot: our decoder
+        # picks the instruction boundaries, so a wrong length lands the next
+        # decode mid-instruction and the disagreement cascades.  The image is
+        # not ours to redistribute, so point at your own copy; without one the
+        # test simply does not exist.
         set(MEGA65_ROM "$ENV{MEGA65_ROM}" CACHE FILEPATH
             "MEGA65.ROM image for the disassembler's real-code test")
         if(MEGA65_ROM AND EXISTS ${MEGA65_ROM})
