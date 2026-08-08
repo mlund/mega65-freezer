@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # mtools is what lets the fat32 test register at all: it is the oracle
+      # verify_fat32.py checks our own FAT32 writer against.
+      - name: Install mtools
+        run: sudo apt-get update && sudo apt-get install -y mtools
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      # The stock release, not the patched build development uses: it can
+      # miscompile 16-bit loop counters on 45GS02 at -mlto-zp >= 8 (see
+      # CMakeLists.txt, C_MCPU). That risk is a runtime one, and nothing here
+      # runs the built .M65 files -- there is no Xemu in CI -- so a build
+      # that only has to compile and link is still a meaningful check.
+      # clang-tidy and clang-format are bundled, confirmed by rehearsing this
+      # whole recipe locally against a genuine upstream llvm-mos build (clang
+      # 22, not the patched clang 23 development uses) -- which is also what
+      # caught .clang-tidy's HeaderFilterRegex and FixedAddressDereference
+      # exclusion both silently matching nothing under an older clang-tidy.
+      - name: Install llvm-mos-sdk
+        run: |
+          wget -q https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz
+          tar xf llvm-mos-linux.tar.xz
+
+      # A different repository's file, fetched fresh on every run.  Enables
+      # the bitedit test's cross-check between the generator's own parse of
+      # iomap.txt and what the compiled table actually decodes to -- the one
+      # check that can catch the generator and the decoder agreeing on
+      # something wrong (see verify_bitedit.py, check_against_iomap()).
+      # Degrades rather than failing the job if mega65-core is unreachable or
+      # renames its branch: MEGA65_IOMAP just goes unset, same as any
+      # checkout without mega65-core cloned locally.
+      - name: Fetch iomap.txt
+        run: |
+          curl -fsS -o iomap.txt \
+            https://raw.githubusercontent.com/MEGA65/mega65-core/development/iomap.txt \
+            || echo "iomap.txt fetch failed; continuing without MEGA65_IOMAP"
+
+      - name: Configure
+        run: |
+          IOMAP_FLAG=""
+          [ -f iomap.txt ] && IOMAP_FLAG="-DMEGA65_IOMAP=${{ github.workspace }}/iomap.txt"
+          cmake -DCMAKE_PREFIX_PATH=${{ github.workspace }}/llvm-mos $IOMAP_FLAG -B build
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Format check
+        run: cmake --build build --target format-check
+
+      # WarningsAsErrors is '*' in .clang-tidy, so this fails on any finding.
+      - name: clang-tidy
+        run: cmake --build build --target tidy
+
+      # Advisory, not enforced -- see CMakeLists.txt for why these two are
+      # split out from the tidy target above. Reported, not gated on.
+      - name: clang-tidy (advisory)
+        continue-on-error: true
+        run: |
+          cmake --build build --target tidy-arithmetic
+          cmake --build build --target tidy-macros
+
+      - name: ruff
+        run: |
+          ruff check tools/ test/
+          ruff format --check tools/ test/
+
+      # No Xemu, no MEGA65_ROM: the emulator and real-ROM tests do not
+      # register at all rather than failing outright, which is deliberate
+      # (see cmake/sdimage.cmake and CMakeLists.txt). Listed explicitly so
+      # what actually ran is visible in the log rather than silently absent.
+      - name: List registered tests
+        run: ctest --test-dir build -N
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
