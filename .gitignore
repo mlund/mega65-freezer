@@ -1,4 +1,7 @@
 build/
+# A second configure is needed to test the FREEZER_TRACE build, since tracing
+# is a compile-time option.
+build-*/
 *.M65
 *.M65.elf
 *.map
