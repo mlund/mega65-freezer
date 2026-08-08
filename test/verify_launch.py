@@ -32,7 +32,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import xemu_keys  # noqa: E402
+import xemu_keys
 
 
 def main() -> int:
@@ -51,17 +51,30 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         dump = os.path.join(tmp, "screen.txt")
         proc = subprocess.Popen(
-            [args.emulator, "-headless", "-sleepless", "-fastboot", "-testing",
-             "-model", "3", "-besure", "-uartmon", socket_path,
-             "-prgmode", "64", "-prg", args.prg, "-dumpscreen", dump],
+            [
+                args.emulator,
+                "-headless",
+                "-sleepless",
+                "-fastboot",
+                "-testing",
+                "-model",
+                "3",
+                "-besure",
+                "-uartmon",
+                socket_path,
+                "-prgmode",
+                "64",
+                "-prg",
+                args.prg,
+                "-dumpscreen",
+                dump,
+            ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         try:
             time.sleep(args.boot)
-            sock = xemu_keys.socket.socket(
-                xemu_keys.socket.AF_UNIX, xemu_keys.socket.SOCK_STREAM
-            )
+            sock = xemu_keys.socket.socket(xemu_keys.socket.AF_UNIX, xemu_keys.socket.SOCK_STREAM)
             sock.settimeout(5)
             sock.connect(socket_path)
             time.sleep(0.3)

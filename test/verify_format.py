@@ -13,7 +13,6 @@ Run via CTest, or by hand::
 """
 
 import argparse
-import os
 import subprocess
 import sys
 import tempfile
@@ -28,16 +27,25 @@ def build_harness(workdir: Path, host_cc: str) -> Path:
     subprocess.run(
         # char is unsigned on llvm-mos but may be signed on the host, so the
         # subscript warning is about the host and not about this code.
-        [host_cc, "-std=c2x", "-O1", "-Wall", "-Wno-char-subscripts", "-o", str(binary),
-         str(HERE / "format_host_harness.c")],
+        [
+            host_cc,
+            "-std=c2x",
+            "-O1",
+            "-Wall",
+            "-Wno-char-subscripts",
+            "-o",
+            str(binary),
+            str(HERE / "format_host_harness.c"),
+        ],
         check=True,
     )
     return binary
 
 
 def run(binary: Path, commands: list[str]) -> list[str]:
-    out = subprocess.run([str(binary)], input="\n".join(commands) + "\n",
-                         capture_output=True, text=True, check=True)
+    out = subprocess.run(
+        [str(binary)], input="\n".join(commands) + "\n", capture_output=True, text=True, check=True
+    )
     return out.stdout.splitlines()
 
 
@@ -58,8 +66,7 @@ def main() -> int:
             expected.append(f"{v:X}")
 
         # Hex at every width the tools use, over a spread of values.
-        values = [0, 1, 9, 10, 15, 16, 255, 256, 4095, 4096, 65535,
-                  0x12345, 0xFFFFFF, 0x7FFFFFF]
+        values = [0, 1, 9, 10, 15, 16, 255, 256, 4095, 4096, 65535, 0x12345, 0xFFFFFF, 0x7FFFFFF]
         for v in values:
             for columns in (1, 2, 4, 7, 8):
                 commands.append(f"hex {v} {columns}")
@@ -91,7 +98,7 @@ def main() -> int:
             return 1
 
         bad = 0
-        for cmd, want, have in zip(commands, expected, got):
+        for cmd, want, have in zip(commands, expected, got, strict=False):
             if want != have:
                 if bad < 10:
                     print(f"{cmd}: expected {want!r}, got {have!r}")

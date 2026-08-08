@@ -29,19 +29,72 @@ SHIFT = 0x0F
 NO_KEY = 0x7F
 
 MATRIX = {
-    "\r": 0x01, "\n": 0x01,
-    "3": 0x08, "w": 0x09, "a": 0x0A, "4": 0x0B, "z": 0x0C, "s": 0x0D, "e": 0x0E,
-    "5": 0x10, "r": 0x11, "d": 0x12, "6": 0x13, "c": 0x14, "f": 0x15, "t": 0x16,
-    "x": 0x17, "7": 0x18, "y": 0x19, "g": 0x1A, "8": 0x1B, "b": 0x1C, "h": 0x1D,
-    "u": 0x1E, "v": 0x1F, "9": 0x20, "i": 0x21, "j": 0x22, "0": 0x23, "m": 0x24,
-    "k": 0x25, "o": 0x26, "n": 0x27, "+": 0x28, "p": 0x29, "l": 0x2A, "-": 0x2B,
-    ".": 0x2C, ":": 0x2D, "@": 0x2E, ",": 0x2F, "}": 0x30, "*": 0x31, ";": 0x32,
-    "=": 0x35, "/": 0x37, "1": 0x38, "_": 0x39, "2": 0x3B, " ": 0x3C, "q": 0x3E,
+    "\r": 0x01,
+    "\n": 0x01,
+    "3": 0x08,
+    "w": 0x09,
+    "a": 0x0A,
+    "4": 0x0B,
+    "z": 0x0C,
+    "s": 0x0D,
+    "e": 0x0E,
+    "5": 0x10,
+    "r": 0x11,
+    "d": 0x12,
+    "6": 0x13,
+    "c": 0x14,
+    "f": 0x15,
+    "t": 0x16,
+    "x": 0x17,
+    "7": 0x18,
+    "y": 0x19,
+    "g": 0x1A,
+    "8": 0x1B,
+    "b": 0x1C,
+    "h": 0x1D,
+    "u": 0x1E,
+    "v": 0x1F,
+    "9": 0x20,
+    "i": 0x21,
+    "j": 0x22,
+    "0": 0x23,
+    "m": 0x24,
+    "k": 0x25,
+    "o": 0x26,
+    "n": 0x27,
+    "+": 0x28,
+    "p": 0x29,
+    "l": 0x2A,
+    "-": 0x2B,
+    ".": 0x2C,
+    ":": 0x2D,
+    "@": 0x2E,
+    ",": 0x2F,
+    "}": 0x30,
+    "*": 0x31,
+    ";": 0x32,
+    "=": 0x35,
+    "/": 0x37,
+    "1": 0x38,
+    "_": 0x39,
+    "2": 0x3B,
+    " ": 0x3C,
+    "q": 0x3E,
 }
 
 # Characters reached by holding shift over another key.
-SHIFTED = {"!": "1", '"': "2", "#": "3", "$": "4", "%": "5",
-           "(": "8", ")": "9", "?": "/", "<": ",", ">": "."}
+SHIFTED = {
+    "!": "1",
+    '"': "2",
+    "#": "3",
+    "$": "4",
+    "%": "5",
+    "(": "8",
+    ")": "9",
+    "?": "/",
+    "<": ",",
+    ">": ".",
+}
 
 # Named keys, for things a character cannot express.
 #
@@ -53,8 +106,17 @@ SHIFTED = {"!": "1", '"': "2", "#": "3", "$": "4", "%": "5",
 # sending 10 for `a` does nothing -- so something between the register and the
 # key queue is not what these tables describe, and it is not understood.
 # At the keyboard Xemu has HELP on Page Up, and CLR on Home.
-NAMED = {"return": 0x01, "f1": 0x04, "f3": 0x05, "f5": 0x06, "f7": 0x03,
-         "down": 0x07, "right": 0x02, "delete": 0x00, "stop": 0x3F}
+NAMED = {
+    "return": 0x01,
+    "f1": 0x04,
+    "f3": 0x05,
+    "f5": 0x06,
+    "f7": 0x03,
+    "down": 0x07,
+    "right": 0x02,
+    "delete": 0x00,
+    "stop": 0x3F,
+}
 
 # No up or left: both are the shifted form of their opposite on a CBM keyboard,
 # and SHIFT in the modifier slot does not reach the key queue -- a shifted
@@ -103,10 +165,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket", required=True, help="Xemu's -uartmon path")
     parser.add_argument("--text", default="", help="characters to type")
-    parser.add_argument("--key", action="append", default=[],
-                        help=f"a named key, one of: {', '.join(sorted(NAMED))}")
-    parser.add_argument("--delay", type=float, default=0.0,
-                        help="seconds to wait before typing, to let the program draw")
+    parser.add_argument(
+        "--key",
+        action="append",
+        default=[],
+        help=f"a named key, one of: {', '.join(sorted(NAMED))}",
+    )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=0.0,
+        help="seconds to wait before typing, to let the program draw",
+    )
     args = parser.parse_args()
 
     time.sleep(args.delay)
