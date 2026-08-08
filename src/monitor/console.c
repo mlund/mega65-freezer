@@ -127,7 +127,10 @@ void setup_screen(void) {
 
     clear_colour_ram();
 
-    // Copy ASCII charset into place
+    /* Writes RAM the VIC never reads: in this bank $9000 is the character-ROM
+     * shadow, so the ROM charset is what reaches the screen and the glyphs here
+     * are screen codes, not ASCII.  The copy and the 2KB font behind it are
+     * dead weight. */
     lcopy((int)&charset[0], CHARSET_ADDRESS, 0x800);
 
     // Set screen line address and write point
@@ -152,9 +155,9 @@ void fatal_error(const unsigned char* filename, uint16_t line_number) {
 }
 
 void set_screen_attributes(long screen_address, unsigned char count, unsigned char attr) {
-    // This involves setting colour RAM values, so we need to either LPOKE, or
-    // map the 2KB colour RAM in at $D800 and work with it there.
-    // XXX - For now we are LPOKING
+    /* Colour RAM is above 64K, so it is reached a byte at a time rather than
+     * mapped in at $D800.  Attributes are a read-modify-write, which a DMA fill
+     * cannot do. */
     long addr = COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + screen_address;
     for (unsigned char i = 0; i < count; i++) {
         lpoke(addr, lpeek(addr) | attr);

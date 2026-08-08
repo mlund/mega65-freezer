@@ -28,8 +28,9 @@
 // 16-bit int; the shift is what the rest of this file already uses for x64.
 #define DIR_NAME_BUF 0x40000L
 // The listing holds at most 0xffff/64 = 1023 entries, and 1023 << 6 = 65472
-// fits an unsigned 16-bit value.  The old code overflowed only because short
-// promotes to *signed* int, which stops at 32767 -- i.e. entry 512.
+// fits an unsigned 16-bit value.  The cast is what keeps it unsigned: a short
+// promotes to *signed* int, which stops at 32767, so from entry 512 the shift
+// would reach the sign bit.
 #define DIR_ENTRY_INDEX(n) ((uint16_t)(n) << 6)
 
 #include <mega65.h>
@@ -61,7 +62,7 @@ uint8_t old_disk_flags, old_disk_len;
 
 static char default_error[] = "ERROR CODE XX";
 char* hyppoerror_to_screen(unsigned char error) {
-    // don't add to many errors, this is lot of space!
+    // Few messages: each costs its full width in the image.
     switch (error) {
             /*
               case 0x07:

@@ -141,14 +141,12 @@ unsigned char next_cpu_speed(void) {
             freeze_poke(0xffd0030L, 0);
             freeze_poke(0xffd3031L, freeze_peek(0xffd3031L) | 0x40);
             freeze_poke(0xffd3054L, freeze_peek(0xffd3054L) & 0xbf);
-            // freeze_poke(0xffd367dL, freeze_peek(0xffd367dL) & 0xef);
             break;
         case 3:
             // Make it 40MHz: !2MHZ && FAST && VFAST
             freeze_poke(0xffd0030L, 0);
             freeze_poke(0xffd3031L, freeze_peek(0xffd3031L) | 0x40);
             freeze_poke(0xffd3054L, freeze_peek(0xffd3054L) | 0x40);
-            // freeze_poke(0xffd367dL, freeze_peek(0xffd367dL) | 0x10);
             break;
         case 40:
         default:
@@ -647,8 +645,6 @@ enum : uint8_t {
 void fix_chargen_area(unsigned char flags) {
     uint16_t i = 512; // needs to be 512 for nocheck to trigger!
     long charset_start;
-
-    // debug_region_list();
 
     if (!(flags & ChargenNoCheck)) {
         if (freeze_fetch_sector(CHARGEN_ADDRESS, NULL) == FreezerOk) {

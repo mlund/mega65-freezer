@@ -47,12 +47,6 @@ int main(void) {
 
     set_palette();
 
-    // done in sprited/editor.c:Initialize
-    // Now find the start sector of the slot, and make a copy for safe keeping
-    // slot_number = 0;
-    // find_freeze_slot_start_sector(slot_number);
-    // freeze_slot_start_sector = *(volatile uint32_t*)0xD681U;
-
     // SD or SDHC card?
     if (SD_STATUS & SD_STATUS_SDHC) {
         sdhc_card = 1;
@@ -60,9 +54,8 @@ int main(void) {
         sdhc_card = 0;
     }
 
-    // done in sprited/editor.c:Initialize
-    // request_freeze_region_list();
-
+    /* The slot sector and the region list are set up by editor.c's Initialize,
+     * not here. */
     // Back to 40 column, 8-bit text mode
     VICIV.ctrlb = 0x00;
     VICIV.ctrlc = (VICIV.ctrlc & 0xa8) | 0x00;

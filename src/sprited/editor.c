@@ -16,54 +16,6 @@
     You should have received a copy of the GNU Lesser General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-    Version   0.10
-    Date      2021-05-28
-
-    CHANGELOG
-
-    v0.5        Uses conio for proper initialization and some of its
-                new features.  Color selection with MEGA/CTRL keys.
-
-    v0.6        FIX: Screen moved to $12000.
-                Multicolor and 16-color sprite support.
-                New color selection UI.
-                Change sprite type on-the-fly.with * key.
-                Clear sprite key.
-
-    v0.8        80x50 screen mode option, new UI, redraw optimizations.
-                Redesigned key scheme.
-                Supports 16-bit sprite data pointers (SPRPTR16).
-                Honours VIC-II Bank bits ($DD00) if SPRPTR16 is OFF.
-                Honours VIC color registers.
-                Supports extended width sprites (SPRX64EN)
-                16-color sprite uses 64-bit implicit width.
-                Drawing tools: pixel, box, circle ,lines.
-                Sprite Test Mode.
-
-    v0.9        Transfer to/from frozen sprite memory of registers and data.
-                Display: 50-line mode, wide-screen/4:3 aspect ratio modes.
-                UI Enhancements and fixes.
-                Fixes buffer overrun in Ask() function.
-                Sprite preview at side.
-                Fancy editing cursor sprite.
-                Fancy pointer sprite
-                H/V expand toggle
-                Size optimizations
-                Redrawing optimizations
-                Fetch/Store slot shortcuts.
-
-    v0.10       90-column display mode by default.
-                Faster I/O to Freeze memory (fetch_sector_32 functions)
-                Fixed Copy Sprite bug
-                Fixed 64bit-width sprite preview.
-                Changes at HELP screen
-                Cursor updates optimization and fix w/SPRX64EN activated
-                Fix "K" key for 16color
-
-
-
-    TODO:
-    * Consider SPRBPMEN for 16-color sprites
  */
 #include "colours.h"
 #include "dma.h"
@@ -840,9 +792,6 @@ void setup_text_palette(void) {
     // Werror do this because ALTPAL is selected by VIC-III HIGHLIGHT+UNDERLINE
     // combination and  Foreground colors in alt-palette are used from the 16th index,
     // so we avoid fiddling with this.
-
-    // POKE(0xD070UL, (PEEK(0xD070UL) & ~48) | ((reg_peek(REG_SPRPALSEL) & 0xC) << 2));
-    // setmapedpal(sprite_palette());
 }
 
 void update_cursor_x(void) {
@@ -919,44 +868,6 @@ static void draw_line(PaintFunc plot) {
     }
     clearattr();
 }
-
-/*
-static void DrawCircle(PaintFunc plot)
-{
-  RECT rc;
-  SetEffectiveToolRect(&rc);
-
-  // RECT rc;
-  // void (*plot)(uint8_t, uint8_t) = bPreview ? DrawShapeChar : g_state.paintCellFn;
-  // SetEffectiveToolRect(&rc);
-
-  // const signed char dx = rc.right - rc.left;
-  // const signed char dy = -(rc.bottom - rc.top);
-  // uint8_t x = g_state.toolOrgX, y = g_state.toolOrgY;
-  // signed char error = dx + dy;
-  // signed char doubled_error = 0;
-  // signed char sx = g_state.cursorX > g_state.toolOrgX ? 1 : -1;
-  // signed char sy = g_state.cursorY > g_state.toolOrgY ? 1 : -1;
-
-  // for (;;)
-  // {
-  //     plot(x, y);
-  //     if (x == g_state.cursorX && y == g_state.cursorY)
-  //         break;
-  //     doubled_error = error * 2;
-  //     if (doubled_error >= dy)
-  //     {
-  //         error += dy;
-  //         x += sx;
-  //     }
-  //     if (doubled_error <= dx)
-  //     {
-  //         error += dx;
-  //         y += sy;
-  //     }
-  // }
-}
-*/
 
 static void draw_box(PaintFunc plot) {
     RECT rc;

@@ -1,18 +1,32 @@
-base knowledge:
-- upon starting a dev new session, always load "llvm-mos" skill from https://github.com/mlund/claude-skills
-- ask user for paths to: `llvm-mos-sdk`, `mega65-core/`, `mega65-rom` (user may/may not have access), `mega65-user-guide/` (all three from the official mega65 gh repos).
+# startup
+
+Upon starting a new session, *always* do this:
+
+- load "llvm-mos" skill from https://github.com/mlund/claude-skills
+- prompt user for paths to:
+  - `llvm-mos-sdk` (clang compiler and tools),
+  - `mega65-core/`
+  - `mega65-rom` (user may/may not have access)
+  - `mega65-user-guide/`
+  (last three from the official mega65 gh repos).
+
+# rules
+
 - code docs never tracks history, are consice/terse/brief and focus on why over what
-- low .M65 tool byte count is paramount - measure rather than guess, and end commit messages with the measured byte delta
+- low .M65 tool byte count is a design goal - measure rather than guess, and end commit messages with the measured byte delta. See git log for history of byte hunting.
 - commit messages should be brief, concise and do not litter with authorship banners and promotion; use plain 1990-era language, no modern jargon
-- force a full rebuild before quoting a byte count; a stale link reports the old number
-- use idiomatic, modern C23.
+- use idiomatic, modern C23. Names are descriptive and style enforced by clang-tidy rules.
 - if possible use host side testing of C code - plenty of existing examples in project
 - use xemu with serial/hyppo testing. Also plenty of examples.
-- measure on xemu or hardware before theorising about a hardware bug
 - ask before committing or pushing; let user review
-- never commit plan documents, SD images or ROMs
 - the freeze slot is SD sectors, not memory: edits go through the monitor's one-sector cache
-- the screen is the C64 ROM charset - PETSCII screen codes, uppercase only, no lowercase
 - explicit addresses belong in the linker script, not in C
 - finish new features with code review, simplification pass, and code documentation review
 - see README.md for build and test invocation
+
+# gotchas
+
+- force a full rebuild before quoting a byte count; a stale link reports the old number
+- never commit plan documents, SD images or ROMs
+- the screen is the C64 ROM charset - PETSCII screen codes, uppercase only, no lowercase
+- measure on xemu or hardware before theorising about a hardware bug
