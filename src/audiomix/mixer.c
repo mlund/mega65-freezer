@@ -99,7 +99,6 @@ void draw_advanced_mixer(void) {
     uint16_t offset;
     uint8_t colour;
 
-    // debug output
     lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 5, SchemeTextDim);
     lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 7, SchemeTextDim);
     lpoke(COLOUR_RAM_ADDRESS + 3 * SCREEN_ROW_BYTES + 11, SchemeTextDim);
@@ -142,7 +141,6 @@ void draw_advanced_mixer(void) {
             }
         }
         if (colour == SchemeText) {
-            // debug output
             audio_menu[3 * 40 + 5] = nybl_to_screen(c >> 4);
             audio_menu[3 * 40 + 6] = nybl_to_screen(c);
         }

@@ -8,8 +8,9 @@
 
 // Same listing buffer and 64-byte stride as the disk chooser: at most
 // 0xffff/64 = 1023 entries, and 1023 << 6 = 65472 fits an unsigned 16-bit
-// value.  file_count and selection_number are short, so the plain product
-// overflowed *signed* int at entry 512.
+// value.  file_count and selection_number are short, so the product must be
+// widened: a short promotes to *signed* int, which stops at 32767, and entry
+// 512 onwards would reach the sign bit.
 #define DIR_NAME_BUF 0x40000L
 #define DIR_ENTRY_INDEX(n) ((uint16_t)(n) << 6)
 

@@ -6,7 +6,7 @@ shorten_name () {
   if [[ $name =~ ^([0-9]+)-(.+)$ ]]; then
     name="${BASH_REMATCH[1]}${BASH_REMATCH[2]}"
   fi
-  # developemnt + extra?
+  # development + extra?
   if [[ $name =~ ^development-(.+)$ ]]; then
     name="dev${BASH_REMATCH[1]}"
   fi
@@ -18,11 +18,12 @@ shorten_name () {
   echo ${name:0:6}
 }
 
-# status of 'B'ranch in 'S'hort format
+# The remote branch containing HEAD, so a pushed commit is named by the branch
+# it lives on rather than by whatever is checked out locally.
 branch=`git branch --remote --verbose --no-abbrev --contains | sed -rne 's/^[^\/]*\/([^\ ]+).*$/\1/p'`
 branch="${branch#HEAD}"
 if [[ -z ${branch} || "${branch}" =~ ^HEAD ]]; then
-  # unpushed stuff, lets try rev-parse instead
+  # Nothing on a remote contains it yet, so fall back to the local name.
   branch=`git rev-parse --abbrev-ref HEAD`
 fi
 branch2=$(shorten_name $branch)

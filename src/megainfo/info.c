@@ -178,13 +178,15 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
 
     ds = (((uint16_t)(code_buffer[offset + 1] & msbmask)) << 8) + (uint16_t)code_buffer[offset];
 
-    // first remove years. years are always full 366 days!
+    /* Years first, counted as 366 days each: the RTC's day count is what is
+     * being unpacked, not a calendar date. */
     while (ds > 366) {
         y++;
         ds -= 366;
     }
 
-    // then find out month and day, years divideable by 4 are jump years (no 100 or 400 in sight!)
+    /* Then the month and day.  Every fourth year is a leap year here; the
+     * century rules cannot be reached in the range an RTC covers. */
     // clang-format off
   if (m==1 && ds>31) { m++; ds -= 31; }
   if (m==2 && !(y&3) && ds>29) { m++; ds-=29; }

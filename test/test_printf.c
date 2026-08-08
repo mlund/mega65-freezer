@@ -1,11 +1,11 @@
 /*
  * Exercises snprintf's decimal conversions on the target.
  *
- * MEGAINFO formats hex everywhere -- %02X, %04X -- and every decimal it shows
- * went through a hand-written itoa.  A decimal conversion therefore has no
- * caller in any of the seven tools, so nothing has ever run this path on the
- * machine.  Hex needs shifts and masks; decimal needs division by ten, which is
- * a different route through the library.
+ * No tool links printf: the seven compose their text and format their own
+ * numbers, so nothing exercises the library's decimal path on the machine and a
+ * tool that started using it would be the first.  Hex needs shifts and masks;
+ * decimal needs division by ten, which is a different route through the
+ * library.
  *
  * Run by CTest under Xemu.  Each check has a number and failure quits the
  * emulator with it, so the exit status says which conversion went wrong.  Zero

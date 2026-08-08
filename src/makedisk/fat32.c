@@ -21,7 +21,6 @@ uint32_t root_dir_cluster = 0;
 
 void mega65_serial_monitor_write(char* s) {
     while (*s) {
-        // There is almost certainly a better way to do this, but it works.
         POKE(0x380, *s);
         /* One block, not three: the value travels from lda to sta in A, and
          * separate asm statements declare nothing, so the compiler is free to
