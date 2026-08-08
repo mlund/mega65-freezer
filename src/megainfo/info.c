@@ -83,31 +83,15 @@ void write_text_upper(unsigned char x, unsigned char y, uint16_t colour, char* t
     write_text_mapped(x, y, colour, text, 0x7f, 0x60);
 }
 
-/*
- * copy_hw_version()
- *
- *   globals: code_buffer
- *
- * extracts hardware and FPGA version from $FFD3629 by
- * copying 32 bytes to global code_buffer, to make access
- * faster (lpeek is a dma_copy!)
- */
+/* Populates code_buffer, m65model and m65submodel from $FFD3628.  One lcopy
+ * rather than 32 lpeeks: each lpeek is a DMA job on this target. */
 void copy_hw_version(void) {
     lcopy(0xFFD3628L, (long)code_buffer, 33);
     m65model = code_buffer[1];
     m65submodel = (code_buffer[0] >> 4) & 0xf;
 }
 
-/*
- * ge_mega_model() -> char *
- *
- *   returns: string (tempstr32 or static)
- *   globals: buffer
- *
- * translate m65model + m65submodel to model string
- *
- * get_hw_version must have been called to fill code_buffer
- */
+/* copy_hw_version() must have filled m65model and m65submodel first. */
 char* format_mega_model(void) {
     switch (m65model) {
         case 0x01:
@@ -156,21 +140,11 @@ char* format_mega_model(void) {
     return tempstr32;
 }
 
-/*
- * format_datestamp(offset, msbmask) -> char *
- *
- *   offset: offset to the start of the FPGA fields (1-KEYBD, 7-ARTIX, 13-MAX10)
- *   msbmask: mask msb byte (neeeded for MAX10, 0x3f)
- *
- *   returns: string (buffer)
- *   globals: tempstr32, buffer, ymd
- *
- * formats a FPGA datestamp (days since 2020-01-01, years full 366 days)
- * to a string YYYY-MM-DD.
- * stores year (without century), month, day as uchar in ymd[3]
- *
- * get_hw_version must have been called to fill code_buffer
- */
+/* A FPGA datestamp is days since 2020-01-01; `offset` is where the three
+ * fields sit in code_buffer (1 KEYBD, 7 ARTIX, 13 MAX10) and `msbmask` masks
+ * the MSB byte, which MAX10 needs at 0x3f.  Leaves the parsed year (without
+ * century), month and day in ymd[] for the caller to compare against.
+ * copy_hw_version() must have filled code_buffer first. */
 char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     unsigned char m = 1;
     uint16_t y = 2020;
@@ -219,19 +193,9 @@ char* format_datestamp(unsigned char offset, unsigned char msbmask) {
     return buffer;
 }
 
-/*
- * format_fpga_hash(offset, reverse) -> char *
- *
- *   offset: offset to the start of the FPGA fields (1-KEYBD, 7-ARTIX, 13-MAX10)
- *   msbmask: reverse byte order
- *
- *   returns: string (buffer)
- *   globals: buffer
- *
- * formats a FPGA commit hash to a 8 character hex number
- *
- * get_hw_version must have been called to fill code_buffer
- */
+/* The FPGA commit hash as 8 hex digits; `offset` locates the field in
+ * code_buffer as in format_datestamp(), `reverse` reads it byte-reversed.
+ * copy_hw_version() must have filled code_buffer first. */
 char* format_fpga_hash(unsigned char offset, unsigned char reverse) {
     char* at = buffer;
     for (uint8_t i = 0; i < 4; i++) {
@@ -243,14 +207,7 @@ char* format_fpga_hash(unsigned char offset, unsigned char reverse) {
     return buffer;
 }
 
-/*
- * format_rom_version() -> char *
- *
- *   returns: string (buffer or static)
- *   globals: buffer
- *
- * formats the ROM version. Tries to detect C64 ROMS.
- */
+/* The ROM version, or a static string for a ROM that cannot be identified. */
 char* format_rom_version(void) {
     // we want to display the version in freeze slot 0!
     freeze_slot_start_sector = read_freeze_slot_start_sector(0);
@@ -259,14 +216,7 @@ char* format_rom_version(void) {
     return detect_rom();
 }
 
-/*
- * format_hyppo_version -> char *
- *
- *   returns: string (buffer)
- *   globals: buffer, tempstr32
- *
- * fetches and formats hyppo and hdos version as a string '?.? / ?.?'
- */
+/* Hyppo and HDOS version as "hyppo.major.minor / hdos.major.minor". */
 char* format_hyppo_version(void) {
     struct hyppo_version v = {0xff, 0xff, 0xff, 0xff};
 
@@ -290,18 +240,9 @@ char* format_hyppo_version(void) {
     return buffer;
 }
 
-/*
- * format_util_version(addr, date) -> uchar
- *
- *   addr: start address in memory
- *
- *   returns: 0 if ok, 1 if older or missing
- *   globals: buffer
- *
- * search the next 256 bytes from start address for a version string
- * starting with 'v:20' and returns the next characters until a zero byte
- * compares to date (which should by artix ymd) and returns 0 if equal or newer
- */
+/* Scans 256 bytes from `addr` for a "v:20" version string and compares it to
+ * `date` (an ARTIX ymd triple).  0 if the found version is that date or newer,
+ * 1 if older or the string is not there. */
 unsigned char format_util_version(long addr, const unsigned char* date) {
     uint16_t i;
     uint16_t j = 0;
@@ -362,18 +303,8 @@ unsigned char format_util_version(long addr, const unsigned char* date) {
     return result;
 }
 
-/*
- * format_hickup_version(addr, date) -> uchar
- *
- *   addr: start address in memory
- *   date: uchar[3] with date
- *
- *   returns: 1 on old version, 0 on actual or newer version
- *   globals: buffer
- *
- * search for GIT: in 40000 upwards
- * tries to parse date and compare to date[3]
- */
+/* As format_util_version(), but for a "GIT: " tag rather than "v:20", scanning
+ * upward from `addr`. */
 unsigned char format_hickup_version(long addr, const unsigned char* date) {
     uint16_t p;
     uint16_t i;
@@ -467,19 +398,10 @@ static unsigned char rtc_pmu = 0xff;
 static uint16_t tod_ov = 0, rtc_ov = 0;
 static short tod_last = -1, tod_ticks = 0, rtc_ticks = 0;
 
-/*
- * get_rtc_stats(reinit) -> uchar
- *
- *   reinit: if 1, restart everything
- *
- *   returns: 1 if ticked
- *   globals: rtc global vars
- *
- * makes one copy of tod and rtc data to a buffer (clock_init == 1)
- * makes only a second copy if first copy was made (clock_init == 0)
- * if tod ticks have changed, also updates all RTCs
- * returns 0 if tod seconds have not changed, otherwise 1
- */
+/* Copies the TOD and RTC registers.  `reinit` takes the first of two copies
+ * needed to detect a tick; the next call with reinit clear takes the second
+ * and compares them, updating every clock display if TOD moved.  Returns
+ * whether it did. */
 unsigned char get_rtc_stats(unsigned char reinit) {
     short pa;
     short pb;
@@ -596,16 +518,8 @@ unsigned char get_rtc_stats(unsigned char reinit) {
     return 1;
 }
 
-/*
- * format_extrtc_status(status)
- *
- *   status: status code from get_rtc_stats
- *
- *   globals: buffer
- *
- * formats status as a string in buffer+1
- * sets buffer+0 to the colour code 0-15
- */
+/* `status` is get_rtc_stats()'s return, packed into a colour byte at buffer[0]
+ * and a description at buffer+1. */
 void format_extrtc_status(unsigned char status) {
     unsigned char colour = SchemeUnknown;
 
@@ -633,14 +547,8 @@ void format_extrtc_status(unsigned char status) {
     buffer[0] = colour;
 }
 
-/*
- * display_rtc_status(x, y, clock)
- *
- *   x, y: where to print
- *   clock: 0 = internal, 1 = external
- *
- * write rtc status to screen
- */
+/* Prints the internal RTC's status at (x, y); a second line beneath it
+ * appears once enough ticks have been seen to judge whether it is running. */
 void display_rtc_status(unsigned char x, unsigned char y) {
     unsigned char colour;
     unsigned char offs = 0xff;
