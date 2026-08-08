@@ -179,7 +179,32 @@ add_custom_target(stage-iomap ALL
             ${SRC}/monitor/iomap.bin ${CMAKE_BINARY_DIR}/src/IOMAP.BIN
     COMMENT "Staging IOMAP.BIN")
 
+# The frames the freezer draws around a slot's thumbnail, picked by machine type
+# and loaded off the card at run time.  Generated rather than committed: the
+# generator is plain Python, so unlike IOMAP.BIN there is nothing to go missing.
+if(Python3_FOUND)
+    set(THUMB_FRAMES)
+    foreach(machine m65 c65 c64)
+        string(TOUPPER ${machine} MACHINE)
+        set(frame ${CMAKE_BINARY_DIR}/src/${MACHINE}THUMB.M65)
+        add_custom_command(OUTPUT ${frame}
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_thumbnail_frames.py
+                    ${CMAKE_CURRENT_SOURCE_DIR}/assets/thumbnail-surround-${machine}.png
+                    --xoff 5 --yoff 1 -o ${frame}
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/assets/thumbnail-surround-${machine}.png
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_thumbnail_frames.py
+            COMMENT "Generating ${MACHINE}THUMB.M65")
+        list(APPEND THUMB_FRAMES ${frame})
+    endforeach()
+    add_custom_target(thumbnail-frames ALL DEPENDS ${THUMB_FRAMES})
+endif()
+
 if(Python3_FOUND AND HOST_C_COMPILER)
+    add_test(NAME thumbnail_frames
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_thumbnail_frames.py)
+
     add_test(NAME format
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_format.py
                 --cc ${HOST_C_COMPILER})
