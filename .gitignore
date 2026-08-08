@@ -7,6 +7,8 @@ build-*/
 *.map
 !ascii8x8.bin
 TODO.md
+# Porting notes kept beside the code, not shipped with it.
+cc65-to-llvm-porting.md
 *.swp
 *.swo
 __pycache__/
