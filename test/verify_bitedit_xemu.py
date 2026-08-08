@@ -13,7 +13,6 @@ Xemu's own image carries stock MEGA65 binaries -- without this the test would
 exercise upstream's monitor rather than ours.  The image is cloned before our
 builds are copied in, so the one passed in is never modified.
 
-macOS only, because the clone-and-inject step uses hdiutil.
 
 With --expect-serial the emulator also runs -hyperserialascii and the trace
 edit_bits() emits on each write is checked.  That is the stronger assertion:
@@ -35,7 +34,6 @@ import argparse
 import contextlib
 import os
 import re
-import shutil
 import signal
 import subprocess
 import sys
@@ -43,6 +41,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import card
 import xemu_keys
 
 # $D011 in the frozen machine.  Its bit 5 is BMM, which the database names, so
@@ -71,39 +70,6 @@ EXPECTED_SCREEN = ["VIC-II", "BMM", "RSEL", "YSCL", "RASTER COMPARE BIT 8"]
 # Typed into the VAL field last.  Not a value a toggle could have produced, so
 # reading it back proves hex entry rather than only the bit flip.
 EXPECTED_VALUE = "3B"
-
-
-def inject(base_image: str, work_dir: str, build_dir: str, with_iomap: bool = True) -> str:
-    """Clone the image and copy our .M65 files onto its FAT32 partition."""
-    if not shutil.which("hdiutil"):
-        sys.exit("hdiutil not found; this test is macOS only")
-    clone = os.path.join(work_dir, "card.img")
-    # -c asks for a copy-on-write clone, so a 4GB image costs nothing.
-    subprocess.run(["cp", "-c", base_image, clone], check=True)
-
-    attached = subprocess.run(
-        ["hdiutil", "attach", "-imagekey", "diskimage-class=CRawDiskImage", clone],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    device = attached.split()[0]
-    mount = re.search(r"(/Volumes/\S.*)$", attached, re.M)
-    if not mount:
-        subprocess.run(["hdiutil", "detach", device], capture_output=True, check=False)
-        sys.exit(f"no FAT32 volume in {base_image}")
-    try:
-        # IOMAP.BIN as well as the tools: the bit editor's names live there, and
-        # a card without it looks exactly like a database that knows nothing.
-        for name in sorted(os.listdir(build_dir)):
-            if name.endswith(".BIN") and not with_iomap:
-                continue
-            if name.endswith((".M65", ".BIN")):
-                shutil.copy(os.path.join(build_dir, name), mount.group(1).strip())
-        subprocess.run(["sync"], check=False)
-    finally:
-        subprocess.run(["hdiutil", "detach", device], capture_output=True, check=False)
-    return clone
 
 
 def find_edit(original: str, clone: str, after: int) -> tuple[int, list[int]]:
@@ -203,7 +169,7 @@ def main() -> int:
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as tmp:
-        card = inject(args.sdimg, tmp, args.build, not args.without_iomap)
+        clone = card.inject(args.sdimg, tmp, args.build, not args.without_iomap)
         dump = os.path.join(tmp, "screen.txt")
         serial_path = os.path.join(tmp, "serial.txt")
         socket_path = f"/tmp/xemu-bitedit-{os.getpid()}.sock"
@@ -217,7 +183,7 @@ def main() -> int:
             "3",
             "-besure",
             "-sdimg",
-            card,
+            clone,
             "-uartmon",
             socket_path,
             "-prgmode",
@@ -269,7 +235,7 @@ def main() -> int:
         if args.expect_serial:
             with open(serial_path, encoding="utf-8", errors="replace") as handle:
                 serial = handle.read()
-        written, carrying = find_edit(args.sdimg, card, int(EXPECTED_VALUE, 16))
+        written, carrying = find_edit(args.sdimg, clone, int(EXPECTED_VALUE, 16))
 
     if args.without_iomap:
         # The editor must still run with no database, so the assertions invert:
