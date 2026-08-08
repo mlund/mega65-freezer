@@ -62,8 +62,10 @@ def inject(base_image: str, work_dir: str, build_dir: str) -> str:
         subprocess.run(["hdiutil", "detach", device], capture_output=True, check=False)
         sys.exit(f"no FAT32 volume in {base_image}")
     try:
+        # IOMAP.BIN as well as the tools: the bit editor's names live there, and
+        # a card without it looks exactly like a database that knows nothing.
         for name in sorted(os.listdir(build_dir)):
-            if name.endswith(".M65"):
+            if name.endswith((".M65", ".BIN")):
                 shutil.copy(os.path.join(build_dir, name), mount.group(1).strip())
         subprocess.run(["sync"], check=False)
     finally:

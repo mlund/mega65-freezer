@@ -74,6 +74,12 @@ REGISTER_NAME_WIDTH = 8
 # names present.
 MAX_FIELDS = 8
 
+# The chip index and the three record flags share one byte.
+FLAG_CHIP_MASK = 0x1F
+FLAG_HAS_FIELDS = 0x20
+FLAG_HAS_NAME = 0x40
+FLAG_HAS_TEXT = 0x80
+
 VOWELS = "AEIOU"
 
 # Registers iomap.txt describes as a whole byte -- "sprite enable bits" -- where
@@ -134,6 +140,8 @@ class Register:
         self.chip: tuple[int, str] | None = None
         self.name: tuple[int, str] | None = None
         self.bit: dict[int, tuple[int, str]] = {}
+        self.text: tuple[int, str] | None = None
+        self.bit_text: dict[int, tuple[int, str]] = {}
 
     def offer_chip(self, rank: int, chip: str) -> None:
         if self.chip is None or self.chip[0] <= rank:
@@ -147,6 +155,14 @@ class Register:
         if bit not in self.bit or self.bit[bit][0] <= rank:
             self.bit[bit] = (rank, name)
 
+    def offer_text(self, rank: int, text: str) -> None:
+        if text and (self.text is None or self.text[0] <= rank):
+            self.text = (rank, text)
+
+    def offer_bit_text(self, rank: int, bit: int, text: str) -> None:
+        if text and (bit not in self.bit_text or self.bit_text[bit][0] <= rank):
+            self.bit_text[bit] = (rank, text)
+
 
 def parse(path: str) -> dict[int, Register]:
     registers: dict[int, Register] = defaultdict(Register)
@@ -157,7 +173,7 @@ def parse(path: str) -> dict[int, Register]:
         match = LINE.match(line.rstrip())
         if not match:
             continue
-        chipset, address, high, low, chip, signal, _description = match.groups()
+        chipset, address, high, low, chip, signal, description = match.groups()
         value = int(address, 16)
         if not IO_FIRST <= value <= IO_LAST:
             continue
@@ -174,10 +190,12 @@ def parse(path: str) -> dict[int, Register]:
         signal = signal.split("@")[0]
         if high is None:
             register.offer_name(rank, signal)
+            register.offer_text(rank, description)
         else:
             first, last = int(high), int(low) if low else int(high)
             for bit in range(min(first, last), max(first, last) + 1):
                 register.offer_bit(rank, bit, signal)
+                register.offer_bit_text(rank, bit, description)
 
     # A drop that stops matching is a silent way to grow the table back.
     if not dropped:
@@ -285,144 +303,248 @@ def register_display_name(register: Register, bit_names: list[str]) -> str | Non
     return squeeze(heads.pop(), REGISTER_NAME_WIDTH) if len(heads) == 1 else None
 
 
-# PETSCII screen codes, not ASCII: the screen renders with the C64 ROM charset
-# (see the monitor's charset note), so A-Z are $01-$1A and the digits sit at
-# $30-$39 as in ASCII.  Every code is below $80, which is what lets the last
-# character of a name carry the terminator in bit 7.
-def to_screen_codes(text: str) -> list[int]:
+# The descriptions are LaTeX sources, not plain text.  Only these five forms are
+# markup; everything else that looks like it is not.
+LATEX = {
+    r"$\times$": "X",
+    r"$\div$": "/",
+    r"\$": "$",
+    r"\#": "#",
+    r"\&": "&",
+    "``": '"',
+    "''": '"',
+    "`": "'",
+}
+
+# What is left once those are applied.  A bare `$` is a hex prefix far more
+# often than a math delimiter -- "Write $45 then $54", "$D000-$DFFF" -- so
+# stripping it corrupts the text; `~` means "approximately" (~3.5MHz), not a
+# non-breaking space; `_` and `#` are literal, as in f011_rsector_found and
+# "thumb wheel #3".  Anything matching this is markup nobody has taught us.
+UNKNOWN_MARKUP = re.compile(r"\\[a-zA-Z]+|\\[^a-zA-Z]|[{}]")
+
+
+def detex(text: str, where: str, warnings: list[str]) -> str:
+    """Turn one description from LaTeX into plain text, complaining if it cannot.
+
+    Passing unknown markup through unchanged rather than guessing keeps a future
+    iomap.txt visible: the reader sees the backslash and knows to look.
+    """
+    for source, replacement in LATEX.items():
+        text = text.replace(source, replacement)
+    leftover = UNKNOWN_MARKUP.findall(text)
+    if leftover:
+        warnings.append(f"{where}: unhandled markup {sorted(set(leftover))} in {text!r}")
+    return " ".join(text.split())
+
+
+# The screen has no lowercase, `_` or `~` in the uppercase ROM charset.
+TEXT_SUBSTITUTIONS = {"_": "-", "~": ""}
+
+# `\` and `^` land on the pound sign and an up arrow in this charset, so they
+# would show as something they are not.
+UNRENDERABLE = (0x5C, 0x5E)
+
+
+def to_screen_codes(text: str, where: str = "", warnings: list[str] | None = None) -> list[int]:
+    """PETSCII screen codes, not ASCII: the screen renders with the C64 ROM
+    charset (see the monitor's charset note), so A-Z are $01-$1A and the digits
+    sit at $30-$39 as in ASCII.  Every code is below $80, which is what lets the
+    caller mark the last character with the terminator in bit 7.
+
+    A name must be representable, so `warnings` left out means raise.  Prose is
+    allowed to lose the odd character, so passing a list means warn and drop.
+    """
+    for source, replacement in TEXT_SUBSTITUTIONS.items():
+        text = text.replace(source, replacement)
     codes = []
-    for character in text:
-        if "A" <= character <= "Z":
-            codes.append(ord(character) - 0x40)
-        elif "0" <= character <= "9" or character == "-":
-            codes.append(ord(character))
-        else:
+    for character in text.upper():
+        code = ord(character)
+        if 0x20 <= code <= 0x3F:
+            codes.append(code)  # space through `?`, unchanged
+        elif 0x40 <= code <= 0x5D and code not in UNRENDERABLE:
+            codes.append(code - 0x40)  # `@`, the letters, and the brackets
+        elif warnings is None:
             raise SystemExit(f"name {text!r} has no screen code for {character!r}")
+        else:
+            warnings.append(f"{where}: dropped {character!r} from a description")
+    return codes
+
+
+def terminated(codes: list[int]) -> list[int]:
+    """The last character carries the end of the string in bit 7."""
     codes[-1] |= 0x80
     return codes
 
 
-def build(registers: dict[int, Register]) -> tuple[list[int], list[str], dict[str, int]]:
-    """Encode every address into the byte stream the C decoder walks.
+# The screen the descriptions have to fit, from bitedit.c: seven shared lines,
+# each BITEDIT_ROW_WIDTH less the tag column.  Checked here because the target
+# cannot: it would simply draw the eighth line off the bottom of the block.
+INFO_ROWS = 7
+INFO_ROOM = 78 - 7
 
-    Record: addr16, length, chip|flags, then 3 index bytes when the register has
-    named bits, then the names -- the register's own first when present.  The
-    length byte is what makes the walk one addition rather than a decode.
+
+def wrapped_lines(text: bytearray, offset: int) -> int:
+    """How many lines one pooled string takes, wrapping as bitedit_wrap does."""
+    if offset == NO_TEXT:
+        return 0
+    end = offset
+    while not text[end] & 0x80:
+        end += 1
+    body, at, lines = text[offset : end + 1], 0, 0
+    while at < len(body):
+        remaining = len(body) - at
+        if remaining <= INFO_ROOM:
+            return lines + 1
+        take = next(
+            (i + 1 for i in range(INFO_ROOM - 1, -1, -1) if body[at + i] == 0x20), INFO_ROOM
+        )
+        at += take
+        lines += 1
+    return lines
+
+
+MAGIC = b"M65I"
+FORMAT_VERSION = 1
+HEADER_BYTES = 12
+NO_TEXT = 0xFFFF
+
+
+def build_binary(registers: dict[int, Register]) -> tuple[bytearray, list[str], list[str]]:
+    """The whole file: header, chip names, records, then the description text.
+
+    Descriptions are pooled and shared -- 542 distinct strings across 638 uses --
+    so a record carries a two-byte offset into the pool rather than its own copy.
     """
+    warnings: list[str] = []
     chips = sorted({r.chip[1] for r in registers.values() if r.chip})
     chip_index = {chip: position for position, chip in enumerate(chips)}
-    if len(chips) > 32:
+    if len(chips) > FLAG_CHIP_MASK + 1:
         raise SystemExit(f"{len(chips)} chips will not fit the 5-bit field")
 
-    stream: list[int] = []
-    fabricated: list[str] = []
+    text = bytearray()
+    offsets: dict[str, int] = {}
 
+    def pool(raw: str | None, where: str) -> int:
+        if not raw:
+            return NO_TEXT
+        clean = detex(raw, where, warnings)
+        if clean not in offsets:
+            codes = to_screen_codes(clean, where, warnings)
+            if not codes:
+                return NO_TEXT
+            offsets[clean] = len(text)
+            text.extend(terminated(codes))
+        return offsets[clean]
+
+    records = bytearray()
+    fabricated: list[str] = []
+    budgets: list[tuple[int, int, list[int]]] = []
     for address in sorted(registers):
         register = registers[address]
         display, names, bit_index = describe(address, register)
-
         if len(names) > MAX_FIELDS:
             raise SystemExit(f"${address:04X} has {len(names)} fields, over {MAX_FIELDS}")
         if len(names) != len(set(names)):
             fabricated.append(f"${address:04X}: {names}")
 
+        body = bytearray()
         flags = chip_index[register.chip[1]] if register.chip else 0
         if names:
-            flags |= 0x20
-        if display:
-            flags |= 0x40
-
-        body: list[int] = []
-        if names:
-            # Eight 3-bit indices, bit 7 of the register down to bit 0.  A bit
-            # with no name takes the index one past the last, which is why an
-            # eight-name register never needs one.
+            flags |= FLAG_HAS_FIELDS
             packed = 0
             for bit in range(7, -1, -1):
                 packed = (packed << 3) | bit_index.get(bit, len(names))
-            body += [(packed >> 16) & 0xFF, (packed >> 8) & 0xFF, packed & 0xFF]
+            body += bytes(((packed >> 16) & 0xFF, (packed >> 8) & 0xFF, packed & 0xFF))
+
+        source = register.text[1] if register.text else None
+        if source is None and not names and register.bit_text:
+            # A register promoted to a byte value keeps its prose.  iomap.txt
+            # hung it on the bit range rather than on the register -- $D020 is
+            # documented as `$D020.7-0 BORDERCOL display border colour` -- so
+            # without this the five colour registers lose their descriptions.
+            source = next(iter(register.bit_text.values()))[1]
+        register_text = pool(source, f"${address:04X}")
+        if register_text != NO_TEXT:
+            flags |= FLAG_HAS_TEXT
+            body += register_text.to_bytes(2, "little")
         if display:
-            body += to_screen_codes(display)
-        for name in names:
-            body += to_screen_codes(name)
+            flags |= FLAG_HAS_NAME
+            body += bytes(terminated(to_screen_codes(display)))
+
+        # One text offset per field, in the order the 3-bit indices select from.
+        field_text: list[int] = []
+        for position, name in enumerate(names):
+            bit = next((b for b in range(8) if bit_index.get(b) == position), None)
+            source = register.bit_text.get(bit) if bit is not None else None
+            where = pool(source[1] if source else None, f"${address:04X}.{bit}")
+            field_text.append(where)
+            body += where.to_bytes(2, "little")
+            body += bytes(terminated(to_screen_codes(name)))
+        budgets.append((address, register_text, field_text))
 
         length = 4 + len(body)
         if length > 0xFF:
             raise SystemExit(f"${address:04X} record is {length} bytes")
-        stream += [address & 0xFF, address >> 8, length, flags, *body]
+        records += bytes((address & 0xFF, address >> 8, length, flags)) + body
+
+    # A register's own description shares the block with the widest of its bits,
+    # so it is the pair that has to fit rather than either one alone.
+    for address, register_text, field_text in budgets:
+        rows = wrapped_lines(text, register_text) + max(
+            (wrapped_lines(text, f) for f in field_text), default=0
+        )
+        if rows > INFO_ROWS:
+            warnings.append(
+                f"${address:04X}: description needs {rows} lines, block holds {INFO_ROWS}"
+            )
 
     if fabricated:
         raise SystemExit(
             "abbreviation collided, which would show an invented name:\n  "
             + "\n  ".join(fabricated)
         )
-    return stream, chips, chip_index
 
-
-def render(stream: list[int], chips: list[str], registers: dict[int, Register]) -> str:
-    # Not squeeze()d: the hyphen is part of the name, so VIC-IV must not become
-    # VICIV.  All 29 already fit the column, UARTMISC exactly.
-    chip_codes: list[int] = []
+    chip_bytes = bytearray()
     for chip in chips:
-        chip_codes += to_screen_codes(chip[:REGISTER_NAME_WIDTH])
+        chip_bytes += bytes(terminated(to_screen_codes(chip[:REGISTER_NAME_WIDTH])))
 
-    out = [
-        "// Generated by tools/gen_iomap_names.py -- do not edit.",
-        "//",
-        "// Regenerate with:  cmake --build build --target iomap-names",
-        "//",
-        "// Names for the I/O registers, from mega65-core's iomap.txt.  Text is in",
-        "// PETSCII screen codes with bit 7 set on a name's last character; see the",
-        "// generator for the record layout and the abbreviation rules.",
-        "",
-        f"#define IOMAP_CHIP_COUNT {len(chips)}",
-        f"#define IOMAP_TABLE_BYTES {len(stream)}",
-        "",
-        "// Chip names in index order, for the NAME column's last resort.",
-        f"static const uint8_t IOMAP_CHIPS[{len(chip_codes)}] IOMAP_RODATA = {{",
-    ]
-    out += emit_bytes(chip_codes)
-    out += [
-        "};",
-        "",
-        "// addr16, length, chip|flags, [3 index bytes], [register name], [bit names].",
-        "// Sorted by address, so a forward walk serves a whole screen of rows.",
-        f"static const uint8_t IOMAP_TABLE[{len(stream)}] IOMAP_RODATA = {{",
-    ]
-    out += emit_bytes(stream)
-    out += ["};", ""]
+    record_start = HEADER_BYTES + len(chip_bytes)
+    text_start = record_start + len(records)
+    total = text_start + len(text)
+    if total > 0xFFFF:
+        raise SystemExit(f"{total} bytes will not fit the 16-bit offsets")
 
-    named_bits = sum(len(r.bit) for r in registers.values())
-    out.insert(
-        7,
-        f"// {len(registers)} addresses, {named_bits} named bits, {len(chips)} chips.",
-    )
-    return "\n".join(out)
-
-
-def emit_bytes(data: list[int]) -> list[str]:
-    return [
-        "    " + " ".join(f"0x{byte:02x}," for byte in data[start : start + 12])
-        for start in range(0, len(data), 12)
-    ]
+    out = bytearray(MAGIC)
+    out += bytes((FORMAT_VERSION, len(chips)))
+    out += record_start.to_bytes(2, "little")
+    out += text_start.to_bytes(2, "little")
+    out += total.to_bytes(2, "little")
+    out += chip_bytes + records + text
+    return out, chips, warnings
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iomap", required=True, help="path to mega65-core's iomap.txt")
-    parser.add_argument("-o", "--output", required=True, help="destination .inc file")
+    parser.add_argument("-o", "--output", required=True, help="destination IOMAP.BIN")
     args = parser.parse_args()
 
     registers = parse(args.iomap)
     if not registers:
         raise SystemExit(f"no ${IO_FIRST:04X}-${IO_LAST:04X} entries in {args.iomap}")
-    stream, chips, _ = build(registers)
+    data, chips, warnings = build_binary(registers)
 
-    with open(args.output, "w", encoding="utf-8") as handle:
-        handle.write(render(stream, chips, registers))
+    for warning in warnings:
+        print(f"warning: {warning}", file=sys.stderr)
 
+    with open(args.output, "wb") as handle:
+        handle.write(data)
+
+    named_bits = sum(len(r.bit) for r in registers.values())
     print(
-        f"{len(registers)} addresses, {len(chips)} chips, {len(stream)} bytes -> {args.output}",
+        f"{len(registers)} addresses, {named_bits} named bits, {len(chips)} chips, "
+        f"{len(data)} bytes -> {args.output}",
         file=sys.stderr,
     )
     return 0

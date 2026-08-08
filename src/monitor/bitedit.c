@@ -9,24 +9,47 @@
 #include "colours.h"
 #include "console.h"
 #include "dma.h"
+#include "format.h"
+#include "helper.h"
 #include "mega65_regs.h"
 #include "screen.h"
+#include "trace.h"
 
 #include <string.h>
-
-#ifdef FREEZER_TRACE
-#include <mega65/debug.h>
-#endif
 
 /* The editor takes the display while it runs, so the count is whatever fits
  * above the footer under the heading.  A scrolling console has nothing to offer
  * a table that is repainted in place, and owning the screen means the rows sit
  * at a known address instead of wherever printing them happened to land. */
-constexpr uint8_t EDIT_ROWS = 23;
+constexpr uint8_t EDIT_ROWS = 14;
 constexpr uint16_t WINDOW_TOP = SCREEN_ADDRESS + SCREEN_ROW_BYTES;
+
+/* The description block, fenced by a rule above and below.  Seven lines is
+ * enough that no register's own text plus its longest bit's ever overflows, so
+ * the two share the space rather than each taking a fixed cut. */
+constexpr uint8_t INFO_ROWS = 7;
+constexpr uint8_t INFO_TAG_WIDTH = 7;
+constexpr uint8_t RULE_ROW = EDIT_ROWS + 1;
+constexpr uint8_t INFO_ROW = RULE_ROW + 1;
+constexpr uint8_t FOOTER_RULE_ROW = INFO_ROW + INFO_ROWS;
+
+/* Where the database is parked once loaded.  Nothing MONITOR links touches
+ * anything above $1F800, and the frozen program's own $40000 lives in the
+ * freeze slot on the card, so this is scratch. */
+constexpr Addr28 IOMAP_ADDRESS = 0x40000L;
+static bool iomap_ready;
+static bool iomap_tried;
 
 static char row_text[BITEDIT_ROW_WIDTH];
 static char row_colour[BITEDIT_ROW_WIDTH];
+
+/* bitedit_table.c asks for the database through this and nothing else, which is
+ * what lets the host test hand it a buffer instead of a card.  lpeek is a flat
+ * load rather than a DMA job, so a byte at a time is the right granularity and
+ * the decoder needs no cache of its own. */
+uint8_t iomap_byte(uint16_t offset) {
+    return iomap_ready ? lpeek(IOMAP_ADDRESS + offset) : 0;
+}
 
 static void paint_row(uint8_t row, uint8_t value, uint8_t cursor_cell) {
     const uint16_t screen = WINDOW_TOP + row * SCREEN_ROW_BYTES;
@@ -65,10 +88,14 @@ static bool readable(uint32_t address) {
     return disasm_read_byte(address, &value);
 }
 
+static void draw_info(uint32_t address, const RegisterInfo* info, uint8_t cursor_cell);
+
 static void draw_window(uint32_t top, uint8_t cursor_row, uint8_t cursor_cell) {
     uint8_t previous_chip = BITEDIT_NO_CHIP;
     uint16_t scan = 0;
+    RegisterInfo cursor_info;
 
+    memset(&cursor_info, 0, sizeof(cursor_info));
     for (uint8_t row = 0; row < EDIT_ROWS; row++) {
         const uint32_t address = top + row;
         const uint8_t cursor = row == cursor_row ? cursor_cell : BITEDIT_CELL_COUNT;
@@ -86,17 +113,149 @@ static void draw_window(uint32_t top, uint8_t cursor_row, uint8_t cursor_cell) {
         bitedit_lookup(bitedit_io_address(address), &info, &scan);
         previous_chip = bitedit_render(row_text, address, value, &info, previous_chip);
         paint_row(row, value, cursor);
+        if (row == cursor_row) {
+            cursor_info = info;
+        }
     }
+    draw_info(top + cursor_row, &cursor_info, cursor_cell);
+}
+
+/* Load the database once per monitor session.  A second B costs nothing, and a
+ * missing file is not an error: the editor simply has no names for anything,
+ * which is the same thing it shows for an address the database never covered. */
+static void load_database(void) {
+    if (iomap_tried) {
+        return;
+    }
+    iomap_tried = true;
+
+    /* The loader resolves against hyppo's working directory and MONITOR, unlike
+     * the freezer, has no root check of its own. */
+    mega65_dos_cdroot();
+    iomap_ready = read_file_from_sdcard("IOMAP.BIN", IOMAP_ADDRESS) == 0;
+    if (iomap_ready) {
+        iomap_ready = bitedit_open();
+    }
+    TRACE(iomap_ready ? "IOMAP LOADED" : "IOMAP MISSING");
+}
+
+/* Returns the row after the last one used, because the register and bit fields
+ * share the block rather than each taking a fixed cut of it. */
+static uint8_t put_info(
+    uint8_t row, const char* tag, uint8_t tag_length, const char* body, uint16_t length) {
+    char line[BITEDIT_ROW_WIDTH];
+    uint16_t at = 0;
+
+    while (row < FOOTER_RULE_ROW) {
+        const bool first = at == 0;
+        memset(line, ' ', BITEDIT_ROW_WIDTH);
+        if (first) {
+            memcpy(line, tag, tag_length);
+        }
+        const uint8_t take = bitedit_wrap(body, length, at, BITEDIT_ROW_WIDTH - INFO_TAG_WIDTH);
+        memcpy(&line[INFO_TAG_WIDTH], &body[at], take);
+        at = (uint16_t)(at + take);
+
+        const uint16_t screen = WINDOW_TOP + (row - 1) * SCREEN_ROW_BYTES;
+        lcopy((long)line, screen, BITEDIT_ROW_WIDTH);
+        lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + screen, SchemeTextDim, BITEDIT_ROW_WIDTH);
+        if (first) {
+            lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + screen, SchemeText, tag_length);
+        }
+        row++;
+        if (at >= length) {
+            break;
+        }
+    }
+    return row;
+}
+
+/* `$D011` or `$D011.5`, in screen codes.  Always available and always true,
+ * which is why it stands in wherever a description is missing. */
+static uint8_t reference(char* tag, uint16_t io_address, int8_t bit) {
+    tag[0] = '$';
+    format_hex(&tag[1], io_address, 4);
+    if (bit < 0) {
+        return 5;
+    }
+    tag[5] = '.';
+    tag[6] = (char)(0x30 + bit);
+    return 7;
+}
+
+/* What the register line says when iomap.txt has no prose for it: the chip and
+ * the register's own mnemonic, which is still more than an empty line. */
+static uint16_t register_fallback(const RegisterInfo* info, char* body) {
+    uint16_t length = 0;
+    if (info->field_count || info->name) {
+        length = bitedit_string(bitedit_chip_name(info->chip), body, BITEDIT_NAME_WIDTH);
+    }
+    if (info->name) {
+        body[length++] = ' ';
+        body[length++] = ' ';
+        length = (uint8_t)(length + bitedit_string(info->name, &body[length], BITEDIT_NAME_WIDTH));
+    }
+    return length;
+}
+
+static void draw_info(uint32_t address, const RegisterInfo* info, uint8_t cursor_cell) {
+    char tag[INFO_TAG_WIDTH];
+    char body[320];
+    const uint16_t io_address = bitedit_io_address(address);
+    uint8_t row = INFO_ROW;
+
+    lfill(WINDOW_TOP + (INFO_ROW - 1) * SCREEN_ROW_BYTES, ' ', INFO_ROWS * SCREEN_ROW_BYTES);
+
+    /* The register line first, then whatever is left goes to the bit line.
+     * Sharing beats a fixed split: register text runs to 156 characters and bit
+     * text to 318, so any fixed division truncates what the other half had room
+     * for. */
+    if (io_address) {
+        const uint8_t tag_length = reference(tag, io_address, -1);
+        uint16_t length = bitedit_string(info->text, body, (uint16_t)(sizeof(body) - 1));
+        if (!length) {
+            length = register_fallback(info, body);
+        }
+        row = put_info(row, tag, tag_length, body, length);
+    }
+
+    if (cursor_cell == BITEDIT_CELL_VALUE) {
+        return;
+    }
+    const uint8_t field = info->bit_field[cursor_cell];
+    if (info->field_count && field < info->field_count) {
+        const uint8_t tag_length =
+            (uint8_t)bitedit_string(info->field_name[field], tag, INFO_TAG_WIDTH);
+        const uint16_t length =
+            bitedit_string(info->field_text[field], body, (uint16_t)(sizeof(body) - 1));
+        put_info(row, tag, tag_length, body, length);
+    } else if (io_address) {
+        /* No name and no prose: say which bit the cursor is on, which is always
+         * true and is what a reader would look up. */
+        const uint8_t tag_length = reference(tag, io_address, (int8_t)cursor_cell);
+        put_info(row, tag, tag_length, body, 0);
+    }
+}
+
+static void rule(uint8_t row) {
+    /* A horizontal line in the ROM charset, so the block reads as its own
+     * region rather than as more table. */
+    constexpr uint8_t GLYPH_RULE = 0x40;
+    const uint16_t screen = WINDOW_TOP + (row - 1) * SCREEN_ROW_BYTES;
+    lfill(screen, GLYPH_RULE, BITEDIT_ROW_WIDTH);
+    lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + screen, SchemeTextDim, BITEDIT_ROW_WIDTH);
 }
 
 /* Clear everything above the footer and put the heading on the top line.  The
  * footer is left alone: display_footer() owns row 24. */
 static void open_window(void) {
-    constexpr uint16_t USED = (EDIT_ROWS + 1) * SCREEN_ROW_BYTES;
+    constexpr uint16_t USED = (FOOTER_RULE_ROW + 1) * SCREEN_ROW_BYTES;
     lfill(SCREEN_ADDRESS, ' ', USED);
     lfill(COLOUR_RAM_ADDRESS, SchemeTextDim, USED);
     bitedit_header(row_text);
     lcopy((long)row_text, SCREEN_ADDRESS, BITEDIT_ROW_WIDTH);
+    rule(RULE_ROW);
+    rule(FOOTER_RULE_ROW);
 }
 
 /* Every write, on the hypervisor serial channel.  The address and value are
@@ -134,6 +293,7 @@ bool edit_bits(void) {
         return false;
     }
 
+    load_database();
     open_window();
     draw_window(top, cursor_row, cursor_cell);
     while (ASCIIKEY) {

@@ -166,9 +166,18 @@ set(MEGA65_IOMAP "$ENV{MEGA65_IOMAP}" CACHE FILEPATH
 if(Python3_FOUND AND MEGA65_IOMAP AND EXISTS ${MEGA65_IOMAP})
     add_custom_target(iomap-names
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/gen_iomap_names.py
-                --iomap ${MEGA65_IOMAP} -o ${SRC}/monitor/iomap_names.inc
-        COMMENT "Regenerating I/O register bit names")
+                --iomap ${MEGA65_IOMAP} -o ${SRC}/monitor/iomap.bin
+        COMMENT "Regenerating the I/O register database")
 endif()
+
+# The database is data on the card, not part of any binary, so it is copied
+# rather than linked.  Committed so a checkout without iomap.txt still ships
+# names; iomap-names above regenerates it, this only stages it.
+add_custom_target(stage-iomap ALL
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/src/IOMAP.BIN
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${SRC}/monitor/iomap.bin ${CMAKE_BINARY_DIR}/src/IOMAP.BIN
+    COMMENT "Staging IOMAP.BIN")
 
 if(Python3_FOUND AND HOST_C_COMPILER)
     add_test(NAME format
@@ -292,6 +301,16 @@ if(Python3_FOUND AND LLVM_MC_EXE)
                         ${BITEDIT_XEMU_ARGS}
                         --build $<TARGET_FILE_DIR:MONITOR>)
             set_tests_properties(bitedit_xemu PROPERTIES TIMEOUT 300)
+
+            # The same run with the database left off the card.  A missing file
+            # is deliberately silent on screen, so this is the only check that
+            # it degrades to an unnamed table rather than hanging or refusing.
+            add_test(NAME bitedit_xemu_no_database
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_bitedit_xemu.py
+                        ${BITEDIT_XEMU_ARGS} --without-iomap
+                        --build $<TARGET_FILE_DIR:MONITOR>)
+            set_tests_properties(bitedit_xemu_no_database PROPERTIES TIMEOUT 300)
         endif()
 
         set(MEGA65_ROM "$ENV{MEGA65_ROM}" CACHE FILEPATH

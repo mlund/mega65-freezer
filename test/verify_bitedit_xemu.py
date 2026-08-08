@@ -21,6 +21,10 @@ it is plain text, so it does not depend on the screen's colours, and it shows
 every write rather than only the byte left behind.  It needs a build configured
 with -DFREEZER_TRACE=ON.
 
+With --without-iomap the database is left off the card, which must leave the
+editor working but unnamed: a missing file is deliberately not an error, so
+this is the only run that proves it degrades rather than hangs or refuses.
+
     python3 test/verify_bitedit_xemu.py --emulator xmega65 --sdimg card.img \\
             --build build/src
 """
@@ -57,15 +61,19 @@ CLOSING = f"m {TARGET}\r"
 # written at all.
 ELSEWHERE = "m 0000400\r"
 
-# What the table must show before anything is touched.
-EXPECTED_SCREEN = ["VIC-II", "BMM", "RSEL", "YSCL"]
+# What the table must show before anything is touched.  The last of these comes
+# from IOMAP.BIN's description pool rather than its names, so it fails if the
+# database did not reach the card -- which the names alone would not catch,
+# since a missing file looks exactly like a register nobody documented.
+# The editor opens with the cursor on bit 7, so RC8 is the described bit.
+EXPECTED_SCREEN = ["VIC-II", "BMM", "RSEL", "YSCL", "RASTER COMPARE BIT 8"]
 
 # Typed into the VAL field last.  Not a value a toggle could have produced, so
 # reading it back proves hex entry rather than only the bit flip.
 EXPECTED_VALUE = "3B"
 
 
-def inject(base_image: str, work_dir: str, build_dir: str) -> str:
+def inject(base_image: str, work_dir: str, build_dir: str, with_iomap: bool = True) -> str:
     """Clone the image and copy our .M65 files onto its FAT32 partition."""
     if not shutil.which("hdiutil"):
         sys.exit("hdiutil not found; this test is macOS only")
@@ -85,8 +93,12 @@ def inject(base_image: str, work_dir: str, build_dir: str) -> str:
         subprocess.run(["hdiutil", "detach", device], capture_output=True, check=False)
         sys.exit(f"no FAT32 volume in {base_image}")
     try:
+        # IOMAP.BIN as well as the tools: the bit editor's names live there, and
+        # a card without it looks exactly like a database that knows nothing.
         for name in sorted(os.listdir(build_dir)):
-            if name.endswith(".M65"):
+            if name.endswith(".BIN") and not with_iomap:
+                continue
+            if name.endswith((".M65", ".BIN")):
                 shutil.copy(os.path.join(build_dir, name), mount.group(1).strip())
         subprocess.run(["sync"], check=False)
     finally:
@@ -180,13 +192,18 @@ def main() -> int:
         help="also require the FREEZER_TRACE write log; needs -DFREEZER_TRACE=ON",
     )
     parser.add_argument(
+        "--without-iomap",
+        action="store_true",
+        help="leave IOMAP.BIN off the card: the editor must still work, unnamed",
+    )
+    parser.add_argument(
         "--screenshot",
         help="write a PNG on exit; the only way to judge the bright/dim difference",
     )
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as tmp:
-        card = inject(args.sdimg, tmp, args.build)
+        card = inject(args.sdimg, tmp, args.build, not args.without_iomap)
         dump = os.path.join(tmp, "screen.txt")
         serial_path = os.path.join(tmp, "serial.txt")
         socket_path = f"/tmp/xemu-bitedit-{os.getpid()}.sock"
@@ -254,7 +271,19 @@ def main() -> int:
                 serial = handle.read()
         written, carrying = find_edit(args.sdimg, card, int(EXPECTED_VALUE, 16))
 
-    problems = [f"screen never showed {want!r}" for want in EXPECTED_SCREEN if want not in screen]
+    if args.without_iomap:
+        # The editor must still run with no database, so the assertions invert:
+        # nothing is named, but the bits are still drawn and still editable, and
+        # the checks below on the written byte apply unchanged.
+        problems = [
+            f"screen showed {seen!r} with no database" for seen in EXPECTED_SCREEN if seen in screen
+        ]
+        if ":FFD3011" not in screen:
+            problems.append("the table did not draw without a database")
+    else:
+        problems = [
+            f"screen never showed {want!r}" for want in EXPECTED_SCREEN if want not in screen
+        ]
 
     if not written:
         problems.append("nothing was written to the card at all")
@@ -276,6 +305,14 @@ def main() -> int:
 
     if args.expect_serial:
         # Xemu wraps each message: Hypervisor serial output: "BITEDIT ...".
+        if args.without_iomap:
+            if "IOMAP MISSING" not in serial:
+                problems.append("no database on the card, but nothing reported it missing")
+        elif "IOMAP LOADED" not in serial:
+            problems.append(
+                "the database did not load: "
+                + ("reported missing" if "IOMAP MISSING" in serial else "no IOMAP trace at all")
+            )
         writes = re.findall(r"BITEDIT ([0-9A-F]{7}) ([0-9A-F]{2})", serial)
         if not writes:
             problems.append("no BITEDIT trace on the serial channel")

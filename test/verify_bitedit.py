@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """Check the bit editor's table against its own structure, on the host.
 
-src/monitor/bitedit_table.c reads a static table and writes into the caller's
-buffer, so it needs no MEGA65 and no emulator.  That matters because the record
-stream is variable length -- a length byte, three bytes of packed 3-bit indices
-and names terminated by bit 7 -- and an off-by-one there shifts every name in
-the table onto the wrong bit, which on hardware looks like a database mistake
-rather than a decoder one.
+src/monitor/bitedit_table.c reaches its database only through iomap_byte(), so
+the host can hand it IOMAP.BIN in memory and run the whole decoder with no
+MEGA65 and no emulator.  That matters because the record stream is variable
+length -- a length byte, three bytes of packed 3-bit indices, names terminated
+by bit 7 and two-byte offsets into a shared text pool -- and an off-by-one there
+shifts every name onto the wrong bit, which on hardware looks like a database
+mistake rather than a decoder one.
 
-The invariants below need no external file, so they run in a plain checkout.
-Pass --iomap to additionally diff the decoded names against mega65-core's
-iomap.txt, which is the only check that can catch the generator and the decoder
-agreeing on something wrong.
+The invariants below need only the committed src/monitor/iomap.bin, so they run
+in a plain checkout.  Pass --iomap to additionally diff the decoded names
+against a fresh parse of mega65-core's iomap.txt, which is the only check that
+can catch the generator and the decoder agreeing on something wrong.
 
 Run via CTest, or by hand::
 
@@ -47,6 +48,9 @@ CELL_VALUE = 8
 NAME_CODES = set(range(0x01, 0x1B)) | set(range(0x30, 0x3A)) | {0x2D}
 
 
+DATABASE = ROOT / "src" / "monitor" / "iomap.bin"
+
+
 def build_harness(workdir: Path, host_cc: str) -> Path:
     """Compile bitedit_table.c plus the host driver with the host compiler."""
     binary = workdir / "bitedit_harness"
@@ -75,7 +79,7 @@ def build_harness(workdir: Path, host_cc: str) -> Path:
 
 def run(binary: Path, commands: list[str]) -> list[str]:
     out = subprocess.run(
-        [str(binary)],
+        [str(binary), str(DATABASE)],
         input="\n".join(commands) + "\n",
         capture_output=True,
         text=True,
@@ -85,7 +89,7 @@ def run(binary: Path, commands: list[str]) -> list[str]:
 
 
 def decode(hex_row: str) -> list[int]:
-    return [int(hex_row[i : i + 2], 16) for i in range(0, len(hex_row), 2)]
+    return list(bytes.fromhex(hex_row))
 
 
 def text(codes: list[int]) -> str:
@@ -102,9 +106,13 @@ def check_walk(binary: Path, failures: list[str]) -> list[int]:
         addresses.append(int(address, 16))
         if not 4 <= int(length) <= 0xFF:
             failures.append(f"${address} record length {length} is implausible")
-    consumed, total = (int(x) for x in lines[-1].split()[1:])
-    if consumed != total:
-        failures.append(f"walk consumed {consumed} of {total} bytes -- a length byte is wrong")
+    consumed, text_start, file_end, present = (int(x) for x in lines[-1].split()[1:])
+    if consumed != text_start:
+        failures.append(
+            f"walk ended at {consumed}, text starts at {text_start} -- a length byte is wrong"
+        )
+    if file_end != present:
+        failures.append(f"header says {file_end} bytes, the file has {present}")
     if addresses != sorted(addresses) or len(addresses) != len(set(addresses)):
         failures.append("records are not in strictly increasing address order")
     if not all(0xD000 <= a <= 0xDFFF for a in addresses):
@@ -133,6 +141,27 @@ def check_lookups(binary: Path, addresses: list[int], failures: list[str]) -> No
             failures.append(f"${address:04X} has 8 fields and still marks a bit unnamed")
         if name != "-" and not name.strip():
             failures.append(f"${address:04X} has an empty register name")
+
+
+def check_descriptions(binary: Path, addresses: list[int], failures: list[str]) -> None:
+    """Every description must resolve, and be something the screen can show."""
+    asked = [f"text {a:04x} -1" for a in addresses]
+    asked += [f"text {a:04x} {bit}" for a in addresses for bit in range(8)]
+    replies = run(binary, asked)
+    if len(replies) != len(asked):
+        failures.append(f"{len(asked)} descriptions asked for, {len(replies)} came back")
+        return
+    allowed = set(" !\"#$%&'()*+,-./0123456789:;<=>?@[]ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    found = 0
+    for question, reply in zip(asked, replies, strict=True):
+        if reply == "-":
+            continue
+        found += 1
+        stray = sorted(set(reply) - allowed)
+        if stray:
+            failures.append(f"{question}: description has {stray} which the screen cannot show")
+    if found < len(addresses) // 2:
+        failures.append(f"only {found} descriptions resolved, which is too few to be right")
 
 
 def check_row_layout(binary: Path, failures: list[str]) -> None:
@@ -210,6 +239,46 @@ def check_cursor_ring(binary: Path, failures: list[str]) -> None:
             failures.append(f"cursor left from {cell} is {left}, expected {want_left}")
 
 
+def check_wrap(binary: Path, failures: list[str]) -> None:
+    """The line-breaking, over the shapes that actually caused trouble.
+
+    A wrap that split text already fitting the row reached a screenshot before
+    anything noticed, so the properties are checked rather than one example.
+    """
+    bodies = [
+        "RASTER COMPARE BIT 8",
+        "BITMAP MODE",
+        "A",
+        "",
+        "SUPERCALIFRAGILISTIC" * 5,
+        "ENABLE VIC-II HOT REGISTERS. WHEN ENABLED, TOUCHING MANY VIC-II REGISTERS "
+        "CAUSES THE VIC-IV TO RECALCULATE DISPLAY PARAMETERS, SUCH AS BORDER POSITIONS",
+        " LEADING AND TRAILING ",
+        "TWO  CONSECUTIVE  SPACES",
+    ]
+    rooms = (71, 40, 10, 1)
+    asked = [f"wrap {room} {body}" for body in bodies for room in rooms]
+    replies = run(binary, asked)
+
+    at = 0
+    for body in bodies:
+        for room in rooms:
+            lines = []
+            while at < len(replies) and replies[at] != ".":
+                lines.append(replies[at].removeprefix("="))
+                at += 1
+            at += 1
+            where = f"wrap room={room} {body[:24]!r}"
+            if any(len(line) > room for line in lines):
+                failures.append(f"{where}: a line is wider than the row")
+            if "".join(lines) != body:
+                failures.append(f"{where}: text was lost or duplicated")
+            if len(body) <= room and len(lines) > 1:
+                failures.append(f"{where}: split text that fitted in one row")
+            if body and not lines:
+                failures.append(f"{where}: produced nothing")
+
+
 def check_arithmetic(binary: Path, failures: list[str]) -> None:
     """toggle and hex entry, over every input they can be given."""
     commands = [f"toggle {v:02x} {b}" for v in range(256) for b in range(8)]
@@ -277,6 +346,8 @@ def main() -> int:
         check_lookups(binary, addresses, failures)
         check_row_layout(binary, failures)
         check_cursor_ring(binary, failures)
+        check_wrap(binary, failures)
+        check_descriptions(binary, addresses, failures)
         check_arithmetic(binary, failures)
         if args.iomap:
             check_against_iomap(binary, args.iomap, failures)
@@ -286,7 +357,7 @@ def main() -> int:
             print(failure, file=sys.stderr)
         print(f"{len(failures)} problems", file=sys.stderr)
         return 1
-    print(f"{len(addresses)} records walked, rows, cursor and arithmetic check out")
+    print(f"{len(addresses)} records walked; rows, text, cursor and arithmetic check out")
     return 0
 
 
