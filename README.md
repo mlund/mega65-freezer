@@ -91,13 +91,13 @@ point it did the same job as its cc65 counterpart:
 
 | tool       |   cc65 |  llvm |    % |
 |------------|-------:|------:|-----:|
-| `AUDIOMIX` |  23161 |  8957 |  -61 |
-| `MEGAINFO` |  21966 | 10648 |  -52 |
+| `AUDIOMIX` |  23161 |  9727 |  -58 |
+| `MEGAINFO` |  21966 | 10646 |  -52 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
-| `ROMLOAD`  |  17378 |  8959 |  -48 |
-| `MAKEDISK` |  22307 | 11592 |  -48 |
-| `SPRITED`  |  31016 | 17130 |  -45 |
-| `FREEZER`  |  24700 | 19615 |  -21 |
+| `ROMLOAD`  |  17378 |  8957 |  -48 |
+| `MAKEDISK` |  22307 | 11590 |  -48 |
+| `SPRITED`  |  31016 | 17128 |  -45 |
+| `FREEZER`  |  24700 | 19573 |  -21 |
 
 `MONITOR` is measured before the disassembler, the cc65 monitor's D command
 being an empty case. With the disassembler, assembler and bit editor it is
