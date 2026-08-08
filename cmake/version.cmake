@@ -3,9 +3,9 @@
 # The format is load-bearing: megainfo/info.c's format_util_version() scans
 # memory for "v:20", skips those four bytes and parses the remainder as
 # YYMMDD.HH-branch-commit, and displays only the rightmost 25 characters.
-# Produced by this directory's gitversion.sh -- a copy of the cc65 build's, so
-# the two can diverge.
-execute_process(COMMAND ./gitversion.sh WORKING_DIRECTORY "${REPO}"
+# tools/gitversion.sh composes it; run from the repository root because it reads
+# the branch and tags from git.
+execute_process(COMMAND ./tools/gitversion.sh WORKING_DIRECTORY "${REPO}"
                 OUTPUT_VARIABLE BUILD_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE
                 RESULT_VARIABLE status ERROR_QUIET)
 if(NOT status EQUAL 0 OR NOT BUILD_VERSION)
