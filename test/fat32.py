@@ -17,6 +17,7 @@ could not immediately reclaim.
 
 from __future__ import annotations
 
+import datetime
 import itertools
 import struct
 
@@ -39,6 +40,19 @@ def _u16(b: bytes, at: int) -> int:
 
 def _u32(b: bytes, at: int) -> int:
     return struct.unpack_from("<I", b, at)[0]
+
+
+def packed_time(when: datetime.datetime) -> tuple[int, int]:
+    """A moment as the (date, time) pair a directory entry holds.
+
+    Seconds are stored halved, so odd ones round down; the epoch is 1980, which
+    is what bounds the year.
+    """
+    if not 1980 <= when.year <= 2107:
+        raise ValueError(f"{when.year} is outside what a directory entry can hold")
+    date = ((when.year - 1980) << 9) | (when.month << 5) | when.day
+    time = (when.hour << 11) | (when.minute << 5) | (when.second // 2)
+    return date, time
 
 
 def short_name(name: str) -> bytes:
@@ -165,12 +179,13 @@ class FAT32:
 
     # --- what callers actually want ---
 
-    def write(self, name: str, data: bytes) -> None:
+    def write(self, name: str, data: bytes, when: datetime.datetime | None = None) -> None:
         """Create or replace a file in the root directory."""
         eleven = short_name(name)
         at, spare = self.find(eleven)
+        fresh = at is None
 
-        if at is None:
+        if fresh:
             at = spare if spare is not None else self.grow(self.root)
             entry = bytearray(ENTRY)
         else:
@@ -197,6 +212,13 @@ class FAT32:
 
         entry[:11] = eleven
         entry[11] = ATTR_ARCHIVE
+        date, time = packed_time(when or datetime.datetime.now())
+        # Created only when the entry is, so replacing a file keeps the date it
+        # first appeared; written and accessed move every time.
+        if fresh:
+            struct.pack_into("<HH", entry, 14, time, date)
+        struct.pack_into("<H", entry, 18, date)
+        struct.pack_into("<HH", entry, 22, time, date)
         head = have[0] if have else 0
         struct.pack_into("<H", entry, 20, head >> 16)
         struct.pack_into("<H", entry, 26, head & 0xFFFF)

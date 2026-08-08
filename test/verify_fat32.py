@@ -15,6 +15,7 @@ copy is touched.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
 import os
 import re
@@ -29,6 +30,10 @@ import fat32
 
 # A MEGA65 card leaves heads and sectors zero, which mtools will not trust.
 MTOOLS_ENV = {**os.environ, "MTOOLS_SKIP_CHECK": "1"}
+
+# Not now(): a fixed moment is the only way to tell a stored timestamp from a
+# coincidence, and the odd second proves seconds are halved as the format says.
+STAMP = datetime.datetime(2019, 3, 7, 14, 5, 47)
 
 # Sized to cross a cluster boundary (4096 bytes here) rather than to be round,
 # and to shrink and grow across a rewrite so both paths are taken.
@@ -84,6 +89,12 @@ def check(image: str, offset: int, expected: dict[str, bytes], problems: list[st
         if f"{stem:<8} {suffix}" not in listing:
             problems.append(f"{name} is not in the directory")
             continue
+        # mdir prints the write time, so a wrong date or a dropped second shows
+        # here rather than only on a machine that sorts by it.
+        stamped = f"{STAMP:%Y-%m-%d  %H:%M}"
+        entry = listed(listing).get(stem, "")
+        if stamped not in entry:
+            problems.append(f"{name}: expected the stamp {stamped}, got {entry!r}")
         got = mtools_read(image, offset, name)
         if got != data:
             problems.append(
@@ -119,7 +130,7 @@ def main() -> int:
             fs = fat32.FAT32(handle, offset)
             for seed, (name, size) in enumerate(CASES):
                 expected[name] = content(size, seed + 1)
-                fs.write(name, expected[name])
+                fs.write(name, expected[name], STAMP)
             fs.flush()
         check(image, offset, expected, problems)
 
@@ -129,7 +140,7 @@ def main() -> int:
             fs = fat32.FAT32(handle, offset)
             for seed, (name, size) in enumerate(CASES):
                 expected[name] = content((size * 3) % 9001, seed + 40)
-                fs.write(name, expected[name])
+                fs.write(name, expected[name], STAMP)
             fs.flush()
         check(image, offset, expected, problems)
 

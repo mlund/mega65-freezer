@@ -12,6 +12,7 @@ the image.
 
 from __future__ import annotations
 
+import datetime
 import os
 import shutil
 import struct
@@ -69,7 +70,11 @@ def inject(base_image: str, work_dir: str, build_dir: str, with_iomap: bool = Tr
             # testing.
             if name.endswith(".BIN") and not with_iomap:
                 continue
-            with open(os.path.join(build_dir, name), "rb") as source:
-                fs.write(name, source.read())
+            built = os.path.join(build_dir, name)
+            # The build's own time, so the card says when the tool was made
+            # rather than when it was copied.
+            when = datetime.datetime.fromtimestamp(os.path.getmtime(built))
+            with open(built, "rb") as source:
+                fs.write(name, source.read(), when)
         fs.flush()
     return card
