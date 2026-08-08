@@ -207,7 +207,18 @@ if(Python3_FOUND)
     add_custom_target(thumbnail-frames ALL DEPENDS ${THUMB_FRAMES})
 endif()
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdimage.cmake)
+
 if(Python3_FOUND AND HOST_C_COMPILER)
+    find_program(MTOOLS_MDIR NAMES mdir)
+    if(MTOOLS_MDIR AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
+        add_test(NAME fat32
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_fat32.py
+                    --sdimg ${MEGA65_SDIMG})
+        set_tests_properties(fat32 PROPERTIES TIMEOUT 300)
+    endif()
+
     add_test(NAME thumbnail_frames
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_thumbnail_frames.py)
@@ -297,7 +308,6 @@ if(Python3_FOUND AND LLVM_MC_EXE)
         endif()
 
         # Assemble in the monitor and read the bytes back off the card.
-        include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/sdimage.cmake)
         if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
             add_test(NAME monitor_assemble
                 COMMAND ${Python3_EXECUTABLE}

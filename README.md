@@ -76,8 +76,9 @@ ctest --test-dir build
 The host tests build the portable halves with the host compiler and need
 nothing else. The emulator tests need an emulator — found automatically, or
 given as `XEMU` — and an SD image, which defaults to Xemu's own. They clone it
-and copy the build onto the clone, so the image itself is never written to.
-Staging the files needs mtools.
+and write the build into the clone's filesystem, so the image itself is never
+touched. With mtools installed, one further test checks that writer by having
+mdir read back what it wrote.
 
 `FREEZER_TRACE` is compile-time, so the serial assertions need their own build:
 

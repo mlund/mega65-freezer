@@ -4,10 +4,10 @@ The freezer loads its tools from the card, so a test that means to exercise ours
 has to put ours there. The image is copied first and only the copy is written
 to, because the one you point at is your own.
 
-Files go in through mtools, which writes the FAT filesystem inside the image
-directly: no mounting, no root, and nothing platform-specific. Reading the
-partition table here is what lets it address the filesystem at all -- mtools
-takes a byte offset, and the FAT partition does not start at zero.
+Files go in through fat32.py, which writes the filesystem inside the image
+directly: no mounting, no root, and nothing platform-specific. The partition
+table is read here because the filesystem does not start at the beginning of
+the image.
 """
 
 from __future__ import annotations
@@ -17,6 +17,8 @@ import shutil
 import struct
 import subprocess
 import sys
+
+import fat32
 
 # Partition types the freezer's card uses. 0x0c is FAT32 with LBA, which is what
 # a MEGA65 card is formatted as; the others are accepted so an older or
@@ -56,25 +58,18 @@ def clone(base_image: str, work_dir: str) -> str:
 
 def inject(base_image: str, work_dir: str, build_dir: str, with_iomap: bool = True) -> str:
     """Clone the image and copy the build onto its filesystem."""
-    if not shutil.which("mcopy"):
-        sys.exit("mcopy not found; install mtools")
-
     card = clone(base_image, work_dir)
-    where = f"{card}@@{partition_offset(card)}"
-    # A MEGA65 card's boot sector leaves heads and sectors zero, which mtools
-    # reads as a geometry it cannot trust and refuses on. The filesystem itself
-    # is sound, and the machine never consults those fields.
-    env = {**os.environ, "MTOOLS_SKIP_CHECK": "1"}
-    for name in sorted(os.listdir(build_dir)):
-        if not name.endswith((".M65", ".BIN")):
-            continue
-        # IOMAP.BIN is the bit editor's names; a card without it looks exactly
-        # like a database that knows nothing, which is a case worth testing.
-        if name.endswith(".BIN") and not with_iomap:
-            continue
-        subprocess.run(
-            ["mcopy", "-i", where, "-o", os.path.join(build_dir, name), "::/"],
-            check=True,
-            env=env,
-        )
+    with open(card, "r+b") as handle:
+        fs = fat32.FAT32(handle, partition_offset(card))
+        for name in sorted(os.listdir(build_dir)):
+            if not name.endswith((".M65", ".BIN")):
+                continue
+            # IOMAP.BIN is the bit editor's names; a card without it looks
+            # exactly like a database that knows nothing, which is a case worth
+            # testing.
+            if name.endswith(".BIN") and not with_iomap:
+                continue
+            with open(os.path.join(build_dir, name), "rb") as source:
+                fs.write(name, source.read())
+        fs.flush()
     return card
