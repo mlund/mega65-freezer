@@ -134,32 +134,38 @@ static unsigned char current_side = 0;
 /* Exactly 18 screen columns, deliberately without a terminator. */
 static unsigned char entry_buffer[18] __attribute__((nonstring)) = "\"                 ";
 
+/* Colour a run of cells from a two-cell pattern.  The second copy's source
+ * trails its destination by one pattern, so the DMA expands those four bytes
+ * over the whole run rather than needing a table as long as the row. */
+static void colour_run(uint32_t at, const unsigned char* pattern, uint16_t bytes) {
+    lcopy((uint32_t)pattern, at, 4);
+    lcopy(at, at + 4, bytes - 4);
+}
+
 void display_error(void) {
     char* errstr;
 
     VICIV.bordercol = SchemeError;
     errstr = hyppoerror_to_screen(mega65_geterrorcode());
-    for (unsigned char i = 0; i < 19 && errstr[i]; i++) {
-        POKE(SCREEN_ADDRESS + (21 * 2) + (i * 2), petscii_to_screen(errstr[i]));
-        lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + (i * 2), SchemeError);
+    unsigned char length = 0;
+    while (length < 19 && errstr[length]) {
+        length++;
     }
-    lcopy((long)error_row, COLOUR_RAM_ADDRESS + (21 * 2), 4);
-    lcopy(COLOUR_RAM_ADDRESS + (21 * 2), COLOUR_RAM_ADDRESS + (21 * 2) + 4, 19 * 2 - 4);
+    draw_text(SCREEN_CELL(21, 0), SchemeError, errstr, length);
+    /* The whole field, not just the text: a shorter message still has to clear
+     * the colour of the one it replaced. */
+    colour_run(COLOUR_RAM_ADDRESS + (21 * 2), error_row, 19 * 2);
 }
 
 void draw_directory_entry(unsigned char screen_row) {
 
-    for (unsigned char i = 0; i < 18; i++) {
-        POKE(
-            SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2) + (i * 2), entry_buffer[i]);
-    }
+    lcopy_skip((Addr28)(uint16_t)entry_buffer,
+        SCREEN_ADDRESS + SCREEN_CELL(21, screen_row),
+        18,
+        SCREEN_CELL_BYTES);
 
-    lcopy((uint32_t)dir_line_colour,
-        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
-        4);
-    lcopy(COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
-        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2) + 4),
-        (19 * 2 - 4));
+    colour_run(
+        COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)), dir_line_colour, 19 * 2);
 }
 
 unsigned char next_directory_entry(void) {
@@ -252,6 +258,17 @@ int read_sector_with_cancel(void) {
     return 1;
 }
 
+/* The selected entry, with the padding the directory stores it with trimmed
+ * off.  32 bytes into a 33-byte buffer, so the terminator always has room even
+ * when every byte of the name is used.  Index 0 is never trimmed, so a caller
+ * may still test it for the leading slash that marks a directory. */
+static void fetch_selected_name(void) {
+    lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number), (uint32_t)disk_name_return, 32);
+    for (unsigned char x = 31; x && disk_name_return[x] == ' '; x--) {
+        disk_name_return[x] = 0;
+    }
+}
+
 unsigned char draw_directory_contents(unsigned char drive_id) {
     unsigned char c;
     unsigned char i;
@@ -264,16 +281,11 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
         return 0;
     }
 
-    lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number), (uint32_t)disk_name_return, 32);
+    fetch_selected_name();
 
     // Don't draw directories
     if (disk_name_return[0] == '/') {
         return 0;
-    }
-
-    // null terminate disk_name_return
-    for (x = 31; x && disk_name_return[x] == ' '; x--) {
-        disk_name_return[x] = 0;
     }
 
     // Try to mount it, with the border marked busy while working
@@ -428,28 +440,12 @@ void draw_disk_image_list(void) {
     unsigned char i;
     unsigned char x;
     unsigned char name[64];
-    // First, clear the screen
-    POKE(SCREEN_ADDRESS + 0, ' ');
-    POKE(SCREEN_ADDRESS + 1, 0);
-    POKE(SCREEN_ADDRESS + 2, ' ');
-    POKE(SCREEN_ADDRESS + 3, 0);
-    lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 40 * 2 * 23 - 4);
-    lpoke(COLOUR_RAM_ADDRESS + 0, 0);
-    lpoke(COLOUR_RAM_ADDRESS + 1, SchemeText);
-    lpoke(COLOUR_RAM_ADDRESS + 2, 0);
-    lpoke(COLOUR_RAM_ADDRESS + 3, SchemeText);
-    lcopy(COLOUR_RAM_ADDRESS, COLOUR_RAM_ADDRESS + 4, 40 * 2 * 23 - 4);
+    /* All 25 rows, where this cleared 23: the instructions below overwrite the
+     * other two immediately. */
+    blank_screen();
+    clear_colour_ram();
 
-    // Draw instructions
-    for (i = 0; i < 80; i++) {
-        POKE(SCREEN_ADDRESS + 23 * SCREEN_ROW_BYTES + (i << 1),
-            petscii_to_screen(diskchooser_instructions[i]));
-    }
-
-    lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES) + 0, 4);
-    lcopy(COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES),
-        COLOUR_RAM_ADDRESS + (23 * SCREEN_ROW_BYTES) + 4,
-        156);
+    draw_text(SCREEN_CELL(0, 23), SchemeSelected | AttribReverse, diskchooser_instructions, 80);
 
     for (i = 0; i < 23; i++) {
         if ((display_offset + i) < file_count) {
@@ -473,16 +469,9 @@ void draw_disk_image_list(void) {
                 POKE(addr + (x << 1), ' ');
             }
         }
-        if ((display_offset + i) == selection_number) {
-            // Highlight the row
-            lcopy((long)highlight_row, COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES), 4);
-        } else {
-            // Normal row
-            lcopy((long)normal_row, COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES), 4);
-        }
-        lcopy(COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES),
-            COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES + 4),
-            76);
+        colour_run(COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES),
+            (display_offset + i) == selection_number ? highlight_row : normal_row,
+            80);
         addr += (40 * 2);
     }
     VICIV.bordercol = SchemeBorder;
@@ -568,12 +557,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
     selection_number = 0;
     display_offset = 0;
 
-    // First, clear the screen
-    POKE(SCREEN_ADDRESS + 0, ' ');
-    POKE(SCREEN_ADDRESS + 1, 0);
-    POKE(SCREEN_ADDRESS + 2, ' ');
-    POKE(SCREEN_ADDRESS + 3, 0);
-    lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 40 * 2 * 25 - 4);
+    blank_screen();
 
     // save old mounted state
     mega65_dos_getprocdesc(0x04); // get procdesc from hyppo to 0x400
@@ -584,9 +568,10 @@ char* freeze_select_disk_image(unsigned char drive_id) {
     }
     old_disk_name[old_disk_len] = 0;
 
-    for (x = 0; reading_disk_list_message[x]; x++) {
-        POKE(SCREEN_ADDRESS + 12 * 40 * 2 + (9 * 2) + (x * 2), reading_disk_list_message[x] & 0x3f);
-    }
+    draw_text(SCREEN_CELL(9, 12),
+        SchemeText,
+        reading_disk_list_message,
+        sizeof(reading_disk_list_message) - 1);
 
     scan_directory(drive_id);
 
@@ -643,18 +628,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                 return NULL;
             case KEY_RETURN:
             case 0x21: // Return = select this disk.
-                // Copy name out
-                lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number),
-                    (uint32_t)disk_name_return,
-                    32);
-                // Then null terminate it
-                for (x = 31; x; x--) {
-                    if (disk_name_return[x] == ' ') {
-                        disk_name_return[x] = 0;
-                    } else {
-                        break;
-                    }
-                }
+                fetch_selected_name();
 
                 // Try to mount it, with the border marked busy while working
                 VICIV.bordercol = SchemeBorderBusy;
