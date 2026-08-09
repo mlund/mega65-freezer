@@ -972,20 +972,7 @@ int main(void) {
                     if (slot_number != 0) {
                         goto invalid_function;
                     }
-                    // Set C64 memory map, PC to reset vector and resume
-                    freeze_poke(0xFFD3640U + 8, freeze_peek(0x2FFFCL));
-                    freeze_poke(0xFFD3640U + 9, freeze_peek(0x2FFFDL));
-                    // Reset $01 port values
-                    freeze_poke(0xFFD3640U + 0x10, 0x3f);
-                    freeze_poke(0xFFD3640U + 0x11, 0x3f);
-                    // disable interrupts, clear decimal mode
-                    freeze_poke(0xFFD3640U + 0x07, 0xe7);
-                    // Clear memory mapping
-                    for (key = 0x0a; key <= 0x0f; key++) {
-                        freeze_poke(0xFFD3640U + key, 0);
-                    }
-                    // Turn off extended graphics mode, only keep palemu
-                    freeze_poke(0xFFD3054U, freeze_peek(0xFFD3054U) & 0x20);
+                    freeze_reset_cpu_state();
                     // fall through
                 case KEY_F3: // F3 = resume
                 case KEY_F4: // RESUME even if ROM changed

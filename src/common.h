@@ -51,5 +51,8 @@ enum : uint8_t {
     ImgProcInternal = 0x01,
     ImgProcNoDisk = 0x02,
 };
+/* Point the frozen CPU at the reset vector and give it a C64 memory map, so a
+ * resume starts the machine rather than the program it froze. */
+void freeze_reset_cpu_state(void);
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides);
 void old_store_selected_disk_image(uint8_t diskid, const char* disk_image);

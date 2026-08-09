@@ -487,19 +487,7 @@ void user_reset_prompt(void) {
     }
 
     if (x == 'y' || x == 'Y') {
-        freeze_poke(0xFFD3640U + 8, freeze_peek(0x2FFFCL));
-        freeze_poke(0xFFD3640U + 9, freeze_peek(0x2FFFDL));
-        // Reset $01 port values
-        freeze_poke(0xFFD3640U + 0x10, 0x3f);
-        freeze_poke(0xFFD3640U + 0x11, 0x3f);
-        // disable interrupts, clear decimal mode
-        freeze_poke(0xFFD3640U + 0x07, 0xe7);
-        // Clear memory mapping
-        for (x = 0x0a; x <= 0x0f; x++) {
-            freeze_poke(0xFFD3640U + x, 0);
-        }
-        // Turn off extended graphics mode, only keep palemu
-        freeze_poke(0xFFD3054U, freeze_peek(0xFFD3054U) & 0x20);
+        freeze_reset_cpu_state();
         unfreeze_slot(0);
 
         while (1) {

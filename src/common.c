@@ -161,6 +161,33 @@ constexpr uint8_t PD_NAMELEN = offsetof(struct ProcessDescriptor, d81_namelen);
 constexpr uint8_t PD_NAME = offsetof(struct ProcessDescriptor, d81_name);
 constexpr uint8_t PD_NAME_BYTES = 32;
 
+/* The frozen CPU's saved state, at the base of its own region. */
+constexpr uint32_t FROZEN_CPU_STATE = 0xFFD3640UL;
+
+void freeze_reset_cpu_state(void) {
+    /* The reset vector is read first: it is in another sector, and freeze_peek
+     * would reload sector_buffer over the patch below. */
+    const unsigned char reset_lo = freeze_peek(0x2FFFCL);
+    const unsigned char reset_hi = freeze_peek(0x2FFFDL);
+
+    /* Offsets $07 to $11 are eleven contiguous bytes of one sector, so this is
+     * one read and one write rather than eleven of each; the region begins on a
+     * sector boundary, so the store needs no read-before-write. */
+    if (freeze_fetch_sector(FROZEN_CPU_STATE, NULL) == FreezerOk) {
+        sector_buffer[0x07] = 0xe7;     // disable interrupts, clear decimal mode
+        sector_buffer[0x08] = reset_lo; // PC to the reset vector
+        sector_buffer[0x09] = reset_hi;
+        for (uint8_t i = 0x0a; i <= 0x0f; i++) {
+            sector_buffer[i] = 0; // clear memory mapping
+        }
+        sector_buffer[0x10] = 0x3f; // reset $01 port values
+        sector_buffer[0x11] = 0x3f;
+        freeze_store_sector(FROZEN_CPU_STATE, NULL);
+    }
+    // Turn off extended graphics mode, only keep palemu
+    freeze_poke(0xFFD3054U, freeze_peek(0xFFD3054U) & 0x20);
+}
+
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
     uint8_t i;
 
