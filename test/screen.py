@@ -25,16 +25,20 @@ ROWS = 25
 CELL_BYTES = 2
 
 
-def codes(dump: bytes, row: int) -> list[int]:
-    """The screen codes of one row."""
-    base = SCREEN_AT + row * ROW_BYTES
-    return [dump[base + column * CELL_BYTES] for column in range(COLUMNS)]
+def codes(memory: bytes, row: int, origin: int = 0) -> list[int]:
+    """The screen codes of one row.
+
+    `origin` is the address `memory` starts at: 0 for a whole-memory dump, or
+    SCREEN_AT for just the screen, as read from a running machine.
+    """
+    base = SCREEN_AT - origin + row * ROW_BYTES
+    return [memory[base + column * CELL_BYTES] for column in range(COLUMNS)]
 
 
-def colours(dump: bytes, row: int) -> list[int]:
+def colours(memory: bytes, row: int, origin: int = 0) -> list[int]:
     """The colour of each cell in one row."""
-    base = COLOUR_AT + row * ROW_BYTES
-    return [dump[base + column * CELL_BYTES + (CELL_BYTES - 1)] for column in range(COLUMNS)]
+    base = COLOUR_AT - origin + row * ROW_BYTES
+    return [memory[base + column * CELL_BYTES + (CELL_BYTES - 1)] for column in range(COLUMNS)]
 
 
 def _glyph(code: int) -> str:
@@ -47,14 +51,17 @@ def _glyph(code: int) -> str:
     return f"{{{code:02X}}}"
 
 
-def text(dump: bytes, row: int) -> str:
+def text(memory: bytes, row: int, origin: int = 0) -> str:
     """One row as something a test can match a phrase against."""
-    return "".join(_glyph(code) for code in codes(dump, row))
+    return "".join(_glyph(code) for code in codes(memory, row, origin))
 
 
-def screen(dump: bytes) -> str:
+def screen(memory: bytes, origin: int = 0) -> str:
     """The whole screen, one row per line."""
-    return "\n".join(text(dump, row) for row in range(ROWS))
+    return "\n".join(text(memory, row, origin) for row in range(ROWS))
+
+
+SCREEN_BYTES = ROWS * ROW_BYTES
 
 
 def load(path: str) -> bytes:

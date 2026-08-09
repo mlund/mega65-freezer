@@ -8,14 +8,15 @@ value fields are where they belong.  That is the whole drawing path -- the
 compile-time fragment stream in freezer/menu.cpp, draw_text(), draw_rule() and
 the colour fills -- so a change that quietly stops drawing something fails here.
 
-Two runs rather than one, because the dump is written on exit and so gives one
-screen per emulator.  The second presses `V`, and the check is that the video
-field *changed*, not that it reached a particular value: which of PAL50/NTSC60
-a cold boot starts from is the emulator's default, not ours, and a test that
-hardcoded it would be pinning someone else's choice.
+One boot, two screens: the serial monitor reads memory while the machine runs,
+so the state before the keypress needs no emulator of its own.  The check on
+`V` is that the video field *changed*, not that it reached a particular value
+-- which of PAL50/NTSC60 a cold boot starts from is the emulator's default, not
+ours, and hardcoding it would pin someone else's choice.
 
-The screen comes from a memory dump rather than -dumpscreen, which reaches only
-half of it in this mode; see test/screen.py.
+Reading memory rather than -dumpscreen is not optional here: that option walks
+one byte per cell and so reaches only half the rows of this screen mode.  See
+test/screen.py.
 
     python3 test/verify_freezer_xemu.py --emulator xmega65 --sdimg card.img \\
             --build build/src
@@ -23,8 +24,6 @@ half of it in this mode; see test/screen.py.
 
 import argparse
 import os
-import signal
-import subprocess
 import sys
 import tempfile
 import time
@@ -32,6 +31,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import card
 import screen
+import xemu
 import xemu_keys
 
 # The rule rows: MENU_RULE_GLYPH is $43, which screen.text() shows as {43}.
@@ -69,76 +69,24 @@ VIDEO_ROW = 7
 VIDEO_COLUMN = 32
 
 
-def _capture(args, clone: str, tmp: str, keys: str, tag: str) -> bytes:
-    """Boot FREEZER, optionally type something, and return memory at exit."""
-    dump = os.path.join(tmp, f"memory-{tag}.bin")
-    # AF_UNIX caps near 104 characters, so the socket cannot live under a long
-    # temporary directory; /tmp keeps it short enough.
-    socket_path = f"/tmp/xemu-freezer-{tag}-{os.getpid()}.sock"
-    proc = subprocess.Popen(
-        [
-            args.emulator,
-            "-headless",
-            "-sleepless",
-            "-fastboot",
-            "-testing",
-            "-model",
-            "3",
-            "-besure",
-            "-sdimg",
-            clone,
-            "-uartmon",
-            socket_path,
-            "-prgmode",
-            "64",
-            "-prg",
-            os.path.join(args.build, "FREEZER.M65"),
-            "-dumpmem",
-            dump,
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        time.sleep(args.boot)
-        if keys:
-            sock = xemu_keys.socket.socket(xemu_keys.socket.AF_UNIX, xemu_keys.socket.SOCK_STREAM)
-            sock.settimeout(5)
-            sock.connect(socket_path)
-            time.sleep(0.3)
-            xemu_keys.type_text(sock, keys)
-            time.sleep(args.settle)
-            sock.close()
-        time.sleep(2)
-    finally:
-        proc.send_signal(signal.SIGTERM)
-        try:
-            proc.wait(timeout=20)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-        if os.path.exists(socket_path):
-            os.unlink(socket_path)
-
-    if not os.path.exists(dump):
-        sys.exit(f"emulator wrote no memory dump for {tag!r}")
-    return screen.load(dump)
-
-
-def _check_menu(dump: bytes) -> list[str]:
+def _check_menu(memory: bytes) -> list[str]:
     problems = []
     for row, wanted in sorted(EXPECTED.items()):
-        text = screen.text(dump, row)
+        text = screen.text(memory, row, screen.SCREEN_AT)
         for phrase in wanted:
             if phrase not in text:
                 problems.append(f"row {row} is missing {phrase!r}: {text!r}")
 
     for row in FULL_RULE_ROWS:
-        text = screen.text(dump, row)
+        text = screen.text(memory, row, screen.SCREEN_AT)
         if text != RULE * screen.COLUMNS:
             problems.append(f"row {row} is not a full rule: {text!r}")
 
     return problems
+
+
+def _video(memory: bytes) -> str:
+    return screen.text(memory, VIDEO_ROW, screen.SCREEN_AT)[VIDEO_COLUMN:].strip()
 
 
 def main() -> int:
@@ -150,15 +98,28 @@ def main() -> int:
     parser.add_argument("--settle", type=float, default=4.0, help="seconds after typing")
     args = parser.parse_args()
 
+    seen = {}
+
+    def drive(sock):
+        seen["cold"] = xemu.read(sock, screen.SCREEN_AT, screen.SCREEN_BYTES)
+        xemu_keys.type_text(sock, "v")
+        time.sleep(args.settle)
+        seen["toggled"] = xemu.read(sock, screen.SCREEN_AT, screen.SCREEN_BYTES)
+
     with tempfile.TemporaryDirectory() as tmp:
         clone = card.inject(args.sdimg, tmp, args.build)
-        cold = _capture(args, clone, tmp, "", "cold")
-        toggled = _capture(args, clone, tmp, "v", "video")
+        xemu.launch(
+            args.emulator,
+            os.path.join(args.build, "FREEZER.M65"),
+            sdimg=clone,
+            socket_path=f"/tmp/xemu-freezer-{os.getpid()}.sock",
+            drive=drive,
+            boot=args.boot,
+        )
 
-    problems = _check_menu(cold)
+    problems = _check_menu(seen["cold"])
 
-    before = screen.text(cold, VIDEO_ROW)[VIDEO_COLUMN:].strip()
-    after = screen.text(toggled, VIDEO_ROW)[VIDEO_COLUMN:].strip()
+    before, after = _video(seen["cold"]), _video(seen["toggled"])
     standards = {"PAL50", "NTSC60"}
     if before not in standards:
         problems.append(f"video field read {before!r}, expected one of {sorted(standards)}")
@@ -170,13 +131,14 @@ def main() -> int:
     # The redraw has to leave the rest of the menu alone, not just change its
     # own field -- draw_freeze_menu() repaints by part, and a wrong part mask
     # would show up here rather than in the field itself.
-    problems += [f"after V: {p}" for p in _check_menu(toggled)]
+    problems += [f"after V: {p}" for p in _check_menu(seen["toggled"])]
 
     if not problems:
         print(f"freeze menu drew, and V moved the video field {before} -> {after}")
         return 0
 
-    sys.stdout.write("\n".join(problems) + "\nScreen was:\n" + screen.screen(toggled) + "\n")
+    shown = screen.screen(seen["toggled"], screen.SCREEN_AT)
+    sys.stdout.write("\n".join(problems) + "\nScreen was:\n" + shown + "\n")
     return 1
 
 
