@@ -8,11 +8,8 @@ set(LLVM_MOS_PLATFORM c64)
 find_package(llvm-mos-sdk REQUIRED)
 project(freezemenu LANGUAGES C CXX ASM)
 
-# C23 for `constexpr`, which is how named constants are declared throughout.
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-# The SDK's charset.h is C++20: its constexpr constructors are what turn the
-# menu text into screen codes at compile time.  Only the menu tables are C++.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -28,28 +25,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # soft stack.  Nothing here is re-entered: interrupts are masked throughout
 # and helper.s's NMI handler is a bare rti.
 set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS} -mcpu=mos45gs02 -D__MEGA65__ -fnonreentrant")
+
 # Mirrors CMAKE_C_FLAGS.  -fno-exceptions and -fno-rtti because nothing here
 # throws: charset.h compiles clean under them and still rejects a bad character
 # at compile time.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcpu=mos45gs02 -D__MEGA65__ -fnonreentrant -fno-exceptions -fno-rtti")
 set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -mcpu=mos45gs02")
 
-# This build assumes a patched llvm-mos.  Stock clang 23 miscompiles 16-bit loop
-# counters on 45GS02 with -mlto-zp >= 8: it decrements one location with DEW
-# while the loop-exit test reads another, so the bound is silently dropped and a
-# bounded loop runs past its array.  It hung MAKEDISK in sdcard_writesector's
-# write-verify, and it also affects the SDK's own libc, so a patched compiler
-# needs a rebuilt SDK to match.
-#
-# Nothing in git records which toolchain a build used; that lives only in the
-# CMake cache.  -DC_MCPU=mos6502 is the way out on an unpatched compiler: no
-# INW/DEW exists there, at a cost of ~3.5KB.  Applied per target rather than to the
-# flags above, because mega65-libc's debug.c needs 65CE02 for `ldz`.  Every
-# inline asm block in our C is plain 6502, so nothing here needs the wider set.
 set(C_MCPU mos45gs02 CACHE STRING "-mcpu for our C sources (mos6502 on an unpatched compiler)")
 
-# Before CPMAddPackage: mega65-libc's tests/CMakeLists.txt runs the same
-# find_program without HINTS, and whichever runs first decides the cache entry.
 # On macOS Xemu installs as an app bundle and is never on PATH, so searching
 # late leaves the dependency's five tests silently unregistered.
 find_program(XEMU NAMES xmega65 xmega65.native xmega65.exe xemu-xmega65 xemu-xmega65.exe
@@ -57,8 +41,6 @@ find_program(XEMU NAMES xmega65 xmega65.native xmega65.exe xemu-xmega65 xemu-xme
 
 include(cmake/CPM.cmake)
 
-# Pinned rather than tracking `development`, so a build is reproducible; bump
-# deliberately.  master does not currently compile under llvm-mos.
 CPMAddPackage(
     NAME mega65libc
     GITHUB_REPOSITORY mega65/mega65-libc
@@ -67,28 +49,17 @@ CPMAddPackage(
 
 set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-# Derived from the SDK package location rather than an absolute path, so
-# everything follows wherever llvm-mos is installed.  Used for the MEGA65
-# register headers in src/ and for the clang-tidy/clang-format below, which
-# must be the toolchain's own -- a system clang-tidy does not know the target.
 cmake_path(GET llvm-mos-sdk_DIR PARENT_PATH _sdk_cmake)   # .../lib/cmake
 cmake_path(GET _sdk_cmake PARENT_PATH _sdk_lib)           # .../lib
 cmake_path(GET _sdk_lib PARENT_PATH LLVM_MOS_ROOT)        # install prefix
 
-# OFF does not link: FREEZER needs the hyppo dirent layer, SPRITED needs conio
-# and mouse.  The option is global; the dependency is per-target.
 option(LINK_LIBC "Link mega65-libc" ON)
 
-# Must be at top level and precede add_subdirectory, or tests registered in a
-# subdirectory are silently dropped.
+# Must be at top level and precede add_subdirectory
 enable_testing()
 
 add_subdirectory(src)
 
-# Static analysis and formatting.  The .c files carry the diagnostics; headers
-# are reached through them.
-# GLOB_RECURSE, not GLOB: src/monitor/ was silently unchecked from the moment it
-# existed, so both targets passed while the files being changed went unread.
 file(GLOB_RECURSE TIDY_SOURCES ${SRC}/*.c ${SRC}/*.cpp)
 file(GLOB_RECURSE FORMAT_SOURCES ${SRC}/*.c ${SRC}/*.cpp ${SRC}/*.h)
 
@@ -96,9 +67,6 @@ find_program(CLANG_TIDY_EXE   NAMES clang-tidy   HINTS ${LLVM_MOS_ROOT}/bin NO_D
 find_program(CLANG_FORMAT_EXE NAMES clang-format HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 
 if(CLANG_TIDY_EXE)
-    # High-volume but genuine, and excluded from `tidy` in .clang-tidy so they cannot bury the
-    # rest.  Almost all are provably-safe screen arithmetic; the ones that are not are the whole
-    # reason to look, since a 16-bit int overflows before it widens.  Advisory, not enforced.
     add_custom_target(tidy-arithmetic
         # `--warnings-as-errors=-*` cancels the WarningsAsErrors: '*' in .clang-tidy, which would
         # otherwise make this advisory target fail the build.  An empty value does not cancel it.
@@ -106,12 +74,6 @@ if(CLANG_TIDY_EXE)
                 --checks=-*,bugprone-implicit-widening-of-multiplication-result,bugprone-narrowing-conversions
                 ${TIDY_SOURCES}
         COMMENT "Checking 16-bit overflow and narrowing (advisory)")
-    # Enumerates every #define that could be a typed constant.  Advisory, and not in
-    # .clang-tidy's Checks, for three reasons: the check always proposes an enum, where the
-    # convention here is constexpr for scalars and enums only for closed sets; helper.h's 39
-    # macros are #included by helper.S and the assembler needs real macros; and screen.h
-    # keeps four as untyped literals so 28-bit address arithmetic promotes.  As an enforced
-    # check it would demand NOLINT on all of those.
     add_custom_target(tidy-macros
         COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} "--warnings-as-errors=-*"
                 --checks=-*,modernize-macro-to-enum
@@ -135,9 +97,7 @@ endif()
 # normal build needs neither Python nor llvm-mc.  Regeneration is a rare action
 # after a toolchain bump, hence a non-default target -- same shape as the
 # clang-tidy and clang-format targets above.
-#
-# NO_DEFAULT_PATH matters here: the tables must come from the *patched* SDK
-# this project builds with, not from a stock llvm-mc that happens to be on PATH.
+
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(LLVM_MC_EXE NAMES llvm-mc HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 find_program(HOST_C_COMPILER NAMES cc clang gcc)
@@ -154,9 +114,7 @@ if(Python3_FOUND AND MEGA65_IOMAP AND EXISTS ${MEGA65_IOMAP})
         COMMENT "Regenerating the I/O register database")
 endif()
 
-# The database is data on the card, not part of any binary, so it is copied
-# rather than linked.  Committed so a checkout without iomap.txt still ships
-# names; iomap-names above regenerates it, this only stages it.
+# iomap database is data on the card
 add_custom_target(stage-iomap ALL
     BYPRODUCTS ${CMAKE_BINARY_DIR}/src/IOMAP.M65
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
