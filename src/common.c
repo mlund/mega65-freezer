@@ -152,14 +152,16 @@ void screen_of_death(const char* msg) {
     }
 }
 
-/* Staging for the writes below.  Not sector_buffer: freeze_store_sector_partial
- * reads the sector into that before patching it, which would clobber a source
- * held there. */
-static unsigned char descriptor_field[32];
+/* The frozen copy of the descriptor.  Its region starts on a sector boundary,
+ * so a store needs no read-before-write and the sector goes back out as it came
+ * in bar the patch: one read and one write, whatever the field. */
+constexpr uint32_t FROZEN_PROCDESC = 0xFFFBD00L;
+constexpr uint8_t PD_FLAGS = offsetof(struct ProcessDescriptor, d81_flags);
+constexpr uint8_t PD_NAMELEN = offsetof(struct ProcessDescriptor, d81_namelen);
+constexpr uint8_t PD_NAME = offsetof(struct ProcessDescriptor, d81_name);
+constexpr uint8_t PD_NAME_BYTES = 32;
 
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
-    /* The frozen copy of the same structure; the live one is HYPPO_PROCDESC. */
-    constexpr uint32_t FROZEN_PROCDESC = 0xFFFBD00L;
     uint8_t i;
 
     mega65_dos_getprocdesc(0x04); // get procdesc from hyppo to 0x400
@@ -170,57 +172,48 @@ void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
         i = 5;
     }
 
-    /* Three sector transfers rather than one per byte.  freeze_poke reads a
-     * whole 512-byte sector, changes one byte and writes it back, so the
-     * thirty-four bytes below cost sixty-eight of them written singly -- and
-     * this runs twice on every boot.  All three fields share one sector, which
-     * test/verify_slotmap.py pins against hyppo's own region table. */
-    descriptor_field[0] = overrides ? (overrides & ImgProcNoDisk ? 0x40 : 0) : i;
-    freeze_store_sector_partial(
-        FROZEN_PROCDESC + offsetof(struct ProcessDescriptor, d81_flags) + diskid,
-        (uint32_t)descriptor_field,
-        1);
-
-    descriptor_field[0] = overrides ? 0 : HYPPO_PROCDESC->d81_namelen[diskid];
-    freeze_store_sector_partial(
-        FROZEN_PROCDESC + offsetof(struct ProcessDescriptor, d81_namelen) + diskid,
-        (uint32_t)descriptor_field,
-        1);
-
-    for (i = 0; i < 32; i++) {
-        descriptor_field[i] = overrides ? 0 : (unsigned char)HYPPO_PROCDESC->d81_name[diskid][i];
+    /* freeze_poke reads a whole 512-byte sector, changes one byte and writes it
+     * back, so these thirty-four bytes cost sixty-eight transfers written
+     * singly -- and this runs twice on every boot. */
+    if (freeze_fetch_sector(FROZEN_PROCDESC, NULL) != FreezerOk) {
+        return;
     }
-    freeze_store_sector_partial(
-        FROZEN_PROCDESC + offsetof(struct ProcessDescriptor, d81_name) + diskid * 32,
-        (uint32_t)descriptor_field,
-        32);
+    sector_buffer[PD_FLAGS + diskid] = overrides ? (overrides & ImgProcNoDisk ? 0x40 : 0) : i;
+    sector_buffer[PD_NAMELEN + diskid] = overrides ? 0 : HYPPO_PROCDESC->d81_namelen[diskid];
+    for (i = 0; i < PD_NAME_BYTES; i++) {
+        sector_buffer[PD_NAME + diskid * PD_NAME_BYTES + i] =
+            overrides ? 0 : (unsigned char)HYPPO_PROCDESC->d81_name[diskid][i];
+    }
+    freeze_store_sector(FROZEN_PROCDESC, NULL);
 }
 
-void old_store_selected_disk_image(uint8_t diskid, char* disk_image) {
-    uint8_t disk_img_name_loc = diskid ? 0x35 : 0x15;
-    uint8_t disk_img_flag_loc = diskid ? 0x12 : 0x11;
+void old_store_selected_disk_image(uint8_t diskid, const char* disk_image) {
+    uint8_t flags;
     uint8_t i;
 
     // reflect mount hyppo mount state into image flags
     if (lpeek(0xFFD368B) & (diskid ? 0x08 : 0x01)) {
-        i = 0b00000101;
+        flags = 0b00000101;
     } else {
         if (lpeek(0xFFD36A1) & (diskid ? 0x04 : 0x01)) {
-            i = 0;
+            flags = 0;
         } else {
-            i = 0x40;
+            flags = 0x40;
         }
     }
-    freeze_poke(0xFFFBD00L + disk_img_flag_loc, i);
 
-    // Replace disk image name in process descriptor block
-    for (i = 0; (i < 32) && disk_image[i]; i++) {
-        freeze_poke(0xFFFBD00L + disk_img_name_loc + i, disk_image[i]);
+    /* Same sector for all three fields, so one read and one write. */
+    if (freeze_fetch_sector(FROZEN_PROCDESC, NULL) != FreezerOk) {
+        return;
     }
-    // Update length of name
-    freeze_poke(0xFFFBD02L + disk_img_flag_loc, i);
+    sector_buffer[PD_FLAGS + diskid] = flags;
+    for (i = 0; (i < PD_NAME_BYTES) && disk_image[i]; i++) {
+        sector_buffer[PD_NAME + diskid * PD_NAME_BYTES + i] = (unsigned char)disk_image[i];
+    }
+    sector_buffer[PD_NAMELEN + diskid] = i;
     // Pad with spaces as required by hypervisor
-    for (; i < 32; i++) {
-        freeze_poke(0xFFFBD00L + disk_img_name_loc + i, ' ');
+    for (; i < PD_NAME_BYTES; i++) {
+        sector_buffer[PD_NAME + diskid * PD_NAME_BYTES + i] = ' ';
     }
+    freeze_store_sector(FROZEN_PROCDESC, NULL);
 }

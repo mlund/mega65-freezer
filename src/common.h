@@ -52,4 +52,4 @@ enum : uint8_t {
     ImgProcNoDisk = 0x02,
 };
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides);
-void old_store_selected_disk_image(uint8_t diskid, char* disk_image);
+void old_store_selected_disk_image(uint8_t diskid, const char* disk_image);

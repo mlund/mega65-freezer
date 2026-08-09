@@ -35,6 +35,10 @@ constexpr uint8_t XEMU_QUIT = 0x42;
  * a structure hyppo places at $FFFBD00.  src/slot.h asserts that offset. */
 constexpr uint32_t SCRATCH = 0xFFFBD00UL + 0x35;
 constexpr uint8_t SCRATCH_BYTES = 32;
+/* The region's own base, where a store needs no read-before-write, and where
+ * SCRATCH begins within its sector. */
+constexpr uint32_t SCRATCH_BASE = 0xFFFBD00UL;
+constexpr uint8_t SCRATCH_OFFSET = 0x35;
 
 [[noreturn]] static void finish(uint8_t code) {
     POKE(XEMU_CONTROL, code);
@@ -52,6 +56,8 @@ static void check(uint8_t number, uint8_t got, uint8_t want) {
 }
 
 static unsigned char buffer[SCRATCH_BYTES];
+/* A whole sector, to compare one way of writing a field against another. */
+static unsigned char snapshot[512];
 
 int main(void) {
     mega65_fast();
@@ -117,6 +123,41 @@ int main(void) {
     /* 7: a write outside every region is refused rather than landing somewhere
      * arbitrary.  $FFD5000 is between two regions in hyppo's table. */
     check(7, freeze_peek(0xFFD5000UL), FreezerNotFrozen);
+
+    /* 8: freeze_fetch_sector with a null buffer leaves the sector in
+     * sector_buffer instead of copying it out, and freeze_store_sector with a
+     * null buffer writes that back.  At a region's base the store skips its
+     * read-before-write, so the pair is two transfers for a whole sector --
+     * the cheapest way to change several bytes of one.  Nothing else pins
+     * these two forms; checks 5 and 6 cover only the partial ones. */
+    for (uint8_t i = 0; i < SCRATCH_BYTES; i++) {
+        freeze_poke(SCRATCH + i, (unsigned char)(i ^ 0x3C));
+    }
+    check(8, freeze_fetch_sector(SCRATCH_BASE, NULL), FreezerOk);
+    for (uint8_t i = 0; i < SCRATCH_BYTES; i++) {
+        check(8, sector_buffer[SCRATCH_OFFSET + i], (unsigned char)(i ^ 0x3C));
+    }
+
+    /* 9: the two ways of writing the same field leave the same sector.  This
+     * is what licenses replacing a per-byte freeze_poke loop with one fetch,
+     * a patch and one store: not that the bytes read back, but that nothing
+     * else in the sector moved. */
+    for (uint16_t i = 0; i < 512; i++) {
+        snapshot[i] = sector_buffer[i];
+    }
+    /* Scribble, so an unchanged sector cannot pass by doing nothing. */
+    for (uint8_t i = 0; i < SCRATCH_BYTES; i++) {
+        freeze_poke(SCRATCH + i, 0x5A);
+    }
+    check(9, freeze_fetch_sector(SCRATCH_BASE, NULL), FreezerOk);
+    for (uint8_t i = 0; i < SCRATCH_BYTES; i++) {
+        sector_buffer[SCRATCH_OFFSET + i] = (unsigned char)(i ^ 0x3C);
+    }
+    check(9, freeze_store_sector(SCRATCH_BASE, NULL), FreezerOk);
+    check(9, freeze_fetch_sector(SCRATCH_BASE, NULL), FreezerOk);
+    for (uint16_t i = 0; i < 512; i++) {
+        check(9, sector_buffer[i], snapshot[i]);
+    }
 
     debug_msg("PASS");
     finish(0);
