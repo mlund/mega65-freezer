@@ -3,7 +3,7 @@
 Upon starting a new session, *always* do this:
 
 - load "llvm-mos" skill from https://github.com/mlund/claude-skills
-- prompt user for paths to:
+- if not already known, prompt user for paths to:
   - `llvm-mos-sdk` (clang compiler and tools),
   - `mega65-core/`
   - `mega65-rom` (user may/may not have access)
@@ -21,7 +21,7 @@ Upon starting a new session, *always* do this:
 - ask before committing or pushing; let user review
 - the freeze slot is SD sectors, not memory: edits go through the monitor's one-sector cache
 - explicit addresses belong in the linker script, not in C
-- finish new features with code review, simplification pass, and code documentation review
+- finish new features with code review, simplification pass, and code documentation review (do they adhere to guidelines give here?)
 - see README.md for build and test invocation
 
 # gotchas
