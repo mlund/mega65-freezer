@@ -938,7 +938,6 @@ int main(void) {
                         freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
                         freeze_io_poke(0x304e, 0x68);
                         freeze_io_poke(0x304f, 0x0 | (freeze_io_peek(0x304f) & 0xf0));
-                        freeze_io_poke(0x3072, 0);
                         // CIA TOD
                         freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) | 0x80);
                         freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) | 0x80);
@@ -951,7 +950,6 @@ int main(void) {
                         VICIV.bbdrpos_msb = 0x1 | (VICIV.bbdrpos_msb & 0xf0);
                         VICIV.textypos_lsb = 0x68;
                         VICIV.textypos_msb = 0x0 | (VICIV.textypos_msb & 0xf0);
-                        VICIV.spr_yadj = 0;
                         // CIA TOD
                         CIA1.cra = CIA1.cra | 0x80;
                         CIA2.cra = CIA2.cra | 0x80;
@@ -965,7 +963,6 @@ int main(void) {
                         freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
                         freeze_io_poke(0x304e, 0x2A);
                         freeze_io_poke(0x304f, 0x0 | (freeze_io_peek(0x304f) & 0xf0));
-                        freeze_io_poke(0x3072, 24);
                         // CIA TOD
                         freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) & 0x7f);
                         freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) & 0x7f);
@@ -978,7 +975,6 @@ int main(void) {
                         VICIV.bbdrpos_msb = 0x1 | (VICIV.bbdrpos_msb & 0xf0);
                         VICIV.textypos_lsb = 0x2A;
                         VICIV.textypos_msb = 0x0 | (VICIV.textypos_msb & 0xf0);
-                        VICIV.spr_yadj = 24;
                         // CIA TOD
                         CIA1.cra = CIA1.cra & 0x7f;
                         CIA2.cra = CIA2.cra & 0x7f;
