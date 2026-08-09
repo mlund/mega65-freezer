@@ -38,6 +38,7 @@ void freeze_poke(uint32_t addr, unsigned char v);
  * slot, not live hardware -- see freeze_peek. */
 unsigned char freeze_io_peek(uint16_t reg);
 void freeze_io_poke(uint16_t reg, unsigned char v);
+void freeze_io_update(uint16_t reg, uint8_t and_mask, uint8_t or_mask);
 enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer);
 enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count);
 enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer);

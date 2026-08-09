@@ -133,31 +133,31 @@ unsigned char next_cpu_speed(void) {
             // Make it 2MHz: 2MHZ && !FAST && !VFAST
             // ffd0030 is a special register to access the C128 D030.0 bit
             freeze_io_poke(0x0030, 1);
-            freeze_io_poke(0x3031, freeze_io_peek(0x3031) & 0xbf);
-            freeze_io_poke(0x3054, freeze_io_peek(0x3054) & 0xbf);
+            freeze_io_update(0x3031, 0xbf, 0x00);
+            freeze_io_update(0x3054, 0xbf, 0x00);
             return 1;
         case 2:
             // Make it 3.5MHz: !2MHZ && FAST && !VFAST
             freeze_io_poke(0x0030, 0);
-            freeze_io_poke(0x3031, freeze_io_peek(0x3031) | 0x40);
-            freeze_io_poke(0x3054, freeze_io_peek(0x3054) & 0xbf);
+            freeze_io_update(0x3031, 0xff, 0x40);
+            freeze_io_update(0x3054, 0xbf, 0x00);
             break;
         case 3:
             // Make it 40MHz: !2MHZ && FAST && VFAST
             freeze_io_poke(0x0030, 0);
-            freeze_io_poke(0x3031, freeze_io_peek(0x3031) | 0x40);
-            freeze_io_poke(0x3054, freeze_io_peek(0x3054) | 0x40);
+            freeze_io_update(0x3031, 0xff, 0x40);
+            freeze_io_update(0x3054, 0xff, 0x40);
             break;
         case 40:
         default:
             // Make it 1MHz: !2MHZ && !FAST && !VFAST
             freeze_io_poke(0x0030, 0);
-            freeze_io_poke(0x3031, freeze_io_peek(0x3031) & 0xbf);
-            freeze_io_poke(0x3054, freeze_io_peek(0x3054) & 0xbf);
+            freeze_io_update(0x3031, 0xbf, 0x00);
+            freeze_io_update(0x3054, 0xbf, 0x00);
             // If a program forced 40 MHz via POKE 0,65, the Hypervisor flag at
             // ffd367d is set, and is overriding the other flags. Clear it.
             // The Freezer itself does not set this.
-            freeze_io_poke(0x367d, freeze_io_peek(0x367d) & 0xef);
+            freeze_io_update(0x367d, 0xef, 0x00);
             return 1;
     }
     return 0;
@@ -905,14 +905,14 @@ int main(void) {
                         freeze_io_poke(0x306f, 0x00);
                         freeze_io_poke(0x3072, 0x00);
                         freeze_io_poke(0x3048, 0x68);
-                        freeze_io_poke(0x3049, (freeze_io_peek(0x3049) & 0xf0));
+                        freeze_io_update(0x3049, 0xf0, 0x00);
                         freeze_io_poke(0x304a, 0xF8);
-                        freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
+                        freeze_io_update(0x304b, 0xf0, 0x1);
                         freeze_io_poke(0x304e, 0x68);
-                        freeze_io_poke(0x304f, (freeze_io_peek(0x304f) & 0xf0));
+                        freeze_io_update(0x304f, 0xf0, 0x00);
                         // CIA TOD
-                        freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) | 0x80);
-                        freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) | 0x80);
+                        freeze_io_update(0x3c0e, 0xff, 0x80);
+                        freeze_io_update(0x3d0e, 0xff, 0x80);
                         // do it for the freezer itself
                         VICIV.rasline0 = 0x00;
                         VICIV.spr_yadj = 0x00;
@@ -930,14 +930,14 @@ int main(void) {
                         freeze_io_poke(0x306f, 0x87);
                         freeze_io_poke(0x3072, 0x18);
                         freeze_io_poke(0x3048, 0x2A);
-                        freeze_io_poke(0x3049, (freeze_io_peek(0x3049) & 0xf0));
+                        freeze_io_update(0x3049, 0xf0, 0x00);
                         freeze_io_poke(0x304a, 0xB9);
-                        freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
+                        freeze_io_update(0x304b, 0xf0, 0x1);
                         freeze_io_poke(0x304e, 0x2A);
-                        freeze_io_poke(0x304f, (freeze_io_peek(0x304f) & 0xf0));
+                        freeze_io_update(0x304f, 0xf0, 0x00);
                         // CIA TOD
-                        freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) & 0x7f);
-                        freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) & 0x7f);
+                        freeze_io_update(0x3c0e, 0x7f, 0x00);
+                        freeze_io_update(0x3d0e, 0x7f, 0x00);
                         // do it for the freezer itself
                         VICIV.rasline0 = 0x87;
                         VICIV.spr_yadj = 0x18;

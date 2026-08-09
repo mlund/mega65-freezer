@@ -193,6 +193,13 @@ __attribute__((noinline)) unsigned char freeze_io_peek(uint16_t reg) {
     return freeze_peek(FROZEN_IO_BASE + reg);
 }
 
+/* Read-modify-write of one frozen register: (old & and_mask) | or_mask.  One
+ * call at each site instead of two; the sector traffic is unchanged, since the
+ * read and the write still go through freeze_peek and freeze_poke. */
+__attribute__((noinline)) void freeze_io_update(uint16_t reg, uint8_t and_mask, uint8_t or_mask) {
+    freeze_io_poke(reg, (unsigned char)((freeze_io_peek(reg) & and_mask) | or_mask));
+}
+
 __attribute__((noinline)) void freeze_io_poke(uint16_t reg, unsigned char v) {
     freeze_poke(FROZEN_IO_BASE + reg, v);
 }
