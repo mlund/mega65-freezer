@@ -2,12 +2,12 @@
 
 Freeze menu and tools for the MEGA65.
 
-An llvm-mos port of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/mega65-freezemenu),
+An llvm-mos rewrite of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/mega65-freezemenu),
 which builds with cc65; see its README for what the tools are for and how they
 are installed. Nothing is shared but the behaviour — the sources, build and
 tests here are separate.
 
-`RESTORE` freezes the running program; FREEZER draws the menu and launches the
+`RESTORE` freezes the running program; `FREEZER` draws the menu and launches the
 rest. Each tool is a separate program loaded from the SD card:
 
 | tool       | what it does                                |
@@ -26,8 +26,7 @@ Two kinds of data are read off the card at run time and built here too:
 
 ## Building
 
-Currently needs a patched llvm-mos: stock clang miscompiles 16-bit loop counters on
-45GS02 with `-mlto-zp >= 8`, which hangs MAKEDISK mid-write.
+Currently needs a patched llvm-mos: stock SDK v23.0.1 miscompiles.
 
 ```
 cmake -DCMAKE_PREFIX_PATH=<prefix> -B build
@@ -69,11 +68,11 @@ Other targets: `format`, `tidy`, `tidy-arithmetic`, `iomap-names`.
 ctest --test-dir build
 ```
 
-The host tests build the portable halves with the host compiler and need
+The host tests build portable parts with the host compiler and need
 nothing else. The emulator tests need an emulator — found automatically, or
 given as `XEMU` — and an SD image, which defaults to Xemu's own. They clone it
 and write the build into the clone's filesystem, so the image itself is never
-touched. With mtools installed, one further test checks that writer by having
+touched. With `mtools` installed, one further test checks that writer by having
 mdir read back what it wrote.
 
 `FREEZER_TRACE` is compile-time, so the serial assertions need their own build:
@@ -99,13 +98,11 @@ point it did the same job as its cc65 counterpart:
 | `SPRITED`  |  31016 | 17128 |  -45 |
 | `FREEZER`  |  24700 | 19573 |  -21 |
 
-`MONITOR` is measured before the disassembler, the cc65 monitor's D command
-being an empty case. With the disassembler, assembler and bit editor it is
-24266.
+Measured _before_ feature additions.
 
-### Bugs found
+### Bugs found (and fixed)
 
-Defects present in the cc65 sources:
+Defects found in original:
 
 - `report_unmapped()` called itself. Every unmapped address reached through D,
   F, H, C, T or B recursed until the stack died. Eight call sites. Every
@@ -136,7 +133,7 @@ Defects present in the cc65 sources:
 
 ### Testing
 
-`ctest` runs both halves:
+`ctest` runs:
 
 - Host tests build the toolchain-independent code — number formatting, block
   moves, the disassembler, the register database, the thumbnail frames, the
@@ -152,19 +149,17 @@ Defects present in the cc65 sources:
 
 Warnings are errors (`-Wall -Wextra`, and the narrowing half of
 `-Wconversion`). clang-tidy runs over every source including
-`misc-no-recursion`, whose earlier exclusion is what let `report_unmapped()`
-ship. A second, advisory target reports 16-bit overflow and narrowing, `int`
+`misc-no-recursion`. A second, advisory target reports 16-bit overflow and narrowing, `int`
 being 16 bits here.
 
 ### Dependencies
 
-The generators are Python with no third-party packages: the PNG decoding for
-the thumbnail frames is stdlib zlib, so libpng is not needed to build.
-MEGAINFO composes its numbers rather than linking printf.
+Generators are Python with no third-party packages like libpng, ophis.
+Pinned mega65-libc is automatically sources by CMake.
 
 ### New features
 
-- `MONITOR`: a disassembler, an assembler, and a bit editor that names and
+- `MONITOR`: added disassembler, assembler, and bit editor that names and
   describes I/O register bits from mega65-core's iomap.txt.
 - Colour schemes, switchable while the tools run.
 - The freeze menu's fixed text is built at compile time and drawn as
