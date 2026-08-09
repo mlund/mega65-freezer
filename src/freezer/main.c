@@ -943,18 +943,18 @@ int main(void) {
                         freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) | 0x80);
                         freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) | 0x80);
                         // do it for the freezer itself
-                        lpoke(0xFFD306fL, 0x00);
-                        lpoke(0xFFD3072L, 0x00);
-                        lpoke(0xFFD3048L, 0x68);
-                        lpoke(0xFFD3049L, 0x0 | (lpeek(0xFFD3049L) & 0xf0));
-                        lpoke(0xFFD304AL, 0xF8);
-                        lpoke(0xFFD304BL, 0x1 | (lpeek(0xFFD304BL) & 0xf0));
-                        lpoke(0xFFD304EL, 0x68);
-                        lpoke(0xFFD304FL, 0x0 | (lpeek(0xFFD304FL) & 0xf0));
-                        lpoke(0xFFD3072L, 0);
+                        VICIV.rasline0 = 0x00;
+                        VICIV.spr_yadj = 0x00;
+                        VICIV.tbdrpos_lsb = 0x68;
+                        VICIV.tbdrpos_msb = 0x0 | (VICIV.tbdrpos_msb & 0xf0);
+                        VICIV.bbdrpos_lsb = 0xF8;
+                        VICIV.bbdrpos_msb = 0x1 | (VICIV.bbdrpos_msb & 0xf0);
+                        VICIV.textypos_lsb = 0x68;
+                        VICIV.textypos_msb = 0x0 | (VICIV.textypos_msb & 0xf0);
+                        VICIV.spr_yadj = 0;
                         // CIA TOD
-                        lpoke(0xffd3c0el, lpeek(0xffd3c0el) | 0x80);
-                        lpoke(0xffd3d0el, lpeek(0xffd3d0el) | 0x80);
+                        CIA1.cra = CIA1.cra | 0x80;
+                        CIA2.cra = CIA2.cra | 0x80;
                     } else {
                         // Switch to NTSC
                         freeze_io_poke(0x306f, 0x87);
@@ -970,18 +970,18 @@ int main(void) {
                         freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) & 0x7f);
                         freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) & 0x7f);
                         // do it for the freezer itself
-                        lpoke(0xFFD306fL, 0x87);
-                        lpoke(0xFFD3072L, 0x18);
-                        lpoke(0xFFD3048L, 0x2A);
-                        lpoke(0xFFD3049L, 0x0 | (lpeek(0xFFD3049L) & 0xf0));
-                        lpoke(0xFFD304AL, 0xB9);
-                        lpoke(0xFFD304BL, 0x1 | (lpeek(0xFFD304BL) & 0xf0));
-                        lpoke(0xFFD304EL, 0x2A);
-                        lpoke(0xFFD304FL, 0x0 | (lpeek(0xFFD304FL) & 0xf0));
-                        lpoke(0xFFD3072L, 24);
+                        VICIV.rasline0 = 0x87;
+                        VICIV.spr_yadj = 0x18;
+                        VICIV.tbdrpos_lsb = 0x2A;
+                        VICIV.tbdrpos_msb = 0x0 | (VICIV.tbdrpos_msb & 0xf0);
+                        VICIV.bbdrpos_lsb = 0xB9;
+                        VICIV.bbdrpos_msb = 0x1 | (VICIV.bbdrpos_msb & 0xf0);
+                        VICIV.textypos_lsb = 0x2A;
+                        VICIV.textypos_msb = 0x0 | (VICIV.textypos_msb & 0xf0);
+                        VICIV.spr_yadj = 24;
                         // CIA TOD
-                        lpoke(0xffd3c0el, lpeek(0xffd3c0el) & 0x7f);
-                        lpoke(0xffd3d0el, lpeek(0xffd3d0el) & 0x7f);
+                        CIA1.cra = CIA1.cra & 0x7f;
+                        CIA2.cra = CIA2.cra & 0x7f;
                     }
                     draw_freeze_menu(UpdateTop);
                     break;
@@ -1115,10 +1115,10 @@ int main(void) {
                     key = freeze_io_peek(0x3054);
                     if (key & 0x20) {
                         freeze_io_poke(0x3054, key & 0xdf);
-                        lpoke(0xFFD3054L, lpeek(0xFFD3054L) & 0xdf);
+                        VICIV.ctrlc = VICIV.ctrlc & 0xdf;
                     } else {
                         freeze_io_poke(0x3054, key | 0x20);
-                        lpoke(0xFFD3054L, lpeek(0xFFD3054L) | 0x20);
+                        VICIV.ctrlc = VICIV.ctrlc | 0x20;
                     }
                     draw_freeze_menu(UpdateTop);
                     break;
