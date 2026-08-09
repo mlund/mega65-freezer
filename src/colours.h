@@ -78,7 +78,7 @@ enum Scheme : uint8_t {
 /* Which scheme a tool starts in.  Not a build option: every scheme is compiled
  * in, and the monitor's F1 cycles them and hands the choice on, so this only
  * picks where that cycle begins.  No other tool binds a key to it. */
-constexpr uint8_t SCHEME_BOOT = SchemeGruvbox;
+constexpr uint8_t SCHEME_BOOT = SchemeClassic;
 
 /* A tool leaves its choice here for the next one it launches, because
  * mega65_dos_exechelper() loads that tool over this one and no variable
