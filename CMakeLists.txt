@@ -257,6 +257,18 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(launch_audiomix PROPERTIES TIMEOUT 180)
         endif()
 
+        # The freeze menu's own screen, which the tests above only pass through:
+        # that it draws, and that a key redraws the field it owns.  Two emulator
+        # runs, hence the longer timeout; see test/verify_freezer_xemu.py.
+        if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
+            add_test(NAME freezer_menu
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_freezer_xemu.py
+                        --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                        --build $<TARGET_FILE_DIR:FREEZER>)
+            set_tests_properties(freezer_menu PROPERTIES TIMEOUT 300)
+        endif()
+
         # Assemble in the monitor and read the bytes back off the card.
         if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
             add_test(NAME monitor_assemble
