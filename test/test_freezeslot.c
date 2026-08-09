@@ -118,6 +118,17 @@ int main(void) {
      * arbitrary.  $FFD5000 is between two regions in hyppo's table. */
     check(7, freeze_peek(0xFFD5000UL), FreezerNotFrozen);
 
+    /* 8: the $DE00 window really is the card's sector buffer, which is what
+     * lets sdcard_writesector verify a write without copying it out first.  A
+     * wrong window would not fail a write -- it would just stop checking it --
+     * so it is compared here against the same bytes read the long way. */
+    freeze_peek(SCRATCH); /* leaves a known sector in the card's buffer */
+    POKE(0xD680, 0x81);   /* map it at $DE00 */
+    for (uint8_t i = 0; i < 16; i++) {
+        check(8, ((volatile uint8_t*)0xDE00)[i], lpeek(0xFFD6E00UL + i));
+    }
+    POKE(0xD680, 0x82); /* and put back whatever was there */
+
     debug_msg("PASS");
     finish(0);
 }
