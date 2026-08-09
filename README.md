@@ -85,20 +85,21 @@ cmake -B build-trace -DFREEZER_TRACE=ON ...
 
 ### Size
 
-Against the binaries shipped on the MEGA65 SD card, each tool measured at the
-point it did the same job as its cc65 counterpart:
+Against the binaries shipped on the MEGA65 SD card:
 
 | tool       |   cc65 |  llvm |    % |
 |------------|-------:|------:|-----:|
-| `AUDIOMIX` |  23161 |  8288 |  -64 |
-| `MAKEDISK` |  22307 | 10230 |  -54 |
-| `MEGAINFO` |  21966 | 10646 |  -52 |
+| `AUDIOMIX` |  23161 |  8240 |  -64 |
+| `MAKEDISK` |  22307 |  9904 |  -56 |
+| `MEGAINFO` |  21966 | 10370 |  -53 |
+| `ROMLOAD`  |  17378 |  8695 |  -50 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
-| `ROMLOAD`  |  17378 |  8957 |  -48 |
-| `SPRITED`  |  31016 | 17128 |  -45 |
-| `FREEZER`  |  24700 | 19573 |  -21 |
+| `SPRITED`  |  31016 | 16840 |  -46 |
+| `FREEZER`  |  24700 | 18500 |  -25 |
 
-Measured _before_ feature additions.
+`MONITOR` alone is measured _before_ feature additions, at the point it did the
+same job as its cc65 counterpart: its disassembler, assembler and bit editor
+have nothing to compare against.
 
 ### Bugs found (and fixed)
 
