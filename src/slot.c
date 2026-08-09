@@ -44,7 +44,7 @@ unsigned char freeze_peek(uint32_t addr) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         /* FreezerNotFrozen's value, but this function returns data, so a real
          * byte of $55 is indistinguishable from the failure. */
         TRACE("not in freeze slot");
@@ -63,7 +63,7 @@ enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
@@ -84,7 +84,7 @@ enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
@@ -107,7 +107,7 @@ enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
@@ -136,7 +136,7 @@ enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint1
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         TRACE("not in freeze slot");
         return FreezerNotFrozen;
     }
@@ -164,7 +164,7 @@ void freeze_poke(uint32_t addr, unsigned char v) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         return;
     }
 

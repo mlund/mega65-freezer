@@ -140,7 +140,7 @@ static void cache_sector(uint32_t freeze_slot_offset) {
  * fill would otherwise write the same sector once per byte. */
 bool block_write_byte(uint32_t address, unsigned char value) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(address);
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         return false;
     }
     cache_sector(freeze_slot_offset);
@@ -154,7 +154,7 @@ bool block_write_byte(uint32_t address, unsigned char value) {
  * gets away with one check per line only because its runs are 16-byte aligned. */
 bool disasm_read_byte(uint32_t address, uint8_t* value) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(address);
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         return false;
     }
     cache_sector(freeze_slot_offset);
@@ -189,7 +189,7 @@ void show_memory_line(uint32_t addr) {
     format_hex(&output_buffer[1], addr, 7);
     output_buffer[8] = ' ';
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         // Memory that isn't saved
         for (unsigned char i = 0; i < 65; i++) {
             output_buffer[9 + i] =
@@ -302,7 +302,7 @@ void set_memory(void) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(mon_address);
     unsigned char i = 0;
 
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         report_unmapped();
         return;
     } else {
@@ -434,7 +434,7 @@ void show_registers(void) {
 
     /* Test the sentinel before shifting: 0xFFFFFFFF >> 9 is 0x7FFFFF, so a
      * shifted value can never equal it and the guard would never fire. */
-    if (freeze_slot_offset == 0xFFFFFFFFUL) {
+    if (freeze_slot_offset == FREEZE_SLOT_NOT_PRESENT) {
         write_line("? FROZEN REGISTERS NOT FOUND  ERROR", 0);
         recolour_last_line(SchemeError);
     } else {

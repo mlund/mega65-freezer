@@ -146,11 +146,9 @@ void display_error(void) {
 
     VICIV.bordercol = SchemeError;
     errstr = hyppoerror_to_screen(mega65_geterrorcode());
-    unsigned char length = 0;
-    while (length < 19 && errstr[length]) {
-        length++;
-    }
-    draw_text(SCREEN_CELL(21, 0), SchemeError, errstr, length);
+    /* No message hyppoerror_to_screen returns exceeds the 19-cell field: the
+     * longest are 18, and the fallback is "ERROR CODE XX". */
+    draw_text(SCREEN_CELL(21, 0), SchemeError, errstr, (unsigned char)strlen(errstr));
     /* The whole field, not just the text: a shorter message still has to clear
      * the colour of the one it replaced. */
     colour_run(COLOUR_RAM_ADDRESS + (21 * 2), error_row, 19 * 2);
@@ -461,11 +459,6 @@ void draw_disk_image_list(void) {
                 } else {
                     POKE(addr + (x << 1), name[x]);
                 }
-            }
-        } else {
-            // Blank dummy entry
-            for (x = 0; x < 40; x++) {
-                POKE(addr + (x << 1), ' ');
             }
         }
         colour_run(COLOUR_RAM_ADDRESS + (i * SCREEN_ROW_BYTES),

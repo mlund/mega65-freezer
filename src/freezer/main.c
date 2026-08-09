@@ -195,7 +195,7 @@ void draw_thumbnail(void) {
     uint32_t thumbnail_sector = find_thumbnail_offset();
 
     // Can't find thumbnail area?  Then show no thumbnail
-    if (thumbnail_sector == 0xFFFFFFFFUL) {
+    if (thumbnail_sector == FREEZE_SLOT_NOT_PRESENT) {
         lfill(0x50000L, 0, 10 * 6 * 64);
         return;
     }
@@ -905,11 +905,11 @@ int main(void) {
                         freeze_io_poke(0x306f, 0x00);
                         freeze_io_poke(0x3072, 0x00);
                         freeze_io_poke(0x3048, 0x68);
-                        freeze_io_poke(0x3049, 0x0 | (freeze_io_peek(0x3049) & 0xf0));
+                        freeze_io_poke(0x3049, (freeze_io_peek(0x3049) & 0xf0));
                         freeze_io_poke(0x304a, 0xF8);
                         freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
                         freeze_io_poke(0x304e, 0x68);
-                        freeze_io_poke(0x304f, 0x0 | (freeze_io_peek(0x304f) & 0xf0));
+                        freeze_io_poke(0x304f, (freeze_io_peek(0x304f) & 0xf0));
                         // CIA TOD
                         freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) | 0x80);
                         freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) | 0x80);
@@ -917,11 +917,11 @@ int main(void) {
                         VICIV.rasline0 = 0x00;
                         VICIV.spr_yadj = 0x00;
                         VICIV.tbdrpos_lsb = 0x68;
-                        VICIV.tbdrpos_msb = 0x0 | (VICIV.tbdrpos_msb & 0xf0);
+                        VICIV.tbdrpos_msb = (VICIV.tbdrpos_msb & 0xf0);
                         VICIV.bbdrpos_lsb = 0xF8;
                         VICIV.bbdrpos_msb = 0x1 | (VICIV.bbdrpos_msb & 0xf0);
                         VICIV.textypos_lsb = 0x68;
-                        VICIV.textypos_msb = 0x0 | (VICIV.textypos_msb & 0xf0);
+                        VICIV.textypos_msb = (VICIV.textypos_msb & 0xf0);
                         // CIA TOD
                         CIA1.cra = CIA1.cra | 0x80;
                         CIA2.cra = CIA2.cra | 0x80;
@@ -930,11 +930,11 @@ int main(void) {
                         freeze_io_poke(0x306f, 0x87);
                         freeze_io_poke(0x3072, 0x18);
                         freeze_io_poke(0x3048, 0x2A);
-                        freeze_io_poke(0x3049, 0x0 | (freeze_io_peek(0x3049) & 0xf0));
+                        freeze_io_poke(0x3049, (freeze_io_peek(0x3049) & 0xf0));
                         freeze_io_poke(0x304a, 0xB9);
                         freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
                         freeze_io_poke(0x304e, 0x2A);
-                        freeze_io_poke(0x304f, 0x0 | (freeze_io_peek(0x304f) & 0xf0));
+                        freeze_io_poke(0x304f, (freeze_io_peek(0x304f) & 0xf0));
                         // CIA TOD
                         freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) & 0x7f);
                         freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) & 0x7f);
@@ -942,11 +942,11 @@ int main(void) {
                         VICIV.rasline0 = 0x87;
                         VICIV.spr_yadj = 0x18;
                         VICIV.tbdrpos_lsb = 0x2A;
-                        VICIV.tbdrpos_msb = 0x0 | (VICIV.tbdrpos_msb & 0xf0);
+                        VICIV.tbdrpos_msb = (VICIV.tbdrpos_msb & 0xf0);
                         VICIV.bbdrpos_lsb = 0xB9;
                         VICIV.bbdrpos_msb = 0x1 | (VICIV.bbdrpos_msb & 0xf0);
                         VICIV.textypos_lsb = 0x2A;
-                        VICIV.textypos_msb = 0x0 | (VICIV.textypos_msb & 0xf0);
+                        VICIV.textypos_msb = (VICIV.textypos_msb & 0xf0);
                         // CIA TOD
                         CIA1.cra = CIA1.cra & 0x7f;
                         CIA2.cra = CIA2.cra & 0x7f;

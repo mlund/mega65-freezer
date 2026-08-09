@@ -48,8 +48,6 @@ unsigned char do_rom_loader(void);
 void do_megainfo(void);
 
 extern unsigned char not_in_root;
-extern struct FreezeRegion freeze_region_list[MAX_REGIONS];
-extern unsigned char freeze_region_count;
 
 /* Bits of freeze_region_flags. */
 enum : uint8_t {

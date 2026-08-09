@@ -36,7 +36,7 @@ extern unsigned char freeze_region_count;
 
 /* Returned when no region holds the address.  A byte offset can never be this,
  * so callers test against it rather than carrying a separate flag. */
-constexpr uint32_t FREEZE_SLOT_NOT_PRESENT = 0xFFFFFFFFUL;
+constexpr uint32_t FREEZE_SLOT_NOT_PRESENT = UINT32_MAX;
 
 /* Byte offset of `address` within the slot, counting from the slot's start and
  * past the saved SD sector, or FREEZE_SLOT_NOT_PRESENT. */
