@@ -9,9 +9,11 @@ sound when they genuinely share a sector.  This pins that.
 
 The region table below is hyppo's own, transcribed from freeze_mem_list in
 mega65-core/src/hyppo/freeze.asm -- the entries are 4 bytes of base, 3 of
-length, 1 of preparatory action.  Expected sectors come from the table, not
-from slotmap.c's arithmetic, so this checks the code against the format rather
-than against itself.
+length, 1 of preparatory action.  What that buys is a check against a second
+reading of the same table: _walk() below is a separate implementation, so a
+transcription slip in either shows up, but a shared misreading of hyppo's
+format would not.  The sector groupings are the part worth having -- they say
+which bytes may be batched into one transfer.
 
     python3 test/verify_slotmap.py --cc cc
 """
