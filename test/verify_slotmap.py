@@ -56,10 +56,25 @@ REGIONS = [
 # holds them.  Every address in a group must land in one sector -- that is the
 # property batching relies on, and the reason each is listed by name.
 SHARE_A_SECTOR = [
-    ("VIC-IV $D000-$D07F", [0xFFD3031, 0xFFD3048, 0xFFD3049, 0xFFD304A, 0xFFD304B,
-                            0xFFD304E, 0xFFD304F, 0xFFD3054, 0xFFD306F, 0xFFD3072]),
-    ("reset block $D640-$D67D", [0xFFD3640, 0xFFD3647, 0xFFD364A, 0xFFD364F,
-                                 0xFFD3650, 0xFFD3651, 0xFFD367D]),
+    (
+        "VIC-IV $D000-$D07F",
+        [
+            0xFFD3031,
+            0xFFD3048,
+            0xFFD3049,
+            0xFFD304A,
+            0xFFD304B,
+            0xFFD304E,
+            0xFFD304F,
+            0xFFD3054,
+            0xFFD306F,
+            0xFFD3072,
+        ],
+    ),
+    (
+        "reset block $D640-$D67D",
+        [0xFFD3640, 0xFFD3647, 0xFFD364A, 0xFFD364F, 0xFFD3650, 0xFFD3651, 0xFFD367D],
+    ),
     ("both CIAs", [0xFFD3C0E, 0xFFD3D0E]),
     ("process descriptor", [0xFFFBD00, 0xFFFBD11, 0xFFFBD14, 0xFFFBD35, 0xFFFBDFF]),
     ("main RAM reset vector", [0x2FFFC, 0x2FFFD]),
@@ -119,15 +134,22 @@ def _script() -> tuple[str, list]:
     for base, length in REGIONS:
         for address in (base, base + min(0x1FF, (length & 0x7FFFFF) - 1)):
             want = _walk(address)
-            expect(f"offset {address:x}", f"offset of ${address:07X}",
-                   "NONE" if want is None else f"{want:x}")
+            expect(
+                f"offset {address:x}",
+                f"offset of ${address:07X}",
+                "NONE" if want is None else f"{want:x}",
+            )
 
     # Sharing a sector is what batching several bytes into one transfer needs.
     for name, addresses in SHARE_A_SECTOR:
         for address in addresses:
             want = _walk(address)
-            expect(f"sector {address:x}", f"{name}: ${address:07X}",
-                   "NONE" if want is None else f"{want >> 9:x}", group=name)
+            expect(
+                f"sector {address:x}",
+                f"{name}: ${address:07X}",
+                "NONE" if want is None else f"{want >> 9:x}",
+                group=name,
+            )
 
     for address in ABSENT:
         expect(f"offset {address:x}", f"${address:07X} is outside every region", "NONE")
@@ -147,8 +169,15 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         binary = os.path.join(tmp, "slotmap")
         subprocess.run(
-            [args.cc, "-std=c23", "-Wall", "-Werror", "-o", binary,
-             os.path.join(HERE, "slotmap_host_harness.c")],
+            [
+                args.cc,
+                "-std=c23",
+                "-Wall",
+                "-Werror",
+                "-o",
+                binary,
+                os.path.join(HERE, "slotmap_host_harness.c"),
+            ],
             check=True,
         )
         got = subprocess.run(
@@ -161,7 +190,7 @@ def main() -> int:
 
     failures = 0
     groups: dict[str, set] = {}
-    for (label, want, group), actual in zip(checks, got):
+    for (label, want, group), actual in zip(checks, got, strict=False):
         if actual != want:
             print(f"FAIL  {label}: expected {want!r}, got {actual!r}")
             failures += 1

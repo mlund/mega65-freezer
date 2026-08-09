@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import collections
 import glob
+import itertools
 import json
 import os
 import re
@@ -56,7 +57,7 @@ ISA_PAIRS = {
 
 
 class Insn:
-    __slots__ = ("size", "op", "arg", "func")
+    __slots__ = ("arg", "func", "op", "size")
 
     def __init__(self, size: int, op: str, arg: str, func: str) -> None:
         self.size, self.op, self.arg, self.func = size, op, arg, func
@@ -110,7 +111,9 @@ def disassemble(path: str) -> list[Insn]:
             continue
         m = INSN_RE.match(line)
         if m:
-            insns.append(Insn(len(m.group(1).split()), m.group(2).lower(), m.group(3).strip(), func))
+            insns.append(
+                Insn(len(m.group(1).split()), m.group(2).lower(), m.group(3).strip(), func)
+            )
     return insns
 
 
@@ -131,7 +134,7 @@ def copy_pairs(insns: list[Insn], syms: dict[int, str]):
     neighbouring instructions out of the count.  The pair is attributed to the
     function containing its store.
     """
-    for first, second in zip(insns, insns[1:]):
+    for first, second in itertools.pairwise(insns):
         reg = LOADS.get(first.op)
         if reg is None or STORES.get(second.op) != reg:
             continue
@@ -213,7 +216,7 @@ def analyse(paths: list[str]) -> dict:
             flows[f"{src_class} -> {dest_class}"] += 1
             per_func[func]["copies"] += 1
 
-        for first, second in zip(insns, insns[1:]):
+        for first, second in itertools.pairwise(insns):
             for (op1, op2, suffix), label in ISA_PAIRS.items():
                 if first.op == op1 and second.op == op2 and second.arg.endswith(suffix):
                     isa[label] += 1
