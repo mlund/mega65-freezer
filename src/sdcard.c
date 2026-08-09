@@ -131,14 +131,7 @@ void sdcard_readsector(const uint32_t sector_number) {
     }
 }
 
-/* The card's own sector buffer, mapped into the I/O area instead of being
- * copied out of it: $81 to the command register puts it at $DE00, $82 takes it
- * away again (MEGA65 Book, "Buffered Sector Operations").  Mapping hides
- * whatever else lives there -- a cartridge, REU emulation -- so it is bracketed
- * as tightly as the comparison allows. */
-constexpr uint8_t SD_MAP_BUFFER = 0x81;
-constexpr uint8_t SD_UNMAP_BUFFER = 0x82;
-#define SD_WINDOW ((volatile uint8_t*)0xDE00)
+uint8_t verify_buffer[512];
 
 void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     // Copy buffer into the SD card buffer, and then execute the write job
@@ -179,16 +172,14 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         }
     }
 
-    /* Compare against the card's buffer where it lies rather than DMAing 512
-     * bytes out of it first, which cost a copy per write and a buffer the
-     * whole program long. */
-    POKE(SD_CTL, SD_MAP_BUFFER);
+    // Copy the read data to a buffer for verification
+    lcopy(SD_SECTORBUFFER, (long)verify_buffer, 512);
+
     for (i = 0; i < 512; i++) {
-        if (sector_buffer[i] != SD_WINDOW[i]) {
+        if (sector_buffer[i] != verify_buffer[i]) {
             break;
         }
     }
-    POKE(SD_CTL, SD_UNMAP_BUFFER);
     if (i == 512) {
         return;
     }
@@ -263,13 +254,14 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             while (PEEK(SD_CTL) & 3) {
             }
 
-            POKE(SD_CTL, SD_MAP_BUFFER);
+            // Copy the read data to a buffer for verification
+            lcopy(SD_SECTORBUFFER, (long)verify_buffer, 512);
+
             for (i = 0; i < 512; i++) {
-                if (sector_buffer[i] != SD_WINDOW[i]) {
+                if (sector_buffer[i] != verify_buffer[i]) {
                     break;
                 }
             }
-            POKE(SD_CTL, SD_UNMAP_BUFFER);
             if (i != 512) {
                 screen_hex(screen_line_address - 80 + 24, sector_number);
             } else {
