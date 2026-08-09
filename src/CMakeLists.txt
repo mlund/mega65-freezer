@@ -127,6 +127,20 @@ if(LINK_LIBC)
     target_link_libraries(test_dma mega65libc)
     set_target_properties(test_dma PROPERTIES OUTPUT_NAME test_dma.prg)
 
+    # The freeze slot's round trip: a byte at a time, and the whole-sector pair
+    # that batching uses instead.  Needs COMMON for the slot and SD code, and a
+    # card at run time, so CTest gives it a cloned image.
+    add_executable(test_freezeslot ${CMAKE_SOURCE_DIR}/test/test_freezeslot.c ${COMMON})
+    add_dependencies(test_freezeslot version_stamp)
+    target_compile_options(test_freezeslot PRIVATE
+        $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
+    target_compile_definitions(test_freezeslot PRIVATE SCREEN_CELL_BYTES=2)
+    target_link_libraries(test_freezeslot mega65libc)
+    # The c64 platform script reserves less zero page than freezemenu.ld does,
+    # so the project-wide -mlto-zp does not fit here.
+    target_link_options(test_freezeslot PRIVATE -mlto-zp=16)
+    set_target_properties(test_freezeslot PROPERTIES OUTPUT_NAME test_freezeslot.prg)
+
     # Decimal conversion has no caller in the seven tools -- they format hex and
     # hand-roll their decimals -- so this path reaches the machine only here.
     add_executable(test_printf ${CMAKE_SOURCE_DIR}/test/test_printf.c)

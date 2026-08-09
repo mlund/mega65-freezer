@@ -228,6 +228,19 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(printf PROPERTIES TIMEOUT 15)
         endif()
 
+        # The freeze slot's round trip on real emulated SD hardware, including
+        # the whole-sector pair that batching uses.  Needs a card it may write
+        # to, so it goes through a runner that clones one.
+        if(XEMU AND TARGET test_freezeslot AND Python3_FOUND
+           AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
+            add_test(NAME freezeslot
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_freezeslot.py
+                        --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                        --prg $<TARGET_FILE:test_freezeslot>)
+            set_tests_properties(freezeslot PROPERTIES TIMEOUT 180)
+        endif()
+
         if(XEMU AND TARGET test_dma)
             add_test(NAME dma
                 COMMAND ${XEMU} -headless -sleepless -testing -model 3
