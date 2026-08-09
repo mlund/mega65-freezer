@@ -276,6 +276,18 @@ if(Python3_FOUND AND LLVM_MC_EXE)
             set_tests_properties(freezer_menu PROPERTIES TIMEOUT 300)
         endif()
 
+        # The chooser's list, MAKEDISK's dialog and its FAT32 writer, in one
+        # run: create a disk image the way a user does and read it back off the
+        # clone.  The only cover diskchooser.c and MAKEDISK have.
+        if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
+            add_test(NAME makedisk_create
+                COMMAND ${Python3_EXECUTABLE}
+                        ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_makedisk_xemu.py
+                        --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                        --build $<TARGET_FILE_DIR:MAKEDISK>)
+            set_tests_properties(makedisk_create PROPERTIES TIMEOUT 600)
+        endif()
+
         # Assemble in the monitor and read the bytes back off the card.
         if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
             add_test(NAME monitor_assemble
