@@ -26,7 +26,6 @@ The image is a clone, so the card passed in is never written to.
 
 import argparse
 import os
-import re
 import signal
 import struct
 import subprocess
@@ -37,16 +36,19 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import card
 import fat32
+import screen
 import xemu_keys
-
-# See verify_freezer_xemu.py for the dump format.
-TOKEN = re.compile(r"\{\$[0-9A-Fa-f]{2}\}|\{[^}]\}|.")
-LINE_BYTES = 40
 
 # The chooser's three fixed entries, which come from the code rather than from
 # whatever disk images the card happens to carry -- so this does not depend on
 # the contents of someone else's SD image.
 CHOOSER_ENTRIES = ["- NO DISK -", '- INTERNAL 3.5" -', "- NEW D81 DD IMAGE -"]
+
+# The two rows of standing instructions along the bottom.
+INSTRUCTIONS = [
+    (23, "SELECT DISK IMAGE, THEN PRESS RETURN"),
+    (24, "OR PRESS RUN/STOP TO LEAVE UNCHANGED"),
+]
 
 # Rows down the list from the top to reach "- NEW D81 DD IMAGE -".
 NEW_IMAGE_ROW = 2
@@ -61,23 +63,9 @@ D81_BYTES = 819200
 ENTRY_SIZE_AT = 28
 
 
-def _tokens(line: str) -> list[str]:
-    found = TOKEN.findall(line)
-    return found + [" "] * (LINE_BYTES - len(found))
-
-
-def _row(lines: list[str], row: int) -> str:
-    pair = _tokens(lines[row * 2]) + _tokens(lines[row * 2 + 1])
-    return "".join(pair[0::2])
-
-
-def _screen(lines: list[str]) -> str:
-    return "\n".join(_row(lines, r) for r in range(len(lines) // 2))
-
-
-def _run(args, clone: str, tmp: str, tag: str, drive) -> list[str]:
-    """Boot FREEZER, let `drive` type into it, and return the screen dump."""
-    dump = os.path.join(tmp, f"screen-{tag}.txt")
+def _run(args, clone: str, tmp: str, tag: str, drive) -> bytes:
+    """Boot FREEZER, let `drive` type into it, and return memory at exit."""
+    dump = os.path.join(tmp, f"memory-{tag}.bin")
     # AF_UNIX caps near 104 characters, so the socket stays in /tmp.
     socket_path = f"/tmp/xemu-makedisk-{tag}-{os.getpid()}.sock"
     proc = subprocess.Popen(
@@ -98,7 +86,7 @@ def _run(args, clone: str, tmp: str, tag: str, drive) -> list[str]:
             "64",
             "-prg",
             os.path.join(args.build, "FREEZER.M65"),
-            "-dumpscreen",
+            "-dumpmem",
             dump,
         ],
         stdout=subprocess.DEVNULL,
@@ -124,9 +112,8 @@ def _run(args, clone: str, tmp: str, tag: str, drive) -> list[str]:
             os.unlink(socket_path)
 
     if not os.path.exists(dump):
-        sys.exit(f"emulator wrote no screen dump for {tag!r}")
-    with open(dump, encoding="utf-8", errors="replace") as handle:
-        return handle.read().split("\n")
+        sys.exit(f"emulator wrote no memory dump for {tag!r}")
+    return screen.load(dump)
 
 
 def _entry_size(image: str, name: str) -> int | None:
@@ -164,10 +151,15 @@ def main() -> int:
             time.sleep(8)
 
         chooser = _run(args, clone, tmp, "chooser", open_chooser)
-        listed = _screen(chooser)
+        listed = screen.screen(chooser)
         for entry in CHOOSER_ENTRIES:
             if entry not in listed:
                 problems.append(f"disk chooser is missing {entry!r}")
+        # Rows 23 and 24, which no test could see until the screen came from a
+        # memory dump: the chooser writes them on every full redraw.
+        for row, phrase in INSTRUCTIONS:
+            if phrase not in screen.text(chooser, row):
+                problems.append(f"row {row} is missing {phrase!r}: {screen.text(chooser, row)!r}")
 
         def make_disk(sock):
             xemu_keys.type_text(sock, "0")
@@ -183,7 +175,7 @@ def main() -> int:
             time.sleep(args.create)
 
         made = _run(args, clone, tmp, "create", make_disk)
-        if "CREATED DISK IMAGE" not in _screen(made):
+        if "CREATED DISK IMAGE" not in screen.screen(made):
             problems.append("MAKEDISK did not report creating the image")
 
         size = _entry_size(clone, filename)
@@ -197,7 +189,7 @@ def main() -> int:
         print(f"chooser listed its entries, and MAKEDISK wrote {filename} at {size} bytes")
         return 0
 
-    sys.stdout.write("\n".join(problems) + "\nFinal screen was:\n" + _screen(made) + "\n")
+    sys.stdout.write("\n".join(problems) + "\nFinal screen was:\n" + screen.screen(made) + "\n")
     return 1
 
 

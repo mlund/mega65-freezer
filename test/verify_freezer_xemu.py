@@ -8,16 +8,14 @@ value fields are where they belong.  That is the whole drawing path -- the
 compile-time fragment stream in freezer/menu.cpp, draw_text(), draw_rule() and
 the colour fills -- so a change that quietly stops drawing something fails here.
 
-Two runs rather than one, because `-dumpscreen` writes on exit and so gives one
+Two runs rather than one, because the dump is written on exit and so gives one
 screen per emulator.  The second presses `V`, and the check is that the video
 field *changed*, not that it reached a particular value: which of PAL50/NTSC60
 a cold boot starts from is the emulator's default, not ours, and a test that
 hardcoded it would be pinning someone else's choice.
 
-Only rows 0-12 are asserted.  Everything below is the frozen program's own
-details -- process name, slot, mounted images -- and there is no frozen program
-when FREEZER is loaded straight in with `-prg`, so those rows are blank and
-xemu trims them (see the dump format note on _tokens).
+The screen comes from a memory dump rather than -dumpscreen, which reaches only
+half of it in this mode; see test/screen.py.
 
     python3 test/verify_freezer_xemu.py --emulator xmega65 --sdimg card.img \\
             --build build/src
@@ -25,7 +23,6 @@ xemu trims them (see the dump format note on _tokens).
 
 import argparse
 import os
-import re
 import signal
 import subprocess
 import sys
@@ -34,18 +31,11 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import card
+import screen
 import xemu_keys
 
-# xemu renders one screen byte as one token: `{$XX}` for a code it has no
-# character for, `{X}` for the graphics codes $41-$5A, otherwise the character
-# itself (xemu/basic_text.c, xemu_cbm_screen_to_text).  A line carries 40 raw
-# bytes with trailing spaces stripped, and 16-bit text mode spends two bytes on
-# a cell, so one 40-column row is two lines and every other token is a glyph.
-TOKEN = re.compile(r"\{\$[0-9A-Fa-f]{2}\}|\{[^}]\}|.")
-LINE_BYTES = 40
-
-# The rule rows: MENU_RULE_GLYPH is $43, which lands in the graphics range.
-RULE = "{C}"
+# The rule rows: MENU_RULE_GLYPH is $43, which screen.text() shows as {43}.
+RULE = "{43}"
 
 # Row -> text that must appear in it.  Each entry is a different drawing path:
 # rows 0/1 and 3 and 9-11 are fixed fragments, 5-7 are labels with live values
@@ -61,6 +51,16 @@ EXPECTED = {
     9: ["M - MONITOR", "L - LOAD ROM/CHAR"],
     10: ["A - AUDIO & VOLUME"],
     11: ["S - SPRITE EDITOR"],
+    # Below the half -dumpscreen could reach.  These are fixed fragments too,
+    # drawn whether or not anything is frozen -- the frozen program's own
+    # details go in the gaps between them and are not asserted, since there is
+    # no frozen program when FREEZER is loaded straight in with -prg.
+    15: ["ROM:"],
+    16: ["TASK ID:"],
+    19: ["(0) INTERNAL DRIVE:"],
+    20: ["(8) UNIT #"],
+    22: ["(1) EXTERNAL 1565:"],
+    23: ["(9) UNIT #"],
 }
 FULL_RULE_ROWS = (2, 4, 8)
 
@@ -69,21 +69,9 @@ VIDEO_ROW = 7
 VIDEO_COLUMN = 32
 
 
-def _tokens(line: str) -> list[str]:
-    """One dump line as one token per screen byte, re-padded to full width."""
-    found = TOKEN.findall(line)
-    return found + [" "] * (LINE_BYTES - len(found))
-
-
-def _row(lines: list[str], row: int) -> str:
-    """One 40-column screen row, glyph bytes only."""
-    pair = _tokens(lines[row * 2]) + _tokens(lines[row * 2 + 1])
-    return "".join(pair[0::2])
-
-
-def _capture(args, clone: str, tmp: str, keys: str, tag: str) -> list[str]:
-    """Boot FREEZER, optionally type something, and return the screen dump."""
-    dump = os.path.join(tmp, f"screen-{tag}.txt")
+def _capture(args, clone: str, tmp: str, keys: str, tag: str) -> bytes:
+    """Boot FREEZER, optionally type something, and return memory at exit."""
+    dump = os.path.join(tmp, f"memory-{tag}.bin")
     # AF_UNIX caps near 104 characters, so the socket cannot live under a long
     # temporary directory; /tmp keeps it short enough.
     socket_path = f"/tmp/xemu-freezer-{tag}-{os.getpid()}.sock"
@@ -105,7 +93,7 @@ def _capture(args, clone: str, tmp: str, keys: str, tag: str) -> list[str]:
             "64",
             "-prg",
             os.path.join(args.build, "FREEZER.M65"),
-            "-dumpscreen",
+            "-dumpmem",
             dump,
         ],
         stdout=subprocess.DEVNULL,
@@ -133,26 +121,21 @@ def _capture(args, clone: str, tmp: str, keys: str, tag: str) -> list[str]:
             os.unlink(socket_path)
 
     if not os.path.exists(dump):
-        sys.exit(f"emulator wrote no screen dump for {tag!r}")
-    with open(dump, encoding="utf-8", errors="replace") as handle:
-        return handle.read().split("\n")
+        sys.exit(f"emulator wrote no memory dump for {tag!r}")
+    return screen.load(dump)
 
 
-def _check_menu(lines: list[str]) -> list[str]:
+def _check_menu(dump: bytes) -> list[str]:
     problems = []
-    needed = 2 * (max(EXPECTED) + 1)
-    if len(lines) < needed:
-        return [f"screen dump has {len(lines)} lines, need at least {needed}"]
-
     for row, wanted in sorted(EXPECTED.items()):
-        text = _row(lines, row)
+        text = screen.text(dump, row)
         for phrase in wanted:
             if phrase not in text:
                 problems.append(f"row {row} is missing {phrase!r}: {text!r}")
 
     for row in FULL_RULE_ROWS:
-        text = _row(lines, row)
-        if text != RULE * 40:
+        text = screen.text(dump, row)
+        if text != RULE * screen.COLUMNS:
             problems.append(f"row {row} is not a full rule: {text!r}")
 
     return problems
@@ -174,8 +157,8 @@ def main() -> int:
 
     problems = _check_menu(cold)
 
-    before = _row(cold, VIDEO_ROW)[VIDEO_COLUMN:].strip()
-    after = _row(toggled, VIDEO_ROW)[VIDEO_COLUMN:].strip()
+    before = screen.text(cold, VIDEO_ROW)[VIDEO_COLUMN:].strip()
+    after = screen.text(toggled, VIDEO_ROW)[VIDEO_COLUMN:].strip()
     standards = {"PAL50", "NTSC60"}
     if before not in standards:
         problems.append(f"video field read {before!r}, expected one of {sorted(standards)}")
@@ -193,7 +176,7 @@ def main() -> int:
         print(f"freeze menu drew, and V moved the video field {before} -> {after}")
         return 0
 
-    sys.stdout.write("\n".join(problems) + "\nScreen was:\n" + "\n".join(toggled) + "\n")
+    sys.stdout.write("\n".join(problems) + "\nScreen was:\n" + screen.screen(toggled) + "\n")
     return 1
 
 
