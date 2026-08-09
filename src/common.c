@@ -158,13 +158,13 @@ void screen_of_death(const char* msg) {
 static unsigned char descriptor_field[32];
 
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
-    const uint8_t disk_img_name_loc = diskid ? 0x35 : 0x15;
-    const uint8_t disk_img_flag_loc = diskid ? 0x12 : 0x11;
+    /* The frozen copy of the same structure; the live one is HYPPO_PROCDESC. */
+    constexpr uint32_t FROZEN_PROCDESC = 0xFFFBD00L;
     uint8_t i;
 
     mega65_dos_getprocdesc(0x04); // get procdesc from hyppo to 0x400
 
-    i = PEEK(0x0400U + disk_img_flag_loc);
+    i = HYPPO_PROCDESC->d81_flags[diskid];
     // write enable fix for HDOS < 1.3
     if (!hdos_new_attach && i == 1) {
         i = 5;
@@ -176,15 +176,24 @@ void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
      * this runs twice on every boot.  All three fields share one sector, which
      * test/verify_slotmap.py pins against hyppo's own region table. */
     descriptor_field[0] = overrides ? (overrides & ImgProcNoDisk ? 0x40 : 0) : i;
-    freeze_store_sector_partial(0xFFFBD00L + disk_img_flag_loc, (uint32_t)descriptor_field, 1);
+    freeze_store_sector_partial(
+        FROZEN_PROCDESC + offsetof(struct ProcessDescriptor, d81_flags) + diskid,
+        (uint32_t)descriptor_field,
+        1);
 
-    descriptor_field[0] = overrides ? 0 : PEEK(0x0402U + disk_img_flag_loc); // name length
-    freeze_store_sector_partial(0xFFFBD02L + disk_img_flag_loc, (uint32_t)descriptor_field, 1);
+    descriptor_field[0] = overrides ? 0 : HYPPO_PROCDESC->d81_namelen[diskid];
+    freeze_store_sector_partial(
+        FROZEN_PROCDESC + offsetof(struct ProcessDescriptor, d81_namelen) + diskid,
+        (uint32_t)descriptor_field,
+        1);
 
     for (i = 0; i < 32; i++) {
-        descriptor_field[i] = overrides ? 0 : PEEK(0x0400U + disk_img_name_loc + i);
+        descriptor_field[i] = overrides ? 0 : (unsigned char)HYPPO_PROCDESC->d81_name[diskid][i];
     }
-    freeze_store_sector_partial(0xFFFBD00L + disk_img_name_loc, (uint32_t)descriptor_field, 32);
+    freeze_store_sector_partial(
+        FROZEN_PROCDESC + offsetof(struct ProcessDescriptor, d81_name) + diskid * 32,
+        (uint32_t)descriptor_field,
+        32);
 }
 
 void old_store_selected_disk_image(uint8_t diskid, char* disk_image) {

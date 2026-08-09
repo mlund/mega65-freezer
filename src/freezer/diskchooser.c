@@ -545,7 +545,6 @@ void scan_directory(unsigned char drive_id) {
 char* freeze_select_disk_image(unsigned char drive_id) {
     unsigned char x;
     int idle_time = 0;
-    uint16_t addr;
     /* Whether the idle-timeout preview below mounted a different image, so
      * cancelling has to remount whatever was there before. */
     unsigned char must_restore_disk = 0;
@@ -560,10 +559,10 @@ char* freeze_select_disk_image(unsigned char drive_id) {
 
     // save old mounted state
     mega65_dos_getprocdesc(0x04); // get procdesc from hyppo to 0x400
-    old_disk_flags = PEEK(0x0400U + drive_id ? 0x12 : 0x11);
-    old_disk_len = PEEK(0x0400U + drive_id ? 0x14 : 0x13);
-    for (x = 0, addr = 0x0400 + drive_id ? 0x35 : 0x15; x < 32; x++, addr++) {
-        old_disk_name[x] = PEEK(addr);
+    old_disk_flags = HYPPO_PROCDESC->d81_flags[drive_id];
+    old_disk_len = HYPPO_PROCDESC->d81_namelen[drive_id];
+    for (x = 0; x < 32; x++) {
+        old_disk_name[x] = HYPPO_PROCDESC->d81_name[drive_id][x];
     }
     old_disk_name[old_disk_len] = 0;
 

@@ -30,8 +30,10 @@ constexpr uint8_t PROCESS_ROM_X = 26, PROCESS_ROM_Y = 15;
 constexpr uint8_t TASK_ID_X = 34, TASK_ID_Y = 16;
 /* The slot label and the number in it are one field written in two parts. */
 constexpr uint8_t SLOT_LABEL_X = 20, SLOT_LABEL_Y = 17, SLOT_NUMBER_X = 34;
-constexpr uint8_t DRIVE_NUM_X = 35, DRIVE0_NUM_Y = 20, DRIVE1_NUM_Y = 23;
-constexpr uint8_t D81_NAME_X = 22, D81_IMAGE0_NAME_Y = 21, D81_IMAGE1_NAME_Y = 24;
+/* The two drives are three rows apart, which is what lets one pass serve both. */
+constexpr uint8_t DRIVE_NUM_X = 35, DRIVE_NUM_Y = 20;
+constexpr uint8_t D81_NAME_X = 22, D81_NAME_Y = 21;
+constexpr uint8_t DRIVE_ROW_STEP = 3;
 
 constexpr uint8_t ROOT_WARN_Y = 9;
 constexpr uint8_t ROOT_WARN_ROWS = 3;
@@ -430,71 +432,36 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     if (part & UpdateDisk) {
-        draw_decimal(SCREEN_CELL(DRIVE_NUM_X, DRIVE0_NUM_Y), SchemeText, freeze_peek(0x10113L));
-        draw_decimal(SCREEN_CELL(DRIVE_NUM_X, DRIVE1_NUM_Y), SchemeText, freeze_peek(0x10114L));
+        /* Hyppo keeps the two drives' fields in arrays, so one pass serves both. */
+        for (uint8_t drive = 0; drive < 2; drive++) {
+            const uint16_t number_cell =
+                SCREEN_CELL(DRIVE_NUM_X, DRIVE_NUM_Y + drive * DRIVE_ROW_STEP);
+            const uint16_t name_cell = SCREEN_CELL(D81_NAME_X, D81_NAME_Y + drive * DRIVE_ROW_STEP);
+            const uint8_t flags = process_descriptor.d81_flags[drive];
+            const uint8_t namelen = process_descriptor.d81_namelen[drive];
+            char* name = process_descriptor.d81_name[drive];
 
-        /* The name fields are drawn over, not into a cleared buffer, so each
-         * needs its own blank first: a shorter name would leave the tail of a
-         * longer one behind. */
-        draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y), SchemeAccent, BLANK_18, 18);
-        draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y), SchemeAccent, BLANK_18, 18);
+            draw_decimal(number_cell, SchemeText, freeze_peek(0x10113L + drive));
 
-        if ((process_descriptor.d81_image0_flags & PdImgFlagsMounted) &&
-            process_descriptor.d81_image0_namelen) {
-            for (i = 0; i < process_descriptor.d81_image0_namelen; i++) {
-                if (!process_descriptor.d81_image0_name[i]) {
-                    break;
+            /* The name is drawn over, not into a cleared buffer, so it needs a
+             * blank first: a shorter name would leave a longer one's tail. */
+            draw_text(name_cell, SchemeAccent, BLANK_18, 18);
+
+            if ((flags & PdImgFlagsMounted) && namelen) {
+                /* A NUL inside the name means hyppo did not write it. */
+                for (i = 0; i < namelen && name[i]; i++) {
                 }
-            }
-            if (i == process_descriptor.d81_image0_namelen) {
-                to_petscii_upper(
-                    process_descriptor.d81_image0_name, process_descriptor.d81_image0_namelen);
-                draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y),
-                    SchemeAccent,
-                    process_descriptor.d81_image0_name,
-                    process_descriptor.d81_image0_namelen < 18
-                        ? process_descriptor.d81_image0_namelen
-                        : 18);
-            }
-        } else if (process_descriptor.d81_image0_flags & PdImgFlagsNoReal) {
-            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y),
-                SchemeAccent,
-                NO_DISK_DRIVE,
-                sizeof(NO_DISK_DRIVE) - 1);
-        } else {
-            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE0_NAME_Y),
-                SchemeAccent,
-                INTERNAL_DRIVE_0,
-                sizeof(INTERNAL_DRIVE_0) - 1);
-        }
-
-        if ((process_descriptor.d81_image1_flags & PdImgFlagsMounted) &&
-            process_descriptor.d81_image1_namelen) {
-            for (i = 0; i < process_descriptor.d81_image1_namelen; i++) {
-                if (!process_descriptor.d81_image1_name[i]) {
-                    break;
+                if (i == namelen) {
+                    to_petscii_upper(name, namelen);
+                    draw_text(name_cell, SchemeAccent, name, namelen < 18 ? namelen : 18);
                 }
+            } else if (flags & PdImgFlagsNoReal) {
+                draw_text(name_cell, SchemeAccent, NO_DISK_DRIVE, sizeof(NO_DISK_DRIVE) - 1);
+            } else if (drive) {
+                draw_text(name_cell, SchemeAccent, INTERNAL_DRIVE_1, sizeof(INTERNAL_DRIVE_1) - 1);
+            } else {
+                draw_text(name_cell, SchemeAccent, INTERNAL_DRIVE_0, sizeof(INTERNAL_DRIVE_0) - 1);
             }
-            if (i == process_descriptor.d81_image1_namelen) {
-                to_petscii_upper(
-                    process_descriptor.d81_image1_name, process_descriptor.d81_image1_namelen);
-                draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y),
-                    SchemeAccent,
-                    process_descriptor.d81_image1_name,
-                    process_descriptor.d81_image1_namelen < 18
-                        ? process_descriptor.d81_image1_namelen
-                        : 18);
-            }
-        } else if (process_descriptor.d81_image1_flags & PdImgFlagsNoReal) {
-            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y),
-                SchemeAccent,
-                NO_DISK_DRIVE,
-                sizeof(NO_DISK_DRIVE) - 1);
-        } else {
-            draw_text(SCREEN_CELL(D81_NAME_X, D81_IMAGE1_NAME_Y),
-                SchemeAccent,
-                INTERNAL_DRIVE_1,
-                sizeof(INTERNAL_DRIVE_1) - 1);
         }
     }
 

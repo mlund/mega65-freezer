@@ -87,12 +87,12 @@ enum : uint8_t {
 struct ProcessDescriptor {
     unsigned char task_id;
     char process_name[16];
-    unsigned char d81_image0_flags;
-    unsigned char d81_image1_flags;
-    unsigned char d81_image0_namelen;
-    unsigned char d81_image1_namelen;
-    char d81_image0_name[32];
-    char d81_image1_name[32];
+    /* Indexed by drive.  Hyppo groups these by kind rather than by drive, so
+     * the pairs are adjacent and an array lands on exactly its layout -- which
+     * the assertions below hold it to. */
+    unsigned char d81_flags[2];
+    unsigned char d81_namelen[2];
+    char d81_name[2][32];
     char filler[0x80 - (1 + 16 + 1 + 1 + 1 + 1 + 32 + 32)];
     struct FileDescriptor file_descriptors[4];
 
@@ -100,13 +100,15 @@ struct ProcessDescriptor {
     char padding[256];
 };
 
-/* Hyppo writes this layout, so the offsets are its to choose, not ours: the
- * fields are grouped by kind rather than by drive.  Asserted because the two
- * per-drive members of each pair are adjacent by that choice alone, and code
- * that walks them as a pair would break silently if a field moved. */
-static_assert(offsetof(struct ProcessDescriptor, d81_image0_flags) == 0x11);
-static_assert(offsetof(struct ProcessDescriptor, d81_image1_flags) == 0x12);
-static_assert(offsetof(struct ProcessDescriptor, d81_image0_namelen) == 0x13);
-static_assert(offsetof(struct ProcessDescriptor, d81_image1_namelen) == 0x14);
-static_assert(offsetof(struct ProcessDescriptor, d81_image0_name) == 0x15);
-static_assert(offsetof(struct ProcessDescriptor, d81_image1_name) == 0x35);
+/* Hyppo writes this layout, so the offsets are its to choose, not ours, and the
+ * arrays above are only correct while it keeps grouping by kind. */
+static_assert(offsetof(struct ProcessDescriptor, d81_flags) == 0x11);
+static_assert(offsetof(struct ProcessDescriptor, d81_namelen) == 0x13);
+static_assert(offsetof(struct ProcessDescriptor, d81_name) == 0x15);
+static_assert(offsetof(struct ProcessDescriptor, d81_name[1]) == 0x35);
+
+/* Where mega65_dos_getprocdesc(0x04) leaves the running program's descriptor.
+ * Named as the struct because the offset arithmetic it replaces is where a
+ * stray conditional cost the disk chooser its saved mount state: `0x0400 +
+ * drive_id ? 0x35 : 0x15` is the constant 0x35, and nothing says so. */
+#define HYPPO_PROCDESC ((const volatile struct ProcessDescriptor*)0x0400)
