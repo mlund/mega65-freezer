@@ -6,7 +6,9 @@
 #include <stdint.h>
 
 constexpr uint16_t SCREEN_ADDRESS = 0xB800;
-// Use default char set, not ASCII charset
+/* Where the VIC finds its glyphs.  In VIC bank $8000 this is the character-ROM
+ * shadow, not RAM, so the screen always renders the C64 ROM charset and text
+ * written here must be screen codes.  Nothing can be loaded over it. */
 constexpr uint16_t CHARSET_ADDRESS = 0x9000;
 /* The window onto the first 2 KB of the 32 KB of colour memory at $FF80000.
  * It does not follow the VIC-IV's colour start ($D064/$D065), so it is the

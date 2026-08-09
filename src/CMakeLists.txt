@@ -16,7 +16,7 @@ add_custom_target(version_stamp
 )
 set_source_files_properties(${VERSION_H} PROPERTIES GENERATED TRUE)
 
-# $9000 (charset destination) - $07ff (load address)
+# $9000 (the charset shadow, which a tool must not run into) - $07ff (load address)
 set(MAX_SIZE 34817)
 
 # Hypervisor serial tracing on the failure paths.  Off by default: a shipping
@@ -97,15 +97,15 @@ function(add_m65 name)
 endfunction()
 
 add_m65(FREEZER  freezer/main.c freezer/diskchooser.c freezer/menu.cpp)
-add_m65(AUDIOMIX audiomix/main.c audiomix/mixer.c audiomix/menu.cpp charset.c)
+add_m65(AUDIOMIX audiomix/main.c audiomix/mixer.c audiomix/menu.cpp)
 add_m65(MONITOR  monitor/main.c monitor/commands.c monitor/disasm.c
                  monitor/blockmove.c monitor/console.c monitor/bitedit.c
-                 monitor/bitedit_table.c charset.c)
+                 monitor/bitedit_table.c)
 target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
-add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c makedisk/layout.c charset.c)
-add_m65(ROMLOAD  romload/main.c romload/chooser.c charset.c)
-add_m65(SPRITED  sprited/main.c sprited/editor.c charset.c)
-add_m65(MEGAINFO megainfo/main.c megainfo/info.c charset.c)
+add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c makedisk/layout.c)
+add_m65(ROMLOAD  romload/main.c romload/chooser.c)
+add_m65(SPRITED  sprited/main.c sprited/editor.c)
+add_m65(MEGAINFO megainfo/main.c megainfo/info.c)
 
 # Bytes per character cell, and so the DMA destination step for both planes.
 # SCREEN_ROW_BYTES is 80 in every tool and means two different things; this is

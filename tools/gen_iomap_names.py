@@ -348,7 +348,7 @@ UNRENDERABLE = (0x5C, 0x5E)
 
 def to_screen_codes(text: str, where: str = "", warnings: list[str] | None = None) -> list[int]:
     """PETSCII screen codes, not ASCII: the screen renders with the C64 ROM
-    charset (see the monitor's charset note), so A-Z are $01-$1A and the digits
+    charset (see CHARSET_ADDRESS in src/screen.h), so A-Z are $01-$1A and the digits
     sit at $30-$39 as in ASCII.  Every code is below $80, which is what lets the
     caller mark the last character with the terminator in bit 7.
 

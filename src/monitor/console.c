@@ -10,8 +10,6 @@
 
 #include <mega65.h>
 
-extern unsigned char* charset;
-
 char* footer_messages[FooterMax + 1] = {
     /* Exactly 80 columns: display_footer() copies the whole row unconditionally. */
     "(D/A)SM (B)IT (C)MP (F)ILL (H)UNT (M)EM (P)IX (R)EG (S)ET (T)RA E(X)IT SREG(;)  ",
@@ -126,12 +124,6 @@ void setup_screen(void) {
     lfill(SCREEN_ADDRESS, 0x20, SCREEN_BYTES);
 
     clear_colour_ram();
-
-    /* Writes RAM the VIC never reads: in this bank $9000 is the character-ROM
-     * shadow, so the ROM charset is what reaches the screen and the glyphs here
-     * are screen codes, not ASCII.  The copy and the 2KB font behind it are
-     * dead weight. */
-    lcopy((int)&charset[0], CHARSET_ADDRESS, 0x800);
 
     // Set screen line address and write point
     screen_line_address = SCREEN_ADDRESS;

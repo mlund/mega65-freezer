@@ -8,8 +8,8 @@
 
 #include <string.h>
 
-/* Shift-Q in the C64 ROM charset the screen actually renders with, which is not
- * the embedded ascii8x8.bin: see the charset note. */
+/* Shift-Q in the C64 ROM charset the screen renders with: see CHARSET_ADDRESS
+ * in screen.h. */
 constexpr uint8_t GLYPH_BIT = 0x51;
 
 /* The NAME column, used only while rendering a row. */
