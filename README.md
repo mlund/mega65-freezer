@@ -15,87 +15,13 @@ rest. Each tool is a separate program loaded from the SD card:
 | `FREEZER`  | the menu, slot browser and thumbnail        |
 | `MONITOR`  | memory, disassembler, assembler, bit editor |
 | `MEGAINFO` | system information                          |
-| `AUDIOMIX` | audio mixer                                 |
-| `SPRITED`  | sprite editor                               |
-| `ROMLOAD`  | ROM chooser                                 |
-| `MAKEDISK` | empty disk image                            |
-
-Two kinds of data are read off the card at run time and built here too:
-`IOMAP.M65`, the I/O register names and descriptions, and `M65THUMB.M65`,
-`C65THUMB.M65` and `C64THUMB.M65`, the frames drawn around a slot's thumbnail.
-
-## Building
-
-Currently needs a patched llvm-mos: stock SDK v23.0.1 miscompiles.
-
-```
-cmake -DCMAKE_PREFIX_PATH=<prefix> -B build
-cmake --build build
-```
-
-Each `.M65` must fit 34817 bytes, which the link enforces.
-
-| variable        | what it does                                          |
-|-----------------|-------------------------------------------------------|
-| `MEGA65_IOMAP`  | path to mega65-core's iomap.txt, to regenerate `IOMAP.M65` |
-| `MEGA65_SDIMG`  | path to an SD image, for the emulator tests           |
-| `MEGA65_ROM`    | path to MEGA65.ROM, for the disassembler's real-code test |
-| `XEMU`          | path to the emulator, if it is not found automatically |
-| `FREEZER_TRACE` | tracing on the hypervisor serial channel (OFF)        |
-| `LTO_ZP`        | zero-page bytes the LTO allocator may use (210)       |
-| `C_MCPU`        | `-mcpu` for our sources, `mos6502` on an unpatched compiler (mos45gs02) |
-| `LINK_LIBC`     | link mega65-libc (ON)                                 |
-
-The three paths also read an environment variable of the same name. Set
-`CPM_SOURCE_CACHE` to a directory to avoid re-fetching mega65-libc.
-
-They point at files you already have, rather than anything downloaded:
-
-    cmake -B build -DMEGA65_IOMAP=~/github/mega65-core/iomap.txt \
-                   -DMEGA65_ROM=~/MEGA65.ROM
-
-`iomap.txt` is generated in [mega65-core](https://github.com/MEGA65/mega65-core)
-from the `@IO:` comments in its VHDL; `MEGA65.ROM` is the machine's own ROM
-image. Neither is ours to redistribute, so neither is included here:
-`IOMAP.M65` is committed instead, and without a ROM the disassembler's
-real-code test does not run.
-
-Other targets: `format`, `tidy`, `tidy-arithmetic`, `iomap-names`.
-
-## Testing
-
-```
-ctest --test-dir build
-```
-
-The host tests build portable parts with the host compiler and need
-nothing else. The emulator tests need an emulator — found automatically, or
-given as `XEMU` — and an SD image, which defaults to Xemu's own. They clone it
-and write the build into the clone's filesystem, so the image itself is never
-touched. With `mtools` installed, one further test checks that writer by having
-mdir read back what it wrote.
-
-`FREEZER_TRACE` is compile-time, so the serial assertions need their own build:
-
-```
-cmake -B build-trace -DFREEZER_TRACE=ON ...
-```
-
-## Differences from the cc65 build
-
-### Size
-
-Against the binaries shipped on the MEGA65 SD card:
-
-| tool       |   cc65 |  llvm |    % |
-|------------|-------:|------:|-----:|
 | `AUDIOMIX` |  23161 |  8240 |  -64 |
-| `MAKEDISK` |  22307 |  9904 |  -56 |
-| `MEGAINFO` |  21966 | 10370 |  -53 |
-| `ROMLOAD`  |  17378 |  8695 |  -50 |
+| `MAKEDISK` |  22307 |  9846 |  -56 |
+| `MEGAINFO` |  21966 | 10362 |  -53 |
+| `ROMLOAD`  |  17378 |  8685 |  -50 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
-| `SPRITED`  |  31016 | 16840 |  -46 |
-| `FREEZER`  |  24700 | 18500 |  -25 |
+| `SPRITED`  |  31016 | 16790 |  -46 |
+| `FREEZER`  |  24700 | 17321 |  -30 |
 
 `MONITOR` alone is measured _before_ feature additions, at the point it did the
 same job as its cc65 counterpart: its disassembler, assembler and bit editor
@@ -105,6 +31,17 @@ have nothing to compare against.
 
 Defects found in original:
 
+- The freeze slot is SD sectors, and `freeze_poke()` reads a whole 512-byte
+  sector, changes one byte and writes it back. Storing the mounted image's name
+  and flags a byte at a time therefore cost 68 sector operations for 34 bytes,
+  twice on every boot: 136 where 12 do. `freeze_common.c:291-294`.
+- Each branch of the PAL/NTSC toggle wrote the sprite Y adjust twice with the
+  same value, on both the frozen side and the freezer's own — four more sector
+  transfers per keypress, for bytes already there. `freezer.c:1118/1125`.
+- Verifying a sector write DMA'd the card's buffer into a 512-byte array first,
+  when the same buffer can be mapped at `$DE00` and compared where it lies. A
+  copy per write, and 512 bytes of RAM for the program's whole life.
+  `fdisk_hal_mega65.c:225`.
 - `report_unmapped()` called itself. Every unmapped address reached through D,
   F, H, C, T or B recursed until the stack died. Eight call sites. Every
   command had been exercised on mapped memory.
