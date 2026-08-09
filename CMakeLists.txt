@@ -173,6 +173,13 @@ if(Python3_FOUND AND HOST_C_COMPILER)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_layout.py
                 --cc ${HOST_C_COMPILER})
 
+    # Which sector of the freeze slot an address falls in, against hyppo's own
+    # freeze_mem_list.  A byte costs a whole sector transfer, so this decides
+    # both correctness and how much SD traffic a routine spends.
+    add_test(NAME slotmap
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_slotmap.py
+                --cc ${HOST_C_COMPILER})
+
     # The bit editor's record stream is variable length, so an off-by-one in the
     # walk puts every name on the wrong bit -- which on hardware reads as a bad
     # database rather than a bad decoder.  MEGA65_IOMAP adds the name diff.

@@ -2,10 +2,12 @@
 
 #include "errors.h"
 #include "helper.h"
+#include "slotmap.h"
 
 #include <ctype.h>
 #include <mega65/dirent.h>
 #include <mega65/fileio.h>
+#include <stddef.h>
 #include <stdint.h>
 
 void freeze_monitor(void);
@@ -28,8 +30,6 @@ extern volatile uint8_t tool_drive_id[1];
 char* freeze_select_disk_image(unsigned char drive_id);
 
 void request_freeze_region_list(void);
-uint32_t address_to_freeze_slot_offset(uint32_t address);
-uint32_t find_thumbnail_offset(void);
 unsigned char freeze_peek(uint32_t addr);
 void freeze_poke(uint32_t addr, unsigned char v);
 
@@ -46,23 +46,6 @@ void do_audio_mixer(void);
 void do_sprite_editor(void);
 unsigned char do_rom_loader(void);
 void do_megainfo(void);
-
-/* Only the lower 24 bits of region_length are valid; the space a region takes
- * in the slot is that length rounded up to a whole 512-byte sector. */
-constexpr uint32_t REGION_LENGTH_MASK = 0x7FFFFF;
-
-struct FreezeRegion {
-    uint32_t address_base;
-    union {
-        uint32_t region_length;
-        struct {
-            unsigned char skip[3];
-            unsigned char freeze_prep;
-        };
-    };
-};
-
-constexpr uint8_t MAX_REGIONS = 256 / sizeof(struct FreezeRegion);
 
 extern unsigned char not_in_root;
 extern struct FreezeRegion freeze_region_list[MAX_REGIONS];
@@ -116,3 +99,14 @@ struct ProcessDescriptor {
     // Pad out to whole sector size, so we can load it easily
     char padding[256];
 };
+
+/* Hyppo writes this layout, so the offsets are its to choose, not ours: the
+ * fields are grouped by kind rather than by drive.  Asserted because the two
+ * per-drive members of each pair are adjacent by that choice alone, and code
+ * that walks them as a pair would break silently if a field moved. */
+static_assert(offsetof(struct ProcessDescriptor, d81_image0_flags) == 0x11);
+static_assert(offsetof(struct ProcessDescriptor, d81_image1_flags) == 0x12);
+static_assert(offsetof(struct ProcessDescriptor, d81_image0_namelen) == 0x13);
+static_assert(offsetof(struct ProcessDescriptor, d81_image1_namelen) == 0x14);
+static_assert(offsetof(struct ProcessDescriptor, d81_image0_name) == 0x15);
+static_assert(offsetof(struct ProcessDescriptor, d81_image1_name) == 0x35);
