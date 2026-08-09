@@ -326,7 +326,10 @@ void draw_freeze_menu(unsigned char part) {
             draw_text(
                 SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, (const char*)freeze_menu_bar, 40);
             if (rom_changed) {
-                draw_text(SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, "         ", 9);
+                /* Blanking nine cells is a fill; draw_text would fold nine
+                 * spaces, which converts each to itself. */
+                lfill_skip(
+                    SCREEN_ADDRESS + SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), ' ', 9, SCREEN_CELL_BYTES);
             }
 
             draw_text(

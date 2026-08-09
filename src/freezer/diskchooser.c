@@ -43,11 +43,10 @@ short file_count = 0, min_dir_entry = 0;
 short selection_number = 0;
 short display_offset = 0;
 
-char reading_disk_list_message[] = "SCANNING DIRECTORY ...";
-
-char diskchooser_instructions[] = "  SELECT DISK IMAGE, THEN PRESS RETURN  "
-                                  "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  "
-                                  "UNMOUNT CURRENT  ";
+/* freezer/menu.cpp, the one C++ translation unit: the chooser's standing text
+ * as screen codes, converted when it was compiled rather than on every redraw. */
+const uint8_t* chooser_help_stream(void);
+const uint8_t* chooser_scanning_stream(void);
 
 // use DMA lcopy overlap trick to save space!
 unsigned char normal_row[4] = {0, SchemeText, 0, SchemeText};
@@ -445,7 +444,7 @@ void draw_disk_image_list(void) {
     blank_screen();
     clear_colour_ram();
 
-    draw_text(SCREEN_CELL(0, 23), SchemeSelected | AttribReverse, diskchooser_instructions, 80);
+    draw_fragments(chooser_help_stream());
 
     for (i = 0; i < 23; i++) {
         if ((display_offset + i) < file_count) {
@@ -568,10 +567,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
     }
     old_disk_name[old_disk_len] = 0;
 
-    draw_text(SCREEN_CELL(9, 12),
-        SchemeText,
-        reading_disk_list_message,
-        sizeof(reading_disk_list_message) - 1);
+    draw_fragments(chooser_scanning_stream());
 
     scan_directory(drive_id);
 

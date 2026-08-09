@@ -43,6 +43,25 @@ constexpr auto FIXED = menu::stream(
     menu::fragment(21, 22, SchemeText, "(1) EXTERNAL 1565:"),
     menu::fragment(25, 23, SchemeText, "(9) UNIT #"));
 
+/* The disk chooser's standing text.  Separate streams because they appear at
+ * different moments: the instructions whenever the list is redrawn, the notice
+ * only while a directory is being read.
+ *
+ * Exactly the eighty cells of rows 23 and 24.  The runtime version carried
+ * seventeen more characters than it ever drew. */
+constexpr auto CHOOSER_HELP = menu::stream(menu::fragment(0,
+    23,
+    /* Cast because C++ deprecates a bitwise or between two enum types, where the
+     * C the rest of the project is written in does not. */
+    uint8_t(SchemeSelected) | uint8_t(AttribReverse),
+    "  SELECT DISK IMAGE, THEN PRESS RETURN  "
+    "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  "));
+
+constexpr auto CHOOSER_SCANNING =
+    menu::stream(menu::fragment(9, 12, SchemeText, "SCANNING DIRECTORY ..."));
+
+static_assert(CHOOSER_HELP.data[0] == 80, "the help fills both rows");
+
 /* The bytes the tables are supposed to produce, checked where a mistake would
  * be a wrong glyph rather than a build failure. */
 static_assert(FIXED.data[0] == 28, "title length");
@@ -57,4 +76,12 @@ static_assert(FIXED.data[sizeof FIXED.data - 1] == 0, "stream terminator");
 
 extern "C" const uint8_t* menu_fixed_stream(void) {
     return FIXED.data;
+}
+
+extern "C" const uint8_t* chooser_help_stream(void) {
+    return CHOOSER_HELP.data;
+}
+
+extern "C" const uint8_t* chooser_scanning_stream(void) {
+    return CHOOSER_SCANNING.data;
 }
