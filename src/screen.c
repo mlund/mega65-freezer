@@ -79,10 +79,10 @@ void draw_rule(uint16_t cell, uint8_t width) {
 }
 
 void blank_screen(void) {
-    lpoke(SCREEN_ADDRESS, 0x20);
-    lpoke(SCREEN_ADDRESS + 1, 0x00);
-    lpoke(SCREEN_ADDRESS + 2, 0x20);
-    lpoke(SCREEN_ADDRESS + 3, 0x00);
+    SCREEN[0] = 0x20;
+    SCREEN[2] = 0x20;
+    SCREEN[1] = 0x00;
+    SCREEN[3] = 0x00;
     lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, SCREEN_BYTES - 4);
 }
 
@@ -98,6 +98,15 @@ void setup_menu_screen_base(void) {
     VICIV.addr =
         (((CHARSET_ADDRESS - 0x8000U) >> 11) << 1) + (((SCREEN_ADDRESS - 0x8000U) >> 10) << 4);
     CIA2.pra = (CIA2.pra & CIA2_VIC_BANK_MASK) | CIA2_VIC_BANK_8000;
+}
+
+/* Takes the cell index, not the 28-bit address: two argument bytes ride in A and
+ * X, and each byte past those costs marshalling into an imaginary register at
+ * every call site.  Widening the signature back to an address would pay that
+ * everywhere; casting at the call site would not, since what the site passes is
+ * what costs, not where the arithmetic widens.  Size for speed: a jsr per cell. */
+void colour_poke(uint16_t cell, uint8_t value) {
+    lpoke(COLOUR_RAM_ADDRESS + cell, value);
 }
 
 /* Super-Extended Attribute Mode reads the high nibble as attributes, so the

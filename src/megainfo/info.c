@@ -69,7 +69,7 @@ static void write_text_mapped(unsigned char x,
         if (colour & WRITE_TEXT_INVERSE_GLYPH && c < 128) {
             c |= 0x80;
         }
-        lpoke(SCREEN_ADDRESS + y * SCREEN_ROW_BYTES + x + i, c);
+        SCREEN[y * SCREEN_ROW_BYTES + x + i] = c;
         lpoke(COLOUR_RAM_ADDRESS + y * SCREEN_ROW_BYTES + x + i, (unsigned char)(colour & 0xff));
     }
 }

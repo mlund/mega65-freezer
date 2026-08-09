@@ -90,6 +90,10 @@ extern char screen_column;
 void setup_menu_screen_base(void);
 void clear_colour_ram(void);
 
+/* One colour cell.  Colour RAM is above the 64 KB window, so unlike SCREEN it
+ * cannot be a pointer; the cell index keeps the call cheap, see screen.c. */
+void colour_poke(uint16_t cell, uint8_t value);
+
 /* Which footer row display_footer() shows.  Kept to what MONITOR actually
  * displays: the table is indexed at run time, so an entry nothing selects still
  * costs its full 80 columns and --gc-sections cannot reclaim it. */
