@@ -130,32 +130,32 @@ unsigned char next_cpu_speed(void) {
         case 1:
             // Make it 2MHz: 2MHZ && !FAST && !VFAST
             // ffd0030 is a special register to access the C128 D030.0 bit
-            freeze_poke(0xffd0030L, 1);
-            freeze_poke(0xffd3031L, freeze_peek(0xffd3031L) & 0xbf);
-            freeze_poke(0xffd3054L, freeze_peek(0xffd3054L) & 0xbf);
+            freeze_io_poke(0x0030, 1);
+            freeze_io_poke(0x3031, freeze_io_peek(0x3031) & 0xbf);
+            freeze_io_poke(0x3054, freeze_io_peek(0x3054) & 0xbf);
             return 1;
         case 2:
             // Make it 3.5MHz: !2MHZ && FAST && !VFAST
-            freeze_poke(0xffd0030L, 0);
-            freeze_poke(0xffd3031L, freeze_peek(0xffd3031L) | 0x40);
-            freeze_poke(0xffd3054L, freeze_peek(0xffd3054L) & 0xbf);
+            freeze_io_poke(0x0030, 0);
+            freeze_io_poke(0x3031, freeze_io_peek(0x3031) | 0x40);
+            freeze_io_poke(0x3054, freeze_io_peek(0x3054) & 0xbf);
             break;
         case 3:
             // Make it 40MHz: !2MHZ && FAST && VFAST
-            freeze_poke(0xffd0030L, 0);
-            freeze_poke(0xffd3031L, freeze_peek(0xffd3031L) | 0x40);
-            freeze_poke(0xffd3054L, freeze_peek(0xffd3054L) | 0x40);
+            freeze_io_poke(0x0030, 0);
+            freeze_io_poke(0x3031, freeze_io_peek(0x3031) | 0x40);
+            freeze_io_poke(0x3054, freeze_io_peek(0x3054) | 0x40);
             break;
         case 40:
         default:
             // Make it 1MHz: !2MHZ && !FAST && !VFAST
-            freeze_poke(0xffd0030L, 0);
-            freeze_poke(0xffd3031L, freeze_peek(0xffd3031L) & 0xbf);
-            freeze_poke(0xffd3054L, freeze_peek(0xffd3054L) & 0xbf);
+            freeze_io_poke(0x0030, 0);
+            freeze_io_poke(0x3031, freeze_io_peek(0x3031) & 0xbf);
+            freeze_io_poke(0x3054, freeze_io_peek(0x3054) & 0xbf);
             // If a program forced 40 MHz via POKE 0,65, the Hypervisor flag at
             // ffd367d is set, and is overriding the other flags. Clear it.
             // The Freezer itself does not set this.
-            freeze_poke(0xffd367dL, freeze_peek(0xffd367dL) & 0xef);
+            freeze_io_poke(0x367d, freeze_io_peek(0x367d) & 0xef);
             return 1;
     }
     return 0;
@@ -334,7 +334,7 @@ void draw_freeze_menu(unsigned char part) {
         // CPU MODE
         draw_text(SCREEN_CELL(CPU_MODE_X, SETTINGS_TOP_Y),
             SchemeText,
-            (freeze_peek(0xffd367dL) & 0x20) ? "  4502" : "  AUTO",
+            (freeze_io_peek(0x367d) & 0x20) ? "  4502" : "  AUTO",
             6);
 
         // Joystick 1/2 swap
@@ -346,18 +346,18 @@ void draw_freeze_menu(unsigned char part) {
         // Cartridge enable
         draw_text(SCREEN_CELL(RIGHT_VALUE_X, SETTINGS_TOP_Y + 1),
             SchemeText,
-            (freeze_peek(0xffd367dL) & 0x01) ? "YES" : " NO",
+            (freeze_io_peek(0x367d) & 0x01) ? "YES" : " NO",
             3);
 
         // PALEMU
         draw_text(SCREEN_CELL(CRTEMU_MODE_X, SETTINGS_TOP_Y + 2),
             SchemeText,
-            (freeze_peek(0xFFD3054L) & 0x20) ? " ON" : "OFF",
+            (freeze_io_peek(0x3054) & 0x20) ? " ON" : "OFF",
             3);
 
         draw_text(SCREEN_CELL(VIDEO_MODE_X, SETTINGS_TOP_Y + 2),
             SchemeText,
-            (freeze_peek(0xffd306fL) & 0x80) ? "NTSC60" : " PAL50",
+            (freeze_io_peek(0x306f) & 0x80) ? "NTSC60" : " PAL50",
             6);
     }
 
@@ -898,13 +898,13 @@ int main(void) {
 
                 case 'T':
                 case 't': // Toggle cartridge enable
-                    freeze_poke(0xFFD367dL, freeze_peek(0xFFD367dL) ^ 0x01);
+                    freeze_io_poke(0x367d, freeze_io_peek(0x367d) ^ 0x01);
                     draw_freeze_menu(UpdateTop);
                     break;
 
                 case 'c':
                 case 'C': // Toggle CPU mode
-                    freeze_poke(0xFFD367dL, freeze_peek(0xFFD367dL) ^ 0x20);
+                    freeze_io_poke(0x367d, freeze_io_peek(0x367d) ^ 0x20);
                     draw_freeze_menu(UpdateTop);
                     break;
 
@@ -927,21 +927,21 @@ int main(void) {
                     // PRESERVE $FFD304E = TEXTYPOS LSB $FFD304F.0-3 = TEXTYPOS MSB $FFD304F.4-7 =
                     // PRESERVE $FFD306F.0-5 = VIC-II first raster $FFD3072     = Sprite Y position
                     // adjust
-                    key = freeze_peek(0xFFD306fL) & 0x80;
+                    key = freeze_io_peek(0x306f) & 0x80;
                     if (key == 0x80) {
                         // Switch to PAL
-                        freeze_poke(0xFFD306fL, 0x00);
-                        freeze_poke(0xFFD3072L, 0x00);
-                        freeze_poke(0xFFD3048L, 0x68);
-                        freeze_poke(0xFFD3049L, 0x0 | (freeze_peek(0xFFD3049L) & 0xf0));
-                        freeze_poke(0xFFD304AL, 0xF8);
-                        freeze_poke(0xFFD304BL, 0x1 | (freeze_peek(0xFFD304BL) & 0xf0));
-                        freeze_poke(0xFFD304EL, 0x68);
-                        freeze_poke(0xFFD304FL, 0x0 | (freeze_peek(0xFFD304FL) & 0xf0));
-                        freeze_poke(0xFFD3072L, 0);
+                        freeze_io_poke(0x306f, 0x00);
+                        freeze_io_poke(0x3072, 0x00);
+                        freeze_io_poke(0x3048, 0x68);
+                        freeze_io_poke(0x3049, 0x0 | (freeze_io_peek(0x3049) & 0xf0));
+                        freeze_io_poke(0x304a, 0xF8);
+                        freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
+                        freeze_io_poke(0x304e, 0x68);
+                        freeze_io_poke(0x304f, 0x0 | (freeze_io_peek(0x304f) & 0xf0));
+                        freeze_io_poke(0x3072, 0);
                         // CIA TOD
-                        freeze_poke(0xffd3c0el, freeze_peek(0xffd3c0el) | 0x80);
-                        freeze_poke(0xffd3d0el, freeze_peek(0xffd3d0el) | 0x80);
+                        freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) | 0x80);
+                        freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) | 0x80);
                         // do it for the freezer itself
                         lpoke(0xFFD306fL, 0x00);
                         lpoke(0xFFD3072L, 0x00);
@@ -957,18 +957,18 @@ int main(void) {
                         lpoke(0xffd3d0el, lpeek(0xffd3d0el) | 0x80);
                     } else {
                         // Switch to NTSC
-                        freeze_poke(0xFFD306fL, 0x87);
-                        freeze_poke(0xFFD3072L, 0x18);
-                        freeze_poke(0xFFD3048L, 0x2A);
-                        freeze_poke(0xFFD3049L, 0x0 | (freeze_peek(0xFFD3049L) & 0xf0));
-                        freeze_poke(0xFFD304AL, 0xB9);
-                        freeze_poke(0xFFD304BL, 0x1 | (freeze_peek(0xFFD304BL) & 0xf0));
-                        freeze_poke(0xFFD304EL, 0x2A);
-                        freeze_poke(0xFFD304FL, 0x0 | (freeze_peek(0xFFD304FL) & 0xf0));
-                        freeze_poke(0xFFD3072L, 24);
+                        freeze_io_poke(0x306f, 0x87);
+                        freeze_io_poke(0x3072, 0x18);
+                        freeze_io_poke(0x3048, 0x2A);
+                        freeze_io_poke(0x3049, 0x0 | (freeze_io_peek(0x3049) & 0xf0));
+                        freeze_io_poke(0x304a, 0xB9);
+                        freeze_io_poke(0x304b, 0x1 | (freeze_io_peek(0x304b) & 0xf0));
+                        freeze_io_poke(0x304e, 0x2A);
+                        freeze_io_poke(0x304f, 0x0 | (freeze_io_peek(0x304f) & 0xf0));
+                        freeze_io_poke(0x3072, 24);
                         // CIA TOD
-                        freeze_poke(0xffd3c0el, freeze_peek(0xffd3c0el) & 0x7f);
-                        freeze_poke(0xffd3d0el, freeze_peek(0xffd3d0el) & 0x7f);
+                        freeze_io_poke(0x3c0e, freeze_io_peek(0x3c0e) & 0x7f);
+                        freeze_io_poke(0x3d0e, freeze_io_peek(0x3d0e) & 0x7f);
                         // do it for the freezer itself
                         lpoke(0xFFD306fL, 0x87);
                         lpoke(0xFFD3072L, 0x18);
@@ -1112,12 +1112,12 @@ int main(void) {
 
                 case 'R':
                 case 'r': // switch CRT Emulation
-                    key = freeze_peek(0xFFD3054L);
+                    key = freeze_io_peek(0x3054);
                     if (key & 0x20) {
-                        freeze_poke(0xFFD3054L, key & 0xdf);
+                        freeze_io_poke(0x3054, key & 0xdf);
                         lpoke(0xFFD3054L, lpeek(0xFFD3054L) & 0xdf);
                     } else {
-                        freeze_poke(0xFFD3054L, key | 0x20);
+                        freeze_io_poke(0x3054, key | 0x20);
                         lpoke(0xFFD3054L, lpeek(0xFFD3054L) | 0x20);
                     }
                     draw_freeze_menu(UpdateTop);

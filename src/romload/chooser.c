@@ -413,8 +413,8 @@ unsigned char freeze_load_romarea(void) {
                             cg_7a_set |= 0x00;
                             cg_7a_mask ^= 0x10;
                         }
-                        freeze_poke(0xFFD307AL, cg_54_set | (freeze_peek(0xFFD307AL) & cg_54_mask));
-                        freeze_poke(0xFFD307AL, cg_7a_set | (freeze_peek(0xFFD307AL) & cg_7a_mask));
+                        freeze_io_poke(0x307a, cg_54_set | (freeze_io_peek(0x307a) & cg_54_mask));
+                        freeze_io_poke(0x307a, cg_7a_set | (freeze_io_peek(0x307a) & cg_7a_mask));
                         lpoke(0xFFD307AL, cg_54_set | (lpeek(0xFFD307AL) & cg_54_mask));
                         lpoke(0xFFD307AL, cg_7a_set | (lpeek(0xFFD307AL) & cg_7a_mask));
 

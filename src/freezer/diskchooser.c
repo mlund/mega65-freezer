@@ -729,7 +729,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                         }
                         // Now check the contents of $D084 to find out the most recently
                         // requested track, and seek the head to that track.
-                        x = freeze_peek(0xFFD3084); // Get last requested track by frozen programme
+                        x = freeze_io_peek(0x3084); // Get last requested track by frozen programme
                         while (x) {
                             F011_COMMAND = F011_CMD_SEEK;
                             while (F011_STATUS & F011_STATUS_BUSY) {

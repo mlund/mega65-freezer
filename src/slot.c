@@ -257,3 +257,22 @@ void freeze_poke(uint32_t addr, unsigned char v) {
 
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 }
+
+/* Every I/O register shares the top half of its 28-bit address, and a call site
+ * that spells the whole thing out marshals those two constant bytes into
+ * imaginary registers, 4 bytes of code each.  A register number is two bytes,
+ * so it rides in A and X and the prefix is added once, here.
+ *
+ * noinline is what makes that true: the call sites pass constants, so the
+ * addition would otherwise fold back through the wrapper and inlining would
+ * restore the original code exactly.  This is the opposite of colour_poke(),
+ * whose argument is a runtime value and which the inliner handles unprompted. */
+constexpr uint32_t FROZEN_IO_BASE = 0x0FFD0000UL;
+
+__attribute__((noinline)) unsigned char freeze_io_peek(uint16_t reg) {
+    return freeze_peek(FROZEN_IO_BASE + reg);
+}
+
+__attribute__((noinline)) void freeze_io_poke(uint16_t reg, unsigned char v) {
+    freeze_poke(FROZEN_IO_BASE + reg, v);
+}

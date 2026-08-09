@@ -99,16 +99,16 @@ char* detect_rom(void) {
  * 2MHZ)), so a machine with VFAST set but neither FAST nor 2MHz is reported
  * faster than it runs. */
 unsigned char detect_cpu_speed(void) {
-    if (freeze_peek(0xffd367dL) & 0x10) {
+    if (freeze_io_peek(0x367d) & 0x10) {
         return 40;
     }
-    if (freeze_peek(0xffd3054L) & 0x40) {
+    if (freeze_io_peek(0x3054) & 0x40) {
         return 40;
     }
-    if (freeze_peek(0xffd3031L) & 0x40) {
+    if (freeze_io_peek(0x3031) & 0x40) {
         return 3;
     }
-    if (freeze_peek(0xffd0030L) & 0x01) {
+    if (freeze_io_peek(0x0030) & 0x01) {
         return 2;
     }
     return 1;

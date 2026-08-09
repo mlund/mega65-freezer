@@ -32,6 +32,12 @@ uint32_t address_to_freeze_slot_offset(uint32_t address);
 uint32_t find_thumbnail_offset(void);
 unsigned char freeze_peek(uint32_t addr);
 void freeze_poke(uint32_t addr, unsigned char v);
+
+/* The same, for the frozen program's saved I/O registers, named by their
+ * register number: freeze_io_peek(0x3054) is its $FFD3054.  Still the freeze
+ * slot, not live hardware -- see freeze_peek. */
+unsigned char freeze_io_peek(uint16_t reg);
+void freeze_io_poke(uint16_t reg, unsigned char v);
 enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer);
 enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count);
 enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer);
