@@ -109,7 +109,7 @@ void setup_menu_screen(void) {
     }
 
     lcopy((long)viciv_regs, 0xffd3000L, 47);
-    // don't write D02f, or we switch back to vic-ii
+    // don't write D02f, or we drop to vic-ii -- viciv.vhdl reverts unless a knock completes
     lcopy((Addr28)(viciv_regs + 48), 0xffd3030L, 80);
 
     // Reset border widths
