@@ -46,10 +46,10 @@ __attribute__((noinline)) void do_dma(void) {
     __asm__ volatile("" ::: "memory");
 
     // Now run DMA job (to and from anywhere, and list is in low 1MB)
-    POKE(0xd702U, 0);
-    POKE(0xd704U, 0x00); // List is in $00xxxxx
-    POKE(0xd701U, ((uint16_t)&dmalist) >> 8);
-    POKE(0xd705U, ((uint16_t)&dmalist) & 0xff); // triggers enhanced DMA
+    DMA_ADDR_BANK = 0;
+    DMA_ADDR_MB = 0x00; // list is in the first megabyte
+    DMA_ADDR_MSB = ((uint16_t)&dmalist) >> 8;
+    DMA_ENABLE = ((uint16_t)&dmalist) & 0xff; // writing the low byte triggers it
 }
 
 /* Everything both jobs share; the caller sets command, source and count. */

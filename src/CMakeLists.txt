@@ -155,7 +155,7 @@ add_m65(MONITOR  monitor/main.c monitor/commands.c monitor/disasm.c
 target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
 add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c makedisk/layout.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c)
-add_m65(SPRITED  sprited/main.c sprited/editor.c)
+add_m65(SPRITED  sprited/main.c sprited/editor.c sprited/textout.c sprited/lineedit.c)
 add_m65(MEGAINFO megainfo/main.c megainfo/info.c)
 
 # Card payloads: not linked into any tool, but built here because they are

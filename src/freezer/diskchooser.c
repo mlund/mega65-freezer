@@ -341,15 +341,15 @@ unsigned char draw_directory_contents(unsigned char drive_id) {
     }
 
     // Then draw title at the top of the screen
-    POKE(SCREEN_ADDRESS + 21 * 2, '"');
+    SCREEN[21 * 2] = '"';
     for (x = 0; x < 16; x++) {
         c = F011_DATA;
         if (c >= 'A' && c <= 'Z') {
             c &= 0x1f;
         }
-        POKE(SCREEN_ADDRESS + (22 + x) * 2, c & 0x7f);
+        SCREEN[(22 + x) * 2] = c & 0x7f;
     }
-    POKE(SCREEN_ADDRESS + 38 * 2, '"');
+    SCREEN[38 * 2] = '"';
     // reverse for disk title
     for (i = 0; i < 18; i++) {
         lpoke(COLOUR_RAM_ADDRESS + (21 * 2) + 1 + i * 2, SchemeAccent | AttribReverse);

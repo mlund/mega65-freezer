@@ -78,12 +78,16 @@ void draw_rule(uint16_t cell, uint8_t width) {
         SCREEN_CELL_BYTES);
 }
 
+/* A cell is one byte or two, so the space goes out strided rather than seeded
+ * and copied: the 16-bit mode holds a character code across the pair, whose
+ * high byte has to be cleared as well. */
 void blank_screen(void) {
-    SCREEN[0] = 0x20;
-    SCREEN[2] = 0x20;
-    SCREEN[1] = 0x00;
-    SCREEN[3] = 0x00;
-    lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, SCREEN_BYTES - 4);
+    constexpr uint16_t CELLS = SCREEN_BYTES / SCREEN_CELL_BYTES;
+
+    lfill_skip(SCREEN_ADDRESS, 0x20, CELLS, SCREEN_CELL_BYTES);
+    if (SCREEN_CELL_BYTES > 1) {
+        lfill_skip(SCREEN_ADDRESS + 1, 0x00, CELLS, SCREEN_CELL_BYTES);
+    }
 }
 
 void setup_menu_screen_base(void) {

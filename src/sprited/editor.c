@@ -19,15 +19,18 @@
  */
 #include "colours.h"
 #include "dma.h"
+#include "lineedit.h"
 #include "mega65_regs.h"
+#include "screen.h"
 #include "slot.h"
+#include "textout.h"
 
 #include <mega65.h>
-#include <mega65/conio.h>
 #include <mega65/hal.h>
 #include <mega65/mouse.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // #define SPRITED_STANDALONE
 
@@ -42,10 +45,10 @@ constexpr uint32_t VIC_BASE = 0xD000UL;
 constexpr uint32_t CIA2_PORT_A = 0xDD00UL;
 
 static inline uint8_t reg_peek(uint32_t address) {
-    return PEEK(address);
+    return REG8(address);
 }
 static inline void reg_poke(uint32_t address, uint8_t value) {
-    POKE(address, value);
+    REG8(address) = value;
 }
 #else
 constexpr uint32_t VIC_BASE = 0xFFD3000UL; // Where VIC-II is mapped in frozen memory
@@ -122,7 +125,7 @@ static inline uint32_t sprite_data_addr(uint8_t sprite) {
 // #define REG_SPRBPMEN_0_3            (vic_registers[0x49] >> 4)
 // #define REG_SPRBPMEN_4_7            (vic_registers[0x4B] >> 4)
 // #define SPRITE_BITPLANE_ENABLE(n)	(((REG_SPRBPMEN_4_7) << 4 | REG_SPRBPMEN_0_3) & (1 << (n)))
-constexpr uint8_t SCREEN_ROWS = 25;
+/* 80 one-byte cells across screen.h's 80-byte row; SCREEN_ROWS is its. */
 constexpr uint8_t SCREEN_COLS = 80;
 
 constexpr uint8_t SPRITE_MAX_COUNT = 8;
@@ -133,6 +136,8 @@ constexpr uint8_t DEFAULT_BACK_COLOR = 11;
 
 constexpr uint8_t TRANS_CHARACTER = 230;
 constexpr uint8_t SOLID_BLOCK_CHARACTER = 224;
+/* The caret while a line is being typed: the same solid block conio drew. */
+constexpr uint8_t CARET_CHARACTER = 224;
 constexpr uint8_t SHAPE_PREVIEW_CHARACTER = 32;
 constexpr uint8_t SIDEBAR_COLUMN = 65;
 constexpr uint8_t SIDEBAR_WIDTH = SCREEN_COLS - SIDEBAR_COLUMN;
@@ -173,10 +178,10 @@ constexpr uint16_t JOY_DELAY = 10000U;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-// Screen RAM for our area. Werror do not use 16-bit character mode
-// so we need 80x25 = 2K area.
-constexpr uint32_t SCREEN_RAM_ADDRESS = 0x12000UL;
-constexpr uint32_t CHARSET_ADDRESS = 0x15000UL;
+/* The editor patches its own glyphs in, so it renders from this copy rather
+ * than the character-ROM shadow screen.h names.  textout.c points CHARPTR at
+ * it; the screen itself is screen.h's, at $B800. */
+constexpr uint32_t EDITOR_CHARSET_ADDRESS = 0x15000UL;
 constexpr uint32_t SPRITE_POINTER_TABLE = 0x16000UL;
 constexpr uint32_t SPRITE_BUFFER = 0x40000UL;
 
@@ -209,7 +214,10 @@ constexpr uint8_t SPRITE_BLOCK_BYTES = 64;
 constexpr uint8_t SPRITE_POINTERS_16BIT = 0x80;
 
 /* The ROM character set, as the VIC-IV sees it in the upper memory map. */
-constexpr uint32_t ROM_CHARSET_SOURCE = 0x2D800;
+/* CHARSET A, the same set the other tools render through the ROM shadow.
+ * Its second bank is the lowercase one, where letters sit at their ASCII
+ * values; this is the first, in screen-code order. */
+constexpr uint32_t ROM_CHARSET_SOURCE = 0x29000;
 constexpr uint16_t CHARSET_BYTES = 2048;
 constexpr uint8_t GLYPH_BYTES = 8;
 
@@ -225,15 +233,6 @@ enum : uint8_t {
     RedrawHeader = 32,
     RedrawAll = 0x3f,
 };
-
-/* mega65-libc types screen text as uint8_t*, while C string literals are
- * char[].  These convert once so call sites stay free of casts. */
-static inline void screen_puts(const char* s) {
-    cputs((const uint8_t*)s);
-}
-static inline void screen_putsxy(uint8_t x, uint8_t y, const char* s) {
-    cputsxy(x, y, (const uint8_t*)s);
-}
 
 /* How the sprite being edited stores its pixels. */
 enum SpriteColorMode : uint8_t {
@@ -708,23 +707,16 @@ static void initialize(void) {
 
     // --- Screen setup ----
 
-    conioinit();
-
-    sethotregs(1);
-
-    setextendedattrib(1);
-    setscreensize(SCREEN_COLS, SCREEN_ROWS);
-    setscreenaddr(SCREEN_RAM_ADDRESS);
+    sprited_screen_init();
     bordercolor(SchemeBorder);
     bgcolor(SchemeBackground);
 
     // --- Charset setup ----
 
-    lcopy(ROM_CHARSET_SOURCE, CHARSET_ADDRESS, CHARSET_BYTES);
+    lcopy(ROM_CHARSET_SOURCE, EDITOR_CHARSET_ADDRESS, CHARSET_BYTES);
     lcopy((Addr28)CHSET_TOOLBOX,
-        CHARSET_ADDRESS + TOOLBOX_CHARSET_BASE_IDX * GLYPH_BYTES,
+        EDITOR_CHARSET_ADDRESS + TOOLBOX_CHARSET_BASE_IDX * GLYPH_BYTES,
         sizeof(CHSET_TOOLBOX));
-    setcharsetaddr(CHARSET_ADDRESS);
 
     // --- Sprite setup ----
 
@@ -1202,7 +1194,7 @@ static void draw_header(void) {
         gohome();
         revers(1);
         textcolor(SchemeBanner);
-        screen_puts(HEADER_TEXT);
+        cputs(HEADER_TEXT);
         revers(0);
     }
 }
@@ -1217,61 +1209,61 @@ static void draw_color_selector(void) {
             case SpriteColorModeMono:
 
                 textcolor(g_state.color[ColorBack]);
-                screen_putsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
+                cputsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
                 textcolor(g_state.color[ColorFore]);
-                screen_putsxy(SIDEBAR_COLUMN + 8, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
+                cputsxy(SIDEBAR_COLUMN + 8, 5, "\xe0\xe0\xe0\xe0\xe0\xe0");
 
                 textcolor(
                     g_state.current_color_idx == ColorBack ? SchemeSelected : SchemeUnselected);
-                screen_putsxy(SIDEBAR_COLUMN + 2, 6, "BK");
+                cputsxy(SIDEBAR_COLUMN + 2, 6, "BK");
 
                 textcolor(
                     g_state.current_color_idx == ColorFore ? SchemeSelected : SchemeUnselected);
-                screen_putsxy(SIDEBAR_COLUMN + 8 + 2, 6, "FG");
+                cputsxy(SIDEBAR_COLUMN + 8 + 2, 6, "FG");
 
                 break;
 
             case SpriteColorMode16:
                 textcolor(g_state.color[ColorFore]);
-                screen_putsxy(SIDEBAR_COLUMN,
+                cputsxy(SIDEBAR_COLUMN,
                     5,
                     "\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0\xe0");
 
                 textcolor(SchemeText);
-                screen_putsxy(SIDEBAR_COLUMN + 2,
+                cputsxy(SIDEBAR_COLUMN + 2,
                     6,
                     g_state.color[ColorFore] == 0 ? "BACKGROUND" : "FOREGROUND");
                 break;
 
             case SpriteColorModeMulti:
                 textcolor(g_state.color[ColorBack]);
-                screen_putsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0");
+                cputsxy(SIDEBAR_COLUMN, 5, "\xe0\xe0\xe0");
                 textcolor(g_state.color[ColorFore]);
-                screen_putsxy(SIDEBAR_COLUMN + 4, 5, "\xe0\xe0\xe0");
+                cputsxy(SIDEBAR_COLUMN + 4, 5, "\xe0\xe0\xe0");
                 textcolor(g_state.color[ColorMc1]);
-                screen_putsxy(SIDEBAR_COLUMN + 4 * 2, 5, "\xe0\xe0\xe0");
+                cputsxy(SIDEBAR_COLUMN + 4 * 2, 5, "\xe0\xe0\xe0");
                 textcolor(g_state.color[ColorMc2]);
-                screen_putsxy(SIDEBAR_COLUMN + 4 * 3, 5, "\xe0\xe0\xe0");
+                cputsxy(SIDEBAR_COLUMN + 4 * 3, 5, "\xe0\xe0\xe0");
 
                 textcolor(SchemeUnselected);
-                screen_putsxy(SIDEBAR_COLUMN + 1, 6, "BK");
-                screen_putsxy(SIDEBAR_COLUMN + 5, 6, "FG");
-                screen_putsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
-                screen_putsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
+                cputsxy(SIDEBAR_COLUMN + 1, 6, "BK");
+                cputsxy(SIDEBAR_COLUMN + 5, 6, "FG");
+                cputsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
+                cputsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
 
                 textcolor(SchemeSelected);
                 switch (g_state.current_color_idx) {
                     case ColorBack:
-                        screen_putsxy(SIDEBAR_COLUMN + 1, 6, "BK");
+                        cputsxy(SIDEBAR_COLUMN + 1, 6, "BK");
                         break;
                     case ColorFore:
-                        screen_putsxy(SIDEBAR_COLUMN + 5, 6, "FG");
+                        cputsxy(SIDEBAR_COLUMN + 5, 6, "FG");
                         break;
                     case ColorMc1:
-                        screen_putsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
+                        cputsxy(SIDEBAR_COLUMN + 8, 6, "MC1");
                         break;
                     case ColorMc2:
-                        screen_putsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
+                        cputsxy(SIDEBAR_COLUMN + 12, 6, "MC2");
                         break;
                     default:
                         break;
@@ -1314,9 +1306,9 @@ static void draw_side_bar_sprite_info(void) {
     if (g_state.redraw_flags & RedrawSidebarInfo) {
         textcolor(SchemeText);
         gotoxy(SIDEBAR_COLUMN, 2);
-        screen_puts("SPRITE ");
+        cputs("SPRITE ");
         cputdec(g_state.sprite_number, 0, 0);
-        screen_puts(g_state.sprite_color_mode == SpriteColorModeMono
+        cputs(g_state.sprite_color_mode == SpriteColorModeMono
                 ? " MONO    "
                 : (g_state.sprite_color_mode == SpriteColorModeMulti ? " MULTI   " : " 16-COL"));
         gotoxy(SIDEBAR_COLUMN, 3);
@@ -1327,11 +1319,11 @@ static void draw_side_bar_sprite_info(void) {
             is_sprite_xwidth(g_state.sprite_number) || is_sprite_16color(g_state.sprite_number)
                 ? SchemeAccent
                 : SchemeUnselected);
-        screen_puts("XWIDE");
+        cputs("XWIDE");
         textcolor(is_sprite_hexpand(g_state.sprite_number) ? SchemeAccent : SchemeUnselected);
-        screen_puts(" HEXP");
+        cputs(" HEXP");
         textcolor(is_sprite_vexpand(g_state.sprite_number) ? SchemeAccent : SchemeUnselected);
-        screen_puts(" VEXP");
+        cputs(" VEXP");
     }
 }
 
@@ -1367,11 +1359,7 @@ static void draw_sidebar(void) {
     g_state.redraw_flags = RedrawNothing;
 }
 
-/* Fold the case rather than trust it.  mega65-libc's cinput() upper-cases
- * what it stores on two conditions that do not survive reading: `PEEK(0x0D18)`
- * is a byte of our own program image rather than the $D018 it means, and
- * `flags & ~CINPUT_NO_AUTOTRANSLATE` is true for every flag value rather than
- * false for that one.  So the stored case is a property of the build. */
+/* Fold the case rather than trust it: line_edit() stores the key as typed. */
 static bool answered_yes(const uint8_t* answer) {
     return (answer[0] | 0x20) == 'y' && (answer[1] | 0x20) == 'e' && (answer[2] | 0x20) == 's';
 }
@@ -1381,8 +1369,23 @@ static void ask(const char* question, uint8_t* into, uint8_t max_length) {
     revers(1);
     textcolor(SchemeBar);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
-    screen_putsxy(0, SCREEN_ROWS - 1, question);
-    cinput(into, max_length + 1, CINPUT_ACCEPT_ALL);
+    cputsxy(0, SCREEN_ROWS - 1, question);
+
+    /* The prompt stays put and the answer is redrawn after every key, so the
+     * caret sits at the end of what has been typed.  line_edit() owns the
+     * buffer; the screen and the keyboard stay here.  See
+     * test/verify_lineedit.py for the edges. */
+    const uint8_t answer_x = (uint8_t)strlen(question);
+    uint8_t length = 0;
+    into[0] = '\0';
+    for (;;) {
+        cputncxy(answer_x, SCREEN_ROWS - 1, (uint8_t)(max_length + 1), ' ');
+        cputsxy(answer_x, SCREEN_ROWS - 1, (const char*)into);
+        cputc(CARET_CHARACTER);
+        if (line_edit((char*)into, (uint8_t)(max_length + 1), &length, cgetc())) {
+            break;
+        }
+    }
     revers(0);
     textcolor(SchemeBackground);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
@@ -1394,13 +1397,13 @@ static void print_key_group(const char* list[], uint8_t count, uint8_t x, uint8_
     gotoxy(x, y);
     revers(1);
     textcolor(SchemeBar);
-    screen_puts(list[0]);
+    cputs(list[0]);
     revers(0);
     textcolor(SchemeText);
 
     for (i = 1; i < count; ++i) {
         gotoxy(x, y + i);
-        screen_puts(list[i]);
+        cputs(list[i]);
     }
 }
 
@@ -1485,10 +1488,8 @@ static void show_help(void) {
     textcolor(SchemeCredits);
     revers(1);
     cputncxy(22, SCREEN_ROWS - 4, SCREEN_COLS - 22, 32);
-    screen_putsxy(
-        22, SCREEN_ROWS - 3, " MEGA65 SPRITE EDITOR  V0.10 (C) 2021 HERNAN DI PIETRO    ");
-    screen_putsxy(
-        22, SCREEN_ROWS - 2, " MOUSE/JOY CODE BY PAUL GARDNER-STEPHEN.                  ");
+    cputsxy(22, SCREEN_ROWS - 3, " MEGA65 SPRITE EDITOR  V0.10 (C) 2021 HERNAN DI PIETRO    ");
+    cputsxy(22, SCREEN_ROWS - 2, " MOUSE/JOY CODE BY PAUL GARDNER-STEPHEN.                  ");
     cputncxy(22, SCREEN_ROWS - 1, SCREEN_COLS - 22, 32);
     revers(0);
 

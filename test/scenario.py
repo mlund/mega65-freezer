@@ -77,16 +77,10 @@ def _press(sock, what: str) -> None:
         raise Failure(f"no such key {what!r}; named keys are {sorted(xemu_keys.NAMED)}")
 
 
-# Where the running tool keeps its screen.  Every tool but SPRITED draws at
-# $B800; SPRITED is at $12000 until it moves.  Rows are indexed as though the
-# buffer began at SCREEN_AT, so only the address read from differs.
-_screen_at = screen.SCREEN_AT
-
-
 def _read_screen(sock) -> tuple[bytes, int]:
     """The screen, and how wide a cell is in whatever mode it is in now."""
     cell_bytes = 2 if xemu.read(sock, screen.CHR16, 1)[0] & 0x01 else 1
-    return xemu.read(sock, _screen_at, screen.SCREEN_BYTES), cell_bytes
+    return xemu.read(sock, screen.SCREEN_AT, screen.SCREEN_BYTES), cell_bytes
 
 
 def _poll(sock, wants, timeout: float):
@@ -182,12 +176,8 @@ def _entry_size(image: str, name: str) -> int | None:
     return struct.unpack_from("<I", entry, _ENTRY_SIZE_AT)[0]
 
 
-def run(
-    description: str, prg: str, steps, *, boot: float = 16.0, screen_at: int = screen.SCREEN_AT
-) -> int:
+def run(description: str, prg: str, steps, *, boot: float = 16.0) -> int:
     """Parse the usual arguments, run `steps` against `prg`, and report."""
-    global _screen_at
-    _screen_at = screen_at
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument("--emulator", required=True)
     parser.add_argument("--sdimg", required=True, help="an SD image to clone, never written to")

@@ -101,6 +101,13 @@ constexpr uint32_t M65_MODEL_ID = 0xffd3629; // UARTMISC:M65MODEL, the board rev
 constexpr uint32_t RTC_SECONDS = 0xffd7110;  // RTC:RTCSEC; minutes, hours, day,
                                              // month and year follow in order
 
+// DMAgic.  Writing DMA_ENABLE is what starts the job, so it goes last; the
+// other three only say where the list is.
+#define DMA_ADDR_MSB REG8(0xD701)
+#define DMA_ADDR_BANK REG8(0xD702)
+#define DMA_ADDR_MB REG8(0xD704)
+#define DMA_ENABLE REG8(0xD705)
+
 // SD controller.  SD:CMDANDSTAT takes a command when written and reports
 // status when read; bit and command names from mega65-core's iomap.txt and the
 // $D680 write decode in sdcardio.vhdl.

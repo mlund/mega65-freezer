@@ -79,14 +79,14 @@ char draw_directory_entry(unsigned char screen_row) {
         (void)F011_DATA;
     }
     // Then draw the 16 chars with quotes
-    POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (21 * 2), '"');
+    SCREEN[(screen_row * SCREEN_ROW_BYTES) + (21 * 2)] = '"';
     for (i = 0; i < 16; i++) {
         c = F011_DATA;
         if (!c) {
             invalid = 1;
         }
         if (firsta0 && (c == 0xa0)) {
-            POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2), 0x22);
+            SCREEN[(screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2)] = 0x22;
             firsta0 = 0;
         } else {
             if (c >= 'A' && c <= 'Z') {
@@ -95,20 +95,20 @@ char draw_directory_entry(unsigned char screen_row) {
             if (c >= 'a' && c <= 'z') {
                 c &= 0x1f;
             }
-            POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2), c & 0x7f);
+            SCREEN[(screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2)] = c & 0x7f;
         }
     }
     if (firsta0) {
-        POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (38 * 2), '"');
+        SCREEN[(screen_row * SCREEN_ROW_BYTES) + (38 * 2)] = '"';
     }
     if (type & 0x40) {
-        POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '<');
+        SCREEN[(screen_row * SCREEN_ROW_BYTES) + (39 * 2)] = '<';
     }
     // Marks an entry whose type carries none of the high-nibble bits.  Written
     // `!type & 0xf0` here and in cc65, which parses as `(!type) & 0xf0` and is
     // always 0, so the '*' never drew.
     if (!(type & 0xf0)) {
-        POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (39 * 2), '*');
+        SCREEN[(screen_row * SCREEN_ROW_BYTES) + (39 * 2)] = '*';
     }
 
     // Read the rest of the entry to advance buffer pointer nicely
@@ -119,7 +119,7 @@ char draw_directory_entry(unsigned char screen_row) {
     if (invalid) {
         // Erase whatever we drew
         for (i = 21; i < 40; i++) {
-            POKE(SCREEN_ADDRESS + (screen_row * SCREEN_ROW_BYTES) + (i * 2), ' ');
+            SCREEN[(screen_row * SCREEN_ROW_BYTES) + (i * 2)] = ' ';
         }
     } else {
         lcopy((uint32_t)dir_line_colour,
@@ -131,10 +131,10 @@ char draw_directory_entry(unsigned char screen_row) {
 }
 
 void clear_screen(unsigned char lines) {
-    POKE(SCREEN_ADDRESS + 0, ' ');
-    POKE(SCREEN_ADDRESS + 1, 0);
-    POKE(SCREEN_ADDRESS + 2, ' ');
-    POKE(SCREEN_ADDRESS + 3, 0);
+    SCREEN[0] = ' ';
+    SCREEN[1] = 0;
+    SCREEN[2] = ' ';
+    SCREEN[3] = 0;
     lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 40 * 2 * lines - 4);
     lpoke(COLOUR_RAM_ADDRESS + 0, 0);
     lpoke(COLOUR_RAM_ADDRESS + 1, SchemeText);
@@ -284,14 +284,14 @@ unsigned char freeze_load_romarea(void) {
     display_offset = 0;
 
     // First, clear the screen
-    POKE(SCREEN_ADDRESS + 0, ' ');
-    POKE(SCREEN_ADDRESS + 1, 0);
-    POKE(SCREEN_ADDRESS + 2, ' ');
-    POKE(SCREEN_ADDRESS + 3, 0);
+    SCREEN[0] = ' ';
+    SCREEN[1] = 0;
+    SCREEN[2] = ' ';
+    SCREEN[3] = 0;
     lcopy(SCREEN_ADDRESS, SCREEN_ADDRESS + 4, 40 * 2 * 25 - 4);
 
     for (x = 0; reading_disk_list_message[x]; x++) {
-        POKE(SCREEN_ADDRESS + 12 * 40 * 2 + (9 * 2) + (x * 2), reading_disk_list_message[x] & 0x3f);
+        SCREEN[12 * 40 * 2 + (9 * 2) + (x * 2)] = reading_disk_list_message[x] & 0x3f;
     }
 
     scan_directory();
