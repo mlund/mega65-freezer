@@ -127,6 +127,16 @@ if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
                 --build $<TARGET_FILE_DIR:AUDIOMIX>)
     set_tests_properties(launch_audiomix PROPERTIES TIMEOUT 180)
 
+    # SPRITED draws through mega65-libc's conio rather than screen.c, at its
+    # own geometry and its own charset, and had no cover at all.  This pins
+    # what it renders so a move onto the shared drawing code can be shown not
+    # to change it.
+    add_test(NAME sprited
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_sprited_xemu.py
+                --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                --build $<TARGET_FILE_DIR:SPRITED>)
+    set_tests_properties(sprited PROPERTIES TIMEOUT 300)
+
     # The freeze menu's own screen, which the tests above only pass through:
     # that it draws, and that a key redraws the field it owns.
     add_test(NAME freezer_menu
