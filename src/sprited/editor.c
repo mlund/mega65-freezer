@@ -1361,10 +1361,17 @@ static bool answered_yes(const uint8_t* answer) {
     return (answer[0] | 0x20) == 'y' && (answer[1] | 0x20) == 'e' && (answer[2] | 0x20) == 's';
 }
 
+/* The status line, cleared.  Three sites asked for it with four one-byte
+ * arguments; two of those ride in A and X and the rest are marshalled at every
+ * call. */
+static void blank_status_row(void) {
+    cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
+}
+
 static void ask(const char* question, uint8_t* into, uint8_t max_length) {
     revers(1);
     textcolor(SchemeBar);
-    cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
+    blank_status_row();
     cputsxy(0, SCREEN_ROWS - 1, question);
 
     /* The prompt stays put and the answer is redrawn after every key, so the
@@ -1384,7 +1391,7 @@ static void ask(const char* question, uint8_t* into, uint8_t max_length) {
     }
     revers(0);
     textcolor(SchemeBackground);
-    cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
+    blank_status_row();
     g_state.redraw_flags |= RedrawSidebarCoords;
 }
 
@@ -1650,7 +1657,7 @@ static void main_loop(void) {
                 erase_canvas_space();
                 set_redraw_full_canvas();
                 textcolor(SchemeBackground);
-                cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
+                blank_status_row();
                 g_state.redraw_flags = RedrawAll;
                 break;
 
