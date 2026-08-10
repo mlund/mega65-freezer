@@ -22,8 +22,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      # Pinned: the formatter's style changes between releases, so an unpinned
+      # install turns an upstream release into a red build with no change here.
+      # Raise it deliberately, and reformat in the same commit.
       - name: Install ruff
-        run: pip install ruff
+        run: pip install ruff==0.12.12
 
       # The stock release, not the patched build development uses: it can
       # miscompile 16-bit loop counters on 45GS02 at -mlto-zp >= 8 (see
