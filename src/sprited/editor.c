@@ -906,8 +906,10 @@ static void draw_mono_cell(uint8_t x, uint8_t y) {
     const uint8_t pixel = lpeek(byte_addr) & (0x80 >> (x % 8));
 
     gotoxy(g_state.canvas_left_x + (x * g_state.cells_per_pixel), y + 2);
+    /* The colour belongs to the pixel, not the cell: one sprite pixel is up to
+     * four cells, and the canvas redraws over a thousand of them. */
+    textcolor(pixel ? g_state.color[ColorFore] : g_state.color[ColorBack]);
     for (cell = 0; cell < g_state.cells_per_pixel; ++cell) {
-        textcolor(pixel ? g_state.color[ColorFore] : g_state.color[ColorBack]);
         cputc(pixel ? SOLID_BLOCK_CHARACTER : TRANS_CHARACTER);
     }
 }
