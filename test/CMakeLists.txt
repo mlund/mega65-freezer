@@ -50,6 +50,14 @@ if(Python3_FOUND AND HOST_C_COMPILER)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_bitedit.py
                 ${BITEDIT_ARGS})
 
+    # SPRITED's line editor, which asks for a filename and a yes/no answer.
+    # Its edges -- backspacing an empty line, the last cell, a control code --
+    # are the cases least likely to get typed at an emulator, and the logic is
+    # pure, so it runs here against the tool's own source.
+    add_test(NAME lineedit
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_lineedit.py
+                --cc ${HOST_C_COMPILER})
+
     # blockmove.c takes its two memory accesses from the caller, so the host
     # build drives it against a flat array.  The overlap cases are the point: a
     # forward copy into a destination inside the source range corrupts only the
