@@ -19,9 +19,6 @@ unknown or incompatible.
 
 ## Development workflow
 
-Requirements: a recent stable Rust toolchain (see `rust-version` in
-`Cargo.toml`).
-
 Before opening a pull request, run tests incl. with the Xemu harness.
 
 - Follow test-driven development: write a failing test that pins the behaviour,
@@ -39,10 +36,10 @@ similar) are welcome, **provided a human is in the loop**. If you use one:
 - You, the human contributor, are responsible for the change. Read, understand,
   and stand behind every line you submit — the same bar as code you wrote by
   hand.
-- Verify it: run the build, tests, `cargo fmt`, and `cargo clippy` locally.
-  "The model said so" is not a substitute for evidence.
+- Verify it: run the build, `ctest`, and the `format-check` and `tidy` targets
+  locally. "The model said so" is not a substitute for evidence.
 - Ensure the agent did not import code, comments, or data of unknown or
-  incompatible provenance (see *Licensing and provenance* above).
+  incompatible provenance (see *Licensing and origin* above).
 - Agents should follow the conventions in [`AGENTS.md`](AGENTS.md).
 
 Unreviewed, bulk machine-generated pull requests will be closed.
@@ -51,4 +48,4 @@ Unreviewed, bulk machine-generated pull requests will be closed.
 
 1. Fork and create a topic branch.
 2. Make your change with tests and a brief, clear commit message.
-4. Open a pull request describing *what* changed and *why*.
+3. Open a pull request describing *what* changed and *why*.
