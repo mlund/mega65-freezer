@@ -67,7 +67,7 @@ include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
 include_directories(SYSTEM ${MEGA65_INCLUDE})
 
 # Must be a link option: -mlto-zp governs LTO codegen, and is silently ignored
-# at compile time.  Moves together with freezemenu.ld's __basic_zp_end; the
+# at compile time.  Moves together with link.ld's __basic_zp_end; the
 # allocator saturates whatever the pair allows, so the two are one setting.
 # Cached because add_link_options() appends after CMAKE_EXE_LINKER_FLAGS and
 # would otherwise override -DLTO_ZP from the command line.
@@ -89,7 +89,10 @@ function(add_m65 name)
     if(LINK_LIBC)
         target_link_libraries(${name} mega65libc)
     endif()
-    target_link_options(${name} PRIVATE -T ${CMAKE_CURRENT_SOURCE_DIR}/freezemenu.ld)
+    # -L so that link.ld's INCLUDE of lowmem.ld resolves from the build
+    # directory.
+    target_link_options(${name} PRIVATE -T ${CMAKE_CURRENT_SOURCE_DIR}/link.ld
+        -Wl,-L,${CMAKE_CURRENT_SOURCE_DIR})
     set_target_properties(${name} PROPERTIES OUTPUT_NAME ${name}.M65)
     add_custom_command(TARGET ${name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -DFILE=$<TARGET_FILE:${name}> -DMAX_SIZE=${MAX_SIZE}
@@ -118,7 +121,7 @@ foreach(t MONITOR MEGAINFO SPRITED)
 endforeach()
 
 # Xemu test targets.  Plain c64 PRGs, not .M65: they are launched with Xemu's
-# `-prg`, so they want the platform's own BASIC stub rather than freezemenu.ld's
+# `-prg`, so they want the platform's own BASIC stub rather than link.ld's
 # $080D trampoline.  mega65-libc supplies assert_eq/xemu_exit/debug_msg, so the
 # tests only build when it is linked.
 if(LINK_LIBC)
@@ -136,9 +139,12 @@ if(LINK_LIBC)
         $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_compile_definitions(test_freezeslot PRIVATE SCREEN_CELL_BYTES=2)
     target_link_libraries(test_freezeslot mega65libc)
-    # The c64 platform script reserves less zero page than freezemenu.ld does,
-    # so the project-wide -mlto-zp does not fit here.
-    target_link_options(test_freezeslot PRIVATE -mlto-zp=16)
+    # The c64 platform script reserves less zero page than link.ld does, so the
+    # project-wide -mlto-zp does not fit here.  lowmem.ld comes along because
+    # slot.c names hyppo's page; as an input file rather than -T, which would
+    # replace the platform's script instead of adding to it.
+    target_link_options(test_freezeslot PRIVATE -mlto-zp=16
+        ${CMAKE_CURRENT_SOURCE_DIR}/lowmem.ld)
     set_target_properties(test_freezeslot PROPERTIES OUTPUT_NAME test_freezeslot.prg)
 
     # Decimal conversion has no caller in the seven tools -- they format hex and

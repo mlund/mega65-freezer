@@ -551,7 +551,7 @@ char* freeze_select_disk_image(unsigned char drive_id) {
     blank_screen();
 
     // save old mounted state
-    mega65_dos_getprocdesc(0x04); // get procdesc from hyppo to 0x400
+    mega65_dos_getprocdesc(HYPPO_PAGE_MSB);
     old_disk_flags = HYPPO_PROCDESC->d81_flags[drive_id];
     old_disk_len = HYPPO_PROCDESC->d81_namelen[drive_id];
     for (x = 0; x < 32; x++) {

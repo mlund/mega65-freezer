@@ -23,10 +23,10 @@
 #define HYPPO_GETPROCDESC 0x48
 #define HYPPO_ATTACH 0x4A
 
-// Hyppo needs its filename buffer page-aligned and in the bottom 32KB.  Two
-// are used so a pending attach name is not clobbered by an exec.
-#define NAME_BUF_EXEC 0x0100
-#define NAME_BUF_DOS 0x0400
+// Hyppo's two page-aligned buffers are reserved in lowmem.ld, which is where
+// the reasoning for their addresses lives: hyppo_page for the filename the
+// file traps read and the descriptor and region list they copy back,
+// hyppo_exec_page for an exec name that has to outlive that page.
 
 // PRG conventions: files load at $07FF and are entered via the BASIC stub.
 #define LOAD_ADDR_LO 0xFF
@@ -43,7 +43,7 @@
 #define ATTACH_LEGACY_BASE 0x40 // pre-1.2 hyppo: $40 or $46
 #define ATTACH_LEGACY_DRIVE1 0x06
 
-// Offsets into hyppo's dirent, written to NAME_BUF_DOS.
+// Offsets into hyppo's dirent, written to hyppo_page.
 #define HDIRENT_NAME_LEN 64 // name is 64 bytes
 #define HDIRENT_CLUSTER 77  // 64 + 1 + 12
 #define HDIRENT_SIZE 81     // HDIRENT_CLUSTER + 4
@@ -59,8 +59,8 @@
 // The filename pointer is stashed alongside each buffer for post-mortem
 // inspection from the monitor.  Unparenthesised for the reason at the top of
 // this file, hence the NOLINT.
-#define NAME_PTR_STASH_EXEC NAME_BUF_EXEC + 0x40 // NOLINT(bugprone-macro-parentheses)
-#define NAME_PTR_STASH_DOS NAME_BUF_DOS + 0x40   // NOLINT(bugprone-macro-parentheses)
+#define NAME_PTR_STASH_EXEC hyppo_exec_page + 0x40 // NOLINT(bugprone-macro-parentheses)
+#define NAME_PTR_STASH_DOS hyppo_page + 0x40       // NOLINT(bugprone-macro-parentheses)
 
 // dos_attach gained its current calling convention in hyppo DOS 1.3.
 #define HDOS_MAJOR_MIN 1
@@ -74,6 +74,14 @@
 #ifndef __ASSEMBLER__
 
 #include <stdint.h>
+
+/* Reserved in lowmem.ld.  Whatever hyppo last put here decides which of
+ * the three shapes is meaningful, so the page is declared as bytes and each
+ * reader casts. */
+extern volatile uint8_t hyppo_page[256];
+
+/* The trap takes the page, not the address: the high byte is all it reads. */
+#define HYPPO_PAGE_MSB ((uint8_t)((uintptr_t)hyppo_page >> 8))
 
 /* Implemented in helper.S.  leaf promises the callee does not re-enter C, so
  * callers keep their statically allocated frames instead of the soft stack.
@@ -127,15 +135,15 @@ HELPER_INLINE void unfreeze_slot(uint16_t slot) {
         : "a", "p", "memory");
 }
 
-/* Buffer address: low byte in X, high in Y -- the opposite of the two above. */
-HELPER_INLINE void fetch_freeze_region_list_from_hypervisor(uint16_t addr) {
-    __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
+/* Buffer address: low byte in X, high in Y -- the opposite of the two above.
+ * Taken as the page rather than the address because the low byte is only ever
+ * zero, and because the caller then hands the assembler a symbol to relocate
+ * instead of a shift to perform. */
+HELPER_INLINE void fetch_freeze_region_list_from_hypervisor(uint8_t page) {
+    __asm__ volatile("ldx #0\n\tlda #%c[fn]\n\tsta %c[trap]\n\tclv"
         :
-        : "x"((unsigned char)addr),
-        "y"((unsigned char)(addr >> 8)),
-        [fn] "i"(SYSPART_REGION_LIST),
-        [trap] "i"(HTRAP_SYSPART)
-        : "a", "p", "memory");
+        : "y"(page), [fn] "i"(SYSPART_REGION_LIST), [trap] "i"(HTRAP_SYSPART)
+        : "a", "x", "p", "memory");
 }
 
 /* Count returns in X(low)/Y(high). */

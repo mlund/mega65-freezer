@@ -163,7 +163,7 @@ unsigned char next_cpu_speed(void) {
     return 0;
 }
 
-/* Placed by src/freezemenu.ld, above the region the linker allocates from, so
+/* Placed by src/link.ld, above the region the linker allocates from, so
  * that its 4KB does not come out of the same budget as the code. */
 extern unsigned char thumbnail_buffer[4096];
 

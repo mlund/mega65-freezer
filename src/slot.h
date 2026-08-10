@@ -22,7 +22,7 @@ constexpr uint8_t BORDER_SIGNAL_ROM_CHANGED = 0x83;
 #define INTERNAL_DRIVE_0 "- INTERNAL 3.5\" -"
 #define INTERNAL_DRIVE_1 "- 1565 DRIVE 1 -"
 /* The disk chooser leaves these for MAKEDISK, which mega65_dos_exechelper()
- * loads over it.  Placed by src/freezemenu.ld, which owns the low-memory map.
+ * loads over it.  Placed by src/link.ld, which owns the low-memory map.
  * volatile because the reader is a different program. */
 extern volatile uint8_t tool_density[1]; /* 0 = DD, 1 = HD */
 extern volatile uint8_t tool_drive_id[1];
@@ -106,8 +106,8 @@ static_assert(offsetof(struct ProcessDescriptor, d81_namelen) == 0x13);
 static_assert(offsetof(struct ProcessDescriptor, d81_name) == 0x15);
 static_assert(offsetof(struct ProcessDescriptor, d81_name[1]) == 0x35);
 
-/* Where mega65_dos_getprocdesc(0x04) leaves the running program's descriptor.
- * Named as the struct because the offset arithmetic it replaces is where a
- * stray conditional cost the disk chooser its saved mount state: `0x0400 +
- * drive_id ? 0x35 : 0x15` is the constant 0x35, and nothing says so. */
-#define HYPPO_PROCDESC ((const volatile struct ProcessDescriptor*)0x0400)
+/* Where mega65_dos_getprocdesc leaves the running program's descriptor.  Named
+ * as the struct because the offset arithmetic it replaces is where a stray
+ * conditional cost the disk chooser its saved mount state: `0x0400 + drive_id
+ * ? 0x35 : 0x15` is the constant 0x35, and nothing says so. */
+#define HYPPO_PROCDESC ((const volatile struct ProcessDescriptor*)hyppo_page)

@@ -191,7 +191,7 @@ void freeze_reset_cpu_state(void) {
 void copy_imageproc_to_freezeregion(uint8_t diskid, uint8_t overrides) {
     uint8_t i;
 
-    mega65_dos_getprocdesc(0x04); // get procdesc from hyppo to 0x400
+    mega65_dos_getprocdesc(HYPPO_PAGE_MSB);
 
     i = HYPPO_PROCDESC->d81_flags[diskid];
     // write enable fix for HDOS < 1.3

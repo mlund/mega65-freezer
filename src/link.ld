@@ -32,34 +32,7 @@ SECTIONS {
 ASSERT(ADDR(.entrytramp) == 0x080d,
     "entry trampoline moved: loader entry is fixed, see PROGRAM_ENTRY in helper.h")
 
-/* Low memory the seven tools share.
- *
- * Only what must outlive the program holding it: mega65_dos_exechelper() loads
- * the next tool over this one, so a value handed across that boundary cannot
- * live in either image.  The tools load at $07FF and run upwards, so these sit
- * below that.  Anything a tool merely needs at a particular alignment is an
- * ordinary aligned object and the compiler places it.  Hyppo's
- * freeze_mem_list saves all 384KB of RAM from $0000000 to the freeze slot
- * before the freezer starts and restores it on resume (mega65-core,
- * src/hyppo/freeze.asm), so the frozen program's own bytes here are safe from
- * us and ours are discarded when it resumes.
- *
- * What is not automatic is the tools agreeing with each other: each links
- * separately and sees only its own reservation, so an overlap between two of
- * them is invisible to both.  The whole map therefore lives here, in the one
- * script all seven share, and the assertions below fail the build if any two
- * reservations meet.
- */
-tool_density      = 0x033C;   /* disk chooser -> MAKEDISK: 0 = DD, 1 = HD  */
-tool_density_size = 0x0001;
-tool_drive_id      = 0x033D;  /* disk chooser -> MAKEDISK: which drive     */
-tool_drive_id_size = 0x0001;
-scheme_handoff      = 0x033E; /* 2 bytes, magic then scheme index          */
-scheme_handoff_size = 0x0002;
-/* The code that performs the load, which cannot live in the image being
- * overwritten. */
-loader_stub      = 0x0340;
-loader_stub_size = 0x0040;
+INCLUDE lowmem.ld
 
 ASSERT(tool_density + tool_density_size <= tool_drive_id,
     "low memory: the density byte runs into the drive id")
@@ -67,8 +40,18 @@ ASSERT(tool_drive_id + tool_drive_id_size <= scheme_handoff,
     "low memory: the drive id runs into the scheme handoff")
 ASSERT(scheme_handoff + scheme_handoff_size <= loader_stub,
     "low memory: the scheme handoff runs into the loader stub")
-ASSERT(loader_stub + loader_stub_size <= 0x0400,
-    "low memory: the loader stub runs past $03FF")
+ASSERT(loader_stub + loader_stub_size <= hyppo_page,
+    "low memory: the loader stub runs into hyppo's page")
+ASSERT(hyppo_page + hyppo_page_size <= ORIGIN(ram) - 2,
+    "low memory: hyppo's page runs into the loaded image")
+ASSERT(hyppo_exec_page + hyppo_exec_page_size <= tool_density,
+    "low memory: the exec name page runs into the tool handoff bytes")
+/* The trap's own rule, so that moving either page fails the build rather than
+ * returning dos_errorcode_invalid_address at run time. */
+ASSERT((hyppo_page & 0xFF) == 0 && hyppo_page < 0x7F00,
+    "hyppo copies only into a page-aligned buffer below $7F00")
+ASSERT((hyppo_exec_page & 0xFF) == 0 && hyppo_exec_page < 0x7F00,
+    "hyppo copies only into a page-aligned buffer below $7F00")
 /* helper.S copies the routine into the reservation, so the routine must fit. */
 ASSERT(loadfile_routine_end - loadfile_routine <= loader_stub_size,
     "the loader stub routine outgrew its reservation in low memory")

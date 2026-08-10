@@ -84,14 +84,14 @@ mega65_dos_exechelper:
 	ldy #0
 .Lex_nameloop:
 	lda (hptr),y
-	sta NAME_BUF_EXEC,y
+	sta hyppo_exec_page,y
 	iny
 	cmp #0
 	bne .Lex_nameloop
 
 	;;  Call dos_setname()
-	ldy #mos16hi(NAME_BUF_EXEC)
-	ldx #mos16lo(NAME_BUF_EXEC)
+	ldy #mos16hi(hyppo_exec_page)
+	ldx #mos16lo(hyppo_exec_page)
 	lda #HYPPO_SETNAME		; dos_setname Hypervisor trap
 	sta HTRAP_DOS
 	clv			; wasted slot required after hyper trap
@@ -182,14 +182,14 @@ mega65_dos_attach:
 	ldy #0
 .Lat_nameloop:
 	lda (hptr),y
-	sta NAME_BUF_DOS,y
+	sta hyppo_page,y
 	iny
 	cmp #0
 	bne .Lat_nameloop
 
 	;;  Call dos_setname()
-	ldy #mos16hi(NAME_BUF_DOS)
-	ldx #mos16lo(NAME_BUF_DOS)
+	ldy #mos16hi(hyppo_page)
+	ldx #mos16lo(hyppo_page)
 	lda #HYPPO_SETNAME		; dos_setname Hypervisor trap
 	sta HTRAP_DOS
 	clv			; wasted slot required after hyper trap
@@ -248,14 +248,14 @@ mega65_dos_chdir:
 	ldy #0
 .Lcd_nameloop:
 	lda (hptr),y
-	sta NAME_BUF_DOS,y
+	sta hyppo_page,y
 	iny
 	cmp #0
 	bne .Lcd_nameloop
 
 	;;  Call dos_setname()
-	ldy #mos16hi(NAME_BUF_DOS)
-	ldx #mos16lo(NAME_BUF_DOS)
+	ldy #mos16hi(hyppo_page)
+	ldx #mos16lo(hyppo_page)
 	lda #HYPPO_SETNAME		; dos_setname Hypervisor trap
 	sta HTRAP_DOS
 	clv			; wasted slot required after hyper trap
@@ -322,7 +322,7 @@ mega65_dos_getprocdesc:
 ;;; filename in __rc2/__rc3; load_address b0=A, b1=X, b2=__rc4, b3=__rc5.
 ;;;
 ;;; The hypervisor needs the name in a page-aligned buffer in the bottom 32KB,
-;;; so it is copied to NAME_BUF_DOS (no screen lives there).
+;;; so it is copied to hyppo_page.
 	.section .text.read_file_from_sdcard,"ax",@progbits
 	.global read_file_from_sdcard
 read_file_from_sdcard:
@@ -339,14 +339,14 @@ read_file_from_sdcard:
 	ldy #0
 .Lrf_nameloop:
 	lda (hptr),y
-	sta NAME_BUF_DOS,y
+	sta hyppo_page,y
 	iny
 	cmp #0
 	bne .Lrf_nameloop
 
 	;;  Call dos_setname()
-	ldy #mos16hi(NAME_BUF_DOS)
-	ldx #mos16lo(NAME_BUF_DOS)
+	ldy #mos16hi(hyppo_page)
+	ldx #mos16lo(hyppo_page)
 	lda #HYPPO_SETNAME		; dos_setname Hypervisor trap
 	sta HTRAP_DOS
 	clv			; wasted slot required after hyper trap

@@ -14,11 +14,9 @@ unsigned char freeze_region_flags = 0;
 uint32_t freeze_slot_start_sector = 0;
 
 void request_freeze_region_list(void) {
-    /* The hypervisor will only deliver the list below 32KB, so it lands on the
-     * screen and is copied from there. */
     uint16_t i;
-    fetch_freeze_region_list_from_hypervisor(0x0400U);
-    lcopy(0x0400U, (uint32_t)&freeze_region_list, 256);
+    fetch_freeze_region_list_from_hypervisor(HYPPO_PAGE_MSB);
+    lcopy((Addr28)hyppo_page, (Addr28)&freeze_region_list, 256);
 
     freeze_region_flags = 0;
     for (i = 0; i < MAX_REGIONS; i++) {
