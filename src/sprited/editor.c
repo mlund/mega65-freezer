@@ -1005,6 +1005,9 @@ static void fetch_vic2_regs_from_slot(void) {
     }
 }
 
+/* The canvas shows the frozen program's sprite, never one of ours: an empty
+ * canvas means an empty slot, which is what an emulator started with -prg
+ * gives -- nothing was ever frozen for this to read. */
 static void fetch_sprite_data_from_slot(void) {
     // TODO: Sprites may exceed 512 bytes
     freeze_fetch_sector_partial(g_state.sprite_data_addr, SPRITE_BUFFER, g_state.sprite_size_bytes);
