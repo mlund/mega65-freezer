@@ -163,7 +163,7 @@ unsigned char next_cpu_speed(void) {
     return 0;
 }
 
-/* src/lowmem.ld puts .thumbnail above the region the linker allocates from, so
+/* src/link.ld puts .thumbnail above the region the linker allocates from, so
  * that this does not come out of the same budget as the code. */
 static __attribute__((section(".thumbnail"))) unsigned char thumbnail_buffer[4096];
 
@@ -1011,9 +1011,6 @@ int main(void) {
                     }
 
                     // Get start sectors of the source and destination slots
-                    // give visual feedback
-                    sdcard_visual_feedback(1);
-
                     freeze_slot_start_sector = read_freeze_slot_start_sector(0);
                     dest_freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 

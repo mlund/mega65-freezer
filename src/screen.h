@@ -15,10 +15,11 @@ constexpr uint16_t CHARSET_ADDRESS = 0x9000;
  * displayed colour only while that offset is zero.  Wider than 16 bits, so it
  * carries the whole expression it appears in into 32-bit arithmetic. */
 constexpr Addr28 COLOUR_RAM_ADDRESS = 0x1f800;
-// 16-bit text mode: 40 columns of two bytes, 25 rows.  No SCREEN_COLS here --
-// sprited/editor.c defines that as 80 for its own layout.
+// 40 columns of two bytes in the 16-bit text mode, 80 of one in the 8-bit.
 constexpr uint8_t SCREEN_ROW_BYTES = 80;
 constexpr uint8_t SCREEN_ROWS = 25;
+/* 40 where a cell is two bytes, 80 where it is one. */
+constexpr uint8_t SCREEN_COLS = SCREEN_ROW_BYTES / SCREEN_CELL_BYTES;
 constexpr uint16_t SCREEN_BYTES = SCREEN_ROW_BYTES * SCREEN_ROWS;
 
 constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;

@@ -125,8 +125,6 @@ static inline uint32_t sprite_data_addr(uint8_t sprite) {
 // #define REG_SPRBPMEN_0_3            (vic_registers[0x49] >> 4)
 // #define REG_SPRBPMEN_4_7            (vic_registers[0x4B] >> 4)
 // #define SPRITE_BITPLANE_ENABLE(n)	(((REG_SPRBPMEN_4_7) << 4 | REG_SPRBPMEN_0_3) & (1 << (n)))
-/* 80 one-byte cells across screen.h's 80-byte row; SCREEN_ROWS is its. */
-constexpr uint8_t SCREEN_COLS = 80;
 
 constexpr uint8_t SPRITE_MAX_COUNT = 8;
 /* A sprite colour, not chrome: it stands in for the frozen VIC's own value
@@ -136,8 +134,6 @@ constexpr uint8_t DEFAULT_BACK_COLOR = 11;
 
 constexpr uint8_t TRANS_CHARACTER = 230;
 constexpr uint8_t SOLID_BLOCK_CHARACTER = 224;
-/* The caret while a line is being typed: the same solid block conio drew. */
-constexpr uint8_t CARET_CHARACTER = 224;
 constexpr uint8_t SHAPE_PREVIEW_CHARACTER = 32;
 constexpr uint8_t SIDEBAR_COLUMN = 65;
 constexpr uint8_t SIDEBAR_WIDTH = SCREEN_COLS - SIDEBAR_COLUMN;
@@ -178,10 +174,6 @@ constexpr uint16_t JOY_DELAY = 10000U;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-/* The editor patches its own glyphs in, so it renders from this copy rather
- * than the character-ROM shadow screen.h names.  textout.c points CHARPTR at
- * it; the screen itself is screen.h's, at $B800. */
-constexpr uint32_t EDITOR_CHARSET_ADDRESS = 0x15000UL;
 constexpr uint32_t SPRITE_POINTER_TABLE = 0x16000UL;
 constexpr uint32_t SPRITE_BUFFER = 0x40000UL;
 
@@ -713,9 +705,9 @@ static void initialize(void) {
 
     // --- Charset setup ----
 
-    lcopy(ROM_CHARSET_SOURCE, EDITOR_CHARSET_ADDRESS, CHARSET_BYTES);
+    lcopy(ROM_CHARSET_SOURCE, EDITOR_CHARSET, CHARSET_BYTES);
     lcopy((Addr28)CHSET_TOOLBOX,
-        EDITOR_CHARSET_ADDRESS + TOOLBOX_CHARSET_BASE_IDX * GLYPH_BYTES,
+        EDITOR_CHARSET + TOOLBOX_CHARSET_BASE_IDX * GLYPH_BYTES,
         sizeof(CHSET_TOOLBOX));
 
     // --- Sprite setup ----
@@ -1307,7 +1299,7 @@ static void draw_side_bar_sprite_info(void) {
         textcolor(SchemeText);
         gotoxy(SIDEBAR_COLUMN, 2);
         cputs("SPRITE ");
-        cputdec(g_state.sprite_number, 0, 0);
+        cputdec(g_state.sprite_number);
         cputs(g_state.sprite_color_mode == SpriteColorModeMono
                 ? " MONO    "
                 : (g_state.sprite_color_mode == SpriteColorModeMulti ? " MULTI   " : " 16-COL"));
@@ -1333,9 +1325,9 @@ static void draw_coordinates(void) {
         gotoxy(SIDEBAR_COLUMN, SCREEN_ROWS - 1);
         textcolor(SchemeAddress);
         cputc('(');
-        cputdec(g_state.cursor_x, 0, 0);
+        cputdec(g_state.cursor_x);
         cputc(',');
-        cputdec(g_state.cursor_y, 0, 0);
+        cputdec(g_state.cursor_y);
         cputc(')');
     }
 }
@@ -1365,7 +1357,6 @@ static bool answered_yes(const uint8_t* answer) {
 }
 
 static void ask(const char* question, uint8_t* into, uint8_t max_length) {
-    gotoy(SCREEN_ROWS - 1);
     revers(1);
     textcolor(SchemeBar);
     cputncxy(0, SCREEN_ROWS - 1, SCREEN_COLS, ' ');
@@ -1381,7 +1372,7 @@ static void ask(const char* question, uint8_t* into, uint8_t max_length) {
     for (;;) {
         cputncxy(answer_x, SCREEN_ROWS - 1, (uint8_t)(max_length + 1), ' ');
         cputsxy(answer_x, SCREEN_ROWS - 1, (const char*)into);
-        cputc(CARET_CHARACTER);
+        cputc(SOLID_BLOCK_CHARACTER);
         if (line_edit((char*)into, (uint8_t)(max_length + 1), &length, cgetc())) {
             break;
         }
@@ -1859,7 +1850,7 @@ static void main_loop(void) {
                 const unsigned char c_bank_reg = reg_peek(REG_SPRPALSEL);
                 const unsigned char c_spr_pal_bank = (c_bank_reg & 0xC) >> 2;
                 gotoxy(1, 1);
-                cputdec(c_spr_pal_bank, 0, 4);
+                cputdec(c_spr_pal_bank);
                 reg_poke(REG_SPRPALSEL,
                     (uint8_t)((c_bank_reg & ~0xC) | (((c_spr_pal_bank + 1) % 4) << 2)));
                 bordercolor(SchemeBorder);

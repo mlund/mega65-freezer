@@ -38,8 +38,11 @@ def main() -> int:
     args = parser.parse_args()
 
     failures = []
+    checked = 0
 
     def check(name, got, want):
+        nonlocal checked
+        checked += 1
         if got != want:
             failures.append(f"{name}: got {got}, wanted {want}")
 
@@ -109,7 +112,7 @@ def main() -> int:
     if failures:
         print(f"{len(failures)} checks failed")
         return 1
-    print("13 checks passed")
+    print(f"{checked} checks passed")
     return 0
 
 

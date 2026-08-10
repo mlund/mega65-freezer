@@ -3,7 +3,7 @@
 # $0801-$9000 span as the code but never reaches the file.
 #
 # Placement is what matters, not size.  The same array above the top costs
-# nothing, which is what src/memory.ld is for -- a 4KB thumbnail buffer up
+# nothing, which is what src/link.ld is for -- a 4KB thumbnail buffer up
 # there is free, and half a kilobyte down here is half a kilobyte the C cannot
 # have.
 #
@@ -42,6 +42,6 @@ if(offenders)
     message(FATAL_ERROR
         "${name}: these sit in the region the C code shares and are not listed "
         "as deliberate:\n    ${report}\n"
-        "Place them in src/memory.ld, or add the name to LOWMEM_ALLOW in "
+        "Place them in src/link.ld, or add the name to LOWMEM_ALLOW in "
         "src/CMakeLists.txt to say they belong here.")
 endif()
