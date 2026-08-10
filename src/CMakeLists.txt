@@ -110,6 +110,36 @@ add_m65(ROMLOAD  romload/main.c romload/chooser.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c)
 add_m65(MEGAINFO megainfo/main.c megainfo/info.c)
 
+# Card payloads: not linked into any tool, but built here because they are
+# loaded off the card at run time and staged from this directory.
+add_custom_target(stage-iomap ALL
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/IOMAP.M65
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/monitor/iomap.bin
+            ${CMAKE_CURRENT_BINARY_DIR}/IOMAP.M65
+    COMMENT "Staging IOMAP.M65")
+
+# The frames drawn around a slot's thumbnail, picked by machine type.
+# Generated rather than committed: the generator is plain Python, so unlike
+# IOMAP.M65 there is nothing to go missing.
+if(Python3_FOUND)
+    set(THUMB_FRAMES)
+    foreach(machine m65 c65 c64)
+        string(TOUPPER ${machine} MACHINE)
+        set(frame ${CMAKE_CURRENT_BINARY_DIR}/${MACHINE}THUMB.M65)
+        add_custom_command(OUTPUT ${frame}
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_SOURCE_DIR}/tools/gen_thumbnail_frames.py
+                    ${CMAKE_SOURCE_DIR}/assets/thumbnail-surround-${machine}.png
+                    --xoff 5 --yoff 1 -o ${frame}
+            DEPENDS ${CMAKE_SOURCE_DIR}/assets/thumbnail-surround-${machine}.png
+                    ${CMAKE_SOURCE_DIR}/tools/gen_thumbnail_frames.py
+            COMMENT "Generating ${MACHINE}THUMB.M65")
+        list(APPEND THUMB_FRAMES ${frame})
+    endforeach()
+    add_custom_target(thumbnail-frames ALL DEPENDS ${THUMB_FRAMES})
+endif()
+
 # Bytes per character cell, and so the DMA destination step for both planes.
 # SCREEN_ROW_BYTES is 80 in every tool and means two different things; this is
 # the number that tells them apart.  See src/screen.h.
