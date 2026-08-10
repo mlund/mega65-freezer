@@ -7,9 +7,11 @@
 #include <stdint.h>
 
 extern unsigned char sdhc_card;
-#define SECTOR_SIZE 512
-extern uint8_t sector_buffer[SECTOR_SIZE];
-#define clear_sector_buffer() lfill((uint32_t)sector_buffer, 0, SECTOR_SIZE)
+/* The card's sector.  A FAT sector and a disk image's sector are separate
+ * ideas that happen to share the word, so the prefix says which is meant. */
+constexpr uint16_t SD_SECTOR_SIZE = 512;
+extern uint8_t sector_buffer[SD_SECTOR_SIZE];
+#define clear_sector_buffer() lfill((uint32_t)sector_buffer, 0, SD_SECTOR_SIZE)
 
 extern uint8_t hal_border_flicker;
 

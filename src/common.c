@@ -8,7 +8,7 @@
 #include <mega65.h>
 #include <string.h>
 
-uint8_t sector_buffer[512];
+uint8_t sector_buffer[SD_SECTOR_SIZE];
 uint16_t slot_number = 0;
 enum Mega65Rom mega65_rom_type = Mega65RomUnknown;
 /* 20, not 12: the OpenROM probe copies 16 bytes to name + 4 and then reads

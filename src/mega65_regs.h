@@ -101,14 +101,34 @@ constexpr uint32_t M65_MODEL_ID = 0xffd3629; // UARTMISC:M65MODEL, the board rev
 constexpr uint32_t RTC_SECONDS = 0xffd7110;  // RTC:RTCSEC; minutes, hours, day,
                                              // month and year follow in order
 
-// SD controller.
+// SD controller.  SD:CMDANDSTAT takes a command when written and reports
+// status when read; bit and command names from mega65-core's iomap.txt and the
+// $D680 write decode in sdcardio.vhdl.
 #define SD_COMMAND REG8(0xD680)
 #define SD_STATUS REG8(0xD680) // same register; reads status
-constexpr uint8_t SD_STATUS_SDHC = 0x10;
+
+constexpr uint8_t SD_STATUS_SDIO_BUSY = 0b00000001;
+constexpr uint8_t SD_STATUS_CARD_BUSY = 0b00000010;
+constexpr uint8_t SD_STATUS_BUSY = 0b00000011; // either engine still working
+constexpr uint8_t SD_STATUS_SDHC = 0b00010000;
+constexpr uint8_t SD_STATUS_ERROR = 0b01000000; // reported in bit 6 so V can test it
+/* Busy, still in reset, or in error -- all of which must be clear before a
+ * command's result means anything. */
+constexpr uint8_t SD_STATUS_UNSETTLED = 0b01100111;
+
+constexpr uint8_t SD_CMD_RESET_BEGIN = 0x00;
+constexpr uint8_t SD_CMD_RESET_END = 0x01;
+constexpr uint8_t SD_CMD_READ = 0x02;
+constexpr uint8_t SD_CMD_WRITE = 0x03;
+constexpr uint8_t SD_CMD_WRITE_MULTI_FIRST = 0x04;
+constexpr uint8_t SD_CMD_WRITE_MULTI_NEXT = 0x05;
+constexpr uint8_t SD_CMD_WRITE_MULTI_LAST = 0x06;
+constexpr uint8_t SD_CMD_SDHC_MODE = 0x41;
+constexpr uint8_t SD_CMD_WRITE_GATE = 0x57; // opens a window of about 1ms
+
 // SD:SDSECTOR0-3, low byte first.  Written a byte at a time rather than as one
 // 32-bit store, so the order the controller sees is the order written here.
-#define SD_SECTOR(byte) REG8(0xD681 + (byte))
-constexpr uint8_t SD_STATUS_BUSY = 0x03; // either engine still working
+#define SD_SECTOR_ADDR(byte) REG8(0xD681 + (byte))
 
 // $D689 carries several unrelated signals; only the buffer select is used
 // here.  SD:BUFSEL, 1 = the SD card's sector buffer, 0 = the F011/FDC's.
@@ -156,6 +176,13 @@ constexpr uint8_t VIC4_CHRXSCL_80_COLUMN = 0x78;
 // $00/$01 CPU port: all lines driven, BASIC banked out, KERNAL and I/O kept.
 constexpr uint8_t CPU_PORT_DDR_ALL_OUTPUTS = 0x3F;
 constexpr uint8_t CPU_PORT_KERNAL_AND_IO = 0x36;
+
+// The SDK names the two registers; these are the values.  CPU_PORTDDR is a
+// direction register for every value but two: the CPU intercepts $40 and $41
+// and they set the speed instead, never reaching the DDR (mega65-core,
+// src/vhdl/gs4510.vhdl:3301).
+constexpr uint8_t CPU_PORT_FORCE_FAST = 0x41;
+constexpr uint8_t CPU_PORT_FORCE_FAST_OFF = 0x40;
 
 // VIC bank select lives in the low two bits of CIA2 port A, inverted, so %01
 // selects $8000-$BFFF.

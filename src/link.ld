@@ -32,7 +32,7 @@ SECTIONS {
 ASSERT(ADDR(.entrytramp) == 0x080d,
     "entry trampoline moved: loader entry is fixed, see PROGRAM_ENTRY in helper.h")
 
-INCLUDE lowmem.ld
+INCLUDE memory.ld
 
 ASSERT(tool_density + tool_density_size <= tool_drive_id,
     "low memory: the density byte runs into the drive id")
@@ -56,20 +56,10 @@ ASSERT((hyppo_exec_page & 0xFF) == 0 && hyppo_exec_page < 0x7F00,
 ASSERT(loadfile_routine_end - loadfile_routine <= loader_stub_size,
     "the loader stub routine outgrew its reservation in low memory")
 
-/* Above the region the linker allocates from, which stops at $9000 so that a
- * tool cannot grow into the character ROM shadow.  The shadow is what the VIC
- * reads there -- never the RAM beneath it -- and $A000-$B7FF is RAM too under
- * the $01 = $36 every tool sets, so this whole span is free for a buffer the
- * VIC is not going to look at.  Being under 64KB, it stays reachable with an
- * ordinary pointer; the thumbnail is picked over a byte at a time, so putting
- * it above the 64KB line would cost a DMA per access.
- *
- * Not in .bss, because .bss shares the $0801-$9000 region with the code: 4KB
- * there is 4KB the C cannot use, even though it never reaches the .M65 file. */
-thumbnail_buffer      = 0x9000;
-thumbnail_buffer_size = 0x1000;
 
-ASSERT(thumbnail_buffer + thumbnail_buffer_size <= 0xB800,
+ASSERT(thumbnail_buffer + thumbnail_buffer_size <= sd_verify_buffer,
+    "high memory: the thumbnail buffer runs into the verify buffer")
+ASSERT(sd_verify_buffer + sd_verify_buffer_size <= 0xB800,
     "the thumbnail buffer runs into the screen at $B800")
 
 __stack = 0xd000;

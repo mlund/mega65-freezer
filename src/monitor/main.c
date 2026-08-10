@@ -29,8 +29,8 @@ int main(void) {
     // XXX add missing C65 AND M65 peripherals
     // C65 UART, ethernet etc
 
-    POKE(0x00, CPU_PORT_DDR_ALL_OUTPUTS);
-    POKE(0x01, CPU_PORT_KERNAL_AND_IO);
+    CPU_PORTDDR = CPU_PORT_DDR_ALL_OUTPUTS;
+    CPU_PORT = CPU_PORT_KERNAL_AND_IO;
 
     // No decimal mode!
     __asm__ volatile("cld");

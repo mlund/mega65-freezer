@@ -22,7 +22,7 @@ short file_count = 0;
 short selection_number = 0;
 short display_offset = 0;
 
-unsigned char buffer[512];
+unsigned char buffer[SD_SECTOR_SIZE];
 
 char reading_disk_list_message[] = "SCANNING DIRECTORY ...";
 
@@ -369,8 +369,10 @@ unsigned char freeze_load_romarea(void) {
                                                     // 256 sectors to load
                             // Write each sector to frozen memory
                             VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
-                            lcopy(0x40000L + 512L * (long)s, (long)buffer, 512);
-                            freeze_store_sector(0x20000L + ((long)s) * 512L, buffer);
+                            lcopy(0x40000L + (long)SD_SECTOR_SIZE * (long)s,
+                                (long)buffer,
+                                SD_SECTOR_SIZE);
+                            freeze_store_sector(0x20000L + ((long)s) * SD_SECTOR_SIZE, buffer);
                         }
                         VICIV.bordercol = SchemeBorder;
 
@@ -397,8 +399,11 @@ unsigned char freeze_load_romarea(void) {
                         if (freeze_region_flags & FreezeRegionHasChargen) {
                             // only put that into the slot, if HYPPO supports it!
                             for (uint16_t i = 0; i < 8; i++) {
-                                lcopy(0x40000L + 512L * i, (long)sector_buffer, 512);
-                                freeze_store_sector(CHARGEN_ADDRESS + 512L * i, NULL);
+                                lcopy(0x40000L + (long)SD_SECTOR_SIZE * i,
+                                    (long)sector_buffer,
+                                    SD_SECTOR_SIZE);
+                                freeze_store_sector(
+                                    CHARGEN_ADDRESS + (long)SD_SECTOR_SIZE * i, NULL);
                             }
                         }
 

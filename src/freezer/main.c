@@ -595,23 +595,23 @@ enum : uint8_t {
     ChargenNoCheck = 0x80, // don't execute check, always fix
 };
 void fix_chargen_area(unsigned char flags) {
-    uint16_t i = 512; // needs to be 512 for nocheck to trigger!
+    uint16_t i = SD_SECTOR_SIZE; // needs to be SD_SECTOR_SIZE for nocheck to trigger!
     long charset_start;
 
     if (!(flags & ChargenNoCheck)) {
         if (freeze_fetch_sector(CHARGEN_ADDRESS, NULL) == FreezerOk) {
             // check if everything is zero
-            for (i = 0; i < 512 && !sector_buffer[i]; i++) {
+            for (i = 0; i < SD_SECTOR_SIZE && !sector_buffer[i]; i++) {
                 ;
             }
         } else {
             // error while reading sector (old core?)
-            i = (flags & ChargenForce) ? 512 : 0;
+            i = (flags & ChargenForce) ? SD_SECTOR_SIZE : 0;
         }
     }
 
     // if first chargen sector was zero...
-    if (i == 512) {
+    if (i == SD_SECTOR_SIZE) {
         charset_start = -1;
         // try to load DEFAULT_CHARSET or MEGA65.ROM
         if (!read_file_from_sdcard(DEFAULT_CHARSET, 0x40000L)) {
@@ -629,8 +629,10 @@ void fix_chargen_area(unsigned char flags) {
             // should we also fix the slot?
             if (flags & ChargenFixSlot) {
                 for (i = 0; i < 8; i++) {
-                    lcopy(charset_start + 512L * i, (long)sector_buffer, 512);
-                    freeze_store_sector(CHARGEN_ADDRESS + 512L * i, NULL);
+                    lcopy(charset_start + (long)SD_SECTOR_SIZE * i,
+                        (long)sector_buffer,
+                        SD_SECTOR_SIZE);
+                    freeze_store_sector(CHARGEN_ADDRESS + (long)SD_SECTOR_SIZE * i, NULL);
                 }
             }
         } else {
@@ -707,8 +709,8 @@ int main(void) {
     }
 
     // Bank out BASIC ROM, leave KERNAL and IO in
-    POKE(0x00, 0x3F);
-    POKE(0x01, 0x36);
+    CPU_PORTDDR = CPU_PORT_DDR_ALL_OUTPUTS;
+    CPU_PORT = CPU_PORT_KERNAL_AND_IO;
 
     // Disable Cartridge ROM
     lpoke(0xFFD37FDL, lpeek(0xFFD37FDL) | 0xC0); // Ensure forced exrom & game are high=disabled
@@ -1022,11 +1024,11 @@ int main(void) {
                         VICIV.bordercol = SchemeAccent;
                         for (uint32_t j = 0; j < 128; j++) {
                             sdcard_readsector(freeze_slot_start_sector + i + j);
-                            lcopy((uint32_t)sector_buffer, 0x40000U + (j << 9), 512);
+                            lcopy((uint32_t)sector_buffer, 0x40000U + (j << 9), SD_SECTOR_SIZE);
                         }
                         VICIV.bordercol = SchemeBorderBusy;
                         for (uint32_t j = 0; j < 128; j++) {
-                            lcopy(0x40000U + (j << 9), (uint32_t)sector_buffer, 512);
+                            lcopy(0x40000U + (j << 9), (uint32_t)sector_buffer, SD_SECTOR_SIZE);
 #ifdef USE_MULTIBLOCK_WRITE
                             if (!j)
                                 sdcard_writesector(dest_freeze_slot_start_sector + i + j, 1);

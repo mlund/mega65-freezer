@@ -321,7 +321,7 @@ static void do_make_disk_image(bool is_d65, uint8_t drive_id) {
 
     // Actually create the file
     file_sector =
-        fat32_create_contiguous_file(filename, disk_total_sectors(geom) * (uint32_t)SECTOR_SIZE);
+        fat32_create_contiguous_file(filename, disk_total_sectors(geom) * (uint32_t)SD_SECTOR_SIZE);
     if (!file_sector) {
         // Error making file
         draw_box(10, 8, 30, 14, SchemeError, 1);
@@ -368,8 +368,8 @@ int main(void) {
     // C65 UART, ethernet etc
 
     // Bank out BASIC ROM, leave KERNAL and IO in
-    POKE(0x00, 0x3F);
-    POKE(0x01, 0x36);
+    CPU_PORTDDR = CPU_PORT_DDR_ALL_OUTPUTS;
+    CPU_PORT = CPU_PORT_KERNAL_AND_IO;
 
     // No decimal mode!
     __asm__ volatile("cld");

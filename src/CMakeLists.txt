@@ -97,7 +97,7 @@ function(add_m65 name)
     if(LINK_LIBC)
         target_link_libraries(${name} mega65libc)
     endif()
-    # -L so that link.ld's INCLUDE of lowmem.ld resolves from the build
+    # -L so that link.ld's INCLUDE of memory.ld resolves from the build
     # directory.
     target_link_options(${name} PRIVATE -T ${CMAKE_CURRENT_SOURCE_DIR}/link.ld
         -Wl,-L,${CMAKE_CURRENT_SOURCE_DIR})
@@ -178,11 +178,11 @@ if(LINK_LIBC)
     target_compile_definitions(test_freezeslot PRIVATE SCREEN_CELL_BYTES=2)
     target_link_libraries(test_freezeslot mega65libc)
     # The c64 platform script reserves less zero page than link.ld does, so the
-    # project-wide -mlto-zp does not fit here.  lowmem.ld comes along because
+    # project-wide -mlto-zp does not fit here.  memory.ld comes along because
     # slot.c names hyppo's page; as an input file rather than -T, which would
     # replace the platform's script instead of adding to it.
     target_link_options(test_freezeslot PRIVATE -mlto-zp=16
-        ${CMAKE_CURRENT_SOURCE_DIR}/lowmem.ld)
+        ${CMAKE_CURRENT_SOURCE_DIR}/memory.ld)
     set_target_properties(test_freezeslot PROPERTIES OUTPUT_NAME test_freezeslot.prg)
 
     # Decimal conversion has no caller in the seven tools -- they format hex and

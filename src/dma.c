@@ -119,6 +119,5 @@ void m65_io_enable(void) {
     // Gate C65 IO enable
     VICIV.key = VIC4_KNOCK_1;
     VICIV.key = VIC4_KNOCK_2;
-    // Force to full speed
-    POKE(0, 65);
+    CPU_PORTDDR = CPU_PORT_FORCE_FAST;
 }

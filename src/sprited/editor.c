@@ -208,9 +208,6 @@ constexpr uint8_t SPRITE_BLOCK_BYTES = 64;
 /* Bit 7 of SPRPTR2: pointers are 16-bit words rather than single bytes. */
 constexpr uint8_t SPRITE_POINTERS_16BIT = 0x80;
 
-/* $00 is the CPU port: 40MHz, VIC-IV I/O and 80 columns in one write. */
-constexpr uint8_t CPU_PORT_FAST = 65;
-
 /* The ROM character set, as the VIC-IV sees it in the upper memory map. */
 constexpr uint32_t ROM_CHARSET_SOURCE = 0x2D800;
 constexpr uint16_t CHARSET_BYTES = 2048;
@@ -701,7 +698,7 @@ static void set_sprite_pointer(uint8_t sprite, uint32_t data_address) {
 }
 
 static void initialize(void) {
-    POKE(0, CPU_PORT_FAST);
+    CPU_PORTDDR = CPU_PORT_FORCE_FAST;
 
     // --- Freezer slot setup
 

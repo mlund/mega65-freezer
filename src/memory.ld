@@ -1,4 +1,4 @@
-/* Low memory the seven tools share.
+/* Memory this project reserves for itself, outside what the linker allocates.
  *
  * Only what must outlive the program holding it: mega65_dos_exechelper() loads
  * the next tool over this one, so a value handed across that boundary cannot
@@ -45,3 +45,20 @@ hyppo_page_size = 0x0100;
  * the bottom of it. */
 hyppo_exec_page      = 0x0100;
 hyppo_exec_page_size = 0x0100;
+
+/* Above the region the linker allocates from, which stops at $9000 so that a
+ * tool cannot grow into the character ROM shadow.  The shadow is what the VIC
+ * reads there -- never the RAM beneath it -- and $A000-$B7FF is RAM too under
+ * the $01 = $36 every tool sets, so this whole span is free for a buffer the
+ * VIC is not going to look at.  Being under 64KB, it stays reachable with an
+ * ordinary pointer, which is what lets both of these be plain arrays.
+ *
+ * Not in .bss, because .bss shares the $0801-$9000 region with the code: a
+ * byte there is a byte the C cannot use, even though it never reaches the .M65
+ * file. */
+thumbnail_buffer      = 0x9000;
+thumbnail_buffer_size = 0x1000;
+/* Read back into after a write, to check the card took it.  Every tool links
+ * the SD code, so this is 512 bytes off all seven budgets. */
+sd_verify_buffer      = 0xA000;
+sd_verify_buffer_size = 0x0200;

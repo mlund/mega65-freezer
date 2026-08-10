@@ -68,7 +68,7 @@ uint32_t mon_address = 0;
 
 char output_buffer[80];
 
-unsigned char mon_sector[512];
+unsigned char mon_sector[SD_SECTOR_SIZE];
 uint32_t mon_sector_num = 0xffffffffUL;
 
 /* Frozen CPU state that M and D need in order to talk about the same addresses
@@ -118,7 +118,7 @@ static bool mon_sector_dirty = false;
 
 static void flush_sector(void) {
     if (mon_sector_dirty) {
-        lcopy((long)mon_sector, (long)sector_buffer, 512);
+        lcopy((long)mon_sector, (long)sector_buffer, SD_SECTOR_SIZE);
         sdcard_writesector(freeze_slot_start_sector + mon_sector_num, 0);
         mon_sector_dirty = false;
     }
@@ -132,7 +132,7 @@ static void cache_sector(uint32_t freeze_slot_offset) {
         flush_sector();
         mon_sector_num = (freeze_slot_offset >> 9);
         sdcard_readsector(freeze_slot_start_sector + mon_sector_num);
-        lcopy((long)sector_buffer, (long)mon_sector, 512);
+        lcopy((long)sector_buffer, (long)mon_sector, SD_SECTOR_SIZE);
     }
 }
 
@@ -397,7 +397,7 @@ void set_memory(void) {
         }
 
         // Write changes back
-        lcopy((long)mon_sector, (long)sector_buffer, 512);
+        lcopy((long)mon_sector, (long)sector_buffer, SD_SECTOR_SIZE);
         sdcard_writesector(freeze_slot_start_sector + mon_sector_num, 0);
 
         // After writing memory values, redisplay the modified region

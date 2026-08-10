@@ -116,12 +116,12 @@ static uint32_t fat32_allocate_cluster(uint32_t cluster) {
     // Find free cluster
     for (fat_sector_num = 0; fat_sector_num < (fat2_sector - fat1_sector); fat_sector_num++) {
         sdcard_readsector(fat1_sector + fat_sector_num);
-        for (i = 0; i < 512; i += 4) {
+        for (i = 0; i < SD_SECTOR_SIZE; i += 4) {
             if (*(uint32_t*)&sector_buffer[i] == 0) {
                 break;
             }
         }
-        if (i < 512) {
+        if (i < SD_SECTOR_SIZE) {
             // Found new free cluster, so place end-of-chain marker on it
             new_cluster = fat_sector_num * 128 + (i >> 2);
             *(uint32_t*)&sector_buffer[i] = 0x0fffffff;
@@ -187,7 +187,7 @@ uint32_t fat32_create_contiguous_file(char* name, uint32_t size) {
             root_dir_sector + hw_mul32(dir_cluster - 2, sectors_per_cluster);
         for (sn = 0; sn < sectors_per_cluster; sn++) {
             sdcard_readsector(dir_sector + sn);
-            for (offset = 0; offset < 512; offset += 32) {
+            for (offset = 0; offset < SD_SECTOR_SIZE; offset += 32) {
                 fat_name_from_entry(&sector_buffer[offset], message);
                 if (!strcmp(message, name)) {
                     // ERROR: Name already exists
@@ -248,12 +248,12 @@ uint32_t fat32_create_contiguous_file(char* name, uint32_t size) {
         sdcard_readsector(fat1_sector + fat_sector_num);
 
         // Skip any FAT sectors with allocated clusters
-        for (j = 0; j < 512; j++) {
+        for (j = 0; j < SD_SECTOR_SIZE; j++) {
             if (sector_buffer[j]) {
                 break;
             }
         }
-        if (j != 512) {
+        if (j != SD_SECTOR_SIZE) {
             // Reset count of contiguous clusters
             contiguous_clusters = 0;
             continue;
@@ -282,7 +282,7 @@ uint32_t fat32_create_contiguous_file(char* name, uint32_t size) {
         // Entries past the end of the chain must read as free, and the buffer
         // still holds the previous sector.
         clear_sector_buffer();
-        for (offset = 0; offset < 512; offset += 4) {
+        for (offset = 0; offset < SD_SECTOR_SIZE; offset += 4) {
             const uint16_t entry = (uint16_t)((k << 7) + (offset >> 2));
             if (entry < clusters) {
                 *(uint32_t*)&sector_buffer[offset] =

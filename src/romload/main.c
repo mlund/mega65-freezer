@@ -39,8 +39,8 @@ int main(void) {
     // C65 UART, ethernet etc
 
     // Bank out BASIC ROM, leave KERNAL and IO in
-    POKE(0x00, 0x3F);
-    POKE(0x01, 0x36);
+    CPU_PORTDDR = CPU_PORT_DDR_ALL_OUTPUTS;
+    CPU_PORT = CPU_PORT_KERNAL_AND_IO;
 
     // No decimal mode!
     __asm__ volatile("cld");

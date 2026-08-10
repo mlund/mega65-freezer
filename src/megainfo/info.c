@@ -42,7 +42,7 @@ static uint8_t is_ntsc = 0;
 static uint8_t has_rtc = 0;
 static uint8_t m65model;
 static uint8_t m65submodel;
-static uint8_t code_buffer[512];
+static uint8_t code_buffer[SD_SECTOR_SIZE];
 static uint8_t ymd[3];
 
 /* Selects the inverse glyph -- bit 7 of the screen code -- not the colour-RAM
@@ -250,10 +250,10 @@ unsigned char format_util_version(long addr, const unsigned char* date) {
     unsigned char result = 0;
     unsigned char p;
 
-    lcopy(addr, (long)code_buffer, 512);
+    lcopy(addr, (long)code_buffer, SD_SECTOR_SIZE);
 
     strncpy(buffer, "UNKNOWN VERSION", 64);
-    for (i = 0; i < 512; i++) {
+    for (i = 0; i < SD_SECTOR_SIZE; i++) {
         if (code_buffer[i] == 0x56 && code_buffer[i + 1] == 0x3a && code_buffer[i + 2] == 0x32 &&
             code_buffer[i + 3] == 0x30) {
             i += 4; // skip v:20
@@ -318,8 +318,8 @@ unsigned char format_hickup_version(long addr, const unsigned char* date) {
     unsigned char temp;
 
     for (p = 0; p < 64 && !finished; p++) {
-        lcopy(addr + 512l * p, (long)code_buffer, 512);
-        for (i = 0; i < 512; i++) {
+        lcopy(addr + (long)SD_SECTOR_SIZE * p, (long)code_buffer, SD_SECTOR_SIZE);
+        for (i = 0; i < SD_SECTOR_SIZE; i++) {
             // looking for needle in the haystack
             if (cmp_idx < NEEDLE_LEN) {
                 if (needle[cmp_idx] == code_buffer[i]) {

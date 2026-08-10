@@ -72,7 +72,7 @@ enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer) {
     sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
     if (buffer != NULL) {
-        lcopy((long)&sector_buffer[offset], (long)buffer, 512 - offset);
+        lcopy((long)&sector_buffer[offset], (long)buffer, SD_SECTOR_SIZE - offset);
     }
 
     return FreezerOk;
@@ -87,7 +87,7 @@ enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint
         return FreezerNotFrozen;
     }
 
-    if (count > 512) {
+    if (count > SD_SECTOR_SIZE) {
         TRACE("count exceeds one sector");
         return FreezerCountTooLarge;
     }
@@ -121,7 +121,7 @@ enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
     if (buffer != NULL) {
         lcopy((long)buffer,
             (long)&sector_buffer[offset],
-            512 - offset); // don't write behind the buffer!
+            SD_SECTOR_SIZE - offset); // don't write behind the buffer!
     }
 
     sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
@@ -145,15 +145,15 @@ enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint1
     /* The run has to end inside the sector, not merely fit in one: the copy
      * below is into sector_buffer at `offset`, so a run that starts late and
      * runs long writes past it.  Tested as two comparisons rather than
-     * `offset + count > 512` because int is 16 bits here and that sum can
+     * `offset + count > SD_SECTOR_SIZE` because int is 16 bits here and that sum can
      * overflow it. */
-    if (count > 512 || offset > (uint16_t)(512 - count)) {
+    if (count > SD_SECTOR_SIZE || offset > (uint16_t)(SD_SECTOR_SIZE - count)) {
         TRACE("run crosses the end of the sector");
         return FreezerCountTooLarge;
     }
 
     /* A partial store has to read what it is not replacing. */
-    if (count != 512 || offset != 0) {
+    if (count != SD_SECTOR_SIZE || offset != 0) {
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
     }
 
