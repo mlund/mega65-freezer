@@ -167,6 +167,11 @@ unsigned char next_cpu_speed(void) {
  * that this does not come out of the same budget as the code. */
 static __attribute__((section(".thumbnail"))) unsigned char thumbnail_buffer[4096];
 
+/* White under xemu, which has no thumbnail generator: $FFD4000 reads as $FF,
+ * freezes that way, and $FF is the palette's brightest entry.  Black instead
+ * means nothing was frozen -- zero maps to the near-black entry just above the
+ * sixteen.  Neither says anything about this code; on hardware it is the
+ * frozen screen. */
 void draw_thumbnail(void) {
     // Take the 4K of thumbnail data and render it to the display
     // area at $50000.
