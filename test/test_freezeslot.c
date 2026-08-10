@@ -159,6 +159,15 @@ int main(void) {
         check(9, sector_buffer[i], snapshot[i]);
     }
 
+    /* 10: a run that would end past the sector is refused, not clamped and not
+     * written.  The copy lands in sector_buffer at the field's offset, so a run
+     * that starts late and runs long would write past it -- and the caller that
+     * could do it passes a runtime address.  $35 into the sector plus 480 bytes
+     * is over the end. */
+    check(10,
+        freeze_store_sector_partial(SCRATCH, (uint32_t)snapshot, 480),
+        FreezerCountTooLarge);
+
     debug_msg("PASS");
     finish(0);
 }

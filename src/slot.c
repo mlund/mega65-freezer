@@ -141,12 +141,18 @@ enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint1
         return FreezerNotFrozen;
     }
 
-    if (count > 512) {
-        TRACE("count exceeds one sector");
-        return FreezerCountTooLarge;
-    }
     offset = freeze_slot_offset & 0x1ff;
     freeze_slot_offset = freeze_slot_offset >> 9L;
+
+    /* The run has to end inside the sector, not merely fit in one: the copy
+     * below is into sector_buffer at `offset`, so a run that starts late and
+     * runs long writes past it.  Tested as two comparisons rather than
+     * `offset + count > 512` because int is 16 bits here and that sum can
+     * overflow it. */
+    if (count > 512 || offset > (uint16_t)(512 - count)) {
+        TRACE("run crosses the end of the sector");
+        return FreezerCountTooLarge;
+    }
 
     /* A partial store has to read what it is not replacing. */
     if (count != 512 || offset != 0) {

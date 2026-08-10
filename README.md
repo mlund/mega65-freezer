@@ -90,12 +90,12 @@ Against the binaries shipped on the MEGA65 SD card:
 | tool       |   cc65 |  llvm |    % |
 |------------|-------:|------:|-----:|
 | `AUDIOMIX` |  23161 |  8242 |  -64 |
-| `MAKEDISK` |  22307 |  9857 |  -56 |
+| `MAKEDISK` |  22307 |  9871 |  -56 |
 | `MEGAINFO` |  21966 | 10364 |  -53 |
-| `ROMLOAD`  |  17378 |  8712 |  -50 |
+| `ROMLOAD`  |  17378 |  8731 |  -50 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
-| `SPRITED`  |  31016 | 16842 |  -46 |
-| `FREEZER`  |  24700 | 16920 |  -31 |
+| `SPRITED`  |  31016 | 16866 |  -46 |
+| `FREEZER`  |  24700 | 16912 |  -32 |
 
 `MONITOR` alone is measured _before_ feature additions, at the point it did the
 same job as its cc65 counterpart: its disassembler, assembler and bit editor
@@ -124,6 +124,14 @@ Defects found in original:
   touched, and `$D07A.5` -- NOBUGCOMPAT, deprecated in the core -- was set
   instead and never cleared again, so it survived into the resumed program.
   `freeze_romload.c:402-405`.
+- Rewriting a sector that would not verify never gave up. The retry loop is
+  written `while (tries < 10)` but nothing increments `tries`, so a card that
+  kept failing the read-back was rewritten for ever. The read path next to it
+  counts its attempts correctly. `fdisk_hal_mega65.c:236`.
+- A partial sector store checked that the run fitted in a sector but not that
+  it *ended* in one, so a run starting late and running long wrote past the
+  512-byte buffer. The sprite editor is the caller that could: it passes a
+  runtime address. `frozen_memory.c:237`.
 - `report_unmapped()` called itself. Every unmapped address reached through D,
   F, H, C, T or B recursed until the stack died. Eight call sites. Every
   command had been exercised on mapped memory.

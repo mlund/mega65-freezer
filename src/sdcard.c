@@ -272,6 +272,9 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         if (hal_border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
         }
+        /* Without this the bound is never approached and a sector that will not
+         * verify is rewritten for ever. */
+        tries++;
     }
 }
 
