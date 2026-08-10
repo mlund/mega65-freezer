@@ -62,5 +62,32 @@ STEPS = [
     ("expect_row", 10, SOLID * 15),
 ]
 
+# The help screen is a full page of text drawn in one go, so it is the densest
+# check available on the drawing code -- and the only one that exercises the
+# credits, which share the page.  It sits behind HELP, which the synthetic
+# keyboard cannot send, so it is reachable only in a build that accepts F1 in
+# its place: -DHARNESS_KEYS=ON, which CMake then signals with this flag.
+HELP_STEPS = [
+    ("key", "f1"),
+    ("expect", "{54}{49}{50}{53} & {54}{52}{49}{43}{4B}{53}", 20),
+    # The three column headings, which the port would move before it broke them.
+    ("expect_row", 2, "{46}{49}{4C}{45} / {54}{58}{46}{45}{52}"),
+    ("expect_row", 2, "{45}{44}{49}{54}"),
+    ("expect_row", 2, "{44}{49}{53}{50}{4C}{41}{59}"),
+    # A row mixing bracketed letters, a digit and punctuation, so a conversion
+    # applied to only part of the range would show.
+    ("expect_row", 7, "{53}{54}{4F}{52}{45} {53}{4C}{4F}{54}      {46}11"),
+    # The credits share the page; V0.10 pins the version string too.
+    (
+        "expect_row",
+        22,
+        "{56}0.10 ({43}) 2021 {48}{45}{52}{4E}{41}{4E} {44}{49} {50}{49}{45}{54}{52}{4F}",
+    ),
+]
+
 if __name__ == "__main__":
-    sys.exit(scenario.run(__doc__, "FREEZER.M65", STEPS, screen_at=SPRITED_SCREEN))
+    steps = STEPS
+    if "--harness-keys" in sys.argv:
+        sys.argv.remove("--harness-keys")
+        steps = [*STEPS, *HELP_STEPS]
+    sys.exit(scenario.run(__doc__, "FREEZER.M65", steps, screen_at=SPRITED_SCREEN))

@@ -131,10 +131,15 @@ if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
     # own geometry and its own charset, and had no cover at all.  This pins
     # what it renders so a move onto the shared drawing code can be shown not
     # to change it.
+    # The help screen sits behind a key the synthetic keyboard cannot send, so
+    # those steps only run against a build that accepts F1 in its place.
+    set(SPRITED_ARGS --emulator ${XEMU} --sdimg ${MEGA65_SDIMG})
+    if(HARNESS_KEYS)
+        list(APPEND SPRITED_ARGS --harness-keys)
+    endif()
     add_test(NAME sprited
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_sprited_xemu.py
-                --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
-                --build $<TARGET_FILE_DIR:SPRITED>)
+                ${SPRITED_ARGS} --build $<TARGET_FILE_DIR:SPRITED>)
     set_tests_properties(sprited PROPERTIES TIMEOUT 300)
 
     # The freeze menu's own screen, which the tests above only pass through:

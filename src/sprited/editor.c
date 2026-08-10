@@ -1644,6 +1644,11 @@ static void main_loop(void) {
                 /* ------------------------------------ HELP ----------------------------------- */
 
             case KEY_HELP:
+#ifdef HARNESS_KEYS
+            /* HELP does not survive the synthetic keyboard, and F1 is the one
+             * function key this editor does not already use. */
+            case KEY_F1:
+#endif
                 show_help();
                 erase_canvas_space();
                 set_redraw_full_canvas();

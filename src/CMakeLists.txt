@@ -58,6 +58,15 @@ if(SDCARD_COUNTERS)
     add_compile_definitions(SDCARD_COUNTERS)
 endif()
 
+# Keys a test can reach standing in for ones it cannot.  The synthetic keyboard
+# does not manage HELP -- test/xemu_keys.py says why, and why it is not
+# understood -- so a screen behind it is untestable without this.  Off by
+# default: the shipping tools answer only the keys they document.
+option(HARNESS_KEYS "Accept substitute keys the test harness can send" OFF)
+if(HARNESS_KEYS)
+    add_compile_definitions(HARNESS_KEYS)
+endif()
+
 add_compile_options(
     # -Oz over -Os: smaller on every target, and nothing here is speed-critical.
     -Oz

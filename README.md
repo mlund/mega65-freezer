@@ -101,6 +101,23 @@ Against the binaries shipped on the MEGA65 SD card:
 same job as its cc65 counterpart: its disassembler, assembler and bit editor
 have nothing to compare against.
 
+### New features
+
+- `MONITOR`:
+  - 45GS10 (dis)assembler
+  - bit editor with named I/O register bits from mega65-core's `iomap.txt`.
+- Dynamic colour schemes
+- `MAKEDISK`: the border reports while the card is busy. Formatting is
+  thousands of sector operations behind a screen that says only "CREATING
+  IMAGE...", and an emulated card answers instantly where a real one does not,
+  so the wait had nothing to distinguish it from a hang.
+- SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
+  a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
+  D81 costs. Transactions rather than time -- the emulator has no card -- so
+  the figures are the half that carries to hardware.
+- The freeze menu's fixed text is built at compile time and drawn as
+  positioned fragments.
+
 ### Bugs found (and fixed)
 
 Defects found in original:
@@ -185,18 +202,4 @@ being 16 bits here.
 Generators are Python with no third-party packages like libpng, ophis.
 Pinned mega65-libc is automatically sources by CMake.
 
-### New features
 
-- `MONITOR`: added disassembler, assembler, and bit editor that names and
-  describes I/O register bits from mega65-core's iomap.txt.
-- Colour schemes, switchable while the tools run.
-- The freeze menu's fixed text is built at compile time and drawn as
-  positioned fragments.
-- `MAKEDISK`: the border reports while the card is busy. Formatting is
-  thousands of sector operations behind a screen that says only "CREATING
-  IMAGE...", and an emulated card answers instantly where a real one does not,
-  so the wait had nothing to distinguish it from a hang.
-- SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
-  a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
-  D81 costs. Transactions rather than time -- the emulator has no card -- so
-  the figures are the half that carries to hardware.
