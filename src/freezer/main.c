@@ -163,9 +163,9 @@ unsigned char next_cpu_speed(void) {
     return 0;
 }
 
-/* Placed by src/memory.ld, above the region the linker allocates from, so
- * that its 4KB does not come out of the same budget as the code. */
-extern unsigned char thumbnail_buffer[4096];
+/* src/lowmem.ld puts .thumbnail above the region the linker allocates from, so
+ * that this does not come out of the same budget as the code. */
+__attribute__((section(".thumbnail"))) unsigned char thumbnail_buffer[4096];
 
 void draw_thumbnail(void) {
     // Take the 4K of thumbnail data and render it to the display

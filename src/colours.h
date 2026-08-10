@@ -84,7 +84,7 @@ constexpr uint8_t SCHEME_BOOT = SchemeClassic;
  * mega65_dos_exechelper() loads that tool over this one and no variable
  * survives.  The magic byte is what distinguishes our two bytes from whatever
  * the frozen program left there; without it the boot scheme is used. */
-/* Placed by src/memory.ld, which owns the whole map so that no
+/* Placed by src/lowmem.ld, which owns the whole map so that no
  * two tools can claim the same bytes.  volatile because the reader is a
  * different program: the write must reach memory before this one is replaced. */
 extern volatile uint8_t scheme_handoff[2];

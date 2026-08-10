@@ -1,6 +1,11 @@
-/* Freezemenu .M65 linker script: C64-style PRG loaded at $0801, entered at
- * $080d via the BASIC SYS stub, and required to end before $9000 (the
- * screen). */
+/* The tools' linker script: a C64-style PRG loaded at $0801, entered at $080d
+ * via the BASIC SYS stub, and required to end before $9000 (the screen).
+ *
+ * Three scripts, by who reads them: this one is the tools'.  lowmem.ld is the
+ * part the on-target tests must agree with, so they link it too.
+ * test_freezeslot.ld is one test's own placement.  Each assertion lives beside
+ * what it guards, so the one below stays here: it is the only one that needs
+ * the region defined in this file. */
 
 /* The SDK defaults this window to $0090, which is where the C64's BASIC zero
  * page ends and the C64 KERNAL's begins.  The MEGA65 has no such split: its
@@ -14,6 +19,10 @@ __basic_zp_end = 0x00FB;
 
 MEMORY {
     ram (rw) : ORIGIN = 0x0801, LENGTH = 0x87ff
+    /* $9000-$B7FF: the character ROM shadow is what the VIC reads at $9000, so
+     * the RAM beneath it is free, and $A000-$B7FF is RAM under the $01 = $36
+     * every tool sets.  Buffers here cost addresses, not budget. */
+    highram (rw) : ORIGIN = 0x9000, LENGTH = 0x2800
 }
 
 INCLUDE commodore.ld
@@ -32,35 +41,23 @@ SECTIONS {
 ASSERT(ADDR(.entrytramp) == 0x080d,
     "entry trampoline moved: loader entry is fixed, see PROGRAM_ENTRY in helper.h")
 
-INCLUDE memory.ld
+INCLUDE lowmem.ld
 
-ASSERT(tool_density + tool_density_size <= tool_drive_id,
-    "low memory: the density byte runs into the drive id")
-ASSERT(tool_drive_id + tool_drive_id_size <= scheme_handoff,
-    "low memory: the drive id runs into the scheme handoff")
-ASSERT(scheme_handoff + scheme_handoff_size <= loader_stub,
-    "low memory: the scheme handoff runs into the loader stub")
-ASSERT(loader_stub + loader_stub_size <= hyppo_page,
-    "low memory: the loader stub runs into hyppo's page")
 ASSERT(hyppo_page + hyppo_page_size <= ORIGIN(ram) - 2,
     "low memory: hyppo's page runs into the loaded image")
-ASSERT(hyppo_exec_page + hyppo_exec_page_size <= tool_density,
-    "low memory: the exec name page runs into the tool handoff bytes")
-/* The trap's own rule, so that moving either page fails the build rather than
- * returning dos_errorcode_invalid_address at run time. */
-ASSERT((hyppo_page & 0xFF) == 0 && hyppo_page < 0x7F00,
-    "hyppo copies only into a page-aligned buffer below $7F00")
-ASSERT((hyppo_exec_page & 0xFF) == 0 && hyppo_exec_page < 0x7F00,
-    "hyppo copies only into a page-aligned buffer below $7F00")
-/* helper.S copies the routine into the reservation, so the routine must fit. */
-ASSERT(loadfile_routine_end - loadfile_routine <= loader_stub_size,
-    "the loader stub routine outgrew its reservation in low memory")
 
+/* NOLOAD keeps these out of the .M65: they occupy addresses, not file bytes.
+ * The arrays are defined in C with __attribute__((section)), so each states its
+ * size once, where the array is. */
+SECTIONS {
+    .thumbnail 0x9000 (NOLOAD) : { *(.thumbnail) } > highram
+    .sdverify  0xA000 (NOLOAD) : { *(.sdverify) }  > highram
+} INSERT AFTER .bss
 
-ASSERT(thumbnail_buffer + thumbnail_buffer_size <= sd_verify_buffer,
+ASSERT(ADDR(.thumbnail) + SIZEOF(.thumbnail) <= ADDR(.sdverify),
     "high memory: the thumbnail buffer runs into the verify buffer")
-ASSERT(sd_verify_buffer + sd_verify_buffer_size <= 0xB800,
-    "the thumbnail buffer runs into the screen at $B800")
+ASSERT(ADDR(.sdverify) + SIZEOF(.sdverify) <= 0xB800,
+    "high memory: the buffers run into the screen at $B800")
 
 __stack = 0xd000;
 
