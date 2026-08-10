@@ -27,6 +27,8 @@ Two kinds of data are read off the card at run time and built here too:
 ## Building
 
 Currently needs a patched llvm-mos: stock SDK v23.0.1 miscompiles.
+You need to build the llvm-mos-sdk using [llvm-mos @ freezer](https://github.com/mlund/llvm-mos/tree/freezer)
+and this step is not detailed here.
 
 ```
 cmake -DCMAKE_PREFIX_PATH=<prefix> -B build
