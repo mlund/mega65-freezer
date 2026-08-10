@@ -18,6 +18,9 @@ So a test is a list:
         ("expect_file", "ZZTEST.D81", 819200),
     ]
 
+`expect_row` matches anywhere in the row; `expect_at` pins a column, for a
+readout whose position is the point.
+
 Every `expect` polls rather than sleeping, re-reading the screen until the text
 appears or the timeout runs out.  That is what keeps a scenario honest on a
 machine of a different speed: `-sleepless` runs flat out and hardware runs in
@@ -67,24 +70,26 @@ def _press(sock, what: str) -> None:
         raise Failure(f"no such key {what!r}; named keys are {sorted(xemu_keys.NAMED)}")
 
 
-def _read_screen(sock) -> bytes:
-    return xemu.read(sock, screen.SCREEN_AT, screen.SCREEN_BYTES)
+def _read_screen(sock) -> tuple[bytes, int]:
+    """The screen, and how wide a cell is in whatever mode it is in now."""
+    cell_bytes = 2 if xemu.read(sock, screen.CHR16, 1)[0] & 0x01 else 1
+    return xemu.read(sock, screen.SCREEN_AT, screen.SCREEN_BYTES), cell_bytes
 
 
 def _poll(sock, wants, timeout: float):
     """Re-read the screen until `wants(memory)` is true, or give up."""
     deadline = time.time() + timeout
-    memory = _read_screen(sock)
+    memory, cells = _read_screen(sock)
     while True:
-        if wants(memory):
+        if wants(memory, cells):
             return memory
         if time.time() >= deadline:
             raise Failure(
                 f"still not true after {timeout:g}s",
-                screen.screen(memory, screen.SCREEN_AT),
+                screen.screen(memory, screen.SCREEN_AT, cells),
             )
         time.sleep(POLL)
-        memory = _read_screen(sock)
+        memory, cells = _read_screen(sock)
 
 
 def _run_steps(sock, steps, seen: dict) -> None:
@@ -99,13 +104,28 @@ def _run_steps(sock, steps, seen: dict) -> None:
                 time.sleep(rest[0])
             elif verb == "expect":
                 text, timeout = rest[0], (rest[1] if len(rest) > 1 else DEFAULT_TIMEOUT)
-                _poll(sock, lambda m, t=text: t in screen.screen(m, screen.SCREEN_AT), timeout)
+                _poll(
+                    sock,
+                    lambda m, c, t=text: t in screen.screen(m, screen.SCREEN_AT, c),
+                    timeout,
+                )
             elif verb == "expect_row":
                 row, text = rest[0], rest[1]
                 timeout = rest[2] if len(rest) > 2 else DEFAULT_TIMEOUT
                 _poll(
                     sock,
-                    lambda m, r=row, t=text: t in screen.text(m, r, screen.SCREEN_AT),
+                    lambda m, c, r=row, t=text: t in screen.text(m, r, screen.SCREEN_AT, c),
+                    timeout,
+                )
+            elif verb == "expect_at":
+                row, column, text = rest[0], rest[1], rest[2]
+                timeout = rest[3] if len(rest) > 3 else DEFAULT_TIMEOUT
+                _poll(
+                    sock,
+                    lambda m, cb, r=row, c=column, t=text: screen.text(m, r, screen.SCREEN_AT, cb)[
+                        c : c + len(t)
+                    ]
+                    == t,
                     timeout,
                 )
             elif verb == "snapshot":
@@ -113,10 +133,11 @@ def _run_steps(sock, steps, seen: dict) -> None:
             elif verb == "expect_changed":
                 name, row = rest[0], rest[1]
                 timeout = rest[2] if len(rest) > 2 else DEFAULT_TIMEOUT
-                was = screen.text(seen[name], row, screen.SCREEN_AT)
+                was_memory, was_cells = seen[name]
+                was = screen.text(was_memory, row, screen.SCREEN_AT, was_cells)
                 _poll(
                     sock,
-                    lambda m, r=row, w=was: screen.text(m, r, screen.SCREEN_AT) != w,
+                    lambda m, c, r=row, w=was: screen.text(m, r, screen.SCREEN_AT, c) != w,
                     timeout,
                 )
             elif verb == "expect_file":

@@ -253,14 +253,14 @@ if(Python3_FOUND AND LLVM_MC_EXE)
 
         # Covers the freezer's launch path -- region list, find, load, run --
         # which `-prg` cannot reach because a tool dropped into memory cold
-        # never starts.  The tool that comes up is the SD image's rather than
-        # ours; see test/verify_launch.py.  Needs Python for the keyboard.
-        if(XEMU AND Python3_FOUND)
+        # never starts.  Needs the card the tools are loaded from, and a clone
+        # of it carrying our builds rather than the image's own.
+        if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
             add_test(NAME launch_monitor
                 COMMAND ${Python3_EXECUTABLE}
                         ${CMAKE_CURRENT_SOURCE_DIR}/test/verify_launch.py
-                        --emulator ${XEMU} --prg $<TARGET_FILE:FREEZER>
-                        --keys m --expect "PC   IRQ  NMI")
+                        --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                        --build $<TARGET_FILE_DIR:FREEZER>)
             # Boots, waits for the menu, types, waits again: about half a minute.
             set_tests_properties(launch_monitor PROPERTIES TIMEOUT 180)
         endif()
