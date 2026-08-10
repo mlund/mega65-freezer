@@ -126,7 +126,7 @@ def main() -> int:
         subprocess.run(
             [
                 args.cc,
-                "-std=c23",
+                "-std=c2x",
                 "-Wall",
                 "-o",
                 binary,
