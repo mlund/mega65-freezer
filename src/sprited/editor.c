@@ -1518,13 +1518,13 @@ static void update_and_full_redraw(bool f_fetch_slot) {
     set_redraw_full_canvas();
 }
 
-uint16_t joy_delay_countdown = 0;
-unsigned char fire_lock = 0;
+static uint16_t joy_delay_countdown = 0;
+static unsigned char fire_lock = 0;
 
 /* unsigned short, not uint16_t: uint16_t is unsigned int on this target, and
  * mouse_update_position() takes unsigned short*, a distinct pointer type. */
-unsigned short mx;
-unsigned short my;
+static unsigned short mx;
+static unsigned short my;
 
 static void set_background(void) {
     g_state.redraw_flags = RedrawSidebarColor;

@@ -150,7 +150,7 @@ void sdcard_readsector(const uint32_t sector_number) {
 
 /* src/lowmem.ld puts .sdverify above the region the linker allocates from, so
  * this does not come out of the same budget as the code. */
-__attribute__((section(".sdverify"))) uint8_t sd_verify_buffer[SD_SECTOR_SIZE];
+static __attribute__((section(".sdverify"))) uint8_t sd_verify_buffer[SD_SECTOR_SIZE];
 
 void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     uint8_t tries = 0;

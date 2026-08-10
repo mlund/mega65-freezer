@@ -39,9 +39,9 @@
 
 extern uint16_t slot_number;
 
-short file_count = 0, min_dir_entry = 0;
-short selection_number = 0;
-short display_offset = 0;
+static short file_count = 0, min_dir_entry = 0;
+static short selection_number = 0;
+static short display_offset = 0;
 
 /* freezer/menu.cpp, the one C++ translation unit: the chooser's standing text
  * as screen codes, converted when it was compiled rather than on every redraw. */
@@ -49,15 +49,15 @@ const uint8_t* chooser_help_stream(void);
 const uint8_t* chooser_scanning_stream(void);
 
 // use DMA lcopy overlap trick to save space!
-unsigned char normal_row[4] = {0, SchemeText, 0, SchemeText};
-unsigned char error_row[4] = {0, SchemeError, 0, SchemeError};
-unsigned char highlight_row[4] = {
+static unsigned char normal_row[4] = {0, SchemeText, 0, SchemeText};
+static unsigned char error_row[4] = {0, SchemeError, 0, SchemeError};
+static unsigned char highlight_row[4] = {
     0, SchemeSelected | AttribReverse, 0, SchemeSelected | AttribReverse};
-unsigned char dir_line_colour[4] = {0, SchemeAccent, 0, SchemeAccent};
+static unsigned char dir_line_colour[4] = {0, SchemeAccent, 0, SchemeAccent};
 
-char disk_name_return[33];
-char old_disk_name[33];
-uint8_t old_disk_flags, old_disk_len;
+static char disk_name_return[33];
+static char old_disk_name[33];
+static uint8_t old_disk_flags, old_disk_len;
 
 static char default_error[] = "ERROR CODE XX";
 char* hyppoerror_to_screen(unsigned char error) {

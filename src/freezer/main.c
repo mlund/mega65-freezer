@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 
-unsigned char freeze_menu_bar[] = "F3-RESUME    F5-RESET      HELP-MEGAINFO"
-                                  "F3-LOAD SLOT F7-SAVE SLOT  HELP-MEGAINFO";
+static unsigned char freeze_menu_bar[] = "F3-RESUME    F5-RESET      HELP-MEGAINFO"
+                                         "F3-LOAD SLOT F7-SAVE SLOT  HELP-MEGAINFO";
 
 /* Where each changing field sits.  The fixed text around them is a stream of
  * fragments in freezer/menu.cpp; these are the holes it leaves. */
@@ -165,7 +165,7 @@ unsigned char next_cpu_speed(void) {
 
 /* src/lowmem.ld puts .thumbnail above the region the linker allocates from, so
  * that this does not come out of the same budget as the code. */
-__attribute__((section(".thumbnail"))) unsigned char thumbnail_buffer[4096];
+static __attribute__((section(".thumbnail"))) unsigned char thumbnail_buffer[4096];
 
 void draw_thumbnail(void) {
     // Take the 4K of thumbnail data and render it to the display
@@ -240,7 +240,7 @@ void draw_thumbnail(void) {
     }
 }
 
-struct ProcessDescriptor process_descriptor;
+static struct ProcessDescriptor process_descriptor;
 
 // clang-format off
 static int8_t last_thumb_frame = -1;

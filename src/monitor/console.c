@@ -15,7 +15,7 @@ char* footer_messages[FooterMax + 1] = {
     "(D/A)SM (B)IT (C)MP (F)ILL (H)UNT (M)EM (P)IX (R)EG (S)ET (T)RA E(X)IT SREG(;)  ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};
 
-char stemp[80];
+static char stemp[80];
 
 /* Via stemp because neither end can be converted in place: callers pass string
  * literals, and screen RAM reads back as ROM when BASIC is banked in. */

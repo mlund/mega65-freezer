@@ -36,10 +36,8 @@ struct DmagicDmalist {
 
 /* The DMAgic is the only reader of dmalist, so without volatile the compiler
  * drops a population as dead when the next call overwrites it, and the pending
- * job runs on the stale list.  dma_byte is the reverse: the DMAgic writes it
- * during lpeek(). */
-volatile struct DmagicDmalist dmalist;
-volatile unsigned char dma_byte;
+ * job runs on the stale list. */
+static volatile struct DmagicDmalist dmalist;
 
 __attribute__((noinline)) void do_dma(void) {
     m65_io_enable();

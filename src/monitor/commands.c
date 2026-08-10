@@ -58,23 +58,22 @@ unsigned char char_to_hex(char in) {
     return 0;
 }
 
-unsigned char screen_line = 0;
-unsigned char screen_line_buffer[80];
-unsigned char screen_line_length = 0;
-unsigned char screen_line_offset = 0;
+static unsigned char screen_line_buffer[80];
+static unsigned char screen_line_length = 0;
+static unsigned char screen_line_offset = 0;
 
-uint32_t hex_value = 0;
+static uint32_t hex_value = 0;
 uint32_t mon_address = 0;
 
-char output_buffer[80];
+static char output_buffer[80];
 
-unsigned char mon_sector[SD_SECTOR_SIZE];
-uint32_t mon_sector_num = 0xffffffffUL;
+static unsigned char mon_sector[SD_SECTOR_SIZE];
+static uint32_t mon_sector_num = 0xffffffffUL;
 
 /* Frozen CPU state that M and D need in order to talk about the same addresses
  * the program did, cached by show_registers().  The PC here is already resolved
  * to 28 bits; the sentinel keeps an unread PC from matching any real address. */
-uint32_t frozen_program_counter = 0xffffffffUL;
+static uint32_t frozen_program_counter = 0xffffffffUL;
 static uint16_t frozen_map_lo = 0;
 static uint16_t frozen_map_hi = 0;
 static unsigned char frozen_map_lo_megabyte = 0;

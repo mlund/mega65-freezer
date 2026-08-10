@@ -18,29 +18,29 @@
 #include <stdio.h>
 #include <string.h>
 
-short file_count = 0;
-short selection_number = 0;
-short display_offset = 0;
+static short file_count = 0;
+static short selection_number = 0;
+static short display_offset = 0;
 
 unsigned char buffer[SD_SECTOR_SIZE];
 
-char reading_disk_list_message[] = "SCANNING DIRECTORY ...";
+static char reading_disk_list_message[] = "SCANNING DIRECTORY ...";
 
-char diskchooser_instructions[] = "SELECT A ROM FILE, PRESS RETURN TO LOAD,"
-                                  "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  ";
+static char diskchooser_instructions[] = "SELECT A ROM FILE, PRESS RETURN TO LOAD,"
+                                         "  OR PRESS RUN/STOP TO LEAVE UNCHANGED  ";
 
-char rom_reset_screen[] = "YOU HAVE LOADED THE ROM FILE            "
-                          "                                        "
-                          "                                        "
-                          "    ROM VERSION:                        "
-                          "                                        "
-                          "INTO FROZEN MEMORY, REPLACING THE WHOLE "
-                          "ROM STORED THERE.                       "
-                          "                                        "
-                          "IT IS PROBABLY UNSAFE TO JUST RESUME THE"
-                          "SYSTEM, A FULL RESET IS RECOMMENDED.    "
-                          "                                        "
-                          "        RESET SYSTEM NOW? (Y/N)         ";
+static char rom_reset_screen[] = "YOU HAVE LOADED THE ROM FILE            "
+                                 "                                        "
+                                 "                                        "
+                                 "    ROM VERSION:                        "
+                                 "                                        "
+                                 "INTO FROZEN MEMORY, REPLACING THE WHOLE "
+                                 "ROM STORED THERE.                       "
+                                 "                                        "
+                                 "IT IS PROBABLY UNSAFE TO JUST RESUME THE"
+                                 "SYSTEM, A FULL RESET IS RECOMMENDED.    "
+                                 "                                        "
+                                 "        RESET SYSTEM NOW? (Y/N)         ";
 
 // clang-format off
 /* One colour-RAM pair -- attribute byte, colour byte -- per screen column, so
@@ -51,15 +51,15 @@ char rom_reset_screen[] = "YOU HAVE LOADED THE ROM FILE            "
   0, (c), 0, (c), 0, (c), 0, (c), 0, (c)
 #define COLOUR_PAIRS_20(c) COLOUR_PAIRS_10(c), COLOUR_PAIRS_10(c)
 
-unsigned char normal_row[40] = { COLOUR_PAIRS_20(SchemeText) };
-unsigned char highlight_row[40] = { COLOUR_PAIRS_20(SchemeSelected | AttribReverse) };
-unsigned char dir_line_colour[40] = { COLOUR_PAIRS_20(SchemeAccent) };
+static unsigned char normal_row[40] = { COLOUR_PAIRS_20(SchemeText) };
+static unsigned char highlight_row[40] = { COLOUR_PAIRS_20(SchemeSelected | AttribReverse) };
+static unsigned char dir_line_colour[40] = { COLOUR_PAIRS_20(SchemeAccent) };
 
 #undef COLOUR_PAIRS_20
 #undef COLOUR_PAIRS_10
 // clang-format on
 
-char rom_name_return[32];
+static char rom_name_return[32];
 
 char draw_directory_entry(unsigned char screen_row) {
     char type;
