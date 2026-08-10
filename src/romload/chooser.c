@@ -404,7 +404,18 @@ unsigned char freeze_load_romarea(void) {
 
                         // set or reset TALL character bit depending on charset extension
                         if (!strcmp(&rom_name_return[strlen(rom_name_return) - 4], ".TCR")) {
-                            // switch palemu off and enable CHARY16
+                            /* $D054.5 is PALEMU and $D07A.4 is CHARY16, so these
+                             * two go to different registers.  Both writes used to
+                             * land on $D07A: PALEMU was never touched and $D07A.5
+                             * -- NOBUGCOMPAT, which the core marks deprecated --
+                             * was set instead, and nothing ever cleared it again.
+                             *
+                             * The bit is left as it was written, which sets
+                             * PALEMU where the old comment said "switch palemu
+                             * off".  Nothing settles which is meant: .TCR is this
+                             * program's own convention, named in no core, ROM,
+                             * book or tool, so there is no specification to read
+                             * and no such file on a stock card to try. */
                             cg_54_set |= 0x20;
                             cg_54_mask ^= 0x20;
                             cg_7a_set |= 0x10;
@@ -413,9 +424,9 @@ unsigned char freeze_load_romarea(void) {
                             cg_7a_set |= 0x00;
                             cg_7a_mask ^= 0x10;
                         }
-                        freeze_io_poke(0x307a, cg_54_set | (freeze_io_peek(0x307a) & cg_54_mask));
+                        freeze_io_poke(0x3054, cg_54_set | (freeze_io_peek(0x3054) & cg_54_mask));
                         freeze_io_poke(0x307a, cg_7a_set | (freeze_io_peek(0x307a) & cg_7a_mask));
-                        lpoke(0xFFD307AL, cg_54_set | (lpeek(0xFFD307AL) & cg_54_mask));
+                        lpoke(0xFFD3054L, cg_54_set | (lpeek(0xFFD3054L) & cg_54_mask));
                         lpoke(0xFFD307AL, cg_7a_set | (lpeek(0xFFD307AL) & cg_7a_mask));
 
                         return 0; // no reset needed, most probably...

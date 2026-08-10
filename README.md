@@ -92,7 +92,7 @@ Against the binaries shipped on the MEGA65 SD card:
 | `AUDIOMIX` |  23161 |  8242 |  -64 |
 | `MAKEDISK` |  22307 |  9857 |  -56 |
 | `MEGAINFO` |  21966 | 10364 |  -53 |
-| `ROMLOAD`  |  17378 |  8701 |  -50 |
+| `ROMLOAD`  |  17378 |  8712 |  -50 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
 | `SPRITED`  |  31016 | 16842 |  -46 |
 | `FREEZER`  |  24700 | 16953 |  -31 |
@@ -119,6 +119,11 @@ Defects found in original:
   descriptor at `$0435`. Backing out of the chooser then restored whatever that
   happened to hold. Two neighbouring reads had the same defect.
   `freeze_diskchooser.c:594-596`.
+- Loading a tall charset wrote to the wrong register. `$D054.5` is PALEMU and
+  `$D07A.4` is CHARY16, but both writes went to `$D07A`: PALEMU was never
+  touched, and `$D07A.5` -- NOBUGCOMPAT, deprecated in the core -- was set
+  instead and never cleared again, so it survived into the resumed program.
+  `freeze_romload.c:402-405`.
 - `report_unmapped()` called itself. Every unmapped address reached through D,
   F, H, C, T or B recursed until the stack died. Eight call sites. Every
   command had been exercised on mapped memory.
