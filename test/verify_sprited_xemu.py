@@ -11,11 +11,17 @@ an accident:
 
 Its screen is at $12000, not $B800, so the scenario is told where to read.
 
-Its cells hold ASCII, not screen codes -- `THE` is $54 $48 $45 where the other
-tools would write $14 $08 $05.  SPRITED copies an ASCII-ordered charset from
-$2D800 and indexes it directly, so screen.text() renders those as {54}{48}{45}
-and the assertions below match that form.  Anything that converts to screen
-codes on the way in would show here immediately.
+Its cells hold $54 $48 $45 for `THE`, where the other tools write $14 $08 $05.
+Not because the charset is ordered by ASCII: $2D800 is the upper half of
+CHARSET C (mega65-user-guide, appendix-memorymap), the C64 lowercase bank, in
+ordinary screen-code order -- and in that bank A-Z sit at $41-$5A, which is
+also where ASCII puts them.  So writing a C string lands on the right glyphs by
+coincidence, which is what conio's setlowercase() arranges.
+
+screen.text() therefore renders these rows as {54}{48}{45}, and the assertions
+below match that form.  draw_text() folds A-Z down by $40, so a port that used
+it against this charset would render lowercase rather than nonsense -- quieter
+than a crash, and this is what would catch it.
 
     python3 test/verify_sprited_xemu.py --emulator xmega65 --sdimg card.img \\
             --build build/src
