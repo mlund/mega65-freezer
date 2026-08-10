@@ -144,6 +144,16 @@ if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
                 --build $<TARGET_FILE_DIR:MAKEDISK>)
     set_tests_properties(makedisk_create PROPERTIES TIMEOUT 600)
 
+    # What creating a D81 costs the card, in transactions rather than seconds:
+    # the emulator has no card to be slow.  Only with the counters built in.
+    if(SDCARD_COUNTERS)
+        add_test(NAME sdcount
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_sdcount_xemu.py
+                    --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                    --build $<TARGET_FILE_DIR:MAKEDISK>)
+        set_tests_properties(sdcount PROPERTIES TIMEOUT 600)
+    endif()
+
     # Assemble in the monitor and read the bytes back off the card.
     add_test(NAME monitor_assemble
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_monitor.py

@@ -65,26 +65,25 @@ static inline uint16_t hw_div16_ceil(uint32_t a, uint32_t b) {
     return whole;
 }
 
-// Registers used only from C, so they are lvalues rather than bare addresses:
-// ASCIIKEY reads and assigns directly instead of through PEEK/POKE.  These stay
-// macros because they must be assignable; the plain values above are constexpr
-// so the compiler checks their type.
+// A register named this way is an lvalue, so it reads and assigns directly
+// instead of through PEEK/POKE.  A macro because it has to be assignable; the
+// plain values above are constexpr so the compiler checks their type.
+#define REG8(addr) (*(volatile uint8_t*)(addr))
+
 // The VIC-III/IV conceals its registers until this knock is written to
 // VICIV.key ($D02F), in this order.
 constexpr uint8_t VIC4_KNOCK_1 = 0x47;
 constexpr uint8_t VIC4_KNOCK_2 = 0x53;
 
-#define MMIO8(addr) (*(volatile uint8_t*)(addr))
-
 // F011 floppy controller (45IO27).  See the MEGA65 user guide, "45IO27
 // Multi-Function I/O Controller".
-#define F011_CONTROL MMIO8(0xD080) // motor and drive select
-#define F011_COMMAND MMIO8(0xD081)
-#define F011_STATUS MMIO8(0xD082)          // BUSY is bit 7
-#define F011_TRACK MMIO8(0xD084)           // FDC:TRACK
-#define F011_SECTOR MMIO8(0xD085)          // FDC:SECTOR
-#define F011_SIDE MMIO8(0xD086)            // FDC:SIDE
-#define F011_DATA MMIO8(0xD087)            // sector byte port
+#define F011_CONTROL REG8(0xD080) // motor and drive select
+#define F011_COMMAND REG8(0xD081)
+#define F011_STATUS REG8(0xD082)          // BUSY is bit 7
+#define F011_TRACK REG8(0xD084)           // FDC:TRACK
+#define F011_SECTOR REG8(0xD085)          // FDC:SECTOR
+#define F011_SIDE REG8(0xD086)            // FDC:SIDE
+#define F011_DATA REG8(0xD087)            // sector byte port
 constexpr uint8_t F011_CMD_SPINUP = 0x20;  // guide: write to COMMAND, then poll BUSY
 constexpr uint8_t F011_STATUS_BUSY = 0x80; // guide: bit 7 of STATUS
 // The rest are read off this program's own usage, not the user guide, which
@@ -96,31 +95,35 @@ constexpr uint8_t F011_CTRL_MOTOR_LED = 0x60; // motor and drive LED on; OR in t
 constexpr uint8_t F011_STATUS_AT_TRACK0 = 0x01;
 constexpr uint8_t F011_STATUS_READ_ERROR = 0x18; // sector read failed
 
-// Read through lpeek rather than MMIO8: these are 28-bit addresses, reachable
+// Read through lpeek rather than REG8: these are 28-bit addresses, reachable
 // whatever is banked at $D000.  Names from mega65-core's iomap.txt.
 constexpr uint32_t M65_MODEL_ID = 0xffd3629; // UARTMISC:M65MODEL, the board revision
 constexpr uint32_t RTC_SECONDS = 0xffd7110;  // RTC:RTCSEC; minutes, hours, day,
                                              // month and year follow in order
 
 // SD controller.
-#define SD_COMMAND MMIO8(0xD680)
-#define SD_STATUS MMIO8(0xD680) // same register; reads status
+#define SD_COMMAND REG8(0xD680)
+#define SD_STATUS REG8(0xD680) // same register; reads status
 constexpr uint8_t SD_STATUS_SDHC = 0x10;
+// SD:SDSECTOR0-3, low byte first.  Written a byte at a time rather than as one
+// 32-bit store, so the order the controller sees is the order written here.
+#define SD_SECTOR(byte) REG8(0xD681 + (byte))
+constexpr uint8_t SD_STATUS_BUSY = 0x03; // either engine still working
 
 // $D689 carries several unrelated signals; only the buffer select is used
 // here.  SD:BUFSEL, 1 = the SD card's sector buffer, 0 = the F011/FDC's.
-#define SD_MISC MMIO8(0xD689)
+#define SD_MISC REG8(0xD689)
 constexpr uint8_t SD_MISC_BUFSEL_SDCARD = 0x80;
 
 // F011 disk-image type and control.  Bit 6 is drive 0 and bit 7 drive 1 in
 // both, so the code shifts by the drive id.
-#define SDFDC_IMAGE_TYPE MMIO8(0xD68A) // SDFDC:D0D64 / D1D64, set for D64
-#define SDFDC_CONTROL MMIO8(0xD68B)    // SDFDC:D0MD / D1MD, set for D65
+#define SDFDC_IMAGE_TYPE REG8(0xD68A) // SDFDC:D0D64 / D1D64, set for D64
+#define SDFDC_CONTROL REG8(0xD68B)    // SDFDC:D0MD / D1MD, set for D65
 
 // AUDIOMIX:REGSEL selects a mixer coefficient, which is then read or written
 // through AUDIOMIX:REGWDATA.
-#define AUDIOMIX_REGSEL MMIO8(0xD6F4)
-#define AUDIOMIX_REGDATA MMIO8(0xD6F5)
+#define AUDIOMIX_REGSEL REG8(0xD6F4)
+#define AUDIOMIX_REGDATA REG8(0xD6F5)
 
 // VIC-IV video setup.  Each of these is a value for one named register, so
 // they stay separate constants rather than becoming an enum: nothing ever
@@ -162,7 +165,7 @@ constexpr uint8_t CIA_ICR_DISABLE_ALL = 0x7F;
 
 // Keyboard event queue: reads the top event as ASCII, 0x00 when empty;
 // assigning any value dequeues.  See the user guide, "Keyboard".
-#define ASCIIKEY MMIO8(0xD610)
+#define ASCIIKEY REG8(0xD610)
 
 /* The codes ASCIIKEY reports for the keys the tools dispatch on.  The commands
  * are function keys because a letter is typed text in the monitor's line
@@ -190,16 +193,16 @@ constexpr uint8_t KEY_F14 = 0xFE;
 
 // UARTMISC modifier key state, read live rather than through the queue: a bit
 // is set while its key is held.
-#define MODKEY MMIO8(0xD611)
+#define MODKEY REG8(0xD611)
 constexpr uint8_t MODKEY_LSHIFT = 0x01; // UARTMISC:MLSHFT
 constexpr uint8_t MODKEY_RSHIFT = 0x02; // UARTMISC:MRSHFT
 constexpr uint8_t MODKEY_CTRL = 0x04;   // UARTMISC:MCTRL
 constexpr uint8_t MODKEY_MEGA = 0x08;   // UARTMISC:MMEGA
 
 // UARTMISC joystick options.
-#define UART_MISC MMIO8(0xD612)
+#define UART_MISC REG8(0xD612)
 constexpr uint8_t UART_MISC_OSKDEBUG = 0x10; // UARTMISC:OSKDEBUG, write only
 constexpr uint8_t UART_MISC_JOYSWAP = 0x20;  // UARTMISC:JOYSWAP
 
 // UARTMISC:M65MODEL, the board this core is running on.
-#define M65MODEL MMIO8(0xD629)
+#define M65MODEL REG8(0xD629)

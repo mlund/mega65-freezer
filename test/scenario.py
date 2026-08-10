@@ -21,6 +21,12 @@ So a test is a list:
 `expect_row` matches anywhere in the row; `expect_at` pins a column, for a
 readout whose position is the point.
 
+`count` reads a counter out of the running tool by name -- ("count",
+"MAKEDISK.sd_reads", 1600) looks the symbol up in that tool's ELF, reports what
+it holds and fails below the floor.  What it measures is transactions, not
+time: an emulated card answers instantly, so the count is the part that carries
+over to hardware, where it is multiplied by a cost only a real card can give.
+
 Every `expect` polls rather than sleeping, re-reading the screen until the text
 appears or the timeout runs out.  That is what keeps a scenario honest on a
 machine of a different speed: `-sleepless` runs flat out and hardware runs in
@@ -41,6 +47,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import card
+import elf
 import fat32
 import screen
 import xemu
@@ -92,7 +99,7 @@ def _poll(sock, wants, timeout: float):
         memory, cells = _read_screen(sock)
 
 
-def _run_steps(sock, steps, seen: dict) -> None:
+def _run_steps(sock, steps, seen: dict, counted: dict, build: str) -> None:
     for index, step in enumerate(steps):
         verb, rest = step[0], step[1:]
         try:
@@ -140,6 +147,14 @@ def _run_steps(sock, steps, seen: dict) -> None:
                     lambda m, c, r=row, w=was: screen.text(m, r, screen.SCREEN_AT, c) != w,
                     timeout,
                 )
+            elif verb == "count":
+                where, least = rest[0], (rest[1] if len(rest) > 1 else None)
+                program, _, name = where.partition(".")
+                at = elf.symbol(os.path.join(build, f"{program}.M65.elf"), name)
+                value = int.from_bytes(xemu.read(sock, at, 4), "little")
+                counted[where] = value
+                if least is not None and value < least:
+                    raise Failure(f"{where} is {value}, wanted at least {least}")
             elif verb == "expect_file":
                 pass  # checked after the run, when the image is closed
             else:
@@ -171,11 +186,12 @@ def run(description: str, prg: str, steps, *, boot: float = 16.0) -> int:
     args = parser.parse_args()
 
     seen: dict = {}
+    counted: dict = {}
     failure: list[Failure] = []
 
     def drive(sock):
         try:
-            _run_steps(sock, steps, seen)
+            _run_steps(sock, steps, seen, counted, args.build)
         except Failure as failed:
             failure.append(failed)
 
@@ -203,6 +219,9 @@ def run(description: str, prg: str, steps, *, boot: float = 16.0) -> int:
                     failure.append(Failure(f"{name} is not on the card"))
                 elif got != size:
                     failure.append(Failure(f"{name} is {got} bytes, expected {size}"))
+
+    for where in sorted(counted):
+        print(f"{where} = {counted[where]}")
 
     if not failure:
         print(f"{len(steps)} steps passed")

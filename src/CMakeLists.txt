@@ -26,6 +26,14 @@ if(FREEZER_TRACE)
     add_compile_definitions(FREEZER_TRACE)
 endif()
 
+# Counting SD transactions.  Off by default so a shipping build carries neither
+# the counters nor the increments; on, a scenario can read them by name and say
+# how much traffic an operation costs.  See test/verify_sdcount_xemu.py.
+option(SDCARD_COUNTERS "Count SD card reads and writes" OFF)
+if(SDCARD_COUNTERS)
+    add_compile_definitions(SDCARD_COUNTERS)
+endif()
+
 add_compile_options(
     # -Oz over -Os: smaller on every target, and nothing here is speed-critical.
     -Oz

@@ -9,8 +9,6 @@
 #include <stdlib.h>
 
 const long SD_SECTORBUFFER = 0xffd6e00L;
-const uint16_t SD_CTL = 0xd680L;
-const uint16_t SD_ADDR = 0xd681L;
 
 unsigned char sdhc_card = 0;
 uint8_t hal_border_flicker = 0;
@@ -22,11 +20,11 @@ void sdcard_visual_feedback(const uint8_t do_flicker) {
 }
 
 void sdcard_reset(void) {
-    POKE(SD_CTL, 0);
-    POKE(SD_CTL, 1);
+    SD_COMMAND = 0;
+    SD_COMMAND = 1;
 
     // Now wait for SD card reset to complete
-    while (PEEK(SD_CTL) & 3) {
+    while (SD_STATUS & SD_STATUS_BUSY) {
         if (hal_border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
         }
@@ -34,7 +32,7 @@ void sdcard_reset(void) {
 
     if (sdhc_card) {
         /* Writes do not take without this, though nothing says why. */
-        POKE(SD_CTL, 0x41);
+        SD_COMMAND = 0x41;
     }
 }
 
@@ -50,7 +48,20 @@ void sdcard_open(void) {
     sdcard_reset();
 }
 
-uint32_t write_count = 0;
+#ifdef SDCARD_COUNTERS
+/* Counting, not timing.  An emulated card completes a transaction in no time,
+ * so the number of transactions is the only figure that carries across to
+ * hardware; multiply it there by a per-operation cost measured on the card.
+ *
+ * Every command issued to the controller is counted, not every call: a sector
+ * that has to be retried costs the card twice and should read as twice. */
+uint32_t sd_reads = 0;
+uint32_t sd_writes = 0;
+uint32_t sd_writes_skipped = 0; /* sector already held what we were about to write */
+#define DEBUG_COUNT(counter) ((counter)++)
+#else
+#define DEBUG_COUNT(counter) ((void)0)
+#endif
 
 void sdcard_readsector(const uint32_t sector_number) {
     char tries = 0;
@@ -66,54 +77,55 @@ void sdcard_readsector(const uint32_t sector_number) {
         }
     }
 
-    POKE(SD_ADDR + 0, (sector_address >> 0) & 0xff);
-    POKE(SD_ADDR + 1, (sector_address >> 8) & 0xff);
-    POKE(SD_ADDR + 2, ((uint32_t)sector_address >> 16) & 0xff);
-    POKE(SD_ADDR + 3, ((uint32_t)sector_address >> 24) & 0xff);
+    SD_SECTOR(0) = (sector_address >> 0) & 0xff;
+    SD_SECTOR(1) = (sector_address >> 8) & 0xff;
+    SD_SECTOR(2) = ((uint32_t)sector_address >> 16) & 0xff;
+    SD_SECTOR(3) = ((uint32_t)sector_address >> 24) & 0xff;
 
     while (tries < 10) {
+        DEBUG_COUNT(sd_reads);
 
         // Wait for SD card to be ready
         timeout = 50000U;
-        while (PEEK(SD_CTL) & 0x3) {
+        while (SD_STATUS & SD_STATUS_BUSY) {
             timeout--;
             if (!timeout) {
                 // Time out -- so reset SD card
-                POKE(SD_CTL, 0);
-                POKE(SD_CTL, 1);
+                SD_COMMAND = 0;
+                SD_COMMAND = 1;
                 timeout = 50000U;
             }
-            if (PEEK(SD_CTL) & 0x40) {
+            if (SD_STATUS & 0x40) {
                 return;
             }
             // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
             // but sdcardio.vhdl thinks not. This means a read error
-            if (PEEK(SD_CTL) == 0x01) {
+            if (SD_STATUS == 0x01) {
                 return;
             }
         }
 
         // Command read
-        POKE(SD_CTL, 2);
+        SD_COMMAND = 2;
 
         // Wait for read to complete
         timeout = 50000U;
-        while (PEEK(SD_CTL) & 0x3) {
+        while (SD_STATUS & SD_STATUS_BUSY) {
             timeout--;
             if (!timeout) {
                 return;
             }
-            if (PEEK(SD_CTL) & 0x40) {
+            if (SD_STATUS & 0x40) {
                 return;
             }
             // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
             // but sdcardio.vhdl thinks not. This means a read error
-            if (PEEK(SD_CTL) == 0x01) {
+            if (SD_STATUS == 0x01) {
                 return;
             }
         }
 
-        if (!(PEEK(SD_CTL) & 0x67)) {
+        if (!(SD_STATUS & 0x67)) {
             // Copy data from hardware sector buffer via DMA
             lcopy(SD_SECTORBUFFER, (long)sector_buffer, 512);
 
@@ -141,34 +153,35 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     uint16_t counter = 0;
 
     // Set address to read/write
-    POKE(SD_CTL, 1); // end reset
+    SD_COMMAND = 1; // end reset
     if (!sdhc_card) {
         sector_address = sector_number * 512;
     } else {
         sector_address = sector_number;
     }
-    POKE(SD_ADDR + 0, (sector_address >> 0) & 0xff);
-    POKE(SD_ADDR + 1, (sector_address >> 8) & 0xff);
-    POKE(SD_ADDR + 2, (sector_address >> 16) & 0xff);
-    POKE(SD_ADDR + 3, (sector_address >> 24) & 0xff);
+    SD_SECTOR(0) = (sector_address >> 0) & 0xff;
+    SD_SECTOR(1) = (sector_address >> 8) & 0xff;
+    SD_SECTOR(2) = (sector_address >> 16) & 0xff;
+    SD_SECTOR(3) = (sector_address >> 24) & 0xff;
 
     // Read the sector and see if it already has the correct contents.
     // If so, nothing to write
 
-    POKE(SD_CTL, 2); // read the sector we just wrote
+    DEBUG_COUNT(sd_reads);
+    SD_COMMAND = 2; // read the sector we just wrote
 
     counter = 0;
-    while (PEEK(SD_CTL) & 3) {
+    while (SD_STATUS & SD_STATUS_BUSY) {
         if (hal_border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
         }
         counter++;
         if (!counter) {
             // SD card not becoming ready: try reset
-            POKE(SD_CTL, 0); // begin reset
+            SD_COMMAND = 0; // begin reset
             usleep(500000);
-            POKE(SD_CTL, 1); // end reset
-            POKE(SD_CTL, 2);
+            SD_COMMAND = 1; // end reset
+            SD_COMMAND = 2;
         }
     }
 
@@ -181,77 +194,69 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         }
     }
     if (i == 512) {
+        DEBUG_COUNT(sd_writes_skipped);
         return;
     }
 
     while (tries < 10) {
+        DEBUG_COUNT(sd_writes);
 
         // Copy data to hardware sector buffer via DMA
         lcopy((long)sector_buffer, SD_SECTORBUFFER, 512);
 
         // Wait for SD card to be ready
         counter = 0;
-        while (PEEK(SD_CTL) & 3) {
+        while (SD_STATUS & SD_STATUS_BUSY) {
             counter++;
             if (!counter) {
                 // SD card not becoming ready: try reset
-                POKE(SD_CTL, 0); // begin reset
+                SD_COMMAND = 0; // begin reset
                 usleep(500000);
-                POKE(SD_CTL, 1);    // end reset
-                POKE(SD_CTL, 0x57); // Open SD card write gate
+                SD_COMMAND = 1;    // end reset
+                SD_COMMAND = 0x57; // Open SD card write gate
                 if (is_multi) {
-                    POKE(SD_CTL, 4);
+                    SD_COMMAND = 4;
                 } else {
-                    POKE(SD_CTL, 3); // retry write
+                    SD_COMMAND = 3; // retry write
                 }
             }
         }
 
         // Command write
-        POKE(SD_CTL, 0x57); // Open SD card write gate
+        SD_COMMAND = 0x57; // Open SD card write gate
         if (is_multi) {
-            POKE(SD_CTL, 4);
+            SD_COMMAND = 4;
         } else {
-            POKE(SD_CTL, 3);
+            SD_COMMAND = 3;
         }
 
         // Wait for write to complete
         counter = 0;
-        while (PEEK(SD_CTL) & 3) {
+        while (SD_STATUS & SD_STATUS_BUSY) {
             counter++;
             if (!counter) {
                 // SD card not becoming ready: try reset
-                POKE(SD_CTL, 0); // begin reset
+                SD_COMMAND = 0; // begin reset
                 usleep(500000);
-                POKE(SD_CTL, 1); // end reset
+                SD_COMMAND = 1; // end reset
                 // Retry write
-                POKE(SD_CTL, 0x57); // Open SD card write gate
+                SD_COMMAND = 0x57; // Open SD card write gate
                 if (is_multi) {
-                    POKE(SD_CTL, 4);
+                    SD_COMMAND = 4;
                 } else {
-                    POKE(SD_CTL, 3);
+                    SD_COMMAND = 3;
                 }
             }
         }
 
-        write_count++;
-        if (hal_border_flicker > 1) {
-            VICIV.bordercol = write_count & 0x0f;
-        }
-
-        if (!(PEEK(SD_CTL) & 0x67)) {
-            write_count++;
-
-            if (hal_border_flicker > 1) {
-                VICIV.bordercol = write_count & 0x0f;
-            }
-
+        if (!(SD_STATUS & 0x67)) {
             /* The controller misbehaves unless a read follows a write, and
              * sometimes wants a reset even then; the read below is also what
              * verifies the write took. */
-            POKE(SD_CTL, 2);
+            DEBUG_COUNT(sd_reads);
+            SD_COMMAND = 2;
 
-            while (PEEK(SD_CTL) & 3) {
+            while (SD_STATUS & SD_STATUS_BUSY) {
             }
 
             // Copy the read data to a buffer for verification
@@ -283,23 +288,23 @@ void sdcard_writenextsector(void) {
     lcopy((long)sector_buffer, SD_SECTORBUFFER, 512);
 
     // Command write of follow-on block in multi-block write job
-    while (PEEK(SD_CTL) & 3) {
+    while (SD_STATUS & SD_STATUS_BUSY) {
     }
-    POKE(SD_CTL, 0x57); // Open SD card write gate
-    POKE(SD_CTL, 5);
-    while (!(PEEK(SD_CTL) & 3)) {
+    SD_COMMAND = 0x57; // Open SD card write gate
+    SD_COMMAND = 5;
+    while (!(SD_STATUS & SD_STATUS_BUSY)) {
     }
-    while (PEEK(SD_CTL) & 3) {
+    while (SD_STATUS & SD_STATUS_BUSY) {
     }
 }
 
 void sdcard_writemultidone(void) {
-    while (PEEK(SD_CTL) & 3) {
+    while (SD_STATUS & SD_STATUS_BUSY) {
     }
-    POKE(SD_CTL, 0x57);
-    POKE(SD_CTL, 6);
-    while (!(PEEK(SD_CTL) & 3)) {
+    SD_COMMAND = 0x57;
+    SD_COMMAND = 6;
+    while (!(SD_STATUS & SD_STATUS_BUSY)) {
     }
-    while (PEEK(SD_CTL) & 3) {
+    while (SD_STATUS & SD_STATUS_BUSY) {
     }
 }
