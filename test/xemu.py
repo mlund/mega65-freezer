@@ -68,11 +68,16 @@ def launch(
     boot: float = 16.0,
     settle: float = 2.0,
     quit_after: float = 20.0,
+    extra: list[str] | None = None,
+    stdout=None,
 ) -> None:
     """Boot `prg`, hand the monitor socket to `drive`, then shut down.
 
     `drive(sock)` runs once the machine is up; it may type, and may read()
     memory.  `dump` collects a memory image on exit, for a whole-screen check.
+    `extra` adds emulator options, and `stdout` catches what it prints -- the
+    hypervisor serial channel arrives that way.  Give it a file rather than a
+    pipe: the run ends with SIGTERM, and a pipe buffer is lost at that moment.
 
     The socket path must be short: AF_UNIX caps near 104 characters, so it
     cannot live under a long temporary directory.
@@ -97,8 +102,14 @@ def launch(
         argv += ["-sdimg", sdimg]
     if dump:
         argv += ["-dumpmem", dump]
+    if extra:
+        argv += extra
 
-    proc = subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen(
+        argv,
+        stdout=subprocess.DEVNULL if stdout is None else stdout,
+        stderr=subprocess.DEVNULL if stdout is None else subprocess.STDOUT,
+    )
     try:
         time.sleep(boot)
         if drive is not None:

@@ -34,14 +34,14 @@ import argparse
 import contextlib
 import os
 import re
-import signal
-import subprocess
 import sys
 import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import card
+import screen as screen_at
+import xemu
 import xemu_keys
 
 # $D011 in the frozen machine.  Its bit 5 is BMM, which the database names, so
@@ -168,69 +168,44 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    seen = {}
+
+    def run(sock):
+        drive(sock, args.settle)
+        time.sleep(5)
+        # The screen is read from the running machine: -dumpscreen walks one
+        # byte per cell, which is right for the monitor's 8-bit mode but not for
+        # the freezer's, and a scenario crosses between the two.
+        seen["memory"] = xemu.read(sock, screen_at.SCREEN_AT, screen_at.SCREEN_BYTES)
+        seen["cells"] = 2 if xemu.read(sock, screen_at.CHR16, 1)[0] & 0x01 else 1
+
     with tempfile.TemporaryDirectory() as tmp:
         clone = card.inject(args.sdimg, tmp, args.build, not args.without_iomap)
-        dump = os.path.join(tmp, "screen.txt")
         serial_path = os.path.join(tmp, "serial.txt")
-        socket_path = f"/tmp/xemu-bitedit-{os.getpid()}.sock"
-        command = [
-            args.emulator,
-            "-headless",
-            "-sleepless",
-            "-fastboot",
-            "-testing",
-            "-model",
-            "3",
-            "-besure",
-            "-sdimg",
-            clone,
-            "-uartmon",
-            socket_path,
-            "-prgmode",
-            "64",
-            "-prg",
-            os.path.join(args.build, "FREEZER.M65"),
-            "-dumpscreen",
-            dump,
-        ]
+        extra = []
         if args.expect_serial:
             # Not -hyperdebug: that is a separate, very spammy hypervisor trace
             # and it drowns the channel this reads.
-            command.append("-hyperserialascii")
+            extra.append("-hyperserialascii")
         if args.screenshot:
-            command += ["-screenshot", os.path.abspath(args.screenshot)]
-        # To a file rather than a pipe: the run ends with SIGTERM, and whatever
-        # is still in a pipe buffer at that moment is lost.
-        with contextlib.ExitStack() as stack:
-            serial_out = subprocess.DEVNULL
-            if args.expect_serial:
-                serial_out = stack.enter_context(open(serial_path, "w", encoding="utf-8"))
-            proc = subprocess.Popen(command, stdout=serial_out, stderr=subprocess.STDOUT)
-            try:
-                time.sleep(args.boot)
-                sock = xemu_keys.socket.socket(
-                    xemu_keys.socket.AF_UNIX, xemu_keys.socket.SOCK_STREAM
-                )
-                sock.settimeout(5)
-                sock.connect(socket_path)
-                time.sleep(0.3)
-                drive(sock, args.settle)
-                sock.close()
-                time.sleep(5)
-            finally:
-                proc.send_signal(signal.SIGTERM)
-                try:
-                    proc.wait(timeout=20)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.wait()
-                if os.path.exists(socket_path):
-                    os.unlink(socket_path)
+            extra += ["-screenshot", os.path.abspath(args.screenshot)]
 
-        if not os.path.exists(dump):
-            sys.exit("emulator wrote no screen dump")
-        with open(dump, encoding="utf-8", errors="replace") as handle:
-            screen = handle.read()
+        with contextlib.ExitStack() as stack:
+            log = None
+            if args.expect_serial:
+                log = stack.enter_context(open(serial_path, "w", encoding="utf-8"))
+            xemu.launch(
+                args.emulator,
+                os.path.join(args.build, "FREEZER.M65"),
+                sdimg=clone,
+                socket_path=f"/tmp/xemu-bitedit-{os.getpid()}.sock",
+                drive=run,
+                boot=args.boot,
+                extra=extra,
+                stdout=log,
+            )
+
+        screen = screen_at.screen(seen["memory"], screen_at.SCREEN_AT, seen["cells"])
         serial = ""
         if args.expect_serial:
             with open(serial_path, encoding="utf-8", errors="replace") as handle:
