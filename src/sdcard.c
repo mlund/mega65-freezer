@@ -148,6 +148,8 @@ void sdcard_readsector(const uint32_t sector_number) {
     }
 }
 
+/* Placed by src/memory.ld, above the region the linker allocates from, so its
+ * half kilobyte does not come out of the same budget as the code. */
 extern uint8_t sd_verify_buffer[SD_SECTOR_SIZE];
 
 void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {

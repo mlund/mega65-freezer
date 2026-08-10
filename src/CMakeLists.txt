@@ -19,6 +19,30 @@ set_source_files_properties(${VERSION_H} PROPERTIES GENERATED TRUE)
 # $9000 (the charset shadow, which a tool must not run into) - $07ff (load address)
 set(MAX_SIZE 34817)
 
+# The same $9000, as an address: everything below it is shared between the code
+# and its data, so a large array there is budget the C cannot have.  See
+# cmake/checkbuffers.cmake, and src/memory.ld for where such an array can go
+# instead.  Each name below is a decision that it stays; none has been examined
+# closely, so they are candidates rather than conclusions.
+set(REGION_TOP 36864)
+set(LOWMEM_THRESHOLD 256)
+set(LOWMEM_ALLOW
+    sector_buffer       # every sector read and written goes through it
+    freeze_region_list  # hyppo's table, read at startup and kept
+    process_descriptor
+    colour_table
+    mon_sector
+    block_buffer
+    code_buffer
+    buffer
+    escapeCode
+    rom_reset_screen
+)
+# Commas, not semicolons: a CMake list on a command line splits into separate
+# arguments.
+string(REPLACE ";" "," LOWMEM_ALLOW_ARG "${LOWMEM_ALLOW}")
+find_program(LLVM_NM_EXE NAMES llvm-nm HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
+
 # Hypervisor serial tracing on the failure paths.  Off by default: a shipping
 # build carries no strings for failures that do not happen.  See src/trace.h.
 option(FREEZER_TRACE "Trace failure paths over the hypervisor serial channel" OFF)
@@ -105,6 +129,13 @@ function(add_m65 name)
     add_custom_command(TARGET ${name} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -DFILE=$<TARGET_FILE:${name}> -DMAX_SIZE=${MAX_SIZE}
                 -P ${CMAKE_SOURCE_DIR}/cmake/checksize.cmake)
+    if(LLVM_NM_EXE)
+        add_custom_command(TARGET ${name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -DFILE=$<TARGET_FILE:${name}>.elf -DNM=${LLVM_NM_EXE}
+                    -DTHRESHOLD=${LOWMEM_THRESHOLD} -DREGION_TOP=${REGION_TOP}
+                    -DALLOW=${LOWMEM_ALLOW_ARG}
+                    -P ${CMAKE_SOURCE_DIR}/cmake/checkbuffers.cmake)
+    endif()
 endfunction()
 
 add_m65(FREEZER  freezer/main.c freezer/diskchooser.c freezer/menu.cpp)
