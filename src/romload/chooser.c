@@ -368,7 +368,7 @@ unsigned char freeze_load_romarea(void) {
                         for (s = 0; s < 256; s++) { // ROM is 128k, devided by 512 byte sectors is
                                                     // 256 sectors to load
                             // Write each sector to frozen memory
-                            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+                            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
                             lcopy(0x40000L + 512L * (long)s, (long)buffer, 512);
                             freeze_store_sector(0x20000L + ((long)s) * 512L, buffer);
                         }
@@ -502,7 +502,7 @@ void user_reset_prompt(void) {
         unfreeze_slot(0);
 
         while (1) {
-            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
         }
     }
 }

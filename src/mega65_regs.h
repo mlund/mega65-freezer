@@ -79,11 +79,11 @@ constexpr uint8_t VIC4_KNOCK_2 = 0x53;
 // Multi-Function I/O Controller".
 #define F011_CONTROL REG8(0xD080) // motor and drive select
 #define F011_COMMAND REG8(0xD081)
-#define F011_STATUS REG8(0xD082)          // BUSY is bit 7
-#define F011_TRACK REG8(0xD084)           // FDC:TRACK
-#define F011_SECTOR REG8(0xD085)          // FDC:SECTOR
-#define F011_SIDE REG8(0xD086)            // FDC:SIDE
-#define F011_DATA REG8(0xD087)            // sector byte port
+#define F011_STATUS REG8(0xD082)           // BUSY is bit 7
+#define F011_TRACK REG8(0xD084)            // FDC:TRACK
+#define F011_SECTOR REG8(0xD085)           // FDC:SECTOR
+#define F011_SIDE REG8(0xD086)             // FDC:SIDE
+#define F011_DATA REG8(0xD087)             // sector byte port
 constexpr uint8_t F011_CMD_SPINUP = 0x20;  // guide: write to COMMAND, then poll BUSY
 constexpr uint8_t F011_STATUS_BUSY = 0x80; // guide: bit 7 of STATUS
 // The rest are read off this program's own usage, not the user guide, which

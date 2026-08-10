@@ -194,12 +194,24 @@ static void format_disk_image(uint32_t file_sector, char* diskname, bool is_d65)
     const struct DiskGeometry* geom = disk_geometry(is_d65);
     const uint32_t sect_count = disk_total_sectors(geom);
 
-    // Make sure entire image is empty
+    /* Thousands of sector operations behind a screen that says only "CREATING
+     * IMAGE...".  The card answers instantly under emulation and does not on
+     * hardware, where a still border is indistinguishable from a hang, so let
+     * the border move while the controller is busy. */
+    sdcard_visual_feedback(2);
+
+    /* Multi-sector writes look like the obvious speed-up here and are not: a
+     * multi-block run cannot read, and it is the read before each write that
+     * skips the write entirely when the sector already holds zeros.  Measured
+     * over a whole D81 on a clean card, that is 1600 writes avoided out of
+     * 1600.  See test/verify_sdcount_xemu.py. */
     clear_sector_buffer();
     for (s = 0; s < sect_count; s++) {
-        // XXX - Using multi-sector writes here would be much faster
         sdcard_writesector(file_sector + s, 0);
     }
+
+    sdcard_visual_feedback(0);
+    VICIV.bordercol = SchemeBorder;
 
     // Link to first directory sector
     sector_buffer[0] = 0x28;

@@ -90,7 +90,7 @@ Against the binaries shipped on the MEGA65 SD card:
 | tool       |   cc65 |  llvm |    % |
 |------------|-------:|------:|-----:|
 | `AUDIOMIX` |  23161 |  8255 |  -64 |
-| `MAKEDISK` |  22307 |  9911 |  -56 |
+| `MAKEDISK` |  22307 |  9978 |  -55 |
 | `MEGAINFO` |  21966 | 10348 |  -53 |
 | `ROMLOAD`  |  17378 |  8744 |  -50 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
@@ -192,3 +192,11 @@ Pinned mega65-libc is automatically sources by CMake.
 - Colour schemes, switchable while the tools run.
 - The freeze menu's fixed text is built at compile time and drawn as
   positioned fragments.
+- `MAKEDISK`: the border reports while the card is busy. Formatting is
+  thousands of sector operations behind a screen that says only "CREATING
+  IMAGE...", and an emulated card answers instantly where a real one does not,
+  so the wait had nothing to distinguish it from a hang.
+- SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
+  a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
+  D81 costs. Transactions rather than time -- the emulator has no card -- so
+  the figures are the half that carries to hardware.

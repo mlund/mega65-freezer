@@ -13,8 +13,9 @@ const long SD_SECTORBUFFER = 0xffd6e00L;
 unsigned char sdhc_card = 0;
 uint8_t hal_border_flicker = 0;
 
-/* How much the border reports while the card is busy: 0 nothing, 1 success and
- * failure only, 2 every step.  Anything higher is taken as 2. */
+/* Whether the border cycles while the controller is busy: 0 silent, above 1
+ * reports.  1 is accepted and does nothing -- no site tests for it -- so a
+ * caller that wants to be told anything asks for 2. */
 void sdcard_visual_feedback(const uint8_t do_flicker) {
     hal_border_flicker = do_flicker < 3 ? do_flicker : 2;
 }
@@ -26,7 +27,7 @@ void sdcard_reset(void) {
     // Now wait for SD card reset to complete
     while (SD_STATUS & SD_STATUS_BUSY) {
         if (hal_border_flicker > 1) {
-            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
         }
     }
 
@@ -133,7 +134,7 @@ void sdcard_readsector(const uint32_t sector_number) {
         }
 
         if (hal_border_flicker > 1) {
-            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
         }
 
         // Reset SD card
@@ -173,7 +174,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     counter = 0;
     while (SD_STATUS & SD_STATUS_BUSY) {
         if (hal_border_flicker > 1) {
-            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
         }
         counter++;
         if (!counter) {
@@ -275,7 +276,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         }
 
         if (hal_border_flicker > 1) {
-            VICIV.bordercol = (VICIV.bordercol + 1) & 0xf;
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
         }
         /* Without this the bound is never approached and a sector that will not
          * verify is rewritten for ever. */
