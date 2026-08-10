@@ -89,13 +89,13 @@ Against the binaries shipped on the MEGA65 SD card:
 
 | tool       |   cc65 |  llvm |    % |
 |------------|-------:|------:|-----:|
-| `AUDIOMIX` |  23161 |  8242 |  -64 |
-| `MAKEDISK` |  22307 |  9871 |  -56 |
-| `MEGAINFO` |  21966 | 10364 |  -53 |
-| `ROMLOAD`  |  17378 |  8731 |  -50 |
+| `AUDIOMIX` |  23161 |  8255 |  -64 |
+| `MAKEDISK` |  22307 |  9911 |  -56 |
+| `MEGAINFO` |  21966 | 10348 |  -53 |
+| `ROMLOAD`  |  17378 |  8744 |  -50 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
-| `SPRITED`  |  31016 | 16866 |  -46 |
-| `FREEZER`  |  24700 | 16912 |  -32 |
+| `SPRITED`  |  31016 | 16791 |  -46 |
+| `FREEZER`  |  24700 | 16815 |  -32 |
 
 `MONITOR` alone is measured _before_ feature additions, at the point it did the
 same job as its cc65 counterpart: its disassembler, assembler and bit editor
