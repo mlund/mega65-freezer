@@ -1,13 +1,21 @@
 # MEGA65 freezer
 
-Freeze menu and tools for the MEGA65.
+## Synopsis
 
-An llvm-mos rewrite of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/mega65-freezemenu),
-which builds with cc65; see its README for what the tools are for and how they
-are installed. Nothing is shared but the behaviour — the sources, build and
-tests here are separate.
+A rewrite of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/mega65-freezemenu)
+in modern C for the llvm-mos toolchain. The tools do what the cc65 originals do,
+in 32-64% fewer bytes ([table below](#size)), which leaves room inside the
+34817-byte budget for new work. Most of the C compiles on the host and is tested
+there; the rest is driven through the MEGA65 serial link by a test harness, so
+far under Xemu, though the same harness would drive hardware. `MONITOR` spends
+the freed bytes on a syntax-highlighted 45GS02 (dis)assembler and a bit editor
+that names registers and bits from mega65-core's `iomap.txt`. The rewrite also
+exposed several bugs in the original, listed below. Every push is built under
+strict compiler warnings and clang-tidy.
 
-`RESTORE` freezes the running program; `FREEZER` draws the menu and launches the
+## Freezer Overview
+
+Pressing `RESTORE` freezes the running program; `FREEZER` draws the menu and launches the
 rest. Each tool is a separate program loaded from the SD card:
 
 | tool       | what it does                                |
@@ -106,7 +114,7 @@ have nothing to compare against.
 ### New features
 
 - `MONITOR`:
-  - 45GS10 (dis)assembler
+  - 45GS02 (dis)assembler
   - bit editor with named I/O register bits from mega65-core's `iomap.txt`.
 - Dynamic colour schemes
 - `MAKEDISK`: the border reports while the card is busy. Formatting is
