@@ -104,8 +104,8 @@ Against the binaries shipped on the MEGA65 SD card:
 | `MEGAINFO` |  21966 | 10356 |  -53 |
 | `ROMLOAD`  |  17378 |  8741 |  -50 |
 | `MONITOR`  |  18226 |  9353 |  -49 |
-| `SPRITED`  |  31016 | 15321 |  -51 |
-| `FREEZER`  |  24700 | 16851 |  -32 |
+| `SPRITED`  |  31016 | 15292 |  -51 |
+| `FREEZER`  |  24700 | 16822 |  -32 |
 
 `MONITOR` alone is measured _before_ feature additions, at the point it did the
 same job as its cc65 counterpart: its disassembler, assembler and bit editor
@@ -139,6 +139,12 @@ Defects found in original:
 - Each branch of the PAL/NTSC toggle wrote the sprite Y adjust twice with the
   same value, on both the frozen side and the freezer's own — four more sector
   transfers per keypress, for bytes already there. `freezer.c:1118/1125`.
+- The chargen fix read the ROM back off the card. Hyppo loads `MEGA65.ROM` to
+  `$20000` immediately before it loads the freezer (`hyppo/task.asm`,
+  `attempt_loadc65rom`), so the charset was already in RAM; the freezer fetched
+  all 131072 bytes again to use the 4096 at offset `$D000`. Every startup pays
+  it, between the menu text and the thumbnail, and the shipped card carries
+  neither of the smaller files that would have avoided it. `freezer.c:826-829`.
 - The disk chooser read the mounted state it saves before previewing an image
   from the wrong place entirely. `0x0400 + drive_id ? 0x35 : 0x15` parses as
   `(0x0400 + drive_id) ? 0x35 : 0x15`, which is the constant `$35`, so the name

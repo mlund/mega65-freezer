@@ -49,7 +49,19 @@ static const char ROOT_WARN[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
 
 // name of the file that is loaded by charset restore F14
 #define DEFAULT_CHARSET "CHARSET.M65"
-#define MAIN_ROM_FILE "MEGA65.ROM"
+
+/* The charset of the ROM the machine is running, in chip RAM: the image sits at
+ * $20000 and its charset $D000 into it.  $D67D.2 write-protects $20000-$3FFFF
+ * and only latches in hypervisor mode, so nothing short of a program that asked
+ * hyppo to unprotect it can have disturbed this. */
+constexpr Addr28 ROM_CHARSET = 0x2D000;
+
+/* Screen code 0 is `@` in every C64-descended charset, and its first two rows
+ * are enough to tell glyphs from the zeros or debris a failed ROM load would
+ * leave.  The case guarded against is no ROM at all, not a differing one. */
+static bool rom_charset_present(void) {
+    return lpeek(ROM_CHARSET) == 0x3C && lpeek(ROM_CHARSET + 1) == 0x66;
+}
 
 static unsigned char rom_changed = 0;
 unsigned char not_in_root = 0;
@@ -618,11 +630,15 @@ void fix_chargen_area(unsigned char flags) {
     // if first chargen sector was zero...
     if (i == SD_SECTOR_SIZE) {
         charset_start = -1;
-        // try to load DEFAULT_CHARSET or MEGA65.ROM
-        if (!read_file_from_sdcard(DEFAULT_CHARSET, 0x40000L)) {
+        /* Hyppo loads MEGA65.ROM to $20000 immediately before it loads this
+         * program (mega65-core src/hyppo/task.asm, attempt_loadc65rom), so the
+         * charset is already in RAM.  Reading that same file back off the card
+         * fetched 128K to use 4K of it, which is what the card is left holding
+         * only when the ROM did not load at all. */
+        if (rom_charset_present()) {
+            charset_start = ROM_CHARSET;
+        } else if (!read_file_from_sdcard(DEFAULT_CHARSET, 0x40000L)) {
             charset_start = 0x40000L;
-        } else if (!read_file_from_sdcard(MAIN_ROM_FILE, 0x40000L)) {
-            charset_start = 0x4D000L;
         }
 
         if (charset_start != -1) {
@@ -793,8 +809,6 @@ int main(void) {
 
     setup_menu_screen();
     predraw_freeze_menu();
-    // chargen fix needs happen before the thumbnail frame is loaded as it clobbers
-    // the thumbnail frame data.
     fix_chargen_area(ChargenFixMem | ChargenNoCheck);
     draw_freeze_menu(UpdateAll);
 
