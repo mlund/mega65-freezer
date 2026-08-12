@@ -218,4 +218,22 @@ being 16 bits here.
 Generators are Python with no third-party packages like libpng, ophis.
 Pinned mega65-libc is automatically sources by CMake.
 
+## Development notes
+
+Porting from cc65 to llvm-mos is deceptively simple: getting to a compiled state often requires mechanical changes only,
+which however is no guarantee of correctness. Memory placement, ZP, inline asm, volatiles all require attention. The lessons
+learned, including how to favor small byte counts, are condensed into the LLM skill
+[`llvm-mos`](https://github.com/mlund/claude-skills/tree/main/plugins/llvm-mos) and is automatically activated
+by [`AGENTS.md`](AGENTS.md) in the the repo root.
+This also loads the [`mega65-dev`](https://github.com/mlund/claude-skills/tree/main/plugins/mega65-dev)
+skill which draws information from the MEGA65 User Guide and VHDL core.
+Note that skills are merely Markdown files and human readable.
+
+My thoughts on using LLMs is positive and LLM contributions are accepted for this project;
+see [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines and restrictions adapted from the LLVM project.
+The human operator needs to reign the LLM which has a habbit of producing large amounts of code and documentation.
+My experience is that code quality improves significantly by first do a planning step and ask critical questions: sway the LLM to look at the problem
+from different angles. Always look for testing opportunities.
+This requires domain knowledge - the more the better - which is of course the crux of the problem, but also true for traditional coding.
+[`AGENTS.md`](AGENTS.md) details specifics for the project and is automatically picked up by most LLMs.
 
