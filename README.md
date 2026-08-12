@@ -3,9 +3,9 @@
 ## Synopsis
 
 An unofficial rewrite of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/mega65-freezemenu)
-in modern C for the llvm-mos toolchain. The tools do what the cc65 originals do,
-in 32-64% fewer bytes ([table below](#size)), which leaves room inside the
-34817-byte budget for new work. Most of the C compiles on the host and is tested
+in modern C for the llvm-mos toolchain. The tools do what the cc65 originals do
+in 32-64% fewer bytes for the same work ([table below](#size)), which leaves
+room inside the 34817-byte budget for new work. Most of the C compiles on the host and is tested
 there; the rest is driven through the MEGA65 serial link by a test harness, so
 far under Xemu, though the same harness would drive hardware. `MONITOR` spends
 the freed bytes on a syntax-highlighted 45GS02 (dis)assembler and a bit editor
@@ -95,21 +95,24 @@ cmake -B build-trace -DFREEZER_TRACE=ON ...
 
 ### Size
 
-Against the binaries shipped on the MEGA65 SD card:
+Against the binaries on the MEGA65 R3 SD card (release 0.97), both columns
+counted whole, as the files are shipped:
 
-| tool       |   cc65 |  llvm |    % |
-|------------|-------:|------:|-----:|
-| `AUDIOMIX` |  23161 |  8268 |  -64 |
-| `MAKEDISK` |  22307 |  9981 |  -55 |
-| `MEGAINFO` |  21966 | 10356 |  -53 |
-| `ROMLOAD`  |  17378 |  8741 |  -50 |
-| `MONITOR`  |  18226 |  9353 |  -49 |
-| `SPRITED`  |  31016 | 15292 |  -51 |
-| `FREEZER`  |  24700 | 16822 |  -32 |
+| tool       |    R3 |  llvm |    % |
+|------------|------:|------:|-----:|
+| `AUDIOMIX` | 23163 |  8268 |  -64 |
+| `MAKEDISK` | 22309 |  9981 |  -55 |
+| `MEGAINFO` | 21968 | 10356 |  -53 |
+| `SPRITED`  | 31018 | 15292 |  -51 |
+| `ROMLOAD`  | 17380 |  8741 |  -50 |
+| `FREEZER`  | 24702 | 16826 |  -32 |
+| `MONITOR`  | 18228 | 21529 | +18* |
 
-`MONITOR` alone is measured _before_ feature additions, at the point it did the
-same job as its cc65 counterpart: its disassembler, assembler and bit editor
-have nothing to compare against.
+`*MONITOR` is no longer the same program, so its figure measures something the
+others do not: 45GS02 disassembler and assembler; the bit editor that names
+registers and their bits, and the copy, fill, compare, hunt and pixel commands
+have no counterpart in the original to be measured against. Doing only what
+that original did, it was 9353 bytes -- 49% less.
 
 ### New features
 
@@ -118,7 +121,7 @@ have nothing to compare against.
  
     <img width="300" alt="Image" src="https://github.com/user-attachments/assets/e20e3cf5-d918-4d81-9dd5-3d32cfd9e26d" />
   
-  - Bit editor with named I/O register bits from mega65-core's `iomap` (pptional SD card file).
+  - Bit editor with named I/O register bits from mega65-core's `iomap` (optional SD card file).
  
     <img width="500" alt="Image" src="https://github.com/user-attachments/assets/7542e667-3e56-4590-917f-08f3136fcce0" />
 
