@@ -115,7 +115,18 @@ have nothing to compare against.
 
 - `MONITOR`:
   - 45GS02 (dis)assembler
-  - bit editor with named I/O register bits from mega65-core's `iomap.txt`.
+ 
+    <img width="300" alt="Image" src="https://github.com/user-attachments/assets/e20e3cf5-d918-4d81-9dd5-3d32cfd9e26d" />
+  
+  - Bit editor with named I/O register bits from mega65-core's `iomap` (pptional SD card file).
+ 
+    <img width="500" alt="Image" src="https://github.com/user-attachments/assets/7542e667-3e56-4590-917f-08f3136fcce0" />
+
+  - Pixel view
+  
+    <img width="350" alt="Image" src="https://github.com/user-attachments/assets/86b3ba5d-f8a5-4e6a-be13-03e9435cadb8" />
+
+  - Fill, compare, copy commands
 - Dynamic colour schemes
 - `MAKEDISK`: the border reports while the card is busy. Formatting is
   thousands of sector operations behind a screen that says only "CREATING
