@@ -48,7 +48,10 @@ void do_sprite_editor(void);
 unsigned char do_rom_loader(void);
 void do_megainfo(void);
 
-extern unsigned char not_in_root;
+/* Whether the SD card's current directory is not its root, which is where
+ * every file the freezer opens by name lives.  Only a directory scan
+ * refreshes it; it starts false because hyppo begins in the root. */
+extern bool in_subdirectory;
 
 /* Bits of freeze_region_flags. */
 enum : uint8_t {

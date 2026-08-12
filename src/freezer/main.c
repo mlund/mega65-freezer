@@ -62,7 +62,7 @@ static bool rom_charset_present(void) {
 }
 
 static uint8_t rom_changed = 0;
-uint8_t not_in_root = 0;
+bool in_subdirectory = false;
 
 void to_petscii_upper(char* text, int length);
 
@@ -570,7 +570,7 @@ void draw_freeze_menu(uint8_t part) {
         }
 
         // only load new image if needed
-        if (!not_in_root &&
+        if (!in_subdirectory &&
             thumb_frame != last_thumb_frame) { // only load a frame if we are in the root
             while (thumb_frame > -1) {
                 if (!read_file_from_sdcard(thumb_frame_name[thumb_frame], 0x052000L)) {
@@ -731,7 +731,7 @@ void start_freezer_tool(char* toolfile) {
     char x = 0;
     char start_tool = 0;
 
-    if (not_in_root) {
+    if (in_subdirectory) {
         for (uint8_t row = 0; row < ROOT_WARN_ROWS; row++) {
             draw_text(SCREEN_CELL(0, ROOT_WARN_Y + row), SchemeWarning, &ROOT_WARN[row * 40], 40);
         }

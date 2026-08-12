@@ -495,7 +495,7 @@ void scan_directory(uint8_t drive_id) {
 
     min_dir_entry = file_count;
 
-    not_in_root = 0;
+    in_subdirectory = false;
     dir = opendir();
     dirent = readdir(dir);
     while (dirent && ((uint16_t)dirent != 0xffffU)) {
@@ -507,7 +507,7 @@ void scan_directory(uint8_t drive_id) {
             if (dirent->d_type & 0x10) {
                 // if there is a .. path, then we are in a subdir
                 if (!strcmp("..", dirent->d_name)) {
-                    not_in_root = 1;
+                    in_subdirectory = true;
                     // overwrite makedisk
                     file_count--;
                     lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), ' ', 64);
@@ -652,7 +652,7 @@ char* freeze_select_disk_image(uint8_t drive_id) {
                         mega65_dos_detach(
                             drive_id | (selection_number == 0 ? M65_DOS_ATTACH_NODRIVE : 0));
                         return selection_number == 0 ? SELDISK_NODISK : SELDISK_INTERNAL;
-                    } else if (selection_number == 2 && !not_in_root) {
+                    } else if (selection_number == 2 && !in_subdirectory) {
                         // Create and mount new empty D81 file
                         // (this is like exec()/fork(), so there is no return value
 
