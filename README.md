@@ -134,6 +134,9 @@ less.
 
   - The frozen machine's memory map under `R`: which 28-bit range each part of
     the 16-bit space reached, what is there, and which register bit decided it.
+
+    <img width="600" alt="Image" src="https://github.com/user-attachments/assets/77f6898b-1287-437d-958f-6ea55ae8ff38" />
+    
   - Addresses as the frozen program saw them. Bit 31 asks for the CPU's view, so
     `M 8000E000` reads through the frozen map where `M E000` is literal --
     the convention the MEGA65 monitor documents.
