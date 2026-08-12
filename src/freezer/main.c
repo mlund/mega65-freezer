@@ -1109,9 +1109,6 @@ int main(void) {
                             sdcard_writesector(dest_freeze_slot_start_sector + i + j, 0);
                         }
                     }
-                    // stop giving visual feedback
-                    sdcard_visual_feedback(0);
-
                     VICIV.bordercol = SchemeBorder;
 
                     draw_freeze_menu(UpdateTop | UpdateProcess | UpdateThumb);

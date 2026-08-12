@@ -225,6 +225,12 @@ Defects found in original:
   The six other slot-change keys pass `UPDATE_DISK` and HOME does not, though
   it does refetch the descriptor those rows are drawn from -- the data was
   right and only the drawing was skipped. `freezer.c:1075`.
+- The freeze-slot copy asked for card feedback with a value nothing tests.
+  `sdcard_visual_feedback(1)` sets the flag to 1, and all six sites that poll it
+  while the controller is busy test it for greater than 1, so the border never
+  cycled: the two colours the copy loop sets around each 64KB block were the
+  only sign it was working. `freezer.c:1290`, against `fdisk_hal_mega65.c:53`
+  and five more.
 - Dead code: a ROM-name update flag, a chunk reader, a pre-blank of the drive
   numbers, the touch and joystick handling, a copy of the filename into a page
   the attach writes itself.

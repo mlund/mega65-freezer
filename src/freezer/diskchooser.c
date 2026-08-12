@@ -692,9 +692,6 @@ char* freeze_select_disk_image(uint8_t drive_id) {
                         while (x) {
                             F011_COMMAND = F011_CMD_SEEK;
                             while (F011_STATUS & F011_STATUS_BUSY) {
-                                if (hal_border_flicker > 1) {
-                                    VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
-                                }
                             }
                             x--;
                         }

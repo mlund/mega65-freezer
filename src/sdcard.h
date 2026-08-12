@@ -13,7 +13,8 @@ constexpr uint16_t SD_SECTOR_SIZE = 512;
 extern uint8_t sector_buffer[SD_SECTOR_SIZE];
 #define clear_sector_buffer() lfill((uint32_t)sector_buffer, 0, SD_SECTOR_SIZE)
 
-extern uint8_t hal_border_flicker;
+/* Read by the card routines while they wait, set through the call below. */
+extern uint8_t border_flicker;
 
 void sdcard_visual_feedback(const uint8_t do_flicker);
 void sdcard_open(void);
