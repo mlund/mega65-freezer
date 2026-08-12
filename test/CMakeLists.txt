@@ -86,6 +86,12 @@ if(Python3_FOUND AND HOST_C_COMPILER AND LLVM_MC_EXE)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_disasm.py
                     --llvm-mc ${LLVM_MC_EXE} --cc ${HOST_C_COMPILER}
                     --rom ${MEGA65_ROM})
+    elseif(MEGA65_ROM)
+        message(STATUS "disasm_rom: skipped, no image at ${MEGA65_ROM}")
+    else()
+        # Said out loud because the strongest check the disassembler has is the
+        # one most easily left off: the test list looks complete without it.
+        message(STATUS "disasm_rom: skipped, set MEGA65_ROM to a MEGA65.ROM image")
     endif()
 endif()
 
