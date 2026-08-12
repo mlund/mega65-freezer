@@ -837,7 +837,8 @@ int main(void) {
                     if (slot_number) {
                         slot_number = 0;
 
-                        draw_freeze_menu(UpdateTop | UpdateProcess | UpdateThumb | UpdateChgSlot);
+                        draw_freeze_menu(
+                            UpdateTop | UpdateProcess | UpdateDisk | UpdateThumb | UpdateChgSlot);
                     }
                     break;
                 case ',':

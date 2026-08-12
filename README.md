@@ -212,6 +212,11 @@ Defects found in original:
   end-of-chain test read $0F000000 where FAT32 ends a chain at $0FFFFFF8.
 - A text entry field cleared its first cell once per character instead of
   clearing the field.
+- HOME jumped to slot 0 without redrawing the drive rows, so they went on
+  showing the previous slot's mounted images until a cursor key was pressed.
+  The six other slot-change keys pass `UPDATE_DISK` and HOME does not, though
+  it does refetch the descriptor those rows are drawn from -- the data was
+  right and only the drawing was skipped. `freezer.c:1075`.
 - Dead code: a ROM-name update flag, a chunk reader, a pre-blank of the drive
   numbers, the touch and joystick handling, a copy of the filename into a page
   the attach writes itself.
