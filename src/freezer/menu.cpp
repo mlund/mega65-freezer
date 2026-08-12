@@ -8,6 +8,7 @@
 
 #include "colours.h"
 #include "screen.h"
+#include "version.h"
 
 namespace {
 
@@ -17,8 +18,8 @@ namespace {
 constexpr auto FIXED = menu::stream(
     /* Dimmed: they name the program rather than saying anything about the
      * machine you froze. */
-    menu::fragment(6, 0, SchemeTextDim, "MEGA65 FREEZE MENU V0.4.1DEV"),
-    menu::fragment(2, 1, SchemeTextDim, "(C) MUSEUM OF ELECTRONIC GAMES & ART"),
+    menu::centered(0, SchemeTextDim, "MEGA65 FREEZE MENU " BUILD_TAG),
+    menu::centered(1, SchemeTextDim, "(C) MUSEUM OF ELECTRONIC GAMES & ART"),
 
     // The machine's settings.  Each value is written by its own Update path.
     menu::fragment(1, 5, SchemeText, "(C)PU MODE:"),
@@ -64,9 +65,16 @@ static_assert(CHOOSER_HELP.data[0] == 80, "the help fills both rows");
 
 /* The bytes the tables are supposed to produce, checked where a mistake would
  * be a wrong glyph rather than a build failure. */
-static_assert(FIXED.data[0] == 28, "title length");
-/* Column 6 of row 0, as a cell offset: 0 * 80 + 6 * 2. */
-static_assert(FIXED.data[1] == 12 && FIXED.data[2] == 0, "title position");
+/* The title carries BUILD_TAG and so changes width between releases: check that
+ * it still lands centred on row 0, rather than a column that would have to be
+ * edited with every tag. Equal margins means length + 2 * column fills the row,
+ * one short of it when an odd length cannot be split evenly. */
+constexpr uint8_t TITLE_LENGTH = FIXED.data[0];
+constexpr uint8_t TITLE_COLUMN = FIXED.data[1] / SCREEN_CELL_BYTES;
+static_assert(FIXED.data[2] == 0, "title on row 0");
+static_assert(TITLE_LENGTH + 2 * TITLE_COLUMN >= SCREEN_COLS - 1 &&
+                  TITLE_LENGTH + 2 * TITLE_COLUMN <= SCREEN_COLS,
+    "title centred");
 static_assert(FIXED.data[4] == 0x0D, "M");
 static_assert(FIXED.data[5] == 0x05, "E");
 static_assert(FIXED.data[9] == 0x35, "5, a digit, unchanged");

@@ -147,6 +147,16 @@ consteval Bytes<N + 3> fragment(uint8_t x, uint8_t y, uint8_t colour, const Ch (
     return f;
 }
 
+/* As fragment(), but works the column out from the text.  A banner carrying a
+ * release number cannot have its column typed in beside it: the number changes
+ * width between releases and the hand-computed column would silently stop
+ * centring it. */
+template <typename Ch, size_t N>
+consteval Bytes<N + 3> centered(uint8_t y, uint8_t colour, const Ch (&text)[N]) {
+    static_assert(N - 1 <= SCREEN_COLS, "text is wider than the screen");
+    return fragment(uint8_t((SCREEN_COLS - (N - 1)) / 2), y, colour, text);
+}
+
 /* Concatenates the fragments and appends the zero length that ends the walk. */
 template <size_t... Ns> consteval Bytes<(Ns + ... + 0) + 1> stream(Bytes<Ns>... parts) {
     Bytes<(Ns + ... + 0) + 1> out{};

@@ -3,3 +3,7 @@
 /* Substituted by cmake/version.cmake at build time, not configure time: the
  * stamp must follow HEAD, and .git/HEAD does not move when committing. */
 #define BUILD_VERSION "@BUILD_VERSION@"
+
+/* The nearest tag, for the menu banner.  Uppercased with BUILD_VERSION: the
+ * screen is the unshifted charset, which has no lowercase. */
+#define BUILD_TAG "@BUILD_TAG@"
