@@ -63,8 +63,6 @@ constexpr auto CHOOSER_SCANNING =
 
 static_assert(CHOOSER_HELP.data[0] == 80, "the help fills both rows");
 
-/* The bytes the tables are supposed to produce, checked where a mistake would
- * be a wrong glyph rather than a build failure. */
 /* The title carries BUILD_TAG and so changes width between releases: check that
  * it still lands centred on row 0, rather than a column that would have to be
  * edited with every tag. Equal margins means length + 2 * column fills the row,
@@ -73,8 +71,11 @@ constexpr uint8_t TITLE_LENGTH = FIXED.data[0];
 constexpr uint8_t TITLE_COLUMN = FIXED.data[1] / SCREEN_CELL_BYTES;
 static_assert(FIXED.data[2] == 0, "title on row 0");
 static_assert(TITLE_LENGTH + 2 * TITLE_COLUMN >= SCREEN_COLS - 1 &&
-                  TITLE_LENGTH + 2 * TITLE_COLUMN <= SCREEN_COLS,
+        TITLE_LENGTH + 2 * TITLE_COLUMN <= SCREEN_COLS,
     "title centred");
+
+/* The bytes the tables are supposed to produce, checked where a mistake would
+ * be a wrong glyph rather than a build failure. */
 static_assert(FIXED.data[4] == 0x0D, "M");
 static_assert(FIXED.data[5] == 0x05, "E");
 static_assert(FIXED.data[9] == 0x35, "5, a digit, unchanged");
