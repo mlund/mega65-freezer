@@ -142,6 +142,9 @@ less.
     the convention the MEGA65 monitor documents.
   - Fill, compare, copy commands
 - Dynamic colour schemes - press F1 to cycle (Mega65, Amiga Workbench, Gruvbox)
+
+  <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
+  
 - `MAKEDISK`: the border reports while the card is busy.
 - SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
   a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
