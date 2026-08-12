@@ -339,8 +339,8 @@ void draw_freeze_menu(unsigned char part) {
                 (const char*)freeze_menu_bar + 40,
                 40);
             draw_text(
-                SCREEN_CELL(SLOT_LABEL_X, SLOT_LABEL_Y), SchemeText, " FREEZE SLOT:      ", 19);
-            draw_decimal(SCREEN_CELL(SLOT_NUMBER_X, SLOT_LABEL_Y), SchemeText, slot_number);
+                SCREEN_CELL(SLOT_LABEL_X, SLOT_LABEL_Y), SchemeTextDim, " FREEZE SLOT:      ", 19);
+            draw_decimal(SCREEN_CELL(SLOT_NUMBER_X, SLOT_LABEL_Y), SchemeValue, slot_number);
         } else {
             draw_text(
                 SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, (const char*)freeze_menu_bar, 40);
@@ -352,35 +352,35 @@ void draw_freeze_menu(unsigned char part) {
             }
 
             draw_text(
-                SCREEN_CELL(SLOT_LABEL_X, SLOT_LABEL_Y), SchemeText, " - PAUSED STATE -   ", 19);
+                SCREEN_CELL(SLOT_LABEL_X, SLOT_LABEL_Y), SchemeValue, " - PAUSED STATE -   ", 19);
         }
 
         // CPU MODE
         draw_text(SCREEN_CELL(CPU_MODE_X, SETTINGS_TOP_Y),
-            SchemeText,
+            SchemeValue,
             (freeze_io_peek(0x367d) & 0x20) ? "  4502" : "  AUTO",
             6);
 
         // Joystick 1/2 swap
         draw_text(SCREEN_CELL(RIGHT_VALUE_X, SETTINGS_TOP_Y),
-            SchemeText,
+            SchemeValue,
             (UART_MISC & UART_MISC_JOYSWAP) ? "YES" : " NO",
             3);
 
         // Cartridge enable
         draw_text(SCREEN_CELL(RIGHT_VALUE_X, SETTINGS_TOP_Y + 1),
-            SchemeText,
+            SchemeValue,
             (freeze_io_peek(0x367d) & 0x01) ? "YES" : " NO",
             3);
 
         // PALEMU
         draw_text(SCREEN_CELL(CRTEMU_MODE_X, SETTINGS_TOP_Y + 2),
-            SchemeText,
+            SchemeValue,
             (freeze_io_peek(0x3054) & 0x20) ? " ON" : "OFF",
             3);
 
         draw_text(SCREEN_CELL(VIDEO_MODE_X, SETTINGS_TOP_Y + 2),
-            SchemeText,
+            SchemeValue,
             (freeze_io_peek(0x306f) & 0x80) ? "NTSC60" : " PAL50",
             6);
     }
@@ -405,7 +405,7 @@ void draw_freeze_menu(unsigned char part) {
                 speed = "???";
                 break;
         }
-        draw_text(SCREEN_CELL(CPU_FREQ_X, SETTINGS_TOP_Y + 1), SchemeText, speed, 3);
+        draw_text(SCREEN_CELL(CPU_FREQ_X, SETTINGS_TOP_Y + 1), SchemeValue, speed, 3);
     }
 
     if ((part & UpdateProcess) || (part & UpdateThumb)) {
@@ -432,7 +432,7 @@ void draw_freeze_menu(unsigned char part) {
     }
 
     if (part & UpdateProcess) {
-        draw_decimal(SCREEN_CELL(TASK_ID_X, TASK_ID_Y), SchemeText, process_descriptor.task_id);
+        draw_decimal(SCREEN_CELL(TASK_ID_X, TASK_ID_Y), SchemeValue, process_descriptor.task_id);
 
         // Process name: only display if no unprintable PETSCII chars
         for (i = 0; i < 16; i++) {
@@ -441,11 +441,11 @@ void draw_freeze_menu(unsigned char part) {
             }
         }
         draw_text(SCREEN_CELL(PROCESS_NAME_X, PROCESS_NAME_Y),
-            SchemeText,
+            SchemeValue,
             (i == 16) ? process_descriptor.process_name : "UNNAMED TASK    ",
             16);
 
-        draw_text(SCREEN_CELL(PROCESS_ROM_X, PROCESS_ROM_Y), SchemeTextBright, mega65_rom_name, 11);
+        draw_text(SCREEN_CELL(PROCESS_ROM_X, PROCESS_ROM_Y), SchemeValue, mega65_rom_name, 11);
     }
 
     if (part & UpdateDisk) {
@@ -458,7 +458,7 @@ void draw_freeze_menu(unsigned char part) {
             const uint8_t namelen = process_descriptor.d81_namelen[drive];
             char* name = process_descriptor.d81_name[drive];
 
-            draw_decimal(number_cell, SchemeText, freeze_peek(0x10113L + drive));
+            draw_decimal(number_cell, SchemeValue, freeze_peek(0x10113L + drive));
 
             /* The name is drawn over, not into a cleared buffer, so it needs a
              * blank first: a shorter name would leave a longer one's tail. */
@@ -986,6 +986,10 @@ int main(void) {
                     break;
                 case '1': // Select mounted disk image for 2nd drive
                     change_mounted_disk_image(1);
+                    break;
+
+                case KEY_F1: // F1 = next colour scheme
+                    apply_scheme((uint8_t)(current_scheme + 1));
                     break;
 
                 case KEY_F5: // F5 = Reset

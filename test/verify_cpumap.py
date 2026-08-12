@@ -153,6 +153,27 @@ def resolve(state: State, address: int, writing: bool) -> tuple[int, int]:
 ORACLE_STEP = 0x40
 
 
+def typed_address(state: State, typed: int) -> int:
+    """What the monitor makes of an address as typed.
+
+    Bit 31 asks for the frozen CPU's view; anything else is already a 28-bit
+    address.  Both are masked to 28 bits, so neither the flag nor the three bits
+    beside it can reach the freeze slot.
+    """
+    if typed & 0x80000000:
+        return resolve(state, typed & 0xFFFF, False)[0] & 0x0FFFFFFF
+    return typed & 0x0FFFFFFF
+
+
+# Typed addresses worth pinning: the flag over each mechanism's window, the same
+# addresses unflagged, and the bits beside the flag that must not survive.
+TYPED = sorted(
+    {0x80000000 | address for address in (0x0000, 0x8000, 0xA000, 0xC000, 0xD020, 0xDE00, 0xE000)}
+    | {0x0000, 0xD020, 0x2E000, 0xFFD3020, 0x7FFDE00}
+    | {0xF000D020, 0x7000D020, 0x8FFFFFFF}
+)
+
+
 def runs(state: State) -> list[tuple[int, int, int, int]]:
     """The merged runs, coalesced from per-window results rather than by
     repeating the walk under test: start a new run wherever the mechanism
@@ -236,6 +257,10 @@ def _script() -> tuple[str, list[tuple[str, str]]]:
         # The rows the map draws, which must describe the same resolution the
         # per-address checks above pin -- a table that reads plausibly while
         # disagreeing with what M then shows is the failure worth catching.
+        for typed in TYPED:
+            lines.append(f"typed {typed:x}")
+            checks.append((f"{name}: typed ${typed:08X}", f"{typed_address(state, typed):x}"))
+
         lines.append("runs")
         for first, last, target, by in runs(state):
             checks.append(
@@ -268,6 +293,9 @@ def main() -> int:
                 "-std=c2x",
                 "-Wall",
                 "-Werror",
+                # cpumap.h names Addr28, which lives in src/addr28.h.
+                "-I",
+                os.path.join(HERE, "..", "src"),
                 "-o",
                 binary,
                 os.path.join(HERE, "cpumap_host_harness.c"),

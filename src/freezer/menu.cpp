@@ -21,28 +21,33 @@ constexpr auto FIXED = menu::stream(
     menu::centered(0, SchemeTextDim, "MEGA65 FREEZE MENU " BUILD_TAG),
     menu::centered(1, SchemeTextDim, "(C) MUSEUM OF ELECTRONIC GAMES & ART"),
 
-    // The machine's settings.  Each value is written by its own Update path.
-    menu::fragment(1, 5, SchemeText, "(C)PU MODE:"),
-    menu::fragment(21, 5, SchemeText, "(J)OY SWAP:"),
-    menu::fragment(1, 6, SchemeText, "CPU (F)REQ:"),
-    menu::fragment(16, 6, SchemeText, "MHZ"),
-    menu::fragment(21, 6, SchemeText, "CAR(T) ENABLE:"),
-    menu::fragment(1, 7, SchemeText, "C(R)T EMU:"),
-    menu::fragment(21, 7, SchemeText, "(V)IDEO:"),
+    /* The labels are dimmed and the values beside them are not: what is worth
+     * reading here is the frozen machine's state, not the words naming it.  The
+     * commands below stay bright, being the one thing on the screen to act on.
+     *
+     * The machine's settings.  Each value is written by its own Update path. */
+    menu::fragment(1, 5, SchemeTextDim, "(C)PU MODE:"),
+    menu::fragment(21, 5, SchemeTextDim, "(J)OY SWAP:"),
+    menu::fragment(1, 6, SchemeTextDim, "CPU (F)REQ:"),
+    menu::fragment(16, 6, SchemeTextDim, "MHZ"),
+    menu::fragment(21, 6, SchemeTextDim, "CAR(T) ENABLE:"),
+    menu::fragment(1, 7, SchemeTextDim, "C(R)T EMU:"),
+    menu::fragment(21, 7, SchemeTextDim, "(V)IDEO:"),
 
     // The tools.
     menu::fragment(1, 9, SchemeText, "M - MONITOR"),
     menu::fragment(21, 9, SchemeText, "L - LOAD ROM/CHAR"),
     menu::fragment(1, 10, SchemeText, "A - AUDIO & VOLUME"),
+    menu::fragment(21, 10, SchemeText, "F1 - THEME"),
     menu::fragment(1, 11, SchemeText, "S - SPRITE EDITOR"),
 
     // The frozen program, to the right of the thumbnail.
-    menu::fragment(21, 15, SchemeText, "ROM:"),
-    menu::fragment(21, 16, SchemeText, "TASK ID:"),
-    menu::fragment(21, 19, SchemeText, "(0) INTERNAL DRIVE:"),
-    menu::fragment(25, 20, SchemeText, "(8) UNIT #"),
-    menu::fragment(21, 22, SchemeText, "(1) EXTERNAL 1565:"),
-    menu::fragment(25, 23, SchemeText, "(9) UNIT #"));
+    menu::fragment(21, 15, SchemeTextDim, "ROM:"),
+    menu::fragment(21, 16, SchemeTextDim, "TASK ID:"),
+    menu::fragment(21, 19, SchemeTextDim, "(0) INTERNAL DRIVE:"),
+    menu::fragment(25, 20, SchemeTextDim, "(8) UNIT #"),
+    menu::fragment(21, 22, SchemeTextDim, "(1) EXTERNAL 1565:"),
+    menu::fragment(25, 23, SchemeTextDim, "(9) UNIT #"));
 
 /* The disk chooser's standing text.  Separate streams because they appear at
  * different moments: the instructions whenever the list is redrawn, the notice

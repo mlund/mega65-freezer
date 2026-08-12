@@ -1,5 +1,7 @@
 #pragma once
 
+#include "addr28.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -29,7 +31,22 @@ void cpumap_load(const uint8_t* saved, uint8_t rom_banking);
  * `writing` selects the write path, which is not the read path: a ROM banked
  * in for reading shadows to the RAM beneath it when written, as on a C64, so
  * storing to an address resolves elsewhere than examining it. */
-uint32_t resolve_cpu_address(uint16_t cpu_address, bool writing);
+Addr28 resolve_cpu_address(uint16_t cpu_address, bool writing);
+
+/* Bit 31 of a typed address means "as the frozen CPU saw it", the convention the
+ * MEGA65 monitor documents (the Book, "Addresses", with the example G 80001500).
+ * Unsigned, because the flag is the sign bit of the 32-bit value the user typed
+ * -- which is also why a typed address is not an Addr28 until it is resolved. */
+constexpr uint32_t CPU_VIEW_FLAG = 0x80000000UL;
+
+/* An address as typed, resolved through the map if it carries CPU_VIEW_FLAG and
+ * passed through if not.  Either way the answer is 28 bits, so the flag and the
+ * three bits beside it can never reach the freeze slot.
+ *
+ * The 32-bit argument is marshalled at each call site, which is still cheaper
+ * than the alternative: testing the flag at all three instead, to reach
+ * resolve_cpu_address() with a free 16-bit argument, measured worse. */
+Addr28 cpumap_typed_address(uint32_t typed);
 
 /* Which mechanism settled a region.  Indexes the CPUMAP_NAME, CPUMAP_MASK and
  * CPUMAP_REGISTER tables in cpumap_labels.inc, so this order is the generator's
@@ -50,7 +67,7 @@ typedef enum : uint8_t {
 typedef struct {
     uint16_t first;
     uint16_t last; /* inclusive, so $FFFF ends the walk and cannot wrap */
-    uint32_t target;
+    Addr28 target;
     CpuMapMechanism by;
 } CpuMapRun;
 

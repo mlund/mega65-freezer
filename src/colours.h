@@ -72,7 +72,8 @@ struct ColourScheme {
 enum Scheme : uint8_t {
     SchemeGruvbox = 0,
     SchemeClassic = 1,
-    SchemeCount = 2,
+    SchemeWorkbench = 2,
+    SchemeCount = 3,
 };
 
 /* Which scheme a tool starts in.  Not a build option: every scheme is compiled
@@ -135,6 +136,36 @@ constexpr struct ColourScheme SCHEMES[SchemeCount] __attribute__((section(".roda
         .highlight   = SCHEME_RGB(0xb0, 0xf4, 0xac),
         .accent      = SCHEME_RGB(0xaa, 0x9d, 0xef),
         .text_bright = SCHEME_RGB(0xb8, 0xb8, 0xb8),
+    },
+    [SchemeWorkbench] = {
+        /* After Amiga Workbench 2.0, and the only scheme here that puts dark
+         * text on a light ground.  That inverts what the role names imply:
+         * emphasis is darkness, so `text` is black and `text_dim` sits only a
+         * little away from the background, where the dark schemes have those
+         * the other way up.
+         *
+         * Every channel is a doubled nibble because OCS and ECS hold four bits
+         * per channel, so anything else is a colour that machine could not
+         * show.  Four are the Workbench 2.x pens as commonly documented --
+         * background $AAA, text $000, text_bright $FFF and address $68B -- and
+         * the rest are chosen to survive a light ground, which Workbench's own
+         * pale pens would not. */
+        .shade       = SCHEME_RGB(0x44, 0x44, 0x44),
+        .text        = SCHEME_RGB(0x00, 0x00, 0x00),
+        .error       = SCHEME_RGB(0xaa, 0x22, 0x22),
+        .address     = SCHEME_RGB(0x66, 0x88, 0xbb),
+        .spare       = SCHEME_RGB(0xbb, 0xaa, 0x99),
+        .operand     = SCHEME_RGB(0x22, 0x77, 0x22),
+        .background  = SCHEME_RGB(0xaa, 0xaa, 0xaa),
+        .value       = SCHEME_RGB(0x22, 0x55, 0xaa),
+        .attention   = SCHEME_RGB(0xcc, 0x77, 0x22),
+        .unknown     = SCHEME_RGB(0x77, 0x77, 0x77),
+        .warning     = SCHEME_RGB(0xff, 0xbb, 0xaa),
+        .unselected  = SCHEME_RGB(0x88, 0x88, 0x88),
+        .text_dim    = SCHEME_RGB(0x55, 0x55, 0x55),
+        .highlight   = SCHEME_RGB(0x66, 0x99, 0x44),
+        .accent      = SCHEME_RGB(0x88, 0x55, 0x22),
+        .text_bright = SCHEME_RGB(0xff, 0xff, 0xff),
     },
 };
 #endif

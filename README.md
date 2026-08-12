@@ -8,7 +8,7 @@ in 32-64% fewer bytes for the same work ([table below](#size)), which leaves
 room inside the 34817-byte budget for new work. Most of the C compiles on the host and is tested
 there; the rest is driven through the MEGA65 serial link by a test harness, so
 far under Xemu, though the same harness would drive hardware. `MONITOR` spends
-the freed bytes on a syntax-highlighted 45GS02 (dis)assembler and a bit editor
+the freed bytes on a syntax-highlighted 45GS02 (dis)assembler; memory map; and a bit editor
 that names registers and bits from mega65-core's `iomap.txt`. The rewrite also
 exposed several bugs in the original, listed below. Every push is built under
 strict compiler warnings and clang-tidy.
@@ -107,14 +107,15 @@ counted whole, as the files are shipped:
 | `MEGAINFO` | 21968 | 10356 |  -53 |
 | `SPRITED`  | 31018 | 15292 |  -51 |
 | `ROMLOAD`  | 17380 |  8741 |  -50 |
-| `FREEZER`  | 24702 | 16826 |  -32 |
-| `MONITOR`  | 18228 | 21529 | +18* |
+| `FREEZER`  | 24702 | 16911 |  -32 |
+| `MONITOR`  | 18228 | 23313 | +28* |
 
 `*MONITOR` is no longer the same program, so its figure measures something the
 others do not: 45GS02 disassembler and assembler; the bit editor that names
-registers and their bits, and the copy, fill, compare, hunt and pixel commands
-have no counterpart in the original to be measured against. Doing only what
-that original did, it was 9353 bytes -- 49% less.
+registers and their bits, the memory map of the frozen machine, and the copy,
+fill, compare, hunt and pixel commands have no counterpart in the original to be
+measured against. Doing only what that original did, it was 9353 bytes -- 49%
+less.
 
 ### New features
 
@@ -131,18 +132,19 @@ that original did, it was 9353 bytes -- 49% less.
   
     <img width="350" alt="Image" src="https://github.com/user-attachments/assets/86b3ba5d-f8a5-4e6a-be13-03e9435cadb8" />
 
+  - The frozen machine's memory map under `R`: which 28-bit range each part of
+    the 16-bit space reached, what is there, and which register bit decided it.
+  - Addresses as the frozen program saw them. Bit 31 asks for the CPU's view, so
+    `M 8000E000` reads through the frozen map where `M E000` is literal --
+    the convention the MEGA65 monitor documents.
   - Fill, compare, copy commands
-- Dynamic colour schemes
-- `MAKEDISK`: the border reports while the card is busy. Formatting is
-  thousands of sector operations behind a screen that says only "CREATING
-  IMAGE...", and an emulated card answers instantly where a real one does not,
-  so the wait had nothing to distinguish it from a hang.
+- Dynamic colour schemes - press F1 to cycle (Mega65, Amiga Workbench, Gruvbox)
+- `MAKEDISK`: the border reports while the card is busy.
 - SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
   a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
   D81 costs. Transactions rather than time -- the emulator has no card -- so
   the figures are the half that carries to hardware.
-- The freeze menu's fixed text is built at compile time and drawn as
-  positioned fragments.
+- The freeze menu's fixed text is built at compile time and drawn as positioned fragments.
 
 ### Bugs found (and fixed)
 

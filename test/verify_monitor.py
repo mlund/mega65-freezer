@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble instructions in the monitor and read them back off the card.
+"""Assemble in the monitor, read it back off the card, and fold a typed address.
 
 The deepest path the emulator can reach: the freezer launches the monitor, `A`
 assembles typed text into bytes and writes them to the freeze slot's sectors,
@@ -44,6 +44,14 @@ STEPS = [
     ("expect", ",0002101 C8"),
     ("expect", ",0002102 CA"),
     ("expect", ",0002103 EA"),
+    # Bit 31 asks for the frozen CPU's view of an address.  $E000 reaches the
+    # KERNAL ROM at 2.E000 with it and bank 0 RAM without, so the two listings
+    # showing different addresses is the whole feature: the fold happened, and
+    # it did not happen to the address that carried no flag.
+    ("type", "m8000e000\r"),
+    ("expect", ":002E000", 30),
+    ("type", "me000\r"),
+    ("expect", ":000E000", 30),
 ]
 
 if __name__ == "__main__":

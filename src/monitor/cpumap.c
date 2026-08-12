@@ -23,13 +23,13 @@ void cpumap_load(const uint8_t* saved, uint8_t rom_banking) {
 
 /* The C65 ROM banks sit $20000 above the 16-bit windows they serve, so every
  * ROM answer here is the address plus this. */
-constexpr uint32_t ROM_BANK_OFFSET = 0x20000UL;
+constexpr Addr28 ROM_BANK_OFFSET = 0x20000UL;
 
 /* The register set every I/O personality aliases, and the one the slot saves. */
-constexpr uint32_t IO_PAGE = 0xFFD3000UL;
+constexpr Addr28 IO_PAGE = 0xFFD3000UL;
 
 /* $DE00-$DFFF reaches the cartridge port rather than the I/O page. */
-constexpr uint32_t CARTRIDGE_IO = 0x7FFD000UL;
+constexpr Addr28 CARTRIDGE_IO = 0x7FFD000UL;
 constexpr uint16_t CARTRIDGE_IO_FIRST = 0xDE00;
 
 /* $D030 bit 0. Within address resolution its only effect is to keep
@@ -53,21 +53,21 @@ static const CpuMapMechanism ROM_BANKING_MECHANISM[8] = {CpuMapRom8, CpuMapRom8,
     CpuMapRomA, CpuMapRomC, CpuMapRam, CpuMapRomE, CpuMapRomE};
 
 /* Character ROM as read through $D000, and the RAM a write to it reaches. */
-constexpr uint32_t CHARACTER_ROM = 0x0002D000UL;
-constexpr uint32_t RAM_UNDER_IO = 0x0000D000UL;
+constexpr Addr28 CHARACTER_ROM = 0x0002D000UL;
+constexpr Addr28 RAM_UNDER_IO = 0x0000D000UL;
 
 /* Which branch below settled the last call.  A side channel and not an out
  * parameter: only cpumap_run() wants it, and the argument would cost bytes at
  * every call site to carry a value the others discard. */
 static CpuMapMechanism decided_by = CpuMapRam;
 
-uint32_t resolve_cpu_address(uint16_t cpu_address, bool writing) {
+Addr28 resolve_cpu_address(uint16_t cpu_address, bool writing) {
     unsigned char block = (unsigned char)(cpu_address >> 13);
     bool lower_half = block < 4;
     uint16_t map = lower_half ? frozen_map_lo : frozen_map_hi;
     unsigned char nibble;
     unsigned char lines;
-    uint32_t address;
+    Addr28 address;
 
     /* MAP is the only mechanism that answers outright: gs4510.vhdl returns
      * here, and everything below it only edits an address that started as the
@@ -79,8 +79,8 @@ uint32_t resolve_cpu_address(uint16_t cpu_address, bool writing) {
         decided_by = lower_half ? CpuMapMapLow : CpuMapMapHigh;
         /* The offset addition wraps inside its megabyte, which the 45GS02's
          * own megabyte register then places in the 28-bit space. */
-        return ((uint32_t)megabyte << 20) |
-            (((uint32_t)cpu_address + (((uint32_t)map & 0x0FFF) << 8)) & 0xFFFFFUL);
+        return ((Addr28)megabyte << 20) |
+            (((Addr28)cpu_address + (((Addr28)map & 0x0FFF) << 8)) & 0xFFFFFL);
     }
 
     nibble = (unsigned char)(cpu_address >> 12);
@@ -141,6 +141,13 @@ uint32_t resolve_cpu_address(uint16_t cpu_address, bool writing) {
     return address;
 }
 
+Addr28 cpumap_typed_address(uint32_t typed) {
+    if ((typed & CPU_VIEW_FLAG) != 0) {
+        return resolve_cpu_address((uint16_t)typed, false) & 0x0FFFFFFFUL;
+    }
+    return typed & 0x0FFFFFFFUL;
+}
+
 /* The coarsest step that cannot step over a boundary.  The mechanisms divide
  * the space at 8KB (MAP), 4KB ($D030 and the I/O window) and 512 bytes (the
  * cartridge expansion area at $DE00) -- but a MAP offset is a multiple of $100
@@ -157,7 +164,7 @@ void cpumap_run(uint16_t from, CpuMapRun* run) {
     /* Absorb the next window while it neither changes mechanism nor breaks the
      * run of destination addresses.  Carrying the expected target forward keeps
      * that test to one 32-bit add per window. */
-    uint32_t expected = run->target;
+    Addr28 expected = run->target;
 
     while (run->last != 0xFFFF) {
         expected += WINDOW_SIZE;

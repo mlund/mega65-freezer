@@ -475,11 +475,11 @@ static bool put_decided_by(const CpuMapRun* run) {
         /* The offset is what the run moved by, which the run already states,
          * so the MAP register itself never has to be read back here.  Only the
          * top three digits are shown: it is a multiple of $100. */
-        uint32_t offset = (run->target - run->first) & 0xFFFFFUL;
+        Addr28 offset = (run->target - run->first) & 0xFFFFFL;
 
         at = put_text(at, CPUMAP_NAME[run->by]);
         at = put_text(at, " +$");
-        format_hex(&output_buffer[at], (long)(offset >> 8), 3);
+        format_hex(&output_buffer[at], offset >> 8, 3);
         output_buffer[at + 3] = '0';
         output_buffer[at + 4] = '0';
         /* Nothing to dim: the whole field is the offset. */
@@ -514,10 +514,10 @@ static void show_memory_map(void) {
         format_hex(&output_buffer[5], run.last, 4);
         output_buffer[10] = '-';
         output_buffer[11] = '>';
-        format_hex(&output_buffer[MAP_TARGET_COLUMN], (long)run.target, 7);
+        format_hex(&output_buffer[MAP_TARGET_COLUMN], run.target, 7);
         output_buffer[MAP_TARGET_COLUMN + 7] = '-';
         format_hex(&output_buffer[MAP_TARGET_COLUMN + 8],
-            (long)(run.target + (run.last - run.first)), 7);
+            run.target + (run.last - run.first), 7);
         put_text(MAP_CONTENTS_COLUMN, map_contents(run.target));
         bool masked = put_decided_by(&run);
         write_line(output_buffer, 0);
@@ -651,13 +651,15 @@ unsigned char parse_hex(void) {
     return digits;
 }
 
-/* A hex value the command cannot do without. */
+/* An address the command cannot do without.  Only parse_range() reaches this,
+ * so everything it reads is an address and folds; the values F, H and ; take
+ * come straight from parse_hex() and must not. */
 static bool parse_required_hex(uint32_t* value) {
     if (!parse_hex()) {
         report_error("? SYNTAX  ERROR");
         return false;
     }
-    *value = hex_value;
+    *value = cpumap_typed_address(hex_value);
     return true;
 }
 
@@ -918,15 +920,15 @@ void set_registers(void) {
 unsigned char parse_address(void) {
     // Try to read hex digits from screen_line_buffer[screen_line_offset].
     unsigned char digits = parse_hex();
-    if (digits > 7) {
+    if (digits > 8) {
         write_line("? ADDRESS TOO LONG  ERROR", 0);
         recolour_last_line(SchemeError);
-        write_line("(Addresses should consist of 1 - 7 hex digits).", 0);
+        write_line("(Addresses should consist of 1 - 8 hex digits).", 0);
         recolour_last_line(SchemeNotice);
         return 1;
     }
     if (digits) {
-        mon_address = hex_value;
+        mon_address = cpumap_typed_address(hex_value);
     }
     // No digits means continue from the previous address -- but only if the
     // rest of the line is blank.  These four commands take one address and
@@ -963,7 +965,7 @@ void assemble_memory(void) {
      * instruction may follow on the same line.  No digits continues from the
      * previous address, as a bare A should. */
     if (parse_hex()) {
-        mon_address = hex_value;
+        mon_address = cpumap_typed_address(hex_value);
     }
 
     /* Whether the current line still carries an instruction.  `A 2000` is an

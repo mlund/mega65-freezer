@@ -10,6 +10,7 @@
  *   read <address>
  *   write <address>
  *   runs                       -> one line per merged run, then END
+ *   typed <address>            -> an address as the monitor would take it typed
  */
 
 #include "../src/monitor/cpumap.c"
@@ -43,6 +44,8 @@ int main(void) {
             printf("%lx\n", (unsigned long)resolve_cpu_address((uint16_t)address, false));
         } else if (sscanf(line, "write %x", &address) == 1) {
             printf("%lx\n", (unsigned long)resolve_cpu_address((uint16_t)address, true));
+        } else if (sscanf(line, "typed %x", &address) == 1) {
+            printf("%lx\n", (unsigned long)cpumap_typed_address(address));
         } else if (strncmp(line, "runs", 4) == 0) {
             CpuMapRun run;
             uint16_t at = 0;
