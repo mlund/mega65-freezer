@@ -151,7 +151,7 @@ add_m65(FREEZER  freezer/main.c freezer/diskchooser.c freezer/menu.cpp)
 add_m65(AUDIOMIX audiomix/main.c audiomix/mixer.c audiomix/menu.cpp)
 add_m65(MONITOR  monitor/main.c monitor/commands.c monitor/disasm.c
                  monitor/blockmove.c monitor/console.c monitor/bitedit.c
-                 monitor/bitedit_table.c)
+                 monitor/bitedit_table.c monitor/cpumap.c)
 target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
 add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c makedisk/layout.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c)

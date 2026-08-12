@@ -14,6 +14,7 @@
 #include "blockmove.h"
 #include "colours.h"
 #include "console.h"
+#include "cpumap.h"
 #include "disasm.h"
 #include "dma.h"
 #include "mega65_regs.h"
@@ -70,46 +71,11 @@ static char output_buffer[80];
 static unsigned char mon_sector[SD_SECTOR_SIZE];
 static uint32_t mon_sector_num = 0xffffffffUL;
 
-/* Frozen CPU state that M and D need in order to talk about the same addresses
- * the program did, cached by show_registers().  The PC here is already resolved
- * to 28 bits; the sentinel keeps an unread PC from matching any real address. */
+/* The frozen PC, resolved to 28 bits so a command taking an address can name
+ * the location the program reached rather than the window it saw.  Cached by
+ * show_registers() alongside the mapping state itself, which lives in
+ * cpumap.c; the sentinel keeps an unread PC from matching any real address. */
 static uint32_t frozen_program_counter = 0xffffffffUL;
-static uint16_t frozen_map_lo = 0;
-static uint16_t frozen_map_hi = 0;
-static unsigned char frozen_map_lo_megabyte = 0;
-static unsigned char frozen_map_hi_megabyte = 0;
-static unsigned char frozen_cpu_port = 0;
-
-/* Translate an address as the frozen CPU saw it into the 28-bit address M and D
- * take.  The MAP register offsets 8KB blocks: MAPLO covers $0000-$7FFF and
- * MAPHI $8000-$FFFF, each holding a selection nibble in its top four bits whose
- * bit N enables block N of that half, and an offset in the remaining three
- * nibbles scaled by 256.  The sum wraps within the 20 bits the 4510 MAP spans.
- * (MEGA65 Book, "The MAP Register".) */
-uint32_t resolve_cpu_address(uint16_t cpu_address) {
-    unsigned char block = (unsigned char)(cpu_address >> 13);
-    bool lower_half = block < 4;
-    uint16_t map = lower_half ? frozen_map_lo : frozen_map_hi;
-    unsigned char megabyte = lower_half ? frozen_map_lo_megabyte : frozen_map_hi_megabyte;
-
-    if (((map >> 12) & (1U << (block & 3))) != 0) {
-        /* The offset addition wraps inside its megabyte, which the 45GS02's
-         * own megabyte register then places in the 28-bit space. */
-        return ((uint32_t)megabyte << 20) |
-            (((uint32_t)cpu_address + (((uint32_t)map & 0x0FFF) << 8)) & 0xFFFFFUL);
-    }
-
-    /* Not mapped, so C64-style banking still decides: $01 bit 1 banks the
-     * KERNAL in and bits 0+1 together the BASIC ROM, which the MEGA65 holds at
-     * $2E000 and $2A000 -- both $20000 above their 16-bit window. */
-    if (cpu_address >= 0xE000U && (frozen_cpu_port & 0x02) != 0) {
-        return 0x20000UL + cpu_address;
-    }
-    if (cpu_address >= 0xA000U && cpu_address < 0xC000U && (frozen_cpu_port & 0x03) == 0x03) {
-        return 0x20000UL + cpu_address;
-    }
-    return cpu_address;
-}
 
 /* Set when mon_sector holds changes the card does not, so that a fill spanning
  * sectors writes each one back before the next displaces it. */
@@ -424,6 +390,149 @@ constexpr uint8_t REGLINE_01 = 44;
 constexpr uint8_t REGLINE_MAPLO = 50;
 constexpr uint8_t REGLINE_MAPHI = 58;
 constexpr uint8_t REGLINE_PC28 = 66;
+#include "cpumap_labels.inc"
+
+/* Where the map's four columns start.  The heading is written to the same
+ * offsets, so changing one means changing MAP_DESC_LINE with it. */
+constexpr uint8_t MAP_TARGET_COLUMN = 13;
+constexpr uint8_t MAP_CONTENTS_COLUMN = 30;
+constexpr uint8_t MAP_DECIDED_COLUMN = 42;
+
+/* As much of a row as write_line() puts on screen. */
+constexpr uint8_t MAP_ROW_WIDTH = 78;
+
+/* Where "%0000.0000" ends, and so where a row's dimming starts. */
+constexpr uint8_t MAP_MASK_END = MAP_DECIDED_COLUMN + 10;
+
+/* Columns 0, 13, 30 and 42, matching the constants above. */
+static const char MAP_DESC_LINE[] = "CPU RANGE    28-BIT RANGE     CONTENTS    DECIDED BY";
+
+/* Text into the row, returning the column after it. */
+static uint8_t put_text(uint8_t at, const char* text) {
+    while (*text) {
+        output_buffer[at++] = *text++;
+    }
+    return at;
+}
+
+/* A bit mask as %0000.1000: which bit, without the reader having to know that
+ * iomap.txt's `.3` counts from the right.  The nibble separator is a full stop
+ * because the screen is the C64 ROM charset, which has no underscore. */
+static uint8_t put_mask(uint8_t at, uint8_t mask) {
+    output_buffer[at++] = '%';
+    for (uint8_t bit = 0x80; bit != 0; bit >>= 1) {
+        if (bit == 0x08) {
+            output_buffer[at++] = '.';
+        }
+        output_buffer[at++] = (mask & bit) ? '1' : '0';
+    }
+    return at;
+}
+
+/* What the frozen program would find at a 28-bit address.  Banks 2 and 3 hold
+ * whatever ROM was loaded, so the names below -- the standard layout -- each
+ * carry a question mark instead of the tool identifying the image, which is a
+ * sector read and a table of version strings to answer the same way on every
+ * machine running the shipped ROM.  MEGAINFO reports the version. */
+static const char* map_contents(uint32_t target) {
+    /* Compared as 4KB pages: every boundary that matters is page-aligned, and
+     * 16-bit comparisons are markedly cheaper here than 28-bit ones. */
+    uint16_t page = (uint16_t)(target >> 12);
+
+    if (page == 0xFFD3) {
+        return "I/O";
+    }
+    if (page == 0x7FFD) {
+        return "CART I/O";
+    }
+    if (page >= 0x020 && page < 0x040) {
+        if (page >= 0x02E && page < 0x030) {
+            return "C64 KERNAL?";
+        }
+        if (page == 0x02D) {
+            return "CHARSET?";
+        }
+        if (page >= 0x02A && page < 0x02C) {
+            return "C64 BASIC?";
+        }
+        return "C65 ROM?";
+    }
+    return page < 0x060 ? "RAM" : "";
+}
+
+/* The register and bit that settled a run, or the offset for a mapped one.  A
+ * mechanism with no name is one where nothing was consulted -- unmapped RAM --
+ * and prints nothing at all.  Returns the column the row's dimming should start
+ * at, or 0 for a row with nothing worth picking out. */
+static bool put_decided_by(const CpuMapRun* run) {
+    uint8_t mask = CPUMAP_MASK[run->by];
+    uint8_t at = MAP_DECIDED_COLUMN;
+
+    if (mask == 0) {
+        if (CPUMAP_NAME[run->by][0] == '\0') {
+            return false;
+        }
+        /* The offset is what the run moved by, which the run already states,
+         * so the MAP register itself never has to be read back here.  Only the
+         * top three digits are shown: it is a multiple of $100. */
+        uint32_t offset = (run->target - run->first) & 0xFFFFFUL;
+
+        at = put_text(at, CPUMAP_NAME[run->by]);
+        at = put_text(at, " +$");
+        format_hex(&output_buffer[at], (long)(offset >> 8), 3);
+        output_buffer[at + 3] = '0';
+        output_buffer[at + 4] = '0';
+        /* Nothing to dim: the whole field is the offset. */
+        return false;
+    }
+
+    at = put_mask(at, mask);
+    at = put_text(at, " mask of ");
+    at = put_text(at, CPUMAP_REGISTER_NAME[CPUMAP_REGISTER[run->by]]);
+    at = put_text(at, " (");
+    at = put_text(at, CPUMAP_NAME[run->by]);
+    output_buffer[at] = ')';
+    return true;
+}
+
+/* Where every part of the frozen 16-bit space actually led, one row per run of
+ * windows that resolved the same way.  Printed under the registers because the
+ * MAPLO/MAPHI/$01 values there are what it explains. */
+static void show_memory_map(void) {
+    CpuMapRun run;
+    uint16_t at = 0;
+
+    write_line(MAP_DESC_LINE, 0);
+    recolour_last_line(SchemeTextDim);
+
+    do {
+        cpumap_run(at, &run);
+
+        lfill((long)output_buffer, ' ', 80);
+        format_hex(&output_buffer[0], run.first, 4);
+        output_buffer[4] = '-';
+        format_hex(&output_buffer[5], run.last, 4);
+        output_buffer[10] = '-';
+        output_buffer[11] = '>';
+        format_hex(&output_buffer[MAP_TARGET_COLUMN], (long)run.target, 7);
+        output_buffer[MAP_TARGET_COLUMN + 7] = '-';
+        format_hex(&output_buffer[MAP_TARGET_COLUMN + 8],
+            (long)(run.target + (run.last - run.first)), 7);
+        put_text(MAP_CONTENTS_COLUMN, map_contents(run.target));
+        bool masked = put_decided_by(&run);
+        write_line(output_buffer, 0);
+
+        /* The addresses in the same colour every other address in this monitor
+         * gets, and everything past the mask dimmed so the mask stands out. */
+        recolour_last_line_segment(0, MAP_CONTENTS_COLUMN, SchemeAddress);
+        if (masked) {
+            recolour_last_line_segment(MAP_MASK_END, MAP_ROW_WIDTH - MAP_MASK_END, SchemeTextDim);
+        }
+
+        at = (uint16_t)(run.last + 1);
+    } while (run.last != 0xFFFF);
+}
+
 void show_registers(void) {
     // Get hypervisor register backup area
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(0xFFD3640U);
@@ -437,26 +546,25 @@ void show_registers(void) {
         write_line("? FROZEN REGISTERS NOT FOUND  ERROR", 0);
         recolour_last_line(SchemeError);
     } else {
+        /* Its own sector, into the buffer the register block is read from
+         * below, so it comes first and is held across that read. */
+        uint8_t rom_banking = freeze_io_peek(0x3030);
+
         freeze_slot_offset = freeze_slot_offset >> 9L;
         sdcard_readsector(freeze_slot_start_sector + freeze_slot_offset);
 
-        // Now show registers: First the description line
+        /* The heading first, dimmed as the map's heading below it is: both
+         * label a block of values rather than being values themselves. */
         write_line(REG_DESC_LINE, 0);
+        recolour_last_line(SchemeTextDim);
 
         // Now prepare the line of actual register values
 
         // $D640-$D67F is frozen as a single piece, so the offsets are $00, not $40 from the
         // beginning
 
-        /* Cache the mapping state before the PC, which is resolved through it.
-         * $D64A/$D64C hold the selection nibble and the offset's high nibble,
-         * $D64B/$D64D the offset's low byte -- high byte first, not the little
-         * endian the rest of this save area uses (gs4510.vhdl:4926). */
-        frozen_map_lo = (uint16_t)(sector_buffer[0x0A] << 8) | sector_buffer[0x0B];
-        frozen_map_hi = (uint16_t)(sector_buffer[0x0C] << 8) | sector_buffer[0x0D];
-        frozen_map_lo_megabyte = sector_buffer[0x0E];
-        frozen_map_hi_megabyte = sector_buffer[0x0F];
-        frozen_cpu_port = sector_buffer[0x11];
+        /* Before the PC, which is resolved through the map it describes. */
+        cpumap_load(&sector_buffer[0x0A], rom_banking);
 
         // PC
         value = sector_buffer[0x08] + (sector_buffer[0x09] << 8);
@@ -464,7 +572,7 @@ void show_registers(void) {
 
         /* The 28-bit address that PC actually reached, which is what M and D
          * accept -- the 16-bit value above names a window, not a location. */
-        frozen_program_counter = resolve_cpu_address(value);
+        frozen_program_counter = resolve_cpu_address(value, false);
         format_hex(&output_buffer[REGLINE_PC28], frozen_program_counter, 7);
 
         // A
@@ -512,18 +620,21 @@ void show_registers(void) {
         /* MAPLO and MAPHI read high byte first, so displaying them as little
          * endian words swapped the selection nibble into the offset. */
         // MAPLO
-        format_hex(&output_buffer[REGLINE_MAPLO], frozen_map_lo, 4);
+        format_hex(&output_buffer[REGLINE_MAPLO],
+            (sector_buffer[0x0A] << 8) | sector_buffer[0x0B], 4);
         value = sector_buffer[0x0E];
         output_buffer[REGLINE_MAPLO + 4] = '/';
         format_hex(&output_buffer[REGLINE_MAPLO + 5], value, 2);
 
         // MAPHI
-        format_hex(&output_buffer[REGLINE_MAPHI], frozen_map_hi, 4);
+        format_hex(&output_buffer[REGLINE_MAPHI],
+            (sector_buffer[0x0C] << 8) | sector_buffer[0x0D], 4);
         value = sector_buffer[0x0F];
         output_buffer[REGLINE_MAPHI + 4] = '/';
         format_hex(&output_buffer[REGLINE_MAPHI + 5], value, 2);
 
         write_line(output_buffer, 0);
+        show_memory_map();
     }
 }
 

@@ -50,6 +50,25 @@ if(Python3_FOUND AND HOST_C_COMPILER)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_bitedit.py
                 ${BITEDIT_ARGS})
 
+    # The frozen CPU's address translation, against a transcription of
+    # gs4510.vhdl's resolve_address_to_long.  Every address resolves to
+    # something whatever the order of the mechanisms, so a precedence mistake
+    # is invisible on screen -- it just names the wrong bank.
+    # With a mega65-core checkout it also re-reads resolve_address_to_long and
+    # fails when it has changed: the oracle is a hand transcription, so upstream
+    # can move while every check here still passes.
+    set(MEGA65_CORE "$ENV{MEGA65_CORE}" CACHE PATH
+        "mega65-core checkout, to check the cpumap oracle against gs4510.vhdl")
+    set(CPUMAP_ARGS --cc ${HOST_C_COMPILER})
+    if(MEGA65_CORE AND EXISTS ${MEGA65_CORE})
+        list(APPEND CPUMAP_ARGS --core ${MEGA65_CORE})
+    else()
+        message(STATUS "cpumap: oracle not pinned, set MEGA65_CORE to a mega65-core checkout")
+    endif()
+    add_test(NAME cpumap
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_cpumap.py
+                ${CPUMAP_ARGS})
+
     # SPRITED's line editor, which asks for a filename and a yes/no answer.
     # Its edges -- backspacing an empty line, the last cell, a control code --
     # are the cases least likely to get typed at an emulator, and the logic is

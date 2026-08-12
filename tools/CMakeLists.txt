@@ -6,7 +6,8 @@ if(Python3_FOUND AND MEGA65_IOMAP AND EXISTS ${MEGA65_IOMAP})
     add_custom_target(iomap-names
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/gen_iomap_names.py
                 --iomap ${MEGA65_IOMAP} -o ${SRC}/monitor/iomap.bin
-        COMMENT "Regenerating the I/O register database")
+                --labels ${SRC}/monitor/cpumap_labels.inc
+        COMMENT "Regenerating the I/O register database and map labels")
 endif()
 
 if(Python3_FOUND AND LLVM_MC_EXE)

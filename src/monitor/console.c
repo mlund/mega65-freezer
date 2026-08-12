@@ -89,7 +89,11 @@ void recolour_last_line(char colour) {
 void display_footer(unsigned char index) {
     to_stemp(footer_messages[index], 80);
     lcopy((long)stemp, FOOTER_ADDRESS, 80);
-    set_screen_attributes(FOOTER_ADDRESS, 80, AttribReverse);
+    /* Reversed, so this colour is the bar and the glyphs take the screen
+     * background.  Every cell is set outright because the console scrolls
+     * through this row, and whatever colour it left must not show through. */
+    lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS,
+        SchemeTextBright | AttribReverse, 80);
 }
 
 void setup_screen(void) {
@@ -143,17 +147,6 @@ void fatal_error(const unsigned char* filename, uint16_t line_number) {
     screen_decimal(FOOTER_ADDRESS + 44 + i, line_number);
     lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS, SchemeError | AttribReverse, 80);
     for (;;) {
-    }
-}
-
-void set_screen_attributes(long screen_address, unsigned char count, unsigned char attr) {
-    /* Colour RAM is above 64K, so it is reached a byte at a time rather than
-     * mapped in at $D800.  Attributes are a read-modify-write, which a DMA fill
-     * cannot do. */
-    long addr = COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + screen_address;
-    for (unsigned char i = 0; i < count; i++) {
-        lpoke(addr, lpeek(addr) | attr);
-        addr++;
     }
 }
 

@@ -36,7 +36,8 @@ Two kinds of data are read off the card at run time and built here too:
 
 Currently needs a patched llvm-mos: stock SDK v23.0.1 miscompiles.
 You need to build the llvm-mos-sdk using [llvm-mos @ freezer](https://github.com/mlund/llvm-mos/tree/freezer)
-and this step is not detailed here.
+and this step is not detailed here. The patches are submitted as
+[PRs to llvm-mos](https://github.com/llvm-mos/llvm-mos/pulls?q=is%3Apr+is%3Aopen+mlund).
 
 ```
 cmake -DCMAKE_PREFIX_PATH=<prefix> -B build
@@ -50,13 +51,14 @@ Each `.M65` must fit 34817 bytes, which the link enforces.
 | `MEGA65_IOMAP`  | path to mega65-core's iomap.txt, to regenerate `IOMAP.M65` |
 | `MEGA65_SDIMG`  | path to an SD image, for the emulator tests           |
 | `MEGA65_ROM`    | path to MEGA65.ROM, for the disassembler's real-code test |
+| `MEGA65_CORE`   | path to a mega65-core checkout, to check the address resolver against `gs4510.vhdl` |
 | `XEMU`          | path to the emulator, if it is not found automatically |
 | `FREEZER_TRACE` | tracing on the hypervisor serial channel (OFF)        |
 | `LTO_ZP`        | zero-page bytes the LTO allocator may use (210)       |
 | `C_MCPU`        | `-mcpu` for our sources, `mos6502` on an unpatched compiler (mos45gs02) |
 | `LINK_LIBC`     | link mega65-libc (ON)                                 |
 
-The three paths also read an environment variable of the same name. Set
+The four paths also read an environment variable of the same name. Set
 `CPM_SOURCE_CACHE` to a directory to avoid re-fetching mega65-libc.
 
 They point at files you already have, rather than anything downloaded:
@@ -243,7 +245,7 @@ This also loads the [`mega65-dev`](https://github.com/mlund/claude-skills/tree/m
 skill which draws information from the MEGA65 User Guide and VHDL core.
 Note that skills are merely Markdown files and human readable.
 
-My thoughts on using LLMs is positive and LLM contributions are accepted for this project;
+My thoughts on using LLMs are positive and LLM contributions are accepted for this project;
 see [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines and restrictions adapted from the LLVM project.
 The human operator needs to reign the LLM which has a habbit of producing large amounts of code and documentation.
 My experience is that code quality improves significantly by first do a planning step and ask critical questions: sway the LLM to look at the problem

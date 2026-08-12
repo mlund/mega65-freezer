@@ -11,7 +11,6 @@ void write_line_len(const char* text, char column, char length);
 void write_line_raw(char* text, char column, char length);
 void recolour_last_line(char colour);
 void recolour_last_line_segment(unsigned char column, unsigned char width, unsigned char colour);
-void set_screen_attributes(long screen_address, unsigned char count, unsigned char attr);
 char read_line(char* buffer, unsigned char max_length, unsigned char column);
 void write_prompt(const char* text, char length);
 void next_line(void);
