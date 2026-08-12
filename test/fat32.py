@@ -179,6 +179,22 @@ class FAT32:
 
     # --- what callers actually want ---
 
+    def remove(self, name: str) -> bool:
+        """Delete a file from the root directory, as DOS does: free its clusters
+        and mark the slot reusable rather than rewriting the directory."""
+        at, _ = self.find(short_name(name))
+        if at is None:
+            return False
+        self.f.seek(at)
+        entry = bytearray(self.f.read(ENTRY))
+        first = (_u16(entry, 20) << 16) | _u16(entry, 26)
+        if first >= 2:
+            self.free(self.chain(first))
+        entry[0] = DELETED
+        self.f.seek(at)
+        self.f.write(entry)
+        return True
+
     def write(self, name: str, data: bytes, when: datetime.datetime | None = None) -> None:
         """Create or replace a file in the root directory."""
         eleven = short_name(name)

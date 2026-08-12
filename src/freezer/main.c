@@ -321,6 +321,9 @@ void draw_thumbnail(void) {
 static struct ProcessDescriptor process_descriptor;
 
 static int8_t last_thumb_frame = -1;
+/* Whether $52000 holds a frame at all.  Separate from last_thumb_frame, which
+ * says what is on the screen and is invalidated to force a redraw. */
+static bool frame_loaded = false;
 static uint8_t thumb_xoff = 5, thumb_yoff = 1;
 /* Index into thumb_frame_name[]. */
 enum ThumbFrame : uint8_t {
@@ -569,11 +572,12 @@ void draw_freeze_menu(uint8_t part) {
                 break;
         }
 
-        // only load new image if needed
-        if (!in_subdirectory &&
-            thumb_frame != last_thumb_frame) { // only load a frame if we are in the root
+        /* Only from the root: hyppo opens by name relative to the current
+         * directory, and the frame files are not in a subdirectory. */
+        if (!in_subdirectory && thumb_frame != last_thumb_frame) {
             while (thumb_frame > -1) {
                 if (!read_file_from_sdcard(thumb_frame_name[thumb_frame], 0x052000L)) {
+                    frame_loaded = true;
                     break;
                 }
                 // fall through to next lower thumb image
@@ -581,8 +585,11 @@ void draw_freeze_menu(uint8_t part) {
             }
         }
 
-        // Work out where the tile data begins
-        if (thumb_frame > -1 && thumb_frame != last_thumb_frame) {
+        /* Work out where the tile data begins.  Guarded by frame_loaded
+         * because the read above is skipped in a subdirectory, and the tile
+         * numbers and offsets would otherwise come from whatever the frozen
+         * program left at $52000. */
+        if (frame_loaded && thumb_frame > -1 && thumb_frame != last_thumb_frame) {
             uint32_t screen_data_start;
             uint16_t* tile_num;
 

@@ -57,6 +57,17 @@ def read(sock: socket.socket, address: int, length: int) -> bytes:
     return bytes(out[:length])
 
 
+def write(sock: socket.socket, address: int, data: bytes) -> None:
+    """Set memory in the running machine, to put it in a state the keyboard
+    cannot reach.  Read back by the caller if it matters -- `s` answers
+    nothing, so there is no reply to wait for."""
+    for start in range(0, len(data), _PER_LINE):
+        chunk = data[start : start + _PER_LINE]
+        bytes_ = " ".join(f"{b:02x}" for b in chunk)
+        sock.sendall(f"s{address + start:x} {bytes_}\n".encode())
+        time.sleep(0.05)
+
+
 def launch(
     emulator: str,
     prg: str,

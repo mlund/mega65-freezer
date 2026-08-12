@@ -212,6 +212,14 @@ Defects found in original:
   end-of-chain test read $0F000000 where FAT32 ends a chain at $0FFFFFF8.
 - A text entry field cleared its first cell once per character instead of
   clearing the field.
+- The thumbnail frame was read back out of memory whether or not it had been
+  read in.  The file is only loaded when the card's current directory is its
+  root, since hyppo opens by name relative to that directory, but the code that
+  takes the tile numbers, the screen pointer and the thumbnail's own position
+  out of `$52000` carried no such condition.  On a card without the frame files,
+  once the disk chooser had stepped into a subdirectory, all three came from
+  whatever the frozen program had left there -- the thumbnail landing wherever
+  `$52020` happened to decode to.  `freezer.c:579`.
 - HOME jumped to slot 0 without redrawing the drive rows, so they went on
   showing the previous slot's mounted images until a cursor key was pressed.
   The six other slot-change keys pass `UPDATE_DISK` and HOME does not, though

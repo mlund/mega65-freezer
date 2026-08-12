@@ -183,6 +183,14 @@ if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
                 --build $<TARGET_FILE_DIR:FREEZER>)
     set_tests_properties(freezer_menu PROPERTIES TIMEOUT 300)
 
+    # A redraw on a card with no thumbnail frames, from a subdirectory: the
+    # frame is skipped there, and what reads it back must be skipped with it.
+    add_test(NAME freezer_thumbframe
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_thumbframe_xemu.py
+                --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                --build $<TARGET_FILE_DIR:FREEZER>)
+    set_tests_properties(freezer_thumbframe PROPERTIES TIMEOUT 300)
+
     # The chooser's list, MAKEDISK's dialog and its FAT32 writer in one run:
     # create an image the way a user does and read it back off the clone.  The
     # only cover diskchooser.c and MAKEDISK have.
