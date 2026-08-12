@@ -2,7 +2,7 @@
 
 ## Synopsis
 
-A rewrite of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/mega65-freezemenu)
+An unofficial rewrite of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/mega65-freezemenu)
 in modern C for the llvm-mos toolchain. The tools do what the cc65 originals do,
 in 32-64% fewer bytes ([table below](#size)), which leaves room inside the
 34817-byte budget for new work. Most of the C compiles on the host and is tested
