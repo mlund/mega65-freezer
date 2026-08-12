@@ -53,12 +53,12 @@ Addr28 cpumap_typed_address(uint32_t typed);
  * CPUMAP_MECHANISMS order and an entry added here needs one there. */
 typedef enum : uint8_t {
     CpuMapRam,
-    CpuMapPort,     /* $01 bits 0-2 */
-    CpuMapRom8,     /* the four $D030 banking bits */
+    CpuMapPort, /* $01 bits 0-2 */
+    CpuMapRom8, /* the four $D030 banking bits */
     CpuMapRomA,
     CpuMapRomC,
     CpuMapRomE,
-    CpuMapCram2k,   /* clear, so the expansion area reaches the cartridge */
+    CpuMapCram2k, /* clear, so the expansion area reaches the cartridge */
     CpuMapMapLow,
     CpuMapMapHigh,
 } CpuMapMechanism;

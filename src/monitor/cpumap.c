@@ -45,12 +45,17 @@ constexpr uint8_t ROM_BANKING_ROME = 0x80;
 
 /* Which bit banks each 4KB window from $8000 up, and what to call it.  ROMC
  * covers only $C000-$CFFF, so $D000 gets a bit no register can set. */
-static const uint8_t ROM_BANKING_WINDOW[8] = {ROM_BANKING_ROM8, ROM_BANKING_ROM8,
-    ROM_BANKING_ROMA, ROM_BANKING_ROMA, ROM_BANKING_ROMC, 0x00, ROM_BANKING_ROME,
+static const uint8_t ROM_BANKING_WINDOW[8] = {ROM_BANKING_ROM8,
+    ROM_BANKING_ROM8,
+    ROM_BANKING_ROMA,
+    ROM_BANKING_ROMA,
+    ROM_BANKING_ROMC,
+    0x00,
+    ROM_BANKING_ROME,
     ROM_BANKING_ROME};
 
-static const CpuMapMechanism ROM_BANKING_MECHANISM[8] = {CpuMapRom8, CpuMapRom8, CpuMapRomA,
-    CpuMapRomA, CpuMapRomC, CpuMapRam, CpuMapRomE, CpuMapRomE};
+static const CpuMapMechanism ROM_BANKING_MECHANISM[8] = {
+    CpuMapRom8, CpuMapRom8, CpuMapRomA, CpuMapRomA, CpuMapRomC, CpuMapRam, CpuMapRomE, CpuMapRomE};
 
 /* Character ROM as read through $D000, and the RAM a write to it reaches. */
 constexpr Addr28 CHARACTER_ROM = 0x0002D000UL;

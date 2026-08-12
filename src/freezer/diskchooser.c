@@ -49,18 +49,18 @@ const uint8_t* chooser_help_stream(void);
 const uint8_t* chooser_scanning_stream(void);
 
 // use DMA lcopy overlap trick to save space!
-static unsigned char normal_row[4] = {0, SchemeText, 0, SchemeText};
-static unsigned char error_row[4] = {0, SchemeError, 0, SchemeError};
-static unsigned char highlight_row[4] = {
+static uint8_t normal_row[4] = {0, SchemeText, 0, SchemeText};
+static uint8_t error_row[4] = {0, SchemeError, 0, SchemeError};
+static uint8_t highlight_row[4] = {
     0, SchemeSelected | AttribReverse, 0, SchemeSelected | AttribReverse};
-static unsigned char dir_line_colour[4] = {0, SchemeAccent, 0, SchemeAccent};
+static uint8_t dir_line_colour[4] = {0, SchemeAccent, 0, SchemeAccent};
 
 static char disk_name_return[33];
 static char old_disk_name[33];
 static uint8_t old_disk_flags, old_disk_len;
 
 static char default_error[] = "ERROR CODE XX";
-char* hyppoerror_to_screen(unsigned char error) {
+char* hyppoerror_to_screen(uint8_t error) {
     // Few messages: each costs its full width in the image.
     switch (error) {
             /*
@@ -128,15 +128,15 @@ enum DiskType : uint8_t {
     DiskTypeD65 = 2,
     DiskTypeD71 = 3,
 };
-static unsigned char disk_type, current_sector, dir_track, entries, cur_row, next_sector;
-static unsigned char current_side = 0;
+static uint8_t disk_type, current_sector, dir_track, entries, cur_row, next_sector;
+static uint8_t current_side = 0;
 /* Exactly 18 screen columns, deliberately without a terminator. */
-static unsigned char entry_buffer[18] __attribute__((nonstring)) = "\"                 ";
+static uint8_t entry_buffer[18] __attribute__((nonstring)) = "\"                 ";
 
 /* Colour a run of cells from a two-cell pattern.  The second copy's source
  * trails its destination by one pattern, so the DMA expands those four bytes
  * over the whole run rather than needing a table as long as the row. */
-static void colour_run(uint32_t at, const unsigned char* pattern, uint16_t bytes) {
+static void colour_run(uint32_t at, const uint8_t* pattern, uint16_t bytes) {
     lcopy((uint32_t)pattern, at, 4);
     lcopy(at, at + 4, bytes - 4);
 }
@@ -148,13 +148,13 @@ void display_error(void) {
     errstr = hyppoerror_to_screen(mega65_geterrorcode());
     /* No message hyppoerror_to_screen returns exceeds the 19-cell field: the
      * longest are 18, and the fallback is "ERROR CODE XX". */
-    draw_text(SCREEN_CELL(21, 0), SchemeError, errstr, (unsigned char)strlen(errstr));
+    draw_text(SCREEN_CELL(21, 0), SchemeError, errstr, (uint8_t)strlen(errstr));
     /* The whole field, not just the text: a shorter message still has to clear
      * the colour of the one it replaced. */
     colour_run(COLOUR_RAM_ADDRESS + (21 * 2), error_row, 19 * 2);
 }
 
-void draw_directory_entry(unsigned char screen_row) {
+void draw_directory_entry(uint8_t screen_row) {
 
     lcopy_skip((Addr28)(uint16_t)entry_buffer,
         SCREEN_ADDRESS + SCREEN_CELL(21, screen_row),
@@ -165,10 +165,10 @@ void draw_directory_entry(unsigned char screen_row) {
         COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)), dir_line_colour, 19 * 2);
 }
 
-unsigned char next_directory_entry(void) {
-    unsigned char c;
-    unsigned char i;
-    unsigned char type = 0;
+uint8_t next_directory_entry(void) {
+    uint8_t c;
+    uint8_t i;
+    uint8_t type = 0;
 
     if (disk_type == DiskTypeD81 || disk_type == DiskTypeD64) {
         // D81 || D64
@@ -215,7 +215,7 @@ void draw_entries(void) {
     // next_sector = 254 -> first already read, no valid dir pointer
     // next_sector < 41  -> next dir sector
     next_sector = 255;
-    for (unsigned char i = 0; i < entries; i++) {
+    for (uint8_t i = 0; i < entries; i++) {
         if (next_directory_entry()) {
             draw_directory_entry(cur_row);
             cur_row++;
@@ -261,15 +261,15 @@ int read_sector_with_cancel(void) {
  * may still test it for the leading slash that marks a directory. */
 static void fetch_selected_name(void) {
     lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(selection_number), (uint32_t)disk_name_return, 32);
-    for (unsigned char x = 31; x && disk_name_return[x] == ' '; x--) {
+    for (uint8_t x = 31; x && disk_name_return[x] == ' '; x--) {
         disk_name_return[x] = 0;
     }
 }
 
-unsigned char draw_directory_contents(unsigned char drive_id) {
-    unsigned char c;
-    unsigned char i;
-    unsigned char x;
+uint8_t draw_directory_contents(uint8_t drive_id) {
+    uint8_t c;
+    uint8_t i;
+    uint8_t x;
     short skip_bytes = 0;
     short j;
 
@@ -434,9 +434,9 @@ exit_with_motor_off:
 
 void draw_disk_image_list(void) {
     unsigned addr = SCREEN_ADDRESS;
-    unsigned char i;
-    unsigned char x;
-    unsigned char name[64];
+    uint8_t i;
+    uint8_t x;
+    uint8_t name[64];
     /* All 25 rows, where this cleared 23: the instructions below overwrite the
      * other two immediately. */
     blank_screen();
@@ -447,7 +447,7 @@ void draw_disk_image_list(void) {
     for (i = 0; i < 23; i++) {
         if ((display_offset + i) < file_count) {
             // Real line
-            lcopy(0x40000U + ((display_offset + i) << 6), (uint32_t)name, 33);
+            lcopy(DIR_NAME_BUF + DIR_ENTRY_INDEX(display_offset + i), (uint32_t)name, 33);
 
             for (x = 0; x < 33; x++) {
                 if ((name[x] >= 'A' && name[x] <= 'Z') || (name[x] >= 'a' && name[x] <= 'z')) {
@@ -469,9 +469,9 @@ void draw_disk_image_list(void) {
     VICIV.bordercol = SchemeBorder;
 }
 
-void scan_directory(unsigned char drive_id) {
-    unsigned char x;
-    unsigned char dir;
+void scan_directory(uint8_t drive_id) {
+    uint8_t x;
+    uint8_t dir;
     char* ptr;
     struct m65_dirent* dirent;
 
@@ -479,7 +479,7 @@ void scan_directory(unsigned char drive_id) {
 
     closeall();
 
-    lfill(0x40000UL, ' ', 0xffffU);
+    lfill(DIR_NAME_BUF, ' ', 0xffffU);
     // Add the pseudo disks
     lcopy((uint32_t)NO_DISK_DRIVE, DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), 11);
     file_count++;
@@ -500,7 +500,7 @@ void scan_directory(unsigned char drive_id) {
     dirent = readdir(dir);
     while (dirent && ((uint16_t)dirent != 0xffffU)) {
 
-        x = (unsigned char)strlen(dirent->d_name);
+        x = (uint8_t)strlen(dirent->d_name);
 
         // check DIR attribute of dirent
         if (x < 32) {
@@ -535,16 +535,15 @@ void scan_directory(unsigned char drive_id) {
     closedir(dir);
 }
 
-char* freeze_select_disk_image(unsigned char drive_id) {
-    unsigned char x;
+char* freeze_select_disk_image(uint8_t drive_id) {
+    uint8_t x;
     int idle_time = 0;
     /* Whether the idle-timeout preview below mounted a different image, so
      * cancelling has to remount whatever was there before. */
-    unsigned char must_restore_disk = 0;
+    uint8_t must_restore_disk = 0;
 
     drive_id = drive_id & 1;
 
-    file_count = 0;
     selection_number = 0;
     display_offset = 0;
 
@@ -596,7 +595,6 @@ char* freeze_select_disk_image(unsigned char drive_id) {
             case KEY_LEFT_ARROW: // <- key at top left of key board
                 // Go back up one directory
                 mega65_dos_chdir((unsigned char*)"..");
-                file_count = 0;
                 selection_number = 0;
                 display_offset = 0;
                 scan_directory(drive_id);
@@ -623,7 +621,6 @@ char* freeze_select_disk_image(unsigned char drive_id) {
                 if (disk_name_return[0] == '/') {
                     // Its a directory
                     mega65_dos_chdir((unsigned char*)&disk_name_return[1]);
-                    file_count = 0;
                     selection_number = 0;
                     display_offset = 0;
                     scan_directory(drive_id);

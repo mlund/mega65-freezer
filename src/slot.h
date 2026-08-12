@@ -27,7 +27,7 @@ constexpr uint8_t BORDER_SIGNAL_ROM_CHANGED = 0x83;
 extern volatile uint8_t tool_density[1]; /* 0 = DD, 1 = HD */
 extern volatile uint8_t tool_drive_id[1];
 
-char* freeze_select_disk_image(unsigned char drive_id);
+char* freeze_select_disk_image(uint8_t drive_id);
 
 void request_freeze_region_list(void);
 unsigned char freeze_peek(uint32_t addr);

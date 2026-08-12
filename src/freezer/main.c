@@ -12,11 +12,9 @@
 #include "slot.h"
 
 #include <mega65.h>
-#include <stdio.h>
-#include <string.h>
 
-static unsigned char freeze_menu_bar[] = "F3-RESUME    F5-RESET      HELP-MEGAINFO"
-                                         "F3-LOAD SLOT F7-SAVE SLOT  HELP-MEGAINFO";
+static char freeze_menu_bar[] = "F3-RESUME    F5-RESET      HELP-MEGAINFO"
+                                "F3-LOAD SLOT F7-SAVE SLOT  HELP-MEGAINFO";
 
 /* Where each changing field sits.  The fixed text around them is a stream of
  * fragments in freezer/menu.cpp; these are the holes it leaves. */
@@ -63,8 +61,8 @@ static bool rom_charset_present(void) {
     return lpeek(ROM_CHARSET) == 0x3C && lpeek(ROM_CHARSET + 1) == 0x66;
 }
 
-static unsigned char rom_changed = 0;
-unsigned char not_in_root = 0;
+static uint8_t rom_changed = 0;
+uint8_t not_in_root = 0;
 
 void to_petscii_upper(char* text, int length);
 
@@ -72,7 +70,7 @@ void to_petscii_upper(char* text, int length);
  * of fragments, converted to screen codes when it was compiled. */
 const uint8_t* menu_fixed_stream(void);
 
-static unsigned char colour_table[256];
+static uint8_t colour_table[256];
 
 /* A thumbnail byte stores three bits of red, three of green and two of blue,
  * and palette entry N holds exactly the colour N names in that form, so a byte
@@ -91,55 +89,132 @@ void make_colour_lookup(void) {
     }
 }
 
-// clang-format off
-static unsigned char viciv_regs[0x80] = {
-  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x9B, 0x37, 0x00, 0x00, 0x00, 0xC9, 0x00, 0x14, 0x71, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0x0E, 0x06, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x0C, 0x00,
-  0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x68, 0x00, 0xF8, 0x01, 0x50, 0x00, 0x68, 0x00,
-  0x0C, 0x83, 0x00, 0x81, 0x05, 0x00, 0x00, 0x00, 0x50, 0x00, 0x78, 0x01, 0x50, 0xC0, 0x28, 0x00,
-  0x00, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x90, 0x00, 0x00, 0xF8, 0x07, 0x00, 0x00,
-  0xFF, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x37, 0x81, 0x18, 0xD2, 0x00, 0x00, 0x7F };
-// clang-format on
+/* The VIC-IV register block in the MEGA65 personality, which is where these
+ * are written: the live chip, not the freeze slot. */
+constexpr Addr28 VIC4_REGISTERS = 0xFFD3000L;
+
+/* Offsets into viciv_regs, which is indexed by the low byte of the register's
+ * address.  Only the ones the code below reaches are named. */
+constexpr uint8_t VIC4_REG_KEY = 0x2F;
+constexpr uint8_t VIC4_REG_TOP_BORDER = 0x48;
+constexpr uint8_t VIC4_REG_BOTTOM_BORDER = 0x4A;
+constexpr uint8_t VIC4_REG_TEXT_YPOS = 0x4E;
+constexpr uint8_t VIC4_REG_CTRLC = 0x54;
+constexpr uint8_t VIC4_REG_RASLINE0 = 0x6F;
+constexpr uint8_t VIC4_REG_SPRITE_YADJ = 0x72;
+
+/* Where the two standards differ.  The table cannot hold one answer for these,
+ * so they are written over it once the current standard is known. */
+constexpr uint8_t NTSC_TOP_BORDER = 0x2A, NTSC_BOTTOM_BORDER = 0xB9;
+constexpr uint8_t NTSC_TEXT_YPOS = 0x2A, NTSC_SPRITE_YADJ = 0x18;
+constexpr uint8_t PAL_TOP_BORDER = 0x68, PAL_BOTTOM_BORDER = 0xF8;
+constexpr uint8_t PAL_TEXT_YPOS = 0x68, PAL_SPRITE_YADJ = 0x00;
+
+/* The whole VIC-IV register block, $D000-$D07F, as the menu wants it.
+ *
+ * The freezer inherits whatever display the frozen program was using -- any
+ * mode, any screen address, any raster split, sprites anywhere -- so it starts
+ * from a block it wrote rather than from registers it would have to audit one
+ * at a time.
+ *
+ * The values are what a working menu screen reads back, not a calculation, and
+ * that is why the two standards are patched in afterwards instead of appearing
+ * here: a table taken from one machine cannot state both. */
+static uint8_t viciv_regs[0x80] = {
+    /* Every entry not named here is zero, which is what the menu wants of
+     * it: no sprites, no raster interrupt, no bitplanes. */
+    [0x11] = 0x9B, /* YSCL      24/25 vertical smooth scroll */
+    [0x12] = 0x37, /* RC        raster compare bits 0 to 7 */
+    [0x16] = 0xC9, /* XSCL      horizontal smooth scroll */
+    [0x18] = 0x14, /* CB        character set address location (x 1KiB) */
+    [0x19] = 0x71, /* RIRQ      raster compare indicate or acknowledge */
+    [0x1A] = 0xE0, /* MRIRQ     mask raster IRQ */
+    [0x20] = 0x0E, /* BORDERCOL display border colour (256 colour) */
+    [0x21] = 0x06, /* SCREENCOL screen colour (256 colour) */
+    [0x22] = 0x01, /* MC1       multi-colour 1 (256 colour) */
+    [0x23] = 0x02, /* MC2       multi-colour 2 (256 colour) */
+    [0x24] = 0x03, /* MC3       multi-colour 3 (256 colour) */
+    [0x25] = 0x04, /* SPRMC0    Sprite multi-colour 0 (8-bit for selection o */
+    [0x27] = 0x01, /* SPR0COL   sprite N colour / 16-colour sprite transpare */
+    [0x28] = 0x02, /* SPR1COL   @SPRNCOL */
+    [0x29] = 0x03, /* SPR2COL   @SPRNCOL */
+    [0x2A] = 0x04, /* SPR3COL   @SPRNCOL */
+    [0x2B] = 0x05, /* SPR4COL   @SPRNCOL */
+    [0x2C] = 0x06, /* SPR5COL   @SPRNCOL */
+    [0x2D] = 0x07, /* SPR6COL   @SPRNCOL */
+    [0x2E] = 0x0C, /* SPR7COL   @SPRNCOL */
+    [0x31] = 0x20, /* VIC-III   Control Register B */
+    [0x40] = 0xFF, /* B0PIX     Display Address Translater (DAT) Bitplane N  */
+    [0x41] = 0xFF, /* B1PIX     @BNPIX */
+    [0x42] = 0xFF, /* B2PIX     @BNPIX */
+    [0x43] = 0xFF, /* B3PIX     @BNPIX */
+    [0x44] = 0xFF, /* B4PIX     @BNPIX */
+    [0x45] = 0xFF, /* B5PIX     @BNPIX */
+    [0x46] = 0xFF, /* B6PIX     @BNPIX */
+    [0x47] = 0xFF, /* B7PIX     @BNPIX */
+    [0x48] = 0x68, /* TBDRPOS   top border position */
+    [0x4A] = 0xF8, /* BBDRPOS   bottom border position */
+    /* The MSB of the one above, and the same for both standards -- $01F8 and
+     * $01B9 -- which is why only the LSB is patched for PAL and NTSC. */
+    [0x4B] = 0x01, /* BBDRPOS   bottom border position, bits 8-11 */
+    [0x4C] = 0x50, /* TEXTXPOS  character generator horizontal position */
+    [0x4E] = 0x68, /* TEXTYPOS  Character generator vertical position */
+    [0x50] = 0x0C, /* XPOSLSB   Read horizontal raster scan position LSB */
+    [0x51] = 0x83, /* XPOSMSB   Read horizontal raster scan position MSB */
+    [0x53] = 0x81, /* MSB       Read physical raster position */
+    [0x54] = 0x05, /* VIC-IV    Control register C */
+    [0x58] = 0x50, /* LINESTEPLSB number of bytes to advance between each text */
+    [0x5A] = 0x78, /* CHRXSCL   Horizontal hardware scale of text mode (pixe */
+    [0x5B] = 0x01, /* CHRYSCL   Vertical scaling of text mode (number of phy */
+    [0x5C] = 0x50, /* LSB       Width of single side border (LSB) */
+    [0x5D] = 0xC0, /* MSB       side border width (MSB) */
+    [0x5E] = 0x28, /* CHRCOUNT  Number of characters to display per row (LSB */
+    [0x61] = 0xB8, /* SCRNPTRMSB screen RAM precise base address (bits 15 - 8 */
+    [0x67] = 0x1F, /* SBPDEBUG  Sprite/bitplane first X DEBUG WILL BE REMOVE */
+    [0x69] = 0x90, /* CHARPTRMSB Character set precise base address (bits 15  */
+    [0x6C] = 0xF8, /* SPRPTRADRLSB sprite pointer address (bits 7 - 0) */
+    [0x6D] = 0x07, /* SPRPTRADRMSB sprite pointer address (bits 15 - 8) */
+    [0x70] = 0xFF, /* VIC-IV    palette bank selection */
+    [0x73] = 0x11, /* ALPHADELAY Alpha delay for compositor */
+    [0x79] = 0x37, /* RASCMP    Physical raster compare value to be used if  */
+    [0x7A] = 0x81, /* MSB       Raster compare value MSB */
+    [0x7B] = 0x18, /* ROWS      Number of text rows to display */
+    [0x7C] = 0xD2, /* PBANK     Set which 128KB bank bitplanes */
+    [0x7F] = 0x7F, /* DEBUGX    VIC-IV debug X position (MSB) */
+};
 
 void setup_menu_screen(void) {
-    // Reset all VIC-IV registers
-    // EXCEPT preserve $D054 CRT emulation mode...
-    viciv_regs[0x54] = (viciv_regs[0x54] & (0xff - 0x20)) | (VICIV.ctrlc & 0x20);
-    // EXCEPT preserve PAL/NTSC
-    viciv_regs[0x6F] = VICIV.rasline0;
-    // fix position for PAL/NTSC
-    if (viciv_regs[0x6f] & 0x80) {
-        viciv_regs[0x48] = 0x2A;
-        viciv_regs[0x4A] = 0xB9;
-        viciv_regs[0x4E] = 0x2A;
-        viciv_regs[0x72] = 0x18; // SPRYADJ
+    /* Two settings are the user's rather than ours, so they are read back off
+     * the chip and written into the block before it is sent. */
+    viciv_regs[VIC4_REG_CTRLC] = (viciv_regs[VIC4_REG_CTRLC] & ~VIC4_CTRLC_CRT_EMULATION) |
+        (VICIV.ctrlc & VIC4_CTRLC_CRT_EMULATION);
+    viciv_regs[VIC4_REG_RASLINE0] = VICIV.rasline0;
+
+    if (viciv_regs[VIC4_REG_RASLINE0] & VIC4_RASLINE0_NTSC) {
+        viciv_regs[VIC4_REG_TOP_BORDER] = NTSC_TOP_BORDER;
+        viciv_regs[VIC4_REG_BOTTOM_BORDER] = NTSC_BOTTOM_BORDER;
+        viciv_regs[VIC4_REG_TEXT_YPOS] = NTSC_TEXT_YPOS;
+        viciv_regs[VIC4_REG_SPRITE_YADJ] = NTSC_SPRITE_YADJ;
     } else {
-        viciv_regs[0x48] = 0x68;
-        viciv_regs[0x4A] = 0xF8;
-        viciv_regs[0x4E] = 0x68;
-        viciv_regs[0x72] = 0x00; // SPRYADJ
+        viciv_regs[VIC4_REG_TOP_BORDER] = PAL_TOP_BORDER;
+        viciv_regs[VIC4_REG_BOTTOM_BORDER] = PAL_BOTTOM_BORDER;
+        viciv_regs[VIC4_REG_TEXT_YPOS] = PAL_TEXT_YPOS;
+        viciv_regs[VIC4_REG_SPRITE_YADJ] = PAL_SPRITE_YADJ;
     }
 
-    lcopy((long)viciv_regs, 0xffd3000L, 47);
-    // don't write D02f, or we drop to vic-ii -- viciv.vhdl reverts unless a knock completes
-    lcopy((Addr28)(viciv_regs + 48), 0xffd3030L, 80);
+    /* In two halves with $D02F left out: it is the I/O personality knock, and
+     * viciv.vhdl reverts to VIC-II unless a whole knock sequence completes, so
+     * writing a stale value there drops the display out from under us.  Both
+     * lengths come from that one register number, so the hole cannot drift. */
+    lcopy((Addr28)viciv_regs, VIC4_REGISTERS, VIC4_REG_KEY);
+    lcopy((Addr28)(viciv_regs + VIC4_REG_KEY + 1),
+        VIC4_REGISTERS + VIC4_REG_KEY + 1,
+        sizeof viciv_regs - VIC4_REG_KEY - 1);
 
-    // Reset border widths
-    // No sprites
-    // Move screen to SCREEN_ADDRESS
-    // 16-bit text mode with full colour for chars >$FF
-    // (which we will use for showing the thumbnail)
-    // 80 bytes per row
-    // Screen at $00B800
-    // Colour RAM at offset $0000
-
-    // Fill colour RAM with sensible value at the start
     clear_colour_ram();
 }
 
-unsigned char next_cpu_speed(void) {
+uint8_t next_cpu_speed(void) {
     switch (detect_cpu_speed()) {
         case 1:
             // Make it 2MHz: 2MHZ && !FAST && !VFAST
@@ -177,7 +252,7 @@ unsigned char next_cpu_speed(void) {
 
 /* src/link.ld puts .thumbnail above the region the linker allocates from, so
  * that this does not come out of the same budget as the code. */
-static __attribute__((section(".thumbnail"))) unsigned char thumbnail_buffer[4096];
+static __attribute__((section(".thumbnail"))) uint8_t thumbnail_buffer[4096];
 
 /* White under xemu, which has no thumbnail generator: $FFD4000 reads as $FF,
  * freezes that way, and $FF is the palette's brightest entry.  Black instead
@@ -185,30 +260,14 @@ static __attribute__((section(".thumbnail"))) unsigned char thumbnail_buffer[409
  * sixteen.  Neither says anything about this code; on hardware it is the
  * frozen screen. */
 void draw_thumbnail(void) {
-    // Take the 4K of thumbnail data and render it to the display
-    // area at $50000.
-    // This requires a bit of fiddling:
-    // First, the thumbnail data has a nominal address of $0010000
-    // in the frozen memory, which overlaps with the main RAM,
-    // so we can't use our normal routine to find the start of freeze
-    // memory. Instead, we will find that region directly, and then
-    // process the 8 sectors of data in a linear fashion.
-    // The thumbnail bytes themselves are arranged linearly, so we
-    // have to work out the right place to store them in the thumbnail
-    // data.  We would really like to avoid having to use lpoke for
-    // this all the time, because lpoke() uses a DMA for every memory
-    // access, which really slows things down. This would be bad, since
-    // we want users to be able to very quickly and smoothly flip between
-    // the freeze slots and see what is there.
-    // But there isn't currently a good solution to this, short of having
-    // a second buffer into which to render it.
-    unsigned char x;
-    unsigned char y;
-    unsigned char i;
-    uint16_t yoffset;
-    uint16_t yoffset_out;
-    uint16_t xoffset;
-    uint16_t j;
+    /* Render the slot's 4KB thumbnail to the tile data at $50000.
+     *
+     * The region is found directly rather than through
+     * address_to_freeze_slot_offset(): the thumbnail's nominal address of
+     * $0010000 overlaps main RAM, so the usual lookup would find the wrong
+     * region.  Its bytes are linear where the tiles are not, hence the
+     * rearrange pass below -- done through a buffer, because a per-pixel
+     * lpoke() is one DMA job each and the slot browser has to flip smoothly. */
     uint32_t thumbnail_sector = find_thumbnail_offset();
 
     // Can't find thumbnail area?  Then show no thumbnail
@@ -217,38 +276,40 @@ void draw_thumbnail(void) {
         return;
     }
     // Copy thumbnail memory to buffer
-    for (i = 0; i < 8; i++) {
+    for (uint8_t i = 0; i < 8; i++) {
         sdcard_readsector(freeze_slot_start_sector + thumbnail_sector + i);
         lcopy((Addr28)sector_buffer, (Addr28)(thumbnail_buffer + (i * 0x200)), 0x200);
         NAVIGATION_KEY_CHECK();
     }
 
     // Pick colours of all pixels in the thumbnail
-    for (j = 0; j < 4096; j++) {
+    for (uint16_t j = 0; j < 4096; j++) {
         thumbnail_buffer[j] = colour_table[thumbnail_buffer[j]];
     }
-    // Fix column 0 of pixels
-    yoffset = 0;
-    for (j = 0; j < 49; j++) {
-        thumbnail_buffer[yoffset] = thumbnail_buffer[yoffset + 1];
-        yoffset += 80;
+
+    /* Fix column 0 of pixels.  The offset runs alongside the counter rather
+     * than being multiplied out of it: a multiply per row costs a call here. */
+    uint16_t row_start = 0;
+    for (uint16_t row = 0; row < 49; row++) {
+        thumbnail_buffer[row_start] = thumbnail_buffer[row_start + 1];
+        row_start += 80;
     }
 
     // Rearrange pixels
-    yoffset = 80 + 13; // skip dud first line
-    for (y = 0; y < 48; y++) {
-        yoffset_out = ((y & 7) << 3) + (y >> 3) * 64;
-        xoffset = 0;
-        for (x = 0; x < 73; x += 8) {
+    uint16_t yoffset = 80 + 13; // skip dud first line
+    for (uint8_t y = 0; y < 48; y++) {
+        uint16_t yoffset_out = ((y & 7) << 3) + (y >> 3) * 64;
+        uint16_t xoffset = 0;
+        for (uint8_t x = 0; x < 73; x += 8) {
             // Also the whole thing is rotated by one byte, so add that on as we plot the pixel
             // PGS Optimise here
 
-            j = 8;
-            if (x == 72) {
-                j = 2;
-            }
+            /* The last column is a part row: 73 pixels do not divide by eight. */
+            uint16_t count = (x == 72) ? 2 : 8;
 
-            lcopy((uint32_t)&thumbnail_buffer[x + yoffset], 0x50000L + (xoffset + yoffset_out), j);
+            lcopy((uint32_t)&thumbnail_buffer[x + yoffset],
+                0x50000L + (xoffset + yoffset_out),
+                count);
 
             xoffset += 64 * 6;
         }
@@ -259,20 +320,23 @@ void draw_thumbnail(void) {
 
 static struct ProcessDescriptor process_descriptor;
 
-// clang-format off
 static int8_t last_thumb_frame = -1;
-static unsigned char thumb_xoff = 5, thumb_yoff = 1;
+static uint8_t thumb_xoff = 5, thumb_yoff = 1;
 /* Index into thumb_frame_name[]. */
 enum ThumbFrame : uint8_t {
     ThumbFrameM65 = 0,
     ThumbFrameC65 = 1,
     ThumbFrameC64 = 2,
 };
-static char thumb_frame_name[][13] = {
-  "M65THUMB.M65",
-  "C65THUMB.M65",
-  "C64THUMB.M65"
+/* Padded to a power of two: a 13-byte stride makes indexing a multiply, which
+ * on this target is a call to __mulhi3 and links the whole helper for one use. */
+// clang-format off
+static char thumb_frame_name[][16] = {
+    "M65THUMB.M65",
+    "C65THUMB.M65",
+    "C64THUMB.M65"
 };
+// clang-format on
 
 /* Blanks a whole row, both planes.  The fixed parts are runs of text with gaps
  * between them, so anything drawn over a whole row has to be cleared rather
@@ -280,8 +344,8 @@ static char thumb_frame_name[][13] = {
 static void clear_menu_row(uint8_t y) {
     const uint16_t cell = SCREEN_CELL(0, y);
     lfill_skip(SCREEN_ADDRESS + cell, ' ', 40, SCREEN_CELL_BYTES);
-    lfill_skip(COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), SchemeText, 40,
-        SCREEN_CELL_BYTES);
+    lfill_skip(
+        COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), SchemeText, 40, SCREEN_CELL_BYTES);
 }
 
 /* Everything that does not change: the stream from freezer/menu.cpp, plus the
@@ -295,17 +359,16 @@ void draw_menu_fixed(void) {
     draw_rule(SCREEN_CELL(0, 12), 40);
 }
 
-void predraw_freeze_menu(void)
-{
-  // Clear screen, blue background, white text, like Action Replay
-  VICIV.bordercol = SchemeBorder;
-  VICIV.screencol = SchemeBackground;
+void predraw_freeze_menu(void) {
+    // Clear screen, blue background, white text, like Action Replay
+    VICIV.bordercol = SchemeBorder;
+    VICIV.screencol = SchemeBackground;
 
-  clear_colour_ram();
-  blank_screen();
-  draw_menu_fixed();
+    clear_colour_ram();
+    blank_screen();
+    draw_menu_fixed();
 
-  last_thumb_frame = -1;
+    last_thumb_frame = -1;
 }
 
 /* Which parts of the menu draw_freeze_menu() redraws, OR-ed together. */
@@ -319,12 +382,11 @@ enum : uint8_t {
     UpdateAll = UpdateTop | UpdateFreq | UpdateProcess | UpdateDisk | UpdateThumb,
     UpdateChgSlot = 0x20,
 };
-// clang-format on
 
-void draw_freeze_menu(unsigned char part) {
+void draw_freeze_menu(uint8_t part) {
     uint16_t i;
-    unsigned char x;
-    unsigned char y;
+    uint8_t x;
+    uint8_t y;
 
     if (part & UpdateChgSlot) {
         freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
@@ -334,16 +396,12 @@ void draw_freeze_menu(unsigned char part) {
     if (part & UpdateTop) {
 
         if (slot_number) {
-            draw_text(SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y),
-                SchemeText,
-                (const char*)freeze_menu_bar + 40,
-                40);
+            draw_text(SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, freeze_menu_bar + 40, 40);
             draw_text(
                 SCREEN_CELL(SLOT_LABEL_X, SLOT_LABEL_Y), SchemeTextDim, " FREEZE SLOT:      ", 19);
             draw_decimal(SCREEN_CELL(SLOT_NUMBER_X, SLOT_LABEL_Y), SchemeValue, slot_number);
         } else {
-            draw_text(
-                SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, (const char*)freeze_menu_bar, 40);
+            draw_text(SCREEN_CELL(KEY_BAR_X, KEY_BAR_Y), SchemeText, freeze_menu_bar, 40);
             if (rom_changed) {
                 /* Blanking nine cells is a fill; draw_text would fold nine
                  * spaces, which converts each to itself. */
@@ -482,12 +540,13 @@ void draw_freeze_menu(unsigned char part) {
         }
     }
 
-    // wait till raster leaves screen
-    while (VICIV.rasterline < 0xf8) {
-    }
-
     // Draw the thumbnail surround area
     if (part & UpdateThumb) {
+        /* Wait for the raster to leave the screen: only the thumbnail is large
+         * enough to tear, and the settings keys redraw far more often. */
+        while (VICIV.rasterline < 0xf8) {
+        }
+
         int8_t thumb_frame = ThumbFrameM65;
 
         switch (mega65_rom_type) {
@@ -560,7 +619,7 @@ void draw_freeze_menu(unsigned char part) {
             last_thumb_frame = -1;
         }
 
-        // Now draw the 10x6 character block for thumbnail display itself
+        // Now draw the 9x6 character block for thumbnail display itself
         // This sits in the region below the menu where we will also have left and right arrows,
         // the program name etc, so you can easily browse through the freeze slots.
         draw_thumbnail();
@@ -611,7 +670,7 @@ enum : uint8_t {
     ChargenForce = 0x40,   // if check can't load region, do fix anyway
     ChargenNoCheck = 0x80, // don't execute check, always fix
 };
-void fix_chargen_area(unsigned char flags) {
+void fix_chargen_area(uint8_t flags) {
     uint16_t i = SD_SECTOR_SIZE; // needs to be SD_SECTOR_SIZE for nocheck to trigger!
     long charset_start;
 
@@ -647,7 +706,8 @@ void fix_chargen_area(unsigned char flags) {
                 lcopy(charset_start, CHARGEN_ADDRESS, 4096);
             }
 
-            // should we also fix the slot?
+            /* The slot as well, so the charset survives the resume rather
+             * than only looking right while the menu is up. */
             if (flags & ChargenFixSlot) {
                 for (i = 0; i < 8; i++) {
                     lcopy(charset_start + (long)SD_SECTOR_SIZE * i,
@@ -709,8 +769,8 @@ void start_freezer_tool(char* toolfile) {
 }
 
 int main(void) {
-    unsigned char drive_state;
-    unsigned char image_state;
+    uint8_t drive_state;
+    uint8_t image_state;
     /* Performs the $D02F knock; without it every later write to a VIC-IV
      * register such as $D054 is silently ignored and the screen mode is
      * never established. */
@@ -721,8 +781,8 @@ int main(void) {
     CIA1.icr = 0x7F;
     CIA2.icr = 0x7F;
     VICIV.imr = 0x00;
-    // XXX add missing C65 AND M65 peripherals
-    // C65 UART, ethernet etc
+    /* The two CIAs and the VIC only: the C65 UART and the ethernet controller
+     * can still raise an interrupt here. */
 
     // check border for return codes from other helpers
     if (VICIV.bordercol == BORDER_SIGNAL_ROM_CHANGED) {
@@ -744,17 +804,6 @@ int main(void) {
 
     // Put $DD00 DDR back to default
     CIA2.ddra = 0xFF;
-
-    // Enable extended attributes so we can use reverse
-    VICIV.ctrlb = VICIV.ctrlb | 0x20;
-
-    // Correct horizontal scaling
-    VICIV.chrxscl = 0x78;
-
-    // Reset character set address
-    VICIV.charptr_lsb = 0x00;
-    VICIV.charptr_msb = 0x10;
-    VICIV.charptr_bnk = 0x00;
 
     // Silence SIDs
     SID1.amp = 0;
@@ -823,7 +872,7 @@ int main(void) {
 
     // Main keyboard input loop
     while (1) {
-        unsigned char key = ASCIIKEY;
+        uint8_t key = ASCIIKEY;
 
         if (key) {
             // Flush char from input buffer
@@ -1050,19 +1099,8 @@ int main(void) {
                         VICIV.bordercol = SchemeBorderBusy;
                         for (uint32_t j = 0; j < 128; j++) {
                             lcopy(0x40000U + (j << 9), (uint32_t)sector_buffer, SD_SECTOR_SIZE);
-#ifdef USE_MULTIBLOCK_WRITE
-                            if (!j)
-                                sdcard_writesector(dest_freeze_slot_start_sector + i + j, 1);
-                            else
-                                sdcard_writenextsector();
-#else
                             sdcard_writesector(dest_freeze_slot_start_sector + i + j, 0);
-#endif
                         }
-#ifdef USE_MULTIBLOCK_WRITE
-                        // Close multi-sector write job
-                        sdcard_writemultidone();
-#endif
                     }
                     // stop giving visual feedback
                     sdcard_visual_feedback(0);

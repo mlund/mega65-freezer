@@ -176,6 +176,14 @@ constexpr uint8_t VIC4_CTRLB_EXTENDED_ATTRIBUTES = 0x20;
 constexpr uint8_t VIC4_CTRLC_LEGACY_MASK = 0xF8;
 constexpr uint8_t VIC4_CTRLC_MODE_MASK = 0xA8;
 constexpr uint8_t VIC4_CTRLC_16BIT_FULL_COLOUR = 0x05;
+/* The CRT emulation the user chose, which is theirs to keep: a tool that
+ * resets the display carries this bit across rather than imposing its own. */
+constexpr uint8_t VIC4_CTRLC_CRT_EMULATION = 0x20;
+
+// VICIV.rasline0 ($D06F).
+/* Set for NTSC, clear for PAL, and the two need different border and sprite
+ * positions -- so it decides more than the frame rate. */
+constexpr uint8_t VIC4_RASLINE0_NTSC = 0x80;
 
 // VICIV.chrxscl ($D05A), the horizontal character scale.
 constexpr uint8_t VIC4_CHRXSCL_80_COLUMN = 0x78;

@@ -516,8 +516,7 @@ static void show_memory_map(void) {
         output_buffer[11] = '>';
         format_hex(&output_buffer[MAP_TARGET_COLUMN], run.target, 7);
         output_buffer[MAP_TARGET_COLUMN + 7] = '-';
-        format_hex(&output_buffer[MAP_TARGET_COLUMN + 8],
-            run.target + (run.last - run.first), 7);
+        format_hex(&output_buffer[MAP_TARGET_COLUMN + 8], run.target + (run.last - run.first), 7);
         put_text(MAP_CONTENTS_COLUMN, map_contents(run.target));
         bool masked = put_decided_by(&run);
         write_line(output_buffer, 0);
@@ -620,15 +619,15 @@ void show_registers(void) {
         /* MAPLO and MAPHI read high byte first, so displaying them as little
          * endian words swapped the selection nibble into the offset. */
         // MAPLO
-        format_hex(&output_buffer[REGLINE_MAPLO],
-            (sector_buffer[0x0A] << 8) | sector_buffer[0x0B], 4);
+        format_hex(
+            &output_buffer[REGLINE_MAPLO], (sector_buffer[0x0A] << 8) | sector_buffer[0x0B], 4);
         value = sector_buffer[0x0E];
         output_buffer[REGLINE_MAPLO + 4] = '/';
         format_hex(&output_buffer[REGLINE_MAPLO + 5], value, 2);
 
         // MAPHI
-        format_hex(&output_buffer[REGLINE_MAPHI],
-            (sector_buffer[0x0C] << 8) | sector_buffer[0x0D], 4);
+        format_hex(
+            &output_buffer[REGLINE_MAPHI], (sector_buffer[0x0C] << 8) | sector_buffer[0x0D], 4);
         value = sector_buffer[0x0F];
         output_buffer[REGLINE_MAPHI + 4] = '/';
         format_hex(&output_buffer[REGLINE_MAPHI + 5], value, 2);

@@ -92,8 +92,8 @@ void display_footer(unsigned char index) {
     /* Reversed, so this colour is the bar and the glyphs take the screen
      * background.  Every cell is set outright because the console scrolls
      * through this row, and whatever colour it left must not show through. */
-    lfill(COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS,
-        SchemeTextBright | AttribReverse, 80);
+    lfill(
+        COLOUR_RAM_ADDRESS - SCREEN_ADDRESS + FOOTER_ADDRESS, SchemeTextBright | AttribReverse, 80);
 }
 
 void setup_screen(void) {
