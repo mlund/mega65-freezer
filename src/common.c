@@ -155,14 +155,14 @@ void screen_of_death(const char* msg) {
 /* The frozen copy of the descriptor.  Its region starts on a sector boundary,
  * so a store needs no read-before-write and the sector goes back out as it came
  * in bar the patch: one read and one write, whatever the field. */
-constexpr uint32_t FROZEN_PROCDESC = 0xFFFBD00L;
-constexpr uint8_t PD_FLAGS = offsetof(struct ProcessDescriptor, d81_flags);
-constexpr uint8_t PD_NAMELEN = offsetof(struct ProcessDescriptor, d81_namelen);
-constexpr uint8_t PD_NAME = offsetof(struct ProcessDescriptor, d81_name);
-constexpr uint8_t PD_NAME_BYTES = 32;
+static constexpr uint32_t FROZEN_PROCDESC = 0xFFFBD00L;
+static constexpr uint8_t PD_FLAGS = offsetof(struct ProcessDescriptor, d81_flags);
+static constexpr uint8_t PD_NAMELEN = offsetof(struct ProcessDescriptor, d81_namelen);
+static constexpr uint8_t PD_NAME = offsetof(struct ProcessDescriptor, d81_name);
+static constexpr uint8_t PD_NAME_BYTES = 32;
 
 /* The frozen CPU's saved state, at the base of its own region. */
-constexpr uint32_t FROZEN_CPU_STATE = 0xFFD3640UL;
+static constexpr uint32_t FROZEN_CPU_STATE = 0xFFD3640UL;
 
 void freeze_reset_cpu_state(void) {
     /* The reset vector is read first: it is in another sector, and freeze_peek

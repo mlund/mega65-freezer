@@ -23,25 +23,25 @@ void cpumap_load(const uint8_t* saved, uint8_t rom_banking) {
 
 /* The C65 ROM banks sit $20000 above the 16-bit windows they serve, so every
  * ROM answer here is the address plus this. */
-constexpr Addr28 ROM_BANK_OFFSET = 0x20000UL;
+static constexpr Addr28 ROM_BANK_OFFSET = 0x20000UL;
 
 /* The register set every I/O personality aliases, and the one the slot saves. */
-constexpr Addr28 IO_PAGE = 0xFFD3000UL;
+static constexpr Addr28 IO_PAGE = 0xFFD3000UL;
 
 /* $DE00-$DFFF reaches the cartridge port rather than the I/O page. */
-constexpr Addr28 CARTRIDGE_IO = 0x7FFD000UL;
-constexpr uint16_t CARTRIDGE_IO_FIRST = 0xDE00;
+static constexpr Addr28 CARTRIDGE_IO = 0x7FFD000UL;
+static constexpr uint16_t CARTRIDGE_IO_FIRST = 0xDE00;
 
 /* $D030 bit 0. Within address resolution its only effect is to keep
  * $DE00-$DFFF on the I/O page; routing $DC00 to colour RAM happens downstream
  * in the iomapper, which never changes the address the CPU formed. */
-constexpr uint8_t ROM_BANKING_CRAM2K = 0x01;
+static constexpr uint8_t ROM_BANKING_CRAM2K = 0x01;
 
 /* The four VIC-III banking bits, each naming the window it covers. */
-constexpr uint8_t ROM_BANKING_ROM8 = 0x08;
-constexpr uint8_t ROM_BANKING_ROMA = 0x10;
-constexpr uint8_t ROM_BANKING_ROMC = 0x20;
-constexpr uint8_t ROM_BANKING_ROME = 0x80;
+static constexpr uint8_t ROM_BANKING_ROM8 = 0x08;
+static constexpr uint8_t ROM_BANKING_ROMA = 0x10;
+static constexpr uint8_t ROM_BANKING_ROMC = 0x20;
+static constexpr uint8_t ROM_BANKING_ROME = 0x80;
 
 /* Which bit banks each 4KB window from $8000 up, and what to call it.  ROMC
  * covers only $C000-$CFFF, so $D000 gets a bit no register can set. */
@@ -58,8 +58,8 @@ static const CpuMapMechanism ROM_BANKING_MECHANISM[8] = {
     CpuMapRom8, CpuMapRom8, CpuMapRomA, CpuMapRomA, CpuMapRomC, CpuMapRam, CpuMapRomE, CpuMapRomE};
 
 /* Character ROM as read through $D000, and the RAM a write to it reaches. */
-constexpr Addr28 CHARACTER_ROM = 0x0002D000UL;
-constexpr Addr28 RAM_UNDER_IO = 0x0000D000UL;
+static constexpr Addr28 CHARACTER_ROM = 0x0002D000UL;
+static constexpr Addr28 RAM_UNDER_IO = 0x0000D000UL;
 
 /* Which branch below settled the last call.  A side channel and not an out
  * parameter: only cpumap_run() wants it, and the argument would cost bytes at
@@ -158,7 +158,7 @@ Addr28 cpumap_typed_address(uint32_t typed) {
  * cartridge expansion area at $DE00) -- but a MAP offset is a multiple of $100
  * and its 20-bit sum wraps at whatever $100 boundary it reaches, so only a
  * 256-byte walk sees every place a run can end. */
-constexpr uint16_t WINDOW_SIZE = 0x100;
+static constexpr uint16_t WINDOW_SIZE = 0x100;
 
 void cpumap_run(uint16_t from, CpuMapRun* run) {
     run->first = from;

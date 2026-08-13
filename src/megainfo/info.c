@@ -31,9 +31,9 @@ static char s_dessentials[][13] = {
  * Global Variables
  */
 /* The RTC counts years from 2000, not 1900. */
-constexpr uint16_t RTC_YEAR_EPOCH = 2000;
+static constexpr uint16_t RTC_YEAR_EPOCH = 2000;
 
-constexpr uint8_t BUFFER_LENGTH = 254;
+static constexpr uint8_t BUFFER_LENGTH = 254;
 /* Text. */
 static char buffer[BUFFER_LENGTH + 2];
 static char tempstr32[32];
@@ -47,7 +47,7 @@ static uint8_t ymd[3];
 
 /* Selects the inverse glyph -- bit 7 of the screen code -- not the colour-RAM
  * AttribReverse.  Kept above the colour byte so a role can be OR-ed with it. */
-constexpr uint16_t WRITE_TEXT_INVERSE_GLYPH = 0x100;
+static constexpr uint16_t WRITE_TEXT_INVERSE_GLYPH = 0x100;
 
 static void write_text_mapped(unsigned char x,
     unsigned char y,

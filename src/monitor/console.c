@@ -10,7 +10,7 @@
 
 #include <mega65.h>
 
-char* footer_messages[FooterMax + 1] = {
+static char* footer_messages[FooterMax + 1] = {
     /* Exactly 80 columns: display_footer() copies the whole row unconditionally. */
     "(D/A)SM (B)IT (C)MP (F)ILL (H)UNT (M)EM (P)IX (R)EG (S)ET (T)RA E(X)IT SREG(;)  ",
     "A FATAL ERROR HAS OCCURRED, SORRY.                                              "};

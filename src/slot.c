@@ -191,7 +191,7 @@ void freeze_poke(uint32_t addr, unsigned char v) {
  * addition would otherwise fold back through the wrapper and inlining would
  * restore the original code exactly.  This is the opposite of colour_poke(),
  * whose argument is a runtime value and which the inliner handles unprompted. */
-constexpr uint32_t FROZEN_IO_BASE = 0x0FFD0000UL;
+static constexpr uint32_t FROZEN_IO_BASE = 0x0FFD0000UL;
 
 __attribute__((noinline)) unsigned char freeze_io_peek(uint16_t reg) {
     return freeze_peek(FROZEN_IO_BASE + reg);

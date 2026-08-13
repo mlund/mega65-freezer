@@ -30,16 +30,16 @@ static_assert(DISASM_MNEMONIC_WIDTH == 3, "mnemonic field width baked into the l
 static_assert(sizeof(MODE_LENGTH) == BitZeroPageRelative + 1, "MODE_LENGTH must cover every mode");
 
 /* Opcodes that act as, or are reached through, a prefix. */
-constexpr uint8_t OPCODE_NEG = 0x42;
-constexpr uint8_t OPCODE_EOM = 0xEA;
-constexpr uint8_t OPCODE_CLD = 0xD8;
-constexpr uint8_t OPCODE_LDA_INDIRECT_Z = 0xB2;
+static constexpr uint8_t OPCODE_NEG = 0x42;
+static constexpr uint8_t OPCODE_EOM = 0xEA;
+static constexpr uint8_t OPCODE_CLD = 0xD8;
+static constexpr uint8_t OPCODE_LDA_INDIRECT_Z = 0xB2;
 
 /* Five byte slots, not the seven a far JSR needs: nothing documented exceeds
  * five, and a far call may overflow and push its own mnemonic right -- which is
  * why the caller is told the columns rather than assuming them. */
-constexpr uint8_t ADDRESS_DIGITS = 7;
-constexpr uint8_t BYTE_FIELD_SLOTS = 5;
+static constexpr uint8_t ADDRESS_DIGITS = 7;
+static constexpr uint8_t BYTE_FIELD_SLOTS = 5;
 static_assert(DISASM_BYTE_COLUMN == 1 + ADDRESS_DIGITS + 1, "byte column follows the address");
 /* Three characters plus at most one suffix -- a Q, an F, or a bit digit -- so
  * the pad below is never zero and the operand column is always derivable. */
@@ -49,8 +49,8 @@ static const char HEX_DIGITS[] RODATA = "0123456789ABCDEF";
 
 /* The Q mnemonics that are not the base name plus a Q, base then replacement.
  * Flat because clang rejects a NUL-less string initialiser. */
-constexpr uint8_t QUAD_IRREGULAR_COUNT = 5;
-constexpr uint8_t QUAD_IRREGULAR_STRIDE = 2 * DISASM_MNEMONIC_WIDTH;
+static constexpr uint8_t QUAD_IRREGULAR_COUNT = 5;
+static constexpr uint8_t QUAD_IRREGULAR_STRIDE = 2 * DISASM_MNEMONIC_WIDTH;
 static const char QUAD_IRREGULAR[] RODATA = "ORAORQ"
                                             "INCINQ"
                                             "DECDEQ"
@@ -421,8 +421,8 @@ enum OperandShape : uint8_t {
 
 /* Modes each shape can mean, narrowest first so that $12 assembles to the
  * zero-page form and $0012 to the absolute one.  MODE_NONE ends each row. */
-constexpr uint8_t MODE_NONE = 0xFF;
-constexpr uint8_t SHAPE_MODE_MAX = 5;
+static constexpr uint8_t MODE_NONE = 0xFF;
+static constexpr uint8_t SHAPE_MODE_MAX = 5;
 static const uint8_t SHAPE_MODES[][SHAPE_MODE_MAX] = {
     [ShapeNone] = {Implied, Accumulator, MODE_NONE},
     [ShapeAccumulator] = {Accumulator, MODE_NONE},

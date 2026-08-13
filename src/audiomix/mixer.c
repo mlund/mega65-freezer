@@ -443,7 +443,7 @@ void draw_simple_mixer(void) {
 /* $D400, reached via its 28-bit flat alias so lfill() can zero all four SID
  * chips' register files (0x100 bytes) in one DMA job rather than four
  * per-chip loops. */
-constexpr Addr28 SID_ALL_28BIT = 0xffd3400;
+static constexpr Addr28 SID_ALL_28BIT = 0xffd3400;
 
 static volatile struct __sid* const SIDS[4] = {&SID1, &SID2, &SID3, &SID4};
 

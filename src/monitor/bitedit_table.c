@@ -10,21 +10,21 @@
 
 /* Shift-Q in the C64 ROM charset the screen renders with: see CHARSET_ADDRESS
  * in screen.h. */
-constexpr uint8_t GLYPH_BIT = 0x51;
+static constexpr uint8_t GLYPH_BIT = 0x51;
 
 /* The NAME column, used only while rendering a row. */
-constexpr uint8_t BITEDIT_NAME_COLUMN = 10;
+static constexpr uint8_t BITEDIT_NAME_COLUMN = 10;
 
 /* Record header: address low, address high, total length, chip and flags. */
-constexpr uint8_t RECORD_HEADER = 4;
-constexpr uint8_t FLAG_CHIP_MASK = 0x1F;
-constexpr uint8_t FLAG_HAS_FIELDS = 0x20;
-constexpr uint8_t FLAG_HAS_NAME = 0x40;
-constexpr uint8_t FLAG_HAS_TEXT = 0x80;
+static constexpr uint8_t RECORD_HEADER = 4;
+static constexpr uint8_t FLAG_CHIP_MASK = 0x1F;
+static constexpr uint8_t FLAG_HAS_FIELDS = 0x20;
+static constexpr uint8_t FLAG_HAS_NAME = 0x40;
+static constexpr uint8_t FLAG_HAS_TEXT = 0x80;
 
 /* File header: "M65I", format version, chip count, then three 16-bit offsets. */
-constexpr uint8_t HEADER_BYTES = 12;
-constexpr uint8_t FORMAT_VERSION = 1;
+static constexpr uint8_t HEADER_BYTES = 12;
+static constexpr uint8_t FORMAT_VERSION = 1;
 
 static uint16_t record_start;
 static uint16_t text_start;

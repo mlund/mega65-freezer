@@ -2,11 +2,44 @@
 # it is expected to be clean, so read the exit status.
 #
 # The check list is deliberately narrow at the edges, because a 6502 target trips several checks
-# that are sound advice on a hosted system and wrong here. Each exclusion below says why, so that
-# nobody has to re-derive it — and so that adding one requires the same.
+# that are sound advice on a hosted system and wrong here. The table below says why for each, so
+# that nobody has to re-derive it, and so that adding one requires the same.
 #
-# The high-volume arithmetic advisories live in the separate `tidy-arithmetic` target rather than
-# here: they are worth reading, but there are 187 of them and they would bury everything else.
+# The reasons sit here rather than beside the entries because `Checks:` is a folded scalar: a `#`
+# inside it is not a comment, it becomes part of the check string, and every exclusion after it is
+# silently lost. Read the list back with `clang-tidy --list-checks -p build src/format.c` after
+# editing -- a broken exclusion shows as a check still enabled, not as an error.
+#
+# The count is what each reported when last measured over src/*.c and src/*/*.c, and says whether
+# the exclusion still carries its weight; one that has fallen to nothing can be deleted.
+#
+#   638  bugprone-signed-bitwise            C promotes uint8_t to signed int before any operator,
+#                                           so masking or shifting a register byte is a signed
+#                                           bitwise operation by definition. Unavoidable.
+#   225  performance-no-int-to-ptr          A register access is an integer cast to a pointer, so
+#                                           this fires on the whole hardware layer.
+#   201  misc-include-cleaner               Wants an include per symbol rather than the header
+#                                           that groups them.
+#    41  bugprone-easily-swappable-params   Any two adjacent parameters of the same type, which
+#                                           here is most of them.
+#    34  bugprone-narrowing-conversions     Both in the `tidy-arithmetic` target instead: 16-bit
+#    33  bugprone-implicit-widening-of-...  int makes them worth reading but advisory, and at this
+#                                           volume they would bury everything else here.
+#    25  portability-no-assembler           One CPU, and inline assembly is reached for on purpose.
+#    17  ...insecureAPI.DeprecatedOrUnsafe  Fixed-size buffers, sized at compile time, and nothing
+#     9  ...insecureAPI.strcpy              here feeds them anything untrusted. The replacements
+#                                           they ask for are not in the SDK's libc.
+#    14  portability-avoid-pragma-once      One compiler, which has always supported it.
+#    10  clang-analyzer-core.NullDereference  Every one is CPU_PORTDDR or CPU_PORT, the 6502's own
+#                                           port at $0000 and $0001. The analyzer cannot know
+#                                           those are registers rather than a null pointer.
+#     1  ...core.FixedAddressDereference    Reading and writing fixed addresses is what a hardware
+#     0  ...optin.core.FixedAddressDeref.   register is. Both spellings are kept: the check moved
+#                                           out of `optin.` between clang versions, and a name
+#                                           that no longer exists is ignored rather than an error,
+#                                           so both survive a bump in either direction.
+#     0  misc-use-anonymous-namespace       C++ only, and the two .cpp files here declare nothing
+#                                           at namespace scope.
 
 Checks: >
   bugprone-*,
@@ -32,9 +65,7 @@ Checks: >
   -bugprone-signed-bitwise,
   -bugprone-implicit-widening-of-multiplication-result,
   -bugprone-narrowing-conversions,
-  -misc-use-anonymous-namespace,
   -misc-include-cleaner,
-  -misc-use-internal-linkage,
   -portability-avoid-pragma-once,
   -portability-no-assembler,
 
@@ -43,18 +74,32 @@ WarningsAsErrors: '*'
 # This project's own headers, and only those. Without a filter clang-tidy reports through the SDK
 # and mega65-libc headers, which are not ours to fix and which drown everything else.
 #
-# This has broken silently once already: an earlier value named files from a different project and
-# matched nothing, so no header was ever checked. It broke the same way a second time when this
-# repository split out of a parent tree that put these sources under llvm/src/ -- the prefix this
-# value used to need -- and became its own repository with them at src/ instead. Same failure mode
-# as the FixedAddressDereference rename above: a regex that stops matching produces silence, not an
-# error, so absence of header findings is not by itself evidence the filter is working.
-HeaderFilterRegex: 'src/[^/]+\.h$'
+# Both halves are load-bearing, and both fail quietly. Too narrow and headers go unchecked with no
+# sign of it: a pattern that cannot cross a separator, such as `src/[^/]+\.h$`, reaches only the
+# headers directly under src/ and none in a subdirectory. Too wide and a dependency comes back in:
+# `src/.*\.h$` on its own also matches `_deps/mega65libc-src/include/mega65/*.h`, since that path
+# has `src/` in it too -- hence the exclusion below.
+#
+# Neither shape announces itself, so check the reach rather than assuming it. Put a badly named
+# struct in a subdirectory header and confirm it is reported:
+#
+#   clang-tidy --list-checks -p build src/format.c   # exclusions still in force?
+#   cmake --build build --target tidy                # clean, and reaching every header?
+HeaderFilterRegex: 'src/.*\.h$'
+ExcludeHeaderFilterRegex: '_deps/'
 
 # Rust's naming, because that is what the rest of this repository is written in and there is no
 # reason for the helper to read differently: types UpperCamelCase, functions and variables
 # snake_case, constants SCREAMING_SNAKE_CASE, enum variants UpperCamelCase.
 CheckOptions:
+  # Functions are left out of the internal-linkage check, variables and types are not. Marking a
+  # file-scope variable `static` costs nothing: measured over all eleven tools, zero bytes. Marking
+  # a function `static` makes it a stronger inlining candidate, and in the two tools that inline
+  # everything into one large main() that reshuffles register allocation for +13 and +10 bytes.
+  # Worth running by hand now and then with AnalyzeFunctions true -- it is what found three dead
+  # functions and a dead colour table -- but not worth enforcing.
+  misc-use-internal-linkage.AnalyzeFunctions: false
+
   # Types: UpperCamelCase
   readability-identifier-naming.ClassCase: CamelCase
   readability-identifier-naming.StructCase: CamelCase

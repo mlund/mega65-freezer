@@ -22,7 +22,7 @@ static short file_count = 0;
 static short selection_number = 0;
 static short display_offset = 0;
 
-unsigned char buffer[SD_SECTOR_SIZE];
+static unsigned char buffer[SD_SECTOR_SIZE];
 
 static char reading_disk_list_message[] = "SCANNING DIRECTORY ...";
 
@@ -53,82 +53,12 @@ static char rom_reset_screen[] = "YOU HAVE LOADED THE ROM FILE            "
 
 static unsigned char normal_row[40] = { COLOUR_PAIRS_20(SchemeText) };
 static unsigned char highlight_row[40] = { COLOUR_PAIRS_20(SchemeSelected | AttribReverse) };
-static unsigned char dir_line_colour[40] = { COLOUR_PAIRS_20(SchemeAccent) };
 
 #undef COLOUR_PAIRS_20
 #undef COLOUR_PAIRS_10
 // clang-format on
 
 static char rom_name_return[32];
-
-char draw_directory_entry(unsigned char screen_row) {
-    char type;
-    char firsta0 = 1;
-    char invalid = 0;
-    unsigned char i;
-    unsigned char c;
-    // Skip first 5 bytes
-    for (i = 0; i < 2; i++) {
-        (void)F011_DATA;
-    }
-    type = F011_DATA;
-    if (!(type & 0xf)) {
-        invalid = 1;
-    }
-    for (i = 0; i < 2; i++) {
-        (void)F011_DATA;
-    }
-    // Then draw the 16 chars with quotes
-    SCREEN[(screen_row * SCREEN_ROW_BYTES) + (21 * 2)] = '"';
-    for (i = 0; i < 16; i++) {
-        c = F011_DATA;
-        if (!c) {
-            invalid = 1;
-        }
-        if (firsta0 && (c == 0xa0)) {
-            SCREEN[(screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2)] = 0x22;
-            firsta0 = 0;
-        } else {
-            if (c >= 'A' && c <= 'Z') {
-                c &= 0x1f;
-            }
-            if (c >= 'a' && c <= 'z') {
-                c &= 0x1f;
-            }
-            SCREEN[(screen_row * SCREEN_ROW_BYTES) + (22 * 2) + (i * 2)] = c & 0x7f;
-        }
-    }
-    if (firsta0) {
-        SCREEN[(screen_row * SCREEN_ROW_BYTES) + (38 * 2)] = '"';
-    }
-    if (type & 0x40) {
-        SCREEN[(screen_row * SCREEN_ROW_BYTES) + (39 * 2)] = '<';
-    }
-    // Marks an entry whose type carries none of the high-nibble bits.  Written
-    // `!type & 0xf0` here and in cc65, which parses as `(!type) & 0xf0` and is
-    // always 0, so the '*' never drew.
-    if (!(type & 0xf0)) {
-        SCREEN[(screen_row * SCREEN_ROW_BYTES) + (39 * 2)] = '*';
-    }
-
-    // Read the rest of the entry to advance buffer pointer nicely
-    for (i = 0; i < 11; i++) {
-        (void)F011_DATA;
-    }
-
-    if (invalid) {
-        // Erase whatever we drew
-        for (i = 21; i < 40; i++) {
-            SCREEN[(screen_row * SCREEN_ROW_BYTES) + (i * 2)] = ' ';
-        }
-    } else {
-        lcopy((uint32_t)dir_line_colour,
-            COLOUR_RAM_ADDRESS + (screen_row * SCREEN_ROW_BYTES + (21 * 2)),
-            19 * 2);
-    }
-
-    return invalid;
-}
 
 void clear_screen(unsigned char lines) {
     SCREEN[0] = ' ';

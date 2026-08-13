@@ -20,7 +20,7 @@
  * could not: they cannot leave the VIC bank. */
 constexpr Addr28 EDITOR_CHARSET = 0x15000;
 
-typedef struct tagRECT {
+typedef struct {
     uint8_t left, top, right, bottom;
 } RECT;
 

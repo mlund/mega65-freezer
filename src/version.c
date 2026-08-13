@@ -7,4 +7,4 @@ __asm__(".section .entrytramp,\"axR\",@progbits\n"
 
 /* Found by scanning memory rather than by linking, so it needs used/retain to
  * survive --gc-sections. */
-__attribute__((used, retain, section(".version"))) const char VERSION[] = "V:" BUILD_VERSION;
+static __attribute__((used, retain, section(".version"))) const char VERSION[] = "V:" BUILD_VERSION;

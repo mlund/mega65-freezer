@@ -18,23 +18,23 @@ static char freeze_menu_bar[] = "F3-RESUME    F5-RESET      HELP-MEGAINFO"
 
 /* Where each changing field sits.  The fixed text around them is a stream of
  * fragments in freezer/menu.cpp; these are the holes it leaves. */
-constexpr uint8_t KEY_BAR_X = 0, KEY_BAR_Y = 3;
-constexpr uint8_t SETTINGS_TOP_Y = 5; /* three rows: mode, frequency, video */
-constexpr uint8_t CPU_MODE_X = 13, CPU_FREQ_X = 13;
-constexpr uint8_t CRTEMU_MODE_X = 16, VIDEO_MODE_X = 33;
-constexpr uint8_t RIGHT_VALUE_X = 36; /* joystick swap, cartridge enable */
-constexpr uint8_t PROCESS_NAME_X = 21, PROCESS_NAME_Y = 14;
-constexpr uint8_t PROCESS_ROM_X = 26, PROCESS_ROM_Y = 15;
-constexpr uint8_t TASK_ID_X = 34, TASK_ID_Y = 16;
+static constexpr uint8_t KEY_BAR_X = 0, KEY_BAR_Y = 3;
+static constexpr uint8_t SETTINGS_TOP_Y = 5; /* three rows: mode, frequency, video */
+static constexpr uint8_t CPU_MODE_X = 13, CPU_FREQ_X = 13;
+static constexpr uint8_t CRTEMU_MODE_X = 16, VIDEO_MODE_X = 33;
+static constexpr uint8_t RIGHT_VALUE_X = 36; /* joystick swap, cartridge enable */
+static constexpr uint8_t PROCESS_NAME_X = 21, PROCESS_NAME_Y = 14;
+static constexpr uint8_t PROCESS_ROM_X = 26, PROCESS_ROM_Y = 15;
+static constexpr uint8_t TASK_ID_X = 34, TASK_ID_Y = 16;
 /* The slot label and the number in it are one field written in two parts. */
-constexpr uint8_t SLOT_LABEL_X = 20, SLOT_LABEL_Y = 17, SLOT_NUMBER_X = 34;
+static constexpr uint8_t SLOT_LABEL_X = 20, SLOT_LABEL_Y = 17, SLOT_NUMBER_X = 34;
 /* The two drives are three rows apart, which is what lets one pass serve both. */
-constexpr uint8_t DRIVE_NUM_X = 35, DRIVE_NUM_Y = 20;
-constexpr uint8_t D81_NAME_X = 22, D81_NAME_Y = 21;
-constexpr uint8_t DRIVE_ROW_STEP = 3;
+static constexpr uint8_t DRIVE_NUM_X = 35, DRIVE_NUM_Y = 20;
+static constexpr uint8_t D81_NAME_X = 22, D81_NAME_Y = 21;
+static constexpr uint8_t DRIVE_ROW_STEP = 3;
 
-constexpr uint8_t ROOT_WARN_Y = 9;
-constexpr uint8_t ROOT_WARN_ROWS = 3;
+static constexpr uint8_t ROOT_WARN_Y = 9;
+static constexpr uint8_t ROOT_WARN_ROWS = 3;
 
 /* Wide enough to blank the longest field drawn over. */
 static const char BLANK_18[] = "                  ";
@@ -52,7 +52,7 @@ static const char ROOT_WARN[] = " NEED TO CHANGE CURRENT DIR TO ROOT TO  "
  * $20000 and its charset $D000 into it.  $D67D.2 write-protects $20000-$3FFFF
  * and only latches in hypervisor mode, so nothing short of a program that asked
  * hyppo to unprotect it can have disturbed this. */
-constexpr Addr28 ROM_CHARSET = 0x2D000;
+static constexpr Addr28 ROM_CHARSET = 0x2D000;
 
 /* Screen code 0 is `@` in every C64-descended charset, and its first two rows
  * are enough to tell glyphs from the zeros or debris a failed ROM load would
@@ -91,24 +91,24 @@ void make_colour_lookup(void) {
 
 /* The VIC-IV register block in the MEGA65 personality, which is where these
  * are written: the live chip, not the freeze slot. */
-constexpr Addr28 VIC4_REGISTERS = 0xFFD3000L;
+static constexpr Addr28 VIC4_REGISTERS = 0xFFD3000L;
 
 /* Offsets into viciv_regs, which is indexed by the low byte of the register's
  * address.  Only the ones the code below reaches are named. */
-constexpr uint8_t VIC4_REG_KEY = 0x2F;
-constexpr uint8_t VIC4_REG_TOP_BORDER = 0x48;
-constexpr uint8_t VIC4_REG_BOTTOM_BORDER = 0x4A;
-constexpr uint8_t VIC4_REG_TEXT_YPOS = 0x4E;
-constexpr uint8_t VIC4_REG_CTRLC = 0x54;
-constexpr uint8_t VIC4_REG_RASLINE0 = 0x6F;
-constexpr uint8_t VIC4_REG_SPRITE_YADJ = 0x72;
+static constexpr uint8_t VIC4_REG_KEY = 0x2F;
+static constexpr uint8_t VIC4_REG_TOP_BORDER = 0x48;
+static constexpr uint8_t VIC4_REG_BOTTOM_BORDER = 0x4A;
+static constexpr uint8_t VIC4_REG_TEXT_YPOS = 0x4E;
+static constexpr uint8_t VIC4_REG_CTRLC = 0x54;
+static constexpr uint8_t VIC4_REG_RASLINE0 = 0x6F;
+static constexpr uint8_t VIC4_REG_SPRITE_YADJ = 0x72;
 
 /* Where the two standards differ.  The table cannot hold one answer for these,
  * so they are written over it once the current standard is known. */
-constexpr uint8_t NTSC_TOP_BORDER = 0x2A, NTSC_BOTTOM_BORDER = 0xB9;
-constexpr uint8_t NTSC_TEXT_YPOS = 0x2A, NTSC_SPRITE_YADJ = 0x18;
-constexpr uint8_t PAL_TOP_BORDER = 0x68, PAL_BOTTOM_BORDER = 0xF8;
-constexpr uint8_t PAL_TEXT_YPOS = 0x68, PAL_SPRITE_YADJ = 0x00;
+static constexpr uint8_t NTSC_TOP_BORDER = 0x2A, NTSC_BOTTOM_BORDER = 0xB9;
+static constexpr uint8_t NTSC_TEXT_YPOS = 0x2A, NTSC_SPRITE_YADJ = 0x18;
+static constexpr uint8_t PAL_TOP_BORDER = 0x68, PAL_BOTTOM_BORDER = 0xF8;
+static constexpr uint8_t PAL_TEXT_YPOS = 0x68, PAL_SPRITE_YADJ = 0x00;
 
 /* The whole VIC-IV register block, $D000-$D07F, as the menu wants it.
  *

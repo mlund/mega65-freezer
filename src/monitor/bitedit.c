@@ -21,22 +21,22 @@
  * above the footer under the heading.  A scrolling console has nothing to offer
  * a table that is repainted in place, and owning the screen means the rows sit
  * at a known address instead of wherever printing them happened to land. */
-constexpr uint8_t EDIT_ROWS = 14;
-constexpr uint16_t WINDOW_TOP = SCREEN_ADDRESS + SCREEN_ROW_BYTES;
+static constexpr uint8_t EDIT_ROWS = 14;
+static constexpr uint16_t WINDOW_TOP = SCREEN_ADDRESS + SCREEN_ROW_BYTES;
 
 /* The description block, fenced by a rule above and below.  Seven lines is
  * enough that no register's own text plus its longest bit's ever overflows, so
  * the two share the space rather than each taking a fixed cut. */
-constexpr uint8_t INFO_ROWS = 7;
-constexpr uint8_t INFO_TAG_WIDTH = 7;
-constexpr uint8_t RULE_ROW = EDIT_ROWS + 1;
-constexpr uint8_t INFO_ROW = RULE_ROW + 1;
-constexpr uint8_t FOOTER_RULE_ROW = INFO_ROW + INFO_ROWS;
+static constexpr uint8_t INFO_ROWS = 7;
+static constexpr uint8_t INFO_TAG_WIDTH = 7;
+static constexpr uint8_t RULE_ROW = EDIT_ROWS + 1;
+static constexpr uint8_t INFO_ROW = RULE_ROW + 1;
+static constexpr uint8_t FOOTER_RULE_ROW = INFO_ROW + INFO_ROWS;
 
 /* Where the database is parked once loaded.  Nothing MONITOR links touches
  * anything above $1F800, and the frozen program's own $40000 lives in the
  * freeze slot on the card, so this is scratch. */
-constexpr Addr28 IOMAP_ADDRESS = 0x40000L;
+static constexpr Addr28 IOMAP_ADDRESS = 0x40000L;
 static bool iomap_ready;
 static bool iomap_tried;
 

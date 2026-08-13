@@ -8,19 +8,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-constexpr Addr28 SD_SECTORBUFFER = 0xffd6e00;
+static constexpr Addr28 SD_SECTORBUFFER = 0xffd6e00;
 
 unsigned char sdhc_card = 0;
 uint8_t border_flicker = 0;
 
 /* Half a second for the card to come back after a reset. */
-constexpr uint32_t SD_RESET_SETTLE_MICROSECS = 500000;
+static constexpr uint32_t SD_RESET_SETTLE_MICROSECS = 500000;
 /* Polls, not time: how long a read waits before the card counts as stalled.
  * The controller answers in microseconds when it is well. */
-constexpr uint16_t SD_READY_POLLS = 50000;
+static constexpr uint16_t SD_READY_POLLS = 50000;
 /* A card that is not SDHC is addressed by byte, and sector * SD_SECTOR_SIZE has to stay
  * inside 32 bits, so the sector number stops here. */
-constexpr uint32_t SD_MAX_SECTOR_BYTE_ADDRESSED = 0x7FFFFF;
+static constexpr uint32_t SD_MAX_SECTOR_BYTE_ADDRESSED = 0x7FFFFF;
 
 /* Whether the border cycles while the controller is busy: 0 silent, above 1
  * reports.  1 is accepted and does nothing -- no site tests for it -- so a

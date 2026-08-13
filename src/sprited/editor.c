@@ -51,8 +51,8 @@ static inline void reg_poke(uint32_t address, uint8_t value) {
     REG8(address) = value;
 }
 #else
-constexpr uint32_t VIC_BASE = 0xFFD3000UL; // Where VIC-II is mapped in frozen memory
-constexpr uint32_t CIA2_PORT_A = 0xFFD3D00UL;
+static constexpr uint32_t VIC_BASE = 0xFFD3000UL; // Where VIC-II is mapped in frozen memory
+static constexpr uint32_t CIA2_PORT_A = 0xFFD3D00UL;
 
 static inline uint8_t reg_peek(uint32_t address) {
     return freeze_peek(address);
@@ -62,15 +62,15 @@ static inline void reg_poke(uint32_t address, uint8_t value) {
 }
 #endif
 
-constexpr uint32_t REG_SPRPTR = VIC_BASE + 0x6C; /* SPRPTR0-2 occupy $6C-$6E */
-constexpr uint32_t REG_SPR_VEXPAND = VIC_BASE + 0x17;
-constexpr uint32_t REG_SPR_HEXPAND = VIC_BASE + 0x1D;
-constexpr uint32_t REG_SPR_16COL = VIC_BASE + 0x6B;
-constexpr uint32_t REG_SPR_MULTICOLOR = VIC_BASE + 0x1C;
-constexpr uint32_t REG_SPRX64EN = VIC_BASE + 0x57;
-constexpr uint32_t REG_SPRITE_MULTICOL1 = VIC_BASE + 0x25;
-constexpr uint32_t REG_SPRITE_MULTICOL2 = VIC_BASE + 0x26;
-constexpr uint32_t REG_SPRPALSEL = VIC_BASE + 0x70;
+static constexpr uint32_t REG_SPRPTR = VIC_BASE + 0x6C; /* SPRPTR0-2 occupy $6C-$6E */
+static constexpr uint32_t REG_SPR_VEXPAND = VIC_BASE + 0x17;
+static constexpr uint32_t REG_SPR_HEXPAND = VIC_BASE + 0x1D;
+static constexpr uint32_t REG_SPR_16COL = VIC_BASE + 0x6B;
+static constexpr uint32_t REG_SPR_MULTICOLOR = VIC_BASE + 0x1C;
+static constexpr uint32_t REG_SPRX64EN = VIC_BASE + 0x57;
+static constexpr uint32_t REG_SPRITE_MULTICOL1 = VIC_BASE + 0x25;
+static constexpr uint32_t REG_SPRITE_MULTICOL2 = VIC_BASE + 0x26;
+static constexpr uint32_t REG_SPRPALSEL = VIC_BASE + 0x70;
 
 static inline uint32_t reg_sprite_color(uint8_t sprite) {
     return VIC_BASE + 0x27 + sprite;
@@ -126,47 +126,47 @@ static inline uint32_t sprite_data_addr(uint8_t sprite) {
 // #define REG_SPRBPMEN_4_7            (vic_registers[0x4B] >> 4)
 // #define SPRITE_BITPLANE_ENABLE(n)	(((REG_SPRBPMEN_4_7) << 4 | REG_SPRBPMEN_0_3) & (1 << (n)))
 
-constexpr uint8_t SPRITE_MAX_COUNT = 8;
+static constexpr uint8_t SPRITE_MAX_COUNT = 8;
 /* A sprite colour, not chrome: it stands in for the frozen VIC's own value
  * until one is read.  The index is fixed, but entry 11 belongs to the scheme,
  * so what it draws as still follows the palette. */
-constexpr uint8_t DEFAULT_BACK_COLOR = 11;
+static constexpr uint8_t DEFAULT_BACK_COLOR = 11;
 
-constexpr uint8_t TRANS_CHARACTER = 230;
-constexpr uint8_t SOLID_BLOCK_CHARACTER = 224;
-constexpr uint8_t SHAPE_PREVIEW_CHARACTER = 32;
-constexpr uint8_t SIDEBAR_COLUMN = 65;
-constexpr uint8_t SIDEBAR_WIDTH = SCREEN_COLS - SIDEBAR_COLUMN;
-constexpr uint8_t SIDEBAR_PREVIEW_AREA_TOP = 10;
-constexpr uint8_t SIDEBAR_PREVIEW_AREA_BOTTOM = 20;
-constexpr uint8_t SIDEBAR_PREVIEW_AREA_HEIGHT =
+static constexpr uint8_t TRANS_CHARACTER = 230;
+static constexpr uint8_t SOLID_BLOCK_CHARACTER = 224;
+static constexpr uint8_t SHAPE_PREVIEW_CHARACTER = 32;
+static constexpr uint8_t SIDEBAR_COLUMN = 65;
+static constexpr uint8_t SIDEBAR_WIDTH = SCREEN_COLS - SIDEBAR_COLUMN;
+static constexpr uint8_t SIDEBAR_PREVIEW_AREA_TOP = 10;
+static constexpr uint8_t SIDEBAR_PREVIEW_AREA_BOTTOM = 20;
+static constexpr uint8_t SIDEBAR_PREVIEW_AREA_HEIGHT =
     SIDEBAR_PREVIEW_AREA_BOTTOM - SIDEBAR_PREVIEW_AREA_TOP;
-constexpr uint8_t SPRITE_OFFSET_X = 24;
-constexpr uint8_t SPRITE_OFFSET_Y = 50;
+static constexpr uint8_t SPRITE_OFFSET_X = 24;
+static constexpr uint8_t SPRITE_OFFSET_Y = 50;
 
 /* The canvas starts below the banner and the sprite-info row. */
-constexpr uint8_t CANVAS_TOP_ROW = 2;
+static constexpr uint8_t CANVAS_TOP_ROW = 2;
 
 /* H320/V200, the space the mouse and the sprites share. */
-constexpr uint16_t SCREEN_MAX_X = 319;
-constexpr uint16_t SCREEN_MAX_Y = 199;
-constexpr uint8_t POINTER_WIDTH = 8;
-constexpr uint8_t POINTER_START_X = 100;
-constexpr uint8_t POINTER_START_Y = 100;
+static constexpr uint16_t SCREEN_MAX_X = 319;
+static constexpr uint16_t SCREEN_MAX_Y = 199;
+static constexpr uint8_t POINTER_WIDTH = 8;
+static constexpr uint8_t POINTER_START_X = 100;
+static constexpr uint8_t POINTER_START_Y = 100;
 
 /* The canvas in mouse coordinates, which are sprite pixels rather than screen
  * columns and rows. */
-constexpr uint16_t CANVAS_MOUSE_LEFT = 55;
-constexpr uint16_t CANVAS_MOUSE_RIGHT = 235;
-constexpr uint16_t CANVAS_MOUSE_TOP = 66;
-constexpr uint16_t CANVAS_MOUSE_BOTTOM = 233;
-constexpr uint8_t MOUSE_CELL_PIXELS = 8;
+static constexpr uint16_t CANVAS_MOUSE_LEFT = 55;
+static constexpr uint16_t CANVAS_MOUSE_RIGHT = 235;
+static constexpr uint16_t CANVAS_MOUSE_TOP = 66;
+static constexpr uint16_t CANVAS_MOUSE_BOTTOM = 233;
+static constexpr uint8_t MOUSE_CELL_PIXELS = 8;
 /* A character cell measured in sprite pixels: the text is H640 and the sprites
  * are H320, so a column is four sprite pixels wide, and a row eight high. */
-constexpr uint8_t CELL_PIXELS_X = 4;
-constexpr uint8_t CELL_PIXELS_Y = 8;
+static constexpr uint8_t CELL_PIXELS_X = 4;
+static constexpr uint8_t CELL_PIXELS_Y = 8;
 
-constexpr uint16_t JOY_DELAY = 10000U;
+static constexpr uint16_t JOY_DELAY = 10000U;
 
 /* These stay macros: they are type-generic, and C has no other spelling of
  * that without _Generic. */
@@ -174,16 +174,16 @@ constexpr uint16_t JOY_DELAY = 10000U;
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-constexpr uint32_t SPRITE_POINTER_TABLE = 0x16000UL;
-constexpr uint32_t SPRITE_BUFFER = 0x40000UL;
+static constexpr uint32_t SPRITE_POINTER_TABLE = 0x16000UL;
+static constexpr uint32_t SPRITE_BUFFER = 0x40000UL;
 
 /* The editor's own three sprites, in the live VIC.  These index VICIV's
  * spr_pos[], spr_color[] and the pointer table, so they name the sprite
  * everywhere rather than hiding it in a register address. */
-constexpr uint8_t MOUSE_POINTER_NUM = 0;
-constexpr uint8_t EDIT_CURSOR_NUM = 1;
-constexpr uint8_t PREVIEW_SPRITE_NUM = 2;
-constexpr uint8_t EDITOR_SPRITES =
+static constexpr uint8_t MOUSE_POINTER_NUM = 0;
+static constexpr uint8_t EDIT_CURSOR_NUM = 1;
+static constexpr uint8_t PREVIEW_SPRITE_NUM = 2;
+static constexpr uint8_t EDITOR_SPRITES =
     (1 << MOUSE_POINTER_NUM) | (1 << EDIT_CURSOR_NUM) | (1 << PREVIEW_SPRITE_NUM);
 
 /* A sprite pointer is an address divided by 64, so the alignment below is
@@ -197,21 +197,21 @@ static uint8_t sprite_cursor[64] __attribute__((aligned(64)));
 #define EDIT_CURSOR_DATA ((Addr28)(uint16_t)sprite_cursor)
 
 /* A hires sprite is 24x21 pixels, three bytes to the row. */
-constexpr uint8_t SPRITE_ROWS = 21;
-constexpr uint8_t SPRITE_FRAME_BYTES = 63;
+static constexpr uint8_t SPRITE_ROWS = 21;
+static constexpr uint8_t SPRITE_FRAME_BYTES = 63;
 /* Sprite data addresses are stored divided by this, in the pointer table and
  * in the pointers the frozen program keeps. */
-constexpr uint8_t SPRITE_BLOCK_BYTES = 64;
+static constexpr uint8_t SPRITE_BLOCK_BYTES = 64;
 /* Bit 7 of SPRPTR2: pointers are 16-bit words rather than single bytes. */
-constexpr uint8_t SPRITE_POINTERS_16BIT = 0x80;
+static constexpr uint8_t SPRITE_POINTERS_16BIT = 0x80;
 
 /* The ROM character set, as the VIC-IV sees it in the upper memory map. */
 /* CHARSET A, the same set the other tools render through the ROM shadow.
  * Its second bank is the lowercase one, where letters sit at their ASCII
  * values; this is the first, in screen-code order. */
-constexpr uint32_t ROM_CHARSET_SOURCE = 0x29000;
-constexpr uint16_t CHARSET_BYTES = 2048;
-constexpr uint8_t GLYPH_BYTES = 8;
+static constexpr uint32_t ROM_CHARSET_SOURCE = 0x29000;
+static constexpr uint16_t CHARSET_BYTES = 2048;
+static constexpr uint8_t GLYPH_BYTES = 8;
 
 /* What still needs drawing, OR-ed together into redraw_flags.  Anonymous
  * because the bits combine, so they never name a type of their own. */
@@ -294,7 +294,6 @@ void set_effective_tool_rect(RECT*);
 void setup_text_palette(void);
 void update_cursor_x(void);
 void update_cursor_y(void);
-void update_cursor_xmsb(void);
 
 /* Toolbox Character set, in order of the DrawingTool enumeration */
 
@@ -536,7 +535,7 @@ static const uint8_t CHSET_TOOLBOX[] = {
 // clang-format on
 // clang-format on
 
-constexpr uint8_t TOOLBOX_CHARSET_BASE_IDX = 232;
+static constexpr uint8_t TOOLBOX_CHARSET_BASE_IDX = 232;
 
 // clang-format off
 // clang-format off
@@ -764,9 +763,6 @@ static void initialize(void) {
     g_state.update_cursor_y_fn();
 }
 
-void load_slot_sprite_palette(void) {
-}
-
 void setup_text_palette(void) {
     // To properly display color in the editor, we set the main palette bank to 0,
     // the sprite palette bank, and use the alt palette to display text and UI.
@@ -784,18 +780,6 @@ void update_cursor_x(void) {
 void update_cursor_y(void) {
     uint8_t yc = g_state.cursor_y * CELL_PIXELS_Y;
     VICIV.spr_pos[EDIT_CURSOR_NUM].y = SPRITE_OFFSET_Y + (CANVAS_TOP_ROW * CELL_PIXELS_Y) + yc;
-}
-
-void update_cursor_xmsb(void) {
-    uint8_t canvas_left_pixels = g_state.canvas_left_x * CELL_PIXELS_X;
-    uint8_t cursor_left_pixels = g_state.cursor_x * g_state.cells_per_pixel * CELL_PIXELS_X;
-    const uint16_t sx = SPRITE_OFFSET_X + canvas_left_pixels + cursor_left_pixels;
-    if (sx < 256) {
-        VICIV.spr_hi_x &= (uint8_t)~(1 << EDIT_CURSOR_NUM);
-    } else {
-        VICIV.spr_hi_x |= 1 << EDIT_CURSOR_NUM;
-    }
-    VICIV.spr_pos[EDIT_CURSOR_NUM].x = (unsigned char)sx;
 }
 
 static void draw_shape_char(uint8_t x, uint8_t y) {
@@ -1545,7 +1529,7 @@ static void set_background(void) {
  * mid-frame at that, which shimmers rather than pulses.  A tick is one wrap of
  * the raster line, about 1/100 s on PAL, so sixteen colours take a little
  * under a second. */
-constexpr uint8_t CURSOR_COLOUR_TICKS = 6;
+static constexpr uint8_t CURSOR_COLOUR_TICKS = 6;
 
 static void main_loop(void) {
     static uint8_t edit_color_index = 0;

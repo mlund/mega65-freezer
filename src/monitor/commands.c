@@ -138,7 +138,7 @@ static void hex_to_screen_codes(unsigned char count) {
 }
 
 /* The marker plus seven hex digits every listing line opens with. */
-constexpr uint8_t ADDRESS_FIELD_WIDTH = 8;
+static constexpr uint8_t ADDRESS_FIELD_WIDTH = 8;
 
 /* The marker and seven digits every listing starts with, coloured as the
  * disassembly colours its own address column. */
@@ -201,7 +201,7 @@ static void report_unmapped(void) {
 }
 
 /* A screenful, matching show_memory()'s sixteen lines. */
-constexpr uint8_t DISASSEMBLY_LINES = 16;
+static constexpr uint8_t DISASSEMBLY_LINES = 16;
 
 /* Indexed by DisasmMnemonicClass: plain, control flow, MEGA65-only. */
 static const unsigned char MNEMONIC_CLASS_COLOUR[] = {
@@ -374,35 +374,35 @@ void set_memory(void) {
 static const char REG_DESC_LINE[] =
     "PC   IRQ  NMI  A  X  Y  Z  B  SP   FLAGS    $01   MAPLO   MAPHI   PC28";
 /* Column of each field in REG_DESC_LINE. */
-constexpr uint8_t REGLINE_PC = 0;
+static constexpr uint8_t REGLINE_PC = 0;
 /* show_registers() never fills these two, so the header advertises IRQ and NMI
  * over blank columns.  Shared with the cc65 monitor. */
-[[maybe_unused]] constexpr uint8_t REGLINE_IRQ = 5;
-[[maybe_unused]] constexpr uint8_t REGLINE_NMI = 10;
-constexpr uint8_t REGLINE_A = 15;
-constexpr uint8_t REGLINE_X = 18;
-constexpr uint8_t REGLINE_Y = 21;
-constexpr uint8_t REGLINE_Z = 24;
-constexpr uint8_t REGLINE_B = 27;
-constexpr uint8_t REGLINE_SP = 30;
-constexpr uint8_t REGLINE_FLAGS = 35;
-constexpr uint8_t REGLINE_01 = 44;
-constexpr uint8_t REGLINE_MAPLO = 50;
-constexpr uint8_t REGLINE_MAPHI = 58;
-constexpr uint8_t REGLINE_PC28 = 66;
+[[maybe_unused]] static constexpr uint8_t REGLINE_IRQ = 5;
+[[maybe_unused]] static constexpr uint8_t REGLINE_NMI = 10;
+static constexpr uint8_t REGLINE_A = 15;
+static constexpr uint8_t REGLINE_X = 18;
+static constexpr uint8_t REGLINE_Y = 21;
+static constexpr uint8_t REGLINE_Z = 24;
+static constexpr uint8_t REGLINE_B = 27;
+static constexpr uint8_t REGLINE_SP = 30;
+static constexpr uint8_t REGLINE_FLAGS = 35;
+static constexpr uint8_t REGLINE_01 = 44;
+static constexpr uint8_t REGLINE_MAPLO = 50;
+static constexpr uint8_t REGLINE_MAPHI = 58;
+static constexpr uint8_t REGLINE_PC28 = 66;
 #include "cpumap_labels.inc"
 
 /* Where the map's four columns start.  The heading is written to the same
  * offsets, so changing one means changing MAP_DESC_LINE with it. */
-constexpr uint8_t MAP_TARGET_COLUMN = 13;
-constexpr uint8_t MAP_CONTENTS_COLUMN = 30;
-constexpr uint8_t MAP_DECIDED_COLUMN = 42;
+static constexpr uint8_t MAP_TARGET_COLUMN = 13;
+static constexpr uint8_t MAP_CONTENTS_COLUMN = 30;
+static constexpr uint8_t MAP_DECIDED_COLUMN = 42;
 
 /* As much of a row as write_line() puts on screen. */
-constexpr uint8_t MAP_ROW_WIDTH = 78;
+static constexpr uint8_t MAP_ROW_WIDTH = 78;
 
 /* Where "%0000.0000" ends, and so where a row's dimming starts. */
-constexpr uint8_t MAP_MASK_END = MAP_DECIDED_COLUMN + 10;
+static constexpr uint8_t MAP_MASK_END = MAP_DECIDED_COLUMN + 10;
 
 /* Columns 0, 13, 30 and 42, matching the constants above. */
 static const char MAP_DESC_LINE[] = "CPU RANGE    28-BIT RANGE     CONTENTS    DECIDED BY";
@@ -729,8 +729,8 @@ static void report_hit_count(
 }
 
 /* H start end byte [byte...] */
-constexpr uint8_t HUNT_PATTERN_MAX = 8;
-constexpr uint8_t HUNT_HITS_MAX = 16;
+static constexpr uint8_t HUNT_PATTERN_MAX = 8;
+static constexpr uint8_t HUNT_HITS_MAX = 16;
 
 void hunt_memory(void) {
     unsigned char pattern[HUNT_PATTERN_MAX];
@@ -830,14 +830,14 @@ void transfer_memory(void) {
 }
 
 /* P start -- eight bytes to a character cell, eight cells across. */
-constexpr uint8_t BITMAP_CELLS = 8;
-constexpr uint8_t BITMAP_ROWS = 2;
-constexpr uint8_t BITMAP_COLUMN = 9;
-constexpr uint8_t BITMAP_CELL_STRIDE = 9; /* eight pixels and a gap */
+static constexpr uint8_t BITMAP_CELLS = 8;
+static constexpr uint8_t BITMAP_ROWS = 2;
+static constexpr uint8_t BITMAP_COLUMN = 9;
+static constexpr uint8_t BITMAP_CELL_STRIDE = 9; /* eight pixels and a gap */
 
 /* A screen code, not ASCII: the filled circle keeps a clear column each side,
  * so neighbouring set pixels stay countable where a solid block merges. */
-constexpr uint8_t BITMAP_SET = 0x51;
+static constexpr uint8_t BITMAP_SET = 0x51;
 
 void show_bitmaps(void) {
     for (unsigned char cell_row = 0; cell_row < BITMAP_ROWS; cell_row++) {
@@ -884,7 +884,7 @@ static void edit_memory_bits(void) {
 static const unsigned char REGISTER_OFFSET[]
     __attribute__((section(".rodata"))) = {0x08, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x07};
 static const unsigned char REGISTER_IS_PAIR[] = {1, 0, 0, 0, 0, 0, 1, 0};
-constexpr uint8_t REGISTER_COUNT = 8;
+static constexpr uint8_t REGISTER_COUNT = 8;
 
 /* ; PC A X Y Z B SP FLAGS -- as many as given, the rest left alone.
  *
