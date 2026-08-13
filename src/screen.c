@@ -9,7 +9,7 @@
 uint16_t screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
 
-void screen_hex(uint16_t addr, long value) {
+void screen_hex(uint16_t addr, int32_t value) {
     char dec[8];
     format_hex(dec, value, 8);
     for (char i = 0; i < 8; i++) {

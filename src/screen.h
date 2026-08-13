@@ -78,7 +78,7 @@ void draw_fragments(const uint8_t* stream);
  * as it goes, where a fragment carries codes converted at compile time. */
 void draw_text(uint16_t cell, uint8_t colour, const char* text, uint8_t length);
 
-void screen_hex(uint16_t addr, long value);
+void screen_hex(uint16_t addr, int32_t value);
 void screen_decimal(uint16_t addr, uint16_t value);
 void draw_decimal(uint16_t cell, uint8_t colour, uint16_t value);
 

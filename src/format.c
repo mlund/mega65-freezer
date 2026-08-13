@@ -16,7 +16,7 @@ uint8_t nybl_to_screen(uint8_t v) {
 }
 
 /* Always eight digits; format_hex() takes the tail it wants. */
-static void hex_to_buf(char* out, const long value) {
+static void hex_to_buf(char* out, const int32_t value) {
     out[0] = nybl_to_screen((uint8_t)(value >> 28));
     out[1] = nybl_to_screen((uint8_t)(value >> 24));
     out[2] = nybl_to_screen((uint8_t)(value >> 20));
@@ -29,7 +29,7 @@ static void hex_to_buf(char* out, const long value) {
 
 /* Writes the low `columns` digits.  Takes a pointer rather than an address as
  * an integer, which would hide the stores from the compiler. */
-void format_hex(char* out, const long value, const char columns) {
+void format_hex(char* out, const int32_t value, const char columns) {
     char dec[8];
     hex_to_buf(dec, value);
 
@@ -74,7 +74,7 @@ char* append_str(char* at, const char* text) {
 
 /* format_hex() writes `columns` digits and no terminator, which is what lets
  * these chain from a cursor. */
-char* append_hex(char* at, long value, uint8_t columns) {
+char* append_hex(char* at, int32_t value, uint8_t columns) {
     format_hex(at, value, (char)columns);
     return at + columns;
 }
