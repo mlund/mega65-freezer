@@ -2,10 +2,103 @@
 # tool loses that test rather than the suite: a run that skipped everything
 # looks exactly like a run that passed.  `ctest -N` lists what registered.
 
+# --- doctest: the pure logic, called directly.  One binary, one TEST_SUITE per
+# subject, so `--test-suite=` gives ctest the same per-subject entries as before
+# and `ctest -R layout` still means what it did. -------------------------------
+#
+# Not add_executable: this build cross-compiles for the 45GS02, so its own
+# compilers cannot produce a host binary.  The code under test is compiled as C
+# and the tests as C++, which keeps the C23 semantics of what is being checked
+# rather than quietly changing them to C++'s.
+#
+# To add a test: write t_<name>.cpp and add its source here.  The stem names
+# the suite and the test file, so `format.c` means TEST_SUITE("format") in
+# t_format.cpp.
+set(HOST_TESTS sprited/lineedit.c makedisk/layout.c monitor/blockmove.c format.c)
+
+# doctest is fetched at configure time, so a checkout with no network loses
+# these four rather than failing.  Said out loud: four silently absent tests
+# read exactly like four passing ones.
+if(NOT DOCTEST_INCLUDE_DIR)
+    message(STATUS "host tests: skipped, doctest was not fetched")
+elseif(NOT (HOST_C_COMPILER AND HOST_CXX_COMPILER))
+    message(STATUS "host tests: skipped, no host C and C++ compiler")
+endif()
+
+if(HOST_C_COMPILER AND HOST_CXX_COMPILER AND DOCTEST_INCLUDE_DIR)
+    # Named once: the compile lines and the header glob below all derive from
+    # this, so a new subdirectory is added here and nowhere else.
+    set(HOST_DIRS ${SRC} ${SRC}/monitor ${SRC}/makedisk ${SRC}/sprited)
+    set(HOST_INCLUDES "")
+    set(HOST_HEADER_GLOBS "")
+    foreach(dir IN LISTS HOST_DIRS)
+        list(APPEND HOST_INCLUDES -I${dir})
+        list(APPEND HOST_HEADER_GLOBS ${dir}/*.h)
+    endforeach()
+
+    # -Wno-char-subscripts because `char` is unsigned on llvm-mos and may be
+    # signed here: a char subscript cannot go negative on the target, so the
+    # warning is about the host rather than about this code.
+    set(HOST_CFLAGS -std=c2x -O1 -Wall -Wextra -Werror -Wno-char-subscripts
+        ${HOST_INCLUDES})
+    set(HOST_CXXFLAGS -std=c++20 -O1 -Wall -Wextra -Werror
+        -I${DOCTEST_INCLUDE_DIR} -I${CMAKE_CURRENT_SOURCE_DIR} ${HOST_INCLUDES})
+
+    # Every header the tests reach through, so editing one rebuilds them.  A
+    # declaration can change without its .c changing, and an object built
+    # against the old one still links and still passes.
+    file(GLOB HOST_HEADERS ${HOST_HEADER_GLOBS})
+
+    # doctest's own implementation, compiled once and shared.
+    set(HOST_OBJECTS doctest_main.o)
+    add_custom_command(OUTPUT doctest_main.o
+        COMMAND ${HOST_CXX_COMPILER} ${HOST_CXXFLAGS}
+                -c -o doctest_main.o ${CMAKE_CURRENT_SOURCE_DIR}/doctest_main.cpp
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/doctest_main.cpp
+        COMMENT "Building doctest main")
+
+    foreach(source IN LISTS HOST_TESTS)
+        get_filename_component(name ${source} NAME_WE)
+        add_custom_command(OUTPUT t_${name}.o
+            COMMAND ${HOST_CXX_COMPILER} ${HOST_CXXFLAGS}
+                    -c -o t_${name}.o ${CMAKE_CURRENT_SOURCE_DIR}/t_${name}.cpp
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/t_${name}.cpp ${HOST_HEADERS}
+            COMMENT "Building t_${name}.cpp")
+        add_custom_command(OUTPUT ${name}_host.o
+            COMMAND ${HOST_C_COMPILER} ${HOST_CFLAGS}
+                    -c -o ${name}_host.o ${SRC}/${source}
+            DEPENDS ${SRC}/${source} ${HOST_HEADERS}
+            COMMENT "Building ${source} for the host")
+        list(APPEND HOST_OBJECTS t_${name}.o ${name}_host.o)
+
+        # Registered here rather than in a second pass: add_test does not need
+        # the binary to exist yet.  A --test-suite that matches nothing runs
+        # nothing and still exits 0, so renaming a TEST_SUITE or mistyping one
+        # above would otherwise leave a test that passes forever while checking
+        # nothing.  Ran zero cases is the failure.
+        add_test(NAME ${name}
+            COMMAND ${CMAKE_CURRENT_BINARY_DIR}/host_tests --test-suite=${name})
+        set_tests_properties(${name} PROPERTIES
+            FAIL_REGULAR_EXPRESSION "test cases: *0 ")
+    endforeach()
+
+    add_custom_command(OUTPUT host_tests
+        COMMAND ${HOST_CXX_COMPILER} -o host_tests ${HOST_OBJECTS}
+        DEPENDS ${HOST_OBJECTS}
+        COMMENT "Linking host_tests")
+    add_custom_target(host_tests_build ALL DEPENDS host_tests)
+endif()
+
 # --- Host tests: the pure code compiled for the host, checked against an
 # oracle that is not this code's own arithmetic. -------------------------------
 
 if(Python3_FOUND)
+    # The harness the emulator tests are written against, over a fake machine:
+    # no emulator, so it runs anywhere and a failure here is the harness rather
+    # than the program it was driving.
+    add_test(NAME harness
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_harness.py)
+
     add_test(NAME thumbnail_frames
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_thumbnail_frames.py)
 endif()
@@ -20,17 +113,6 @@ if(Python3_FOUND AND HOST_C_COMPILER)
                     --sdimg ${MEGA65_SDIMG})
         set_tests_properties(fat32 PROPERTIES TIMEOUT 300)
     endif()
-
-    add_test(NAME format
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_format.py
-                --cc ${HOST_C_COMPILER})
-
-    # Disk geometry, FAT records and RTC decoding against what hyppo and the
-    # 45IO27 registers require.  A wrong image size mounts and then reads back
-    # the wrong half.
-    add_test(NAME layout
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_layout.py
-                --cc ${HOST_C_COMPILER})
 
     # Which sector of the freeze slot an address falls in, against hyppo's own
     # freeze_mem_list.  A byte costs a whole sector transfer, so this decides
@@ -69,21 +151,6 @@ if(Python3_FOUND AND HOST_C_COMPILER)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_cpumap.py
                 ${CPUMAP_ARGS})
 
-    # SPRITED's line editor, which asks for a filename and a yes/no answer.
-    # Its edges -- backspacing an empty line, the last cell, a control code --
-    # are the cases least likely to get typed at an emulator, and the logic is
-    # pure, so it runs here against the tool's own source.
-    add_test(NAME lineedit
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_lineedit.py
-                --cc ${HOST_C_COMPILER})
-
-    # blockmove.c takes its two memory accesses from the caller, so the host
-    # build drives it against a flat array.  The overlap cases are the point: a
-    # forward copy into a destination inside the source range corrupts only the
-    # tail, which reads as working on hardware.
-    add_test(NAME blockmove
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_blockmove.py
-                --cc ${HOST_C_COMPILER})
 endif()
 
 # --- Disassembler: every opcode and prefix diffed against llvm-mc, so a

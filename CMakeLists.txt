@@ -41,6 +41,20 @@ CPMAddPackage(
     GIT_TAG 49f2f11
 )
 
+# The host tests' framework.  DOWNLOAD_ONLY because only the header is wanted:
+# adding doctest's own CMakeLists would declare targets against this build's
+# compilers, which cross-compile for the 45GS02 and cannot produce anything
+# that runs here.  DOCTEST_INCLUDE_DIR is what test/ compiles against.
+CPMAddPackage(
+    NAME doctest
+    GITHUB_REPOSITORY doctest/doctest
+    GIT_TAG v2.5.3
+    DOWNLOAD_ONLY YES
+)
+if(doctest_ADDED)
+    set(DOCTEST_INCLUDE_DIR ${doctest_SOURCE_DIR}/doctest)
+endif()
+
 set(SRC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 cmake_path(GET llvm-mos-sdk_DIR PARENT_PATH _sdk_cmake)   # .../lib/cmake
@@ -55,6 +69,10 @@ option(LINK_LIBC "Link mega65-libc" ON)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_program(LLVM_MC_EXE NAMES llvm-mc HINTS ${LLVM_MOS_ROOT}/bin NO_DEFAULT_PATH)
 find_program(HOST_C_COMPILER NAMES cc clang gcc)
+# The doctest tests are C++ and the code they exercise stays C, so both are
+# needed.  Neither can be CMAKE_C_COMPILER: this build cross-compiles for the
+# 45GS02, so the project's own compilers cannot produce something that runs here.
+find_program(HOST_CXX_COMPILER NAMES c++ clang++ g++)
 
 # iomap.txt is not ours to redistribute and the table generated from it is
 # committed, so a checkout without it builds normally and only loses the

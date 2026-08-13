@@ -30,9 +30,11 @@ import hashlib
 import itertools
 import os
 import re
-import subprocess
 import sys
 import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hostbuild
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -69,6 +71,7 @@ def check_core(root: str) -> bool:
         return False
     print(f"core {CORE_VERSION}: resolve_address_to_long unchanged")
     return True
+
 
 # The register set the slot gives us, named as the VHDL names them.
 State = tuple[int, int, int, int, int, int, int]
@@ -263,9 +266,7 @@ def _script() -> tuple[str, list[tuple[str, str]]]:
 
         lines.append("runs")
         for first, last, target, by in runs(state):
-            checks.append(
-                (f"{name}: run from ${first:04X}", f"{first:x} {last:x} {target:x} {by}")
-            )
+            checks.append((f"{name}: run from ${first:04X}", f"{first:x} {last:x} {target:x} {by}"))
         checks.append((f"{name}: run list ends", "END"))
 
     return "\n".join(lines) + "\n", checks
@@ -286,32 +287,19 @@ def main() -> int:
 
     script, checks = _script()
     with tempfile.TemporaryDirectory() as tmp:
-        binary = os.path.join(tmp, "cpumap")
-        subprocess.run(
-            [
-                args.cc,
-                "-std=c2x",
-                "-Wall",
-                "-Werror",
-                # cpumap.h names Addr28, which lives in src/addr28.h.
-                "-I",
-                os.path.join(HERE, "..", "src"),
-                "-o",
-                binary,
-                os.path.join(HERE, "cpumap_host_harness.c"),
-            ],
-            check=True,
+        # src/ is on the include path already: cpumap.h names Addr28, which
+        # lives in src/addr28.h.
+        binary = hostbuild.build(
+            args.cc, tmp, "cpumap", [os.path.join(HERE, "cpumap_host_harness.c")]
         )
-        got = subprocess.run(
-            [binary], input=script, capture_output=True, text=True, check=True
-        ).stdout.splitlines()
+        got = hostbuild.lines(binary, script)
 
     if len(got) != len(checks):
         print(f"harness produced {len(got)} lines, expected {len(checks)}")
         return 1
 
     failures = 0
-    for (label, want), actual in zip(checks, got):
+    for (label, want), actual in zip(checks, got, strict=True):
         if actual != want:
             if failures < 20:
                 print(f"FAIL  {label}: expected ${want.upper()}, got ${actual.upper()}")

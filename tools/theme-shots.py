@@ -34,8 +34,8 @@ ROOT = os.path.dirname(HERE)
 # copy that would drift.
 sys.path.insert(0, os.path.join(ROOT, "test"))
 import card  # noqa: E402
-import xemu  # noqa: E402
-import xemu_keys  # noqa: E402
+import scenario  # noqa: E402
+import xemuharness  # noqa: E402
 
 # In the order F1 reaches them from SCHEME_BOOT, which is Classic.  Kept here
 # rather than read from colours.h because the names are what the pictures are
@@ -51,25 +51,24 @@ def capture(emulator: str, sdimg: str, build: str, workdir: str) -> list[str]:
     for index, name in enumerate(SCHEMES):
         out = os.path.join(workdir, f"{index}-{name}.png")
 
-        def drive(sock, presses=index):
-            for _ in range(presses):
-                xemu_keys.press(sock, xemu_keys.NAMED["f1"])
-                # The menu repaints from the palette write, not a redraw, but
-                # the key queue still wants the gap.
-                time.sleep(0.3)
-            xemu_keys.release_keys(sock)
-            time.sleep(1.0)
-
-        xemu.launch(
+        with xemuharness.launch(
             emulator,
             os.path.join(build, "FREEZER.M65"),
             sdimg=clone,
+            ready=scenario.READY,
             # AF_UNIX caps near 104 characters, so this cannot go under a long
             # working directory.
             socket_path=f"/tmp/theme-shot{index}.sock",
-            drive=drive,
             extra=["-screenshot", out],
-        )
+        ) as machine:
+            for _ in range(index):
+                machine.press("f1")
+                # The menu repaints from the palette write rather than a
+                # redraw, so there is no screen change to wait for -- only the
+                # key queue's own gap.
+                time.sleep(0.3)
+            time.sleep(1.0)
+
         if not os.path.exists(out):
             raise SystemExit(f"{name}: Xemu wrote no screenshot to {out}")
         shots.append(out)

@@ -31,9 +31,10 @@ struct M65Tm {
     uint16_t tm_year; /* Year - 1900 (in practice, never < 2000) */
 };
 
-/* One disk format.  Held in a table rather than recomputed per site: the image
- * size and the number of sectors formatted have to agree, and when they were
- * separate expressions they did not. */
+/* One disk format.  Held in a table rather than recomputed per site, so the
+ * image size and the number of sectors formatted cannot disagree: hyppo
+ * identifies an image only by its length, so a mismatch mounts and then reads
+ * back the wrong half. */
 struct DiskGeometry {
     uint16_t tracks;
     uint16_t sectors_per_track; /* both sides */

@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """Draw SPRITED's screen and check what it put there.
 
-The sprite editor was the one tool that did not draw through src/screen.c: it
-used mega65-libc's conio, its own screen at $12000 and its own charset.  This
-was written against that, and still passes, which is what says the move onto
-the shared drawing code did not change the picture.
+The sprite editor has a screen of its own at $12000 and a charset of its own,
+so what it renders is not covered by anything that watches the freezer's.  The
+rows below are the whole of its layout: the title, the labels, the palette
+strip, the cursor readout and the preview area, each a different drawing path.
 
-Its cells used to hold ASCII: $54 $48 $45 for `THE`, because it rendered CHARSET C's
-lowercase bank, where A-Z sit at $41-$5A -- the same values ASCII gives them.
-It now copies CHARSET A and writes screen codes like every other tool, so these
-assertions read as plain text.  That the rows below say the same words as
-before is the evidence the port did not change the picture.
+Cells hold screen codes, as every other tool's do -- SPRITED copies CHARSET A --
+so these assertions read as plain text rather than as the ASCII its old
+lowercase bank would have given.
 
     python3 test/verify_sprited_xemu.py --emulator xmega65 --sdimg card.img \\
             --build build/src

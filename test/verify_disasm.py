@@ -4,22 +4,22 @@ llvm-mos does not know.
 
 Four passes:
 
-1. **Round trip.**  All 1024 opcode/prefix combinations -- 256 bare, 256 behind
+1. Round trip.  All 1024 opcode/prefix combinations -- 256 bare, 256 behind
    $EA, 256 behind $42 $42, 256 behind $42 $42 $EA -- decoded by both this
    project's disasm.c (compiled for the host) and llvm-mc, then compared.  The
    intended divergences are normalised away rather than ignored, so a new one
    shows up as a failure.
 
-2. **Branch targets.**  llvm-mc prints the raw offset where we resolve the
+2. Branch targets.  llvm-mc prints the raw offset where we resolve the
    target, so the round trip cannot compare those operands at all.
 
-3. **Undocumented forms.**  NEGQ and the $D8 $D8 far JMP/JSR/RTS prefix appear
+3. Undocumented forms.  NEGQ and the $D8 $D8 far JMP/JSR/RTS prefix appear
    in neither llvm-mos nor the User Guide's tables, so there is no oracle to
    diff against.  These are hand-written vectors read off gs4510.vhdl; the
    far-JSR length is the one that matters, since getting it wrong desynchronises
    every following line.
 
-4. **A real ROM**, when one is supplied.  The synthetic sweep hands llvm-mc the
+4. A real ROM, when one is supplied.  The synthetic sweep hands llvm-mc the
    bytes of one instruction at a time; walking a ROM makes our own decoder
    choose the boundaries, so a wrong length lands the next decode
    mid-instruction and cascades -- the failure a listing actually shows.
@@ -34,7 +34,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -42,6 +41,9 @@ from pathlib import Path
 TEST = Path(__file__).resolve().parent
 SRC = TEST.parent / "src" / "monitor"
 TOOLS = TEST.parent / "tools"
+
+sys.path.insert(0, str(TEST))
+import hostbuild  # noqa: E402
 
 sys.path.insert(0, str(TOOLS))
 # Share only the llvm-mc invocation, so a change to the triple or CPU name
@@ -92,25 +94,15 @@ def run_llvm_mc(llvm_mc: str, encodings: list[list[int]]) -> list[list[str]]:
 
 
 def build_harness(workdir: Path, host_cc: str) -> Path:
-    """Compile disasm.c plus the host driver with the host compiler."""
-    binary = workdir / "disasm_host"
-    subprocess.run(
-        [
+    return Path(
+        hostbuild.build(
             host_cc,
-            "-std=c2x",
-            "-O1",
-            "-Wall",
-            "-Wextra",
-            "-Werror",
-            f"-I{SRC}",
-            str(TEST / "disasm_host_harness.c"),
-            str(SRC / "disasm.c"),
-            "-o",
-            str(binary),
-        ],
-        check=True,
+            str(workdir),
+            "disasm_host",
+            [str(TEST / "disasm_host_harness.c"), str(SRC / "disasm.c")],
+            includes=[str(SRC)],
+        )
     )
-    return binary
 
 
 def run_harness(binary: Path, cases: list[list[int]]) -> list[tuple[int, str]]:
@@ -119,10 +111,7 @@ def run_harness(binary: Path, cases: list[list[int]]) -> list[tuple[int, str]]:
 
 def run_harness_lines(binary: Path, lines: list[str]) -> list[tuple[int, str]]:
     """Decode one instruction per line; a leading @<hex> sets its address."""
-    result = subprocess.run(
-        [str(binary)], input="\n".join(lines), capture_output=True, text=True, check=True
-    )
-    return [parse_harness_line(line) for line in result.stdout.splitlines()]
+    return [parse_harness_line(row) for row in hostbuild.lines(str(binary), "\n".join(lines))]
 
 
 def parse_harness_line(line: str) -> tuple[int, str]:
@@ -183,8 +172,8 @@ def check_round_trip(llvm_mc: str, binary: Path) -> list[str]:
     for case, (length, text), reference in zip(cases, ours, theirs, strict=True):
         encoding = " ".join(f"{byte:02X}" for byte in case[:length])
         # $42 $42 $42 is NEGQ on real silicon but three NEGs to llvm-mos, which
-        # has no entry for it.  There is no oracle here, so the UNDOCUMENTED
-        # vectors below carry this case instead of the round trip.
+        # has no entry for it.  With no oracle to diff against, the UNDOCUMENTED
+        # vectors below are what check this case.
         if case[:3] == [0x42, 0x42, 0x42]:
             skipped += 1
             continue
@@ -282,12 +271,9 @@ SENTINEL = 0x02
 def walk_rom(binary: Path, rom: Path, base: int) -> list[tuple[int, bytes, str]]:
     """Decode a ROM image start to end, following the lengths we report."""
     image = rom.read_bytes()
-    rows = subprocess.run(
-        [str(binary), "--walk", str(rom), f"{base:X}", f"{base:X}", str(len(image))],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.splitlines()
+    rows = hostbuild.lines(
+        str(binary), "", ["--walk", str(rom), f"{base:X}", f"{base:X}", str(len(image))]
+    )
 
     walked, address = [], base
     for row in rows:
@@ -347,14 +333,7 @@ def check_rom(llvm_mc: str, walked: list[tuple[int, bytes, str]], base: int) -> 
 
 def run_assembler(binary: Path, lines: list[str]) -> list[str]:
     """Assemble each "<address> <instruction>" line, returning bytes or !status."""
-    result = subprocess.run(
-        [str(binary), "--assemble"],
-        input="\n".join(lines),
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.splitlines()
+    return hostbuild.lines(str(binary), "\n".join(lines), ["--assemble"])
 
 
 def check_round_trip_assembly(binary: Path, walked: list[tuple[int, bytes, str]]) -> list[str]:
@@ -488,7 +467,7 @@ def main() -> int:
     parser.add_argument(
         "--rom",
         type=Path,
-        help="MEGA65 ROM image to walk as real-code coverage; skipped if absent",
+        help="MEGA65 ROM image to walk as real code; skipped if absent",
     )
     parser.add_argument(
         "--rom-base",

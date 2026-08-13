@@ -14,7 +14,7 @@ in a plain checkout.  Pass --iomap to additionally diff the decoded names
 against a fresh parse of mega65-core's iomap.txt, which is the only check that
 can catch the generator and the decoder agreeing on something wrong.
 
-Run via CTest, or by hand::
+Run via CTest, or by hand:
 
     python3 test/verify_bitedit.py --cc cc
 """
@@ -22,13 +22,15 @@ Run via CTest, or by hand::
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+
+sys.path.insert(0, str(HERE))
+import hostbuild  # noqa: E402
 
 # Mirrors bitedit_table.h.  Duplicated rather than parsed out so that a column
 # moving in the C without anyone meaning it fails here.
@@ -51,40 +53,18 @@ DATABASE = ROOT / "src" / "monitor" / "iomap.bin"
 
 
 def build_harness(workdir: Path, host_cc: str) -> Path:
-    """Compile bitedit_table.c plus the host driver with the host compiler."""
-    binary = workdir / "bitedit_harness"
-    subprocess.run(
-        [
-            host_cc,
-            "-std=c2x",
-            "-O1",
-            "-Wall",
-            "-Wextra",
-            "-Werror",
-            "-Wno-char-subscripts",
-            "-I",
-            str(ROOT / "src"),
-            "-I",
-            str(ROOT / "src" / "monitor"),
-            "-o",
-            str(binary),
-            str(HERE / "bitedit_host_harness.c"),
-            str(ROOT / "src" / "format.c"),
-        ],
-        check=True,
+    binary = hostbuild.build(
+        host_cc,
+        str(workdir),
+        "bitedit_harness",
+        [str(HERE / "bitedit_host_harness.c"), str(ROOT / "src" / "format.c")],
+        includes=[str(ROOT / "src" / "monitor")],
     )
-    return binary
+    return Path(binary)
 
 
 def run(binary: Path, commands: list[str]) -> list[str]:
-    out = subprocess.run(
-        [str(binary), str(DATABASE)],
-        input="\n".join(commands) + "\n",
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.splitlines()
+    return hostbuild.lines(str(binary), "\n".join(commands) + "\n", [str(DATABASE)])
 
 
 def decode(hex_row: str) -> list[int]:
@@ -265,7 +245,7 @@ def check_cursor_ring(binary: Path, failures: list[str]) -> None:
     """Nine cells in a ring, both directions, every starting point.
 
     The emulator cannot press a shifted cursor key, so left is unreachable
-    there; this is the only coverage it gets.
+    there; nothing else covers it.
     """
     order = [CELL_VALUE, *range(7, -1, -1)]  # value field, then bits 7..0
     replies = run(binary, [f"cursor {cell}" for cell in order])
@@ -280,10 +260,11 @@ def check_cursor_ring(binary: Path, failures: list[str]) -> None:
 
 
 def check_wrap(binary: Path, failures: list[str]) -> None:
-    """The line-breaking, over the shapes that actually caused trouble.
+    """The line-breaking, checked as properties rather than as one example.
 
-    A wrap that split text already fitting the row reached a screenshot before
-    anything noticed, so the properties are checked rather than one example.
+    A wrap that splits text already fitting the row still looks like a wrapped
+    line, so an example screen is no evidence: what has to hold is that nothing
+    is lost, nothing is duplicated, and no piece is wider than the row.
     """
     bodies = [
         "RASTER COMPARE BIT 8",

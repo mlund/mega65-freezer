@@ -35,14 +35,11 @@ import contextlib
 import os
 import re
 import sys
-import tempfile
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import card
-import screen as screen_at
-import xemu
-import xemu_keys
+import scenario
+import xemuharness
+from xemuharness import Failure
 
 # $D011 in the frozen machine.  Its bit 5 is BMM, which the database names, so
 # a screen carrying "BMM" proves the lookup and the abbreviation as well as the
@@ -65,7 +62,22 @@ ELSEWHERE = "m 0000400\r"
 # database did not reach the card -- which the names alone would not catch,
 # since a missing file looks exactly like a register nobody documented.
 # The editor opens with the cursor on bit 7, so RC8 is the described bit.
-EXPECTED_SCREEN = ["VIC-II", "BMM", "RSEL", "YSCL", "RASTER COMPARE BIT 8"]
+NAMED_SCREEN = ["VIC-II", "BMM", "RSEL", "YSCL", "RASTER COMPARE BIT 8"]
+
+# The address row, which draws in both configurations.
+ADDRESS_ROW = f":{TARGET.upper()}"
+
+
+def wanted_on_screen(with_database: bool) -> tuple[list[str], list[str]]:
+    """What the table must and must not show, given whether the database is on
+    the card.  Chosen once: the wait for the table to draw and the assertion
+    afterwards are the same fact, and stating it twice let them disagree."""
+    if with_database:
+        return [ADDRESS_ROW, *NAMED_SCREEN], []
+    # No database must leave the editor working but unnamed -- a missing file
+    # is deliberately not an error.
+    return [ADDRESS_ROW], NAMED_SCREEN
+
 
 # Typed into the VAL field last.  Not a value a toggle could have produced, so
 # reading it back proves hex entry rather than only the bit flip.
@@ -103,7 +115,7 @@ def find_edit(original: str, clone: str, after: int) -> tuple[int, list[int]]:
     return written, carrying
 
 
-def drive(sock, settle: float) -> None:
+def drive(machine, required: list[str]):
     """Exercise both ways of changing a byte, then prove the result persisted.
 
     Both editing paths are covered because they are separate code: SPACE goes
@@ -116,42 +128,52 @@ def drive(sock, settle: float) -> None:
     the reopen has to fetch the byte back off the card.  Reopening also puts the
     names back on screen, which M's sixteen lines would otherwise push off.
     """
-    xemu_keys.type_text(sock, "m")
-    time.sleep(5)
-    xemu_keys.type_text(sock, OPENING)
-    time.sleep(settle)
+
+    def until(phrase, what):
+        return machine.wait_until(lambda s: phrase in s, what=what)
+
+    machine.type_text("m")
+    until("PC   IRQ  NMI", "the monitor never started")
+
+    machine.type_text(OPENING)
+    for phrase in required:
+        until(phrase, f"the bit table never showed {phrase!r}")
 
     # The cursor opens on bit 7 and RIGHT walks down, so two presses reach bit 5.
+    # A toggled bit shows only as the table changing, so that is what says the
+    # keypress landed.
+    was = machine.snapshot().whole()
     for _ in range(2):
-        xemu_keys.press(sock, xemu_keys.NAMED["right"])
-    xemu_keys.type_text(sock, " ")
-    time.sleep(1)
+        machine.press("right")
+    machine.type_text(" ")
+    machine.wait_until(lambda s: s.whole() != was, what="SPACE toggled nothing")
 
     # Onward to the value field rather than back to it: a shifted cursor key
     # does not survive the virtual key slots -- LEFT arrives as RIGHT -- so the
     # test relies on the cursor ring wrapping past bit 0.
     for _ in range(6):
-        xemu_keys.press(sock, xemu_keys.NAMED["right"])
-    xemu_keys.type_text(sock, EXPECTED_VALUE.lower())
-    time.sleep(1)
+        machine.press("right")
+    machine.type_text(EXPECTED_VALUE.lower())
+    until(EXPECTED_VALUE, f"{EXPECTED_VALUE} never reached the value field")
 
-    xemu_keys.press(sock, xemu_keys.NAMED["stop"])
-    time.sleep(2)
-    xemu_keys.type_text(sock, CLOSING)
-    time.sleep(2)
-    xemu_keys.type_text(sock, ELSEWHERE)
-    time.sleep(2)
-    xemu_keys.type_text(sock, OPENING)
-    time.sleep(settle)
+    machine.press("stop")
+    machine.type_text(CLOSING)
+    until(f":{TARGET.upper()}", "leaving the editor did not reach the monitor")
+
+    machine.type_text(ELSEWHERE)
+    until(":0000400", "the displacing read never happened")
+
+    machine.type_text(OPENING)
+    shot = machine.snapshot()
+    for phrase in required:
+        shot = until(phrase, f"the bit table did not bring {phrase!r} back")
+    # Handed back rather than re-read by the caller: this is the screen the
+    # assertions are about, and reading it twice is a whole screen of traffic.
+    return shot
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--emulator", required=True)
-    parser.add_argument("--sdimg", required=True, help="an SD image to clone, never written to")
-    parser.add_argument("--build", required=True, help="directory holding the .M65 builds")
-    parser.add_argument("--boot", type=float, default=16.0)
-    parser.add_argument("--settle", type=float, default=3.0)
+    parser = scenario.add_arguments(argparse.ArgumentParser(description=__doc__))
     parser.add_argument(
         "--expect-serial",
         action="store_true",
@@ -168,19 +190,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    seen = {}
+    required, forbidden = wanted_on_screen(not args.without_iomap)
 
-    def run(sock):
-        drive(sock, args.settle)
-        time.sleep(5)
-        # The screen is read from the running machine: -dumpscreen walks one
-        # byte per cell, which is right for the monitor's 8-bit mode but not for
-        # the freezer's, and a scenario crosses between the two.
-        seen["memory"] = xemu.read(sock, screen_at.SCREEN_AT, screen_at.SCREEN_BYTES)
-        seen["cells"] = 2 if xemu.read(sock, screen_at.CHR16, 1)[0] & 0x01 else 1
-
-    with tempfile.TemporaryDirectory() as tmp:
-        clone = card.inject(args.sdimg, tmp, args.build, not args.without_iomap)
+    with scenario.staged_card(args, with_iomap=not args.without_iomap) as (clone, tmp):
         serial_path = os.path.join(tmp, "serial.txt")
         extra = []
         if args.expect_serial:
@@ -194,37 +206,20 @@ def main() -> int:
             log = None
             if args.expect_serial:
                 log = stack.enter_context(open(serial_path, "w", encoding="utf-8"))
-            xemu.launch(
-                args.emulator,
-                os.path.join(args.build, "FREEZER.M65"),
-                sdimg=clone,
-                socket_path=f"/tmp/xemu-bitedit-{os.getpid()}.sock",
-                drive=run,
-                boot=args.boot,
-                extra=extra,
-                stdout=log,
-            )
+            with scenario.machine_on(args, clone, extra=extra, stdout=log) as machine:
+                try:
+                    screen = drive(machine, required).whole()
+                except Failure as failed:
+                    return xemuharness.report_failure(failed)
 
-        screen = screen_at.screen(seen["memory"], screen_at.SCREEN_AT, seen["cells"])
         serial = ""
         if args.expect_serial:
             with open(serial_path, encoding="utf-8", errors="replace") as handle:
                 serial = handle.read()
         written, carrying = find_edit(args.sdimg, clone, int(EXPECTED_VALUE, 16))
 
-    if args.without_iomap:
-        # The editor must still run with no database, so the assertions invert:
-        # nothing is named, but the bits are still drawn and still editable, and
-        # the checks below on the written byte apply unchanged.
-        problems = [
-            f"screen showed {seen!r} with no database" for seen in EXPECTED_SCREEN if seen in screen
-        ]
-        if ":FFD3011" not in screen:
-            problems.append("the table did not draw without a database")
-    else:
-        problems = [
-            f"screen never showed {want!r}" for want in EXPECTED_SCREEN if want not in screen
-        ]
+    problems = [f"screen never showed {want!r}" for want in required if want not in screen]
+    problems += [f"screen showed {seen!r} with no database" for seen in forbidden if seen in screen]
 
     if not written:
         problems.append("nothing was written to the card at all")

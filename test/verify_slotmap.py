@@ -20,9 +20,11 @@ which bytes may be batched into one transfer.
 
 import argparse
 import os
-import subprocess
 import sys
 import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import hostbuild
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -169,22 +171,10 @@ def main() -> int:
 
     script, checks = _script()
     with tempfile.TemporaryDirectory() as tmp:
-        binary = os.path.join(tmp, "slotmap")
-        subprocess.run(
-            [
-                args.cc,
-                "-std=c2x",
-                "-Wall",
-                "-Werror",
-                "-o",
-                binary,
-                os.path.join(HERE, "slotmap_host_harness.c"),
-            ],
-            check=True,
+        binary = hostbuild.build(
+            args.cc, tmp, "slotmap", [os.path.join(HERE, "slotmap_host_harness.c")]
         )
-        got = subprocess.run(
-            [binary], input=script, capture_output=True, text=True, check=True
-        ).stdout.splitlines()
+        got = hostbuild.lines(binary, script)
 
     if len(got) != len(checks):
         print(f"harness produced {len(got)} lines, expected {len(checks)}")

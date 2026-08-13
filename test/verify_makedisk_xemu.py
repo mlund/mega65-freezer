@@ -34,8 +34,8 @@ STEPS = [
     ("key", "0"),
     # Its three fixed entries come from the code rather than from whatever disk
     # images this card carries, so they are the portable thing to assert.  Rows
-    # 23 and 24 are the standing instructions, which nothing could see until the
-    # screen came from memory rather than -dumpscreen.
+    # 23 and 24 are the standing instructions, below the half a one-byte-per-cell
+    # screen dump can reach.
     ("expect_row", 0, "- NO DISK -"),
     ("expect_row", 1, '- INTERNAL 3.5" -'),
     ("expect_row", 2, "- NEW D81 DD IMAGE -"),
