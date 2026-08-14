@@ -47,17 +47,17 @@ struct DhcpLease {
 
 /* Fills `payload` with a DHCPDISCOVER and returns its length.  The caller owns
  * DHCP_PAYLOAD_BYTES. */
-uint16_t dhcp_discover(uint8_t* payload, const uint8_t* mac, uint32_t xid);
+[[nodiscard]] uint16_t dhcp_discover(uint8_t* payload, const uint8_t* mac, uint32_t xid);
 
 /* The same for the DHCPREQUEST that accepts `offer`. */
-uint16_t dhcp_request(
+[[nodiscard]] uint16_t dhcp_request(
     uint8_t* payload, const uint8_t* mac, uint32_t xid, const struct DhcpLease* offer);
 
 /* What `payload` is, and what it said.  Anything that is not a reply to this
  * machine's own exchange -- another client's, or another run of ours -- reads
  * as DhcpNothing, because a LAN carries other people's DHCP traffic and a
  * broadcast reply arrives whether or not it was meant for us. */
-enum DhcpMessage dhcp_parse(const uint8_t* payload,
+[[nodiscard]] enum DhcpMessage dhcp_parse(const uint8_t* payload,
     uint16_t length,
     uint32_t xid,
     const uint8_t* mac,

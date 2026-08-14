@@ -18,13 +18,41 @@
  * So every frame on the wire arrives here, and deciding which are ours is the
  * caller's: udp_parse() matches the destination address, and the exchanges
  * that run before there is an address to match -- DHCP -- match on their own
- * transaction id instead.  ETH_RX_TO_US carries the controller's own verdict
- * for a caller that would rather not parse, though it arrives with the frame
- * and so cannot save the copy; the cheap way to refuse a frame before it is
- * copied is a small `limit`. */
+ * transaction id instead.  The controller offers its own verdict in the frame's
+ * flag nibble below, but it arrives with the frame and so cannot save the copy;
+ * the cheap way to refuse a frame before it is copied is a small `limit`. */
 static constexpr uint8_t ETH_PHASE_ONE = 1;
 static constexpr uint8_t ETH_FILTER =
     ETH_BCST_MASK | ETH_MCST_MASK | (uint8_t)(ETH_PHASE_ONE << 2) | (uint8_t)(ETH_PHASE_ONE << 6);
+
+/* $D6E1.1 means two different things: reading it is part of the free-buffer
+ * count the generated ETH_RXBF_MASK names, writing it asks for the next
+ * received frame.  The write is edge triggered -- ethernet.vhdl:1787 keeps
+ * last_rx_rotate_bit and acts on a 0 -> 1 transition -- so it takes a write
+ * with the bit low and then one with it high, not a single write. */
+static constexpr uint8_t ETH_RX_ROTATE = 0b00000010;
+
+/* Both frame buffers, in the 28-bit space where DMA reaches them.  Reading
+ * this address gives the receive buffer and writing it goes to the transmit
+ * one, so the same constant serves both and a copy between them is not the
+ * no-op it looks like.
+ *
+ * Not mapped over $D800: that window hides the CIAs at $DC00/$DD00, and it
+ * would need the ethernet I/O personality ($45/$54) rather than the standard
+ * knock the tools already perform. */
+static constexpr uint32_t ETH_BUFFER = 0xFFDE800;
+
+/* A received frame is preceded by two bytes, and only twelve of their sixteen
+ * bits are the length -- the top four are flags, of which $80 is a failed CRC
+ * (mega65-user-guide/appendix-45e100-registers.tex, the $D000/$D001 rows).
+ * Reading the pair as a plain 16-bit length yields values in the thousands for
+ * ordinary frames, which is a mistake that looks like a dead receiver rather
+ * than like a decoding error.  The other three flags -- multicast, broadcast,
+ * addressed-to-us -- say nothing the frame's own destination address does not,
+ * so nothing here reads them. */
+static constexpr uint16_t ETH_RX_LENGTH_BYTES = 2;
+static constexpr uint16_t ETH_RX_LENGTH_MASK = 0x0FFF;
+static constexpr uint8_t ETH_RX_BAD_CRC = 0x80;
 
 void eth_init(void) {
     /* Setting the filter is the whole of it.  Deliberately no reset: the reset
@@ -70,8 +98,7 @@ void eth_send(const uint8_t* frame, uint16_t length) {
     ETHERNET.command = ETHERNET_STARTTX;
 }
 
-uint16_t eth_receive(uint8_t* into, uint16_t limit, uint8_t* flags) {
-    *flags = 0;
+uint16_t eth_receive(uint8_t* into, uint16_t limit) {
     if (!(ETHERNET.ctrl2 & ETH_RXQ_MASK)) {
         return 0;
     }
@@ -83,28 +110,18 @@ uint16_t eth_receive(uint8_t* into, uint16_t limit, uint8_t* flags) {
 
     const uint8_t low = lpeek(ETH_BUFFER);
     const uint8_t high = lpeek(ETH_BUFFER + 1);
-    uint8_t report = high & ETH_RX_FLAGS;
-    uint16_t copied = 0;
 
     /* A failed CRC means truncated or corrupted in transit, so there is
      * nothing worth copying and nothing worth reporting a length for.  A
      * zero-length frame falls through the same way: lcopy of nothing is
      * nothing (src/dma.c), so it needs no test of its own. */
-    if (!(high & ETH_RX_BAD_CRC)) {
-        const uint16_t length = (uint16_t)(low | ((uint16_t)high << 8)) & ETH_RX_LENGTH_MASK;
-        if (length > limit) {
-            /* Dropped, like a failed CRC, rather than handed over in part.
-             * Both are "not a usable frame", and deciding one here and the
-             * other in every caller is how a caller comes to forget: a partial
-             * frame parses as a plausible short one, where nothing at all is
-             * unmistakable.  The flag still says it happened. */
-            report |= ETH_RX_TRUNCATED;
-        } else {
-            copied = length;
-            lcopy((Addr28)(ETH_BUFFER + ETH_RX_LENGTH_BYTES), (Addr28)(uint16_t)into, copied);
-        }
+    if (high & ETH_RX_BAD_CRC) {
+        return 0;
     }
-
-    *flags = report;
-    return copied;
+    const uint16_t length = (uint16_t)(low | ((uint16_t)high << 8)) & ETH_RX_LENGTH_MASK;
+    if (length > limit) {
+        return 0;
+    }
+    lcopy((Addr28)(ETH_BUFFER + ETH_RX_LENGTH_BYTES), (Addr28)(uint16_t)into, length);
+    return length;
 }

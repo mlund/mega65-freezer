@@ -181,9 +181,8 @@ int main(void) {
 
     /* A quarter of the way in, one ARP request and one UDP broadcast go out,
      * and the rest of the run listens.  Per RX event the log takes the decoded
-     * length, the controller's flag byte, and the frame as eth_receive()
-     * delivered it -- our own frames included, which the source address in the
-     * dump tells apart. */
+     * length and the frame as eth_receive() delivered it -- our own frames
+     * included, which the source address in the dump tells apart. */
     static constexpr uint8_t SENDER[IPV4_BYTES] = {192, 168, 68, 234};
     static constexpr uint8_t TARGET[IPV4_BYTES] = {192, 168, 68, 57};
     uint16_t frames = 0;
@@ -198,8 +197,7 @@ int main(void) {
     restart_clock();
     while (frames_elapsed < LISTEN_FRAMES && !(answered && logged == FRAMES_LOGGED)) {
         tick();
-        uint8_t rx_flags = 0;
-        const uint16_t got = eth_receive(net_in, sizeof net_in, &rx_flags);
+        const uint16_t got = eth_receive(net_in, sizeof net_in);
         if (!got) {
             continue;
         }
@@ -211,7 +209,6 @@ int main(void) {
         if (logged < FRAMES_LOGGED) {
             const uint8_t at = (uint8_t)(LOG_HEADER + logged * FRAME_SLICE);
             log_put16(at, got);
-            sector_buffer[at + 2] = rx_flags;
             for (uint8_t i = 0; i < FRAME_SLICE - 4; i++) {
                 sector_buffer[at + 4 + i] = net_in[i];
             }
@@ -256,8 +253,7 @@ int main(void) {
             eth_send(net_out, length);
         }
 
-        uint8_t rx = 0;
-        const uint16_t got = eth_receive(net_in, sizeof net_in, &rx);
+        const uint16_t got = eth_receive(net_in, sizeof net_in);
         if (!got) {
             continue;
         }
@@ -295,14 +291,13 @@ int main(void) {
         restart_clock();
         while (frames_elapsed < SERVE_FRAMES) {
             tick();
-            uint8_t rx = 0;
             /* Bounded to what an ARP exchange is on the wire rather than to
              * the buffer: eth_receive() drops what will not fit before copying
              * it, which is the cheapest way to not spend a 1500-byte DMA on
              * every neighbour's traffic.  ETH_MIN_RECEIVED and not
              * ETH_MIN_FRAME -- the reported length carries the check sequence,
              * and 60 here answered nothing at all. */
-            const uint16_t got = eth_receive(net_in, ETH_MIN_RECEIVED, &rx);
+            const uint16_t got = eth_receive(net_in, ETH_MIN_RECEIVED);
             const uint16_t answer = got ? arp_answer(net_in, got, us.mac, us.ip) : 0;
             if (answer) {
                 eth_send(net_in, answer);

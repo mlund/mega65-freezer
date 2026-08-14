@@ -41,11 +41,11 @@ struct CatalogRecord {
 
 /* True, and fills `out`, when the 128 bytes are a catalogue this client can
  * read.  Refuses an unknown version, and a record size it could not index. */
-bool catalog_header(const uint8_t* raw, struct CatalogHeader* out);
+[[nodiscard]] bool catalog_header(const uint8_t* raw, struct CatalogHeader* out);
 
 /* Where record `index` starts.  32-bit because 512 records of 128 bytes is
  * already past what 16 bits hold. */
-uint32_t catalog_record_offset(uint16_t record_bytes, uint16_t index);
+[[nodiscard]] uint32_t catalog_record_offset(uint16_t record_bytes, uint16_t index);
 
 /* Unpacks one record's fields into `out`. */
 void catalog_record(const uint8_t* raw, struct CatalogRecord* out);

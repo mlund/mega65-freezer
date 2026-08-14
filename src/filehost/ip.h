@@ -31,14 +31,14 @@ constexpr uint8_t UDP_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES + UDP_HE
  *
  * Only the final piece may have an odd length: an odd piece is padded to the
  * next word, which is only the same answer when nothing follows it. */
-uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length);
+[[nodiscard]] uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length);
 /* Folds an accumulated sum into the sixteen bits a header carries. */
-uint16_t ip_sum_final(uint32_t sum);
+[[nodiscard]] uint16_t ip_sum_final(uint32_t sum);
 
 /* Fills `frame` with an ethernet/IPv4/UDP datagram carrying `payload`, and
  * returns the whole frame's length.  The caller owns at least
  * UDP_PAYLOAD_AT + payload_length bytes. */
-uint16_t udp_build(uint8_t* frame,
+[[nodiscard]] uint16_t udp_build(uint8_t* frame,
     const struct NetEndpoint* from,
     const struct NetEndpoint* to,
     const uint8_t* payload,
@@ -57,5 +57,5 @@ struct UdpDatagram {
  *
  * A wrong UDP checksum is a rejection; a zero one is not, since RFC 768 makes
  * it optional over IPv4 and says zero means it was not computed. */
-bool udp_parse(
+[[nodiscard]] bool udp_parse(
     const uint8_t* frame, uint16_t length, const struct NetEndpoint* us, struct UdpDatagram* out);

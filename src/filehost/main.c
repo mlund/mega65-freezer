@@ -297,8 +297,7 @@ static void ethernet_probe(bool transmit) {
     uint16_t last_type = 0;
     bool answered = false;
     for (uint16_t poll = 0; poll < PROBE_POLLS && !answered; poll++) {
-        uint8_t rx_flags = 0;
-        const uint16_t got = eth_receive(probe_received, sizeof probe_received, &rx_flags);
+        const uint16_t got = eth_receive(probe_received, sizeof probe_received);
         if (!got) {
             usleep(PROBE_POLL_US);
             continue;

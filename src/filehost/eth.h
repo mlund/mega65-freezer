@@ -15,46 +15,6 @@
  * mega65-libc later; the browser around it is GPL-3 like the rest of the
  * repository. */
 
-/* $D6E1.1 means two different things: reading it is part of the free-buffer
- * count the generated ETH_RXBF_MASK names, writing it asks for the next
- * received frame.  The write is edge triggered -- ethernet.vhdl:1787 keeps
- * last_rx_rotate_bit and acts on a 0 -> 1 transition -- so it takes a write
- * with the bit low and then one with it high, not a single write. */
-constexpr uint8_t ETH_RX_ROTATE = 0b00000010;
-
-/* Both frame buffers, in the 28-bit space where DMA reaches them.  Reading
- * this address gives the receive buffer and writing it goes to the transmit
- * one, so the same constant serves both and a copy between them is not the
- * no-op it looks like.
- *
- * Not mapped over $D800: that window hides the CIAs at $DC00/$DD00, and it
- * would need the ethernet I/O personality ($45/$54) rather than the standard
- * knock the tools already perform. */
-constexpr uint32_t ETH_BUFFER = 0xFFDE800;
-
-/* A received frame is preceded by two bytes, and only twelve of their sixteen
- * bits are the length -- the top four are flags
- * (mega65-user-guide/appendix-45e100-registers.tex, the $D000/$D001 rows).
- * Reading the pair as a plain 16-bit length yields values in the thousands for
- * ordinary frames, which is a mistake that looks like a dead receiver rather
- * than like a decoding error. */
-constexpr uint16_t ETH_RX_LENGTH_BYTES = 2;
-constexpr uint16_t ETH_RX_LENGTH_MASK = 0x0FFF;
-constexpr uint8_t ETH_RX_MULTICAST = 0x10;
-constexpr uint8_t ETH_RX_BROADCAST = 0x20;
-/* The controller's own answer to "is this addressed to us", which spares a
- * caller a parse while the receiver runs promiscuous.  It arrives with the
- * frame, so it cannot spare the copy -- `limit` is what does that. */
-constexpr uint8_t ETH_RX_TO_US = 0x40;
-constexpr uint8_t ETH_RX_BAD_CRC = 0x80;
-/* The flags occupy the high nibble; the low one is the top of the length, and
- * eth_receive() masks it away rather than hand a caller a byte that is half
- * flags and half arithmetic. */
-constexpr uint8_t ETH_RX_FLAGS = 0xF0;
-/* Not the controller's, which is why it fits in the nibble the length vacated:
- * set when the frame was longer than the buffer it was given. */
-constexpr uint8_t ETH_RX_TRUNCATED = 0x01;
-
 constexpr uint16_t ETH_MAX_FRAME = 1500;
 /* Ethernet's own minimum, which a short frame is padded up to. */
 constexpr uint16_t ETH_MIN_FRAME = 60;
@@ -85,21 +45,19 @@ void eth_init(void);
 void eth_mac(uint8_t* out);
 
 /* Whether the transmitter has finished with the last frame it was given. */
-bool eth_tx_idle(void);
+[[nodiscard]] bool eth_tx_idle(void);
 
 /* Copies `length` bytes to the transmit buffer and starts the transmitter. */
 void eth_send(const uint8_t* frame, uint16_t length);
 
-/* The frame waiting in the receive buffer, or 0 when there is none and when
- * one arrived with a failed CRC.
+/* How many bytes of the waiting frame are now in `into`, and 0 when no frame
+ * waits, when one arrived with a failed CRC, or when one was longer than
+ * `limit`.
  *
- * Returns how many bytes are in `into`.  A frame too long for the buffer is
- * dropped rather than delivered in part -- it returns 0 and sets
- * ETH_RX_TRUNCATED in `flags` -- so what comes back is always a whole frame a
- * parser may walk, and a caller that ignores the flag loses information rather
- * than safety.
- *
- * `flags` also takes the controller's own verdict -- ETH_RX_TO_US and friends
- * -- and is not optional: every caller wants it, and testing it for null on
- * each of four paths cost more than the pointer does. */
-uint16_t eth_receive(uint8_t* into, uint16_t limit, uint8_t* flags);
+ * All three are "no usable frame", and the over-long one is dropped rather
+ * than delivered in part: a partial frame parses as a plausible short one,
+ * where nothing at all is unmistakable.  So what comes back is always a whole
+ * frame a parser may walk, and `limit` is also the cheap way to refuse a frame
+ * before it is copied -- the receiver runs promiscuous, so most of what
+ * arrives is somebody else's. */
+[[nodiscard]] uint16_t eth_receive(uint8_t* into, uint16_t limit);

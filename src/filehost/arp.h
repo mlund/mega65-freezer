@@ -20,12 +20,13 @@ constexpr uint16_t ETHERTYPE_ARP = 0x0806;
 /* Fills `frame` with a request asking who has `target_ip`.  Returns its
  * length.  `sender_ip` may be all zeros -- an ARP probe in the sense of RFC
  * 5227, which is what a machine that has not yet asked for a lease can send. */
-uint16_t arp_request(
+[[nodiscard]] uint16_t arp_request(
     uint8_t* frame, const uint8_t* mac, const uint8_t* sender_ip, const uint8_t* target_ip);
 
 /* True when `frame` is an ARP reply from `ip`, and then `mac_out` is its
  * hardware address. */
-bool arp_reply_from(const uint8_t* frame, uint16_t length, const uint8_t* ip, uint8_t* mac_out);
+[[nodiscard]] bool arp_reply_from(
+    const uint8_t* frame, uint16_t length, const uint8_t* ip, uint8_t* mac_out);
 
 /* The answer, when `frame` is somebody asking who has `ip`, and 0 when it is
  * not.  Built over `frame` itself, which is what a caller holding one received
@@ -36,4 +37,5 @@ bool arp_reply_from(const uint8_t* frame, uint16_t length, const uint8_t* ip, ui
  * that stays silent is one whose replies are never delivered.  Recognising and
  * answering are one call so that no caller can answer something it has not
  * recognised -- there is no runt frame to read past the end of. */
-uint16_t arp_answer(uint8_t* frame, uint16_t length, const uint8_t* mac, const uint8_t* ip);
+[[nodiscard]] uint16_t arp_answer(
+    uint8_t* frame, uint16_t length, const uint8_t* mac, const uint8_t* ip);

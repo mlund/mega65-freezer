@@ -23,14 +23,14 @@ static inline void net_put16(uint8_t* at, uint16_t value) {
 }
 
 /* Reads one back. */
-static inline uint16_t net_get16(const uint8_t* at) {
+[[nodiscard]] static inline uint16_t net_get16(const uint8_t* at) {
     return (uint16_t)(((uint16_t)at[0] << 8) | at[1]);
 }
 
 /* Whether an address is all zeros, which across this stack means "not yet
  * given one": nothing claims such an address, answers for it, or matches
  * against it. */
-static inline bool net_zero(const uint8_t* a, uint8_t count) {
+[[nodiscard]] static inline bool net_zero(const uint8_t* a, uint8_t count) {
     for (uint8_t i = 0; i < count; i++) {
         if (a[i]) {
             return false;
@@ -40,7 +40,7 @@ static inline bool net_zero(const uint8_t* a, uint8_t count) {
 }
 
 /* Whether two addresses -- a MAC, an IP -- are the same one. */
-static inline bool net_same(const uint8_t* a, const uint8_t* b, uint8_t count) {
+[[nodiscard]] static inline bool net_same(const uint8_t* a, const uint8_t* b, uint8_t count) {
     for (uint8_t i = 0; i < count; i++) {
         if (a[i] != b[i]) {
             return false;
