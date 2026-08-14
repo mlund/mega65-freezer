@@ -33,6 +33,7 @@
 #include "common.h"
 #include "dma.h"
 #include "eth.h"
+#include "ip.h"
 #include "mega65_regs.h"
 #include "sdcard.h"
 
@@ -44,15 +45,23 @@
 constexpr uint32_t LOG_SECTOR = 22532;
 
 constexpr uint8_t FRAME_SLICE = 64; /* enough for the headers of anything */
-constexpr uint8_t FRAMES_LOGGED = 4;
+/* Three, not four: the fourth slot would start at 256, which does not fit
+ * the uint8_t the offset is held in and wraps onto the header. */
+constexpr uint8_t FRAMES_LOGGED = 3;
 constexpr uint8_t LOG_HEADER = 64;
 
 /* Long enough to see ordinary LAN traffic, short enough that a run finishes
  * while the host is still waiting for it. */
 constexpr uint16_t POLLS = 2000;
 constexpr uint32_t POLL_US = 1000;
+constexpr uint16_t UDP_FROM_PORT = 4511;
+constexpr uint16_t UDP_TO_PORT = 4512;
+/* A frame takes microseconds to go out; this is only a bound, not a wait. */
+constexpr uint16_t TX_IDLE_POLLS = 100;
 
 static uint8_t frame[ETH_MIN_FRAME];
+/* Room for the headers and a short payload, for the UDP datagram below. */
+static uint8_t out_frame[UDP_PAYLOAD_AT + 16];
 
 static void log_put16(uint8_t at, uint16_t value) {
     sector_buffer[at] = (uint8_t)value;
@@ -91,24 +100,47 @@ int main(void) {
     sector_buffer[17] = ETHERNET.ctrl2;
     sector_buffer[18] = ETHERNET.ctrl3;
 
-    /* Nothing is transmitted: what is under test is what the receiver
-     * delivers, and our own frame in the log would only confuse it.
-     *
-     * Per RX event: the decoded length, the controller's flag byte, and the
-     * frame itself as eth_receive() delivered it. */
+    /* A quarter of the way in, one ARP request and one UDP broadcast go out,
+     * and the rest of the run listens.  Per RX event the log takes the decoded
+     * length, the controller's flag byte, and the frame as eth_receive()
+     * delivered it -- our own frames included, which the source address in the
+     * dump tells apart. */
     static constexpr uint8_t SENDER[IPV4_BYTES] = {192, 168, 68, 234};
     static constexpr uint8_t TARGET[IPV4_BYTES] = {192, 168, 68, 57};
     uint16_t frames = 0;
     uint16_t logged = 0;
-    bool sent = false;
     bool answered = false;
     uint8_t reply_mac[MAC_BYTES] = {0};
 
     for (uint16_t poll = 0; poll < POLLS; poll++) {
-        if (poll == POLLS / 4 && !sent) {
+        if (poll == POLLS / 4) {
             const uint16_t length = arp_request(frame, mac, SENDER, TARGET);
             eth_send(frame, length);
-            sent = true;
+
+            /* And a UDP broadcast, whose checksum the listener's own kernel
+             * verifies before any socket sees it -- so its arrival is an
+             * account of the arithmetic that this code did not write. */
+            static const uint8_t hello[] = {'M', '6', '5', 'U', 'D', 'P', '1'};
+            struct NetEndpoint from = {.port = UDP_FROM_PORT};
+            struct NetEndpoint to = {.port = UDP_TO_PORT};
+            for (uint8_t i = 0; i < MAC_BYTES; i++) {
+                from.mac[i] = mac[i];
+                to.mac[i] = 0xFF; /* broadcast */
+            }
+            for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+                from.ip[i] = SENDER[i];
+                to.ip[i] = 255;
+            }
+            const uint16_t datagram = udp_build(out_frame, &from, &to, hello, sizeof hello);
+            /* Bounded, like every other wait here: a transmitter that never
+             * reports idle would otherwise hang before the log is written, and
+             * a hung machine says less than a log that records the fact. */
+            for (uint16_t spin = 0; spin < TX_IDLE_POLLS && !eth_tx_idle(); spin++) {
+                usleep(POLL_US);
+            }
+            sector_buffer[27] = eth_tx_idle() ? 1 : 0;
+            eth_send(out_frame, datagram);
+            sector_buffer[20] = 1;
         }
 
         uint8_t rx_flags = 0;
@@ -126,7 +158,7 @@ int main(void) {
             const uint8_t at = (uint8_t)(LOG_HEADER + logged * FRAME_SLICE);
             log_put16(at, got);
             sector_buffer[at + 2] = rx_flags;
-            for (uint8_t i = 0; i < FRAME_SLICE - 4 && i < sizeof frame; i++) {
+            for (uint8_t i = 0; i < sizeof frame; i++) {
                 sector_buffer[at + 4 + i] = frame[i];
             }
             logged++;
@@ -141,7 +173,6 @@ int main(void) {
     }
     log_put16(4, frames);
     log_put16(6, logged);
-    sector_buffer[20] = sent ? 1 : 0;
     sector_buffer[21] = ETHERNET.ctrl1;
     sector_buffer[22] = ETHERNET.ctrl2;
 

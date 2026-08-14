@@ -15,7 +15,7 @@
 # the suite and the test file, so `format.c` means TEST_SUITE("format") in
 # t_format.cpp.
 set(HOST_TESTS sprited/lineedit.c makedisk/layout.c monitor/blockmove.c format.c
-    screencode.c filehost/catalog.c filehost/shortname.c filehost/arp.c)
+    screencode.c filehost/catalog.c filehost/shortname.c filehost/arp.c filehost/ip.c)
 
 # doctest is fetched at configure time, so a checkout with no network loses
 # these rather than failing.  Said out loud: a silently absent test reads

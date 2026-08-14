@@ -51,6 +51,15 @@ constexpr uint16_t ETH_MAX_FRAME = 1500;
 /* Ethernet's own minimum, less the CRC the controller appends. */
 constexpr uint16_t ETH_MIN_FRAME = 60;
 
+/* The frame header every protocol above sits behind.  Everything on the wire
+ * is big-endian, which is the opposite of this CPU, so the two-byte fields are
+ * assembled a byte at a time rather than through a cast. */
+constexpr uint8_t MAC_BYTES = 6;
+constexpr uint8_t ETH_DESTINATION = 0;
+constexpr uint8_t ETH_SOURCE = 6;
+constexpr uint8_t ETH_TYPE = 12;
+constexpr uint8_t ETH_HEADER_BYTES = 14;
+
 /* Sets the receive filter, and nothing else -- see eth.c for why this must not
  * reset the controller.  Interrupts are already masked by the time a freezer
  * tool runs, which is what makes polling safe. */

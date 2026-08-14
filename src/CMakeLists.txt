@@ -233,7 +233,7 @@ if(LINK_LIBC)
     # back.  Not a CTest entry: there is no ethernet under Xemu on macOS, so
     # this is run by hand against hardware.  See test/ethtest.c.
     add_executable(ethtest ${CMAKE_SOURCE_DIR}/test/ethtest.c
-        filehost/eth.c filehost/arp.c ${COMMON})
+        filehost/eth.c filehost/arp.c filehost/ip.c ${COMMON})
     add_dependencies(ethtest version_stamp)
     target_compile_options(ethtest PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_compile_definitions(ethtest PRIVATE SCREEN_CELL_BYTES=2)

@@ -154,8 +154,14 @@ less.
   the fixed-width `catalog` file of
   [ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md),
   read off the card as `CATALOG.M65`. Fetching it and the files it names over
-  TFTP is the next step and is not here yet, so for now something else has to
-  put both on the card. An image is named on the card by five characters of its
+  TFTP is not here yet, so for now something else has to put both on the card.
+  The layers under it are: the 45E100 driver, ARP, IPv4 and UDP, each checked
+  on the host against its RFC and on hardware from inside the freezer, where
+  the controller turns out to send and receive perfectly well. `E` runs an
+  ethernet probe and `R` listens without transmitting. `test/ethtest.c` is how
+  the wire is seen at all — Xemu has no ethernet on macOS, so it runs on the
+  machine under `etherload` and writes what arrived to a sector the host reads
+  back. An image is named on the card by five characters of its
   catalogue path and three of a hash of the whole path: the writer here emits
   8.3 short names only, and truncation alone would land two catalogue entries on
   one file.

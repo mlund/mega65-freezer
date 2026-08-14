@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 #pragma once
 
+#include "net.h" /* MAC_BYTES, IPV4_BYTES and the byte helpers */
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -11,8 +13,6 @@
  * this compiles for the host and is tested there -- the emulator has no
  * ethernet on macOS, so a test on the wire is a test on hardware. */
 
-constexpr uint8_t MAC_BYTES = 6;
-constexpr uint8_t IPV4_BYTES = 4;
 /* 14 bytes of ethernet header and 28 of ARP. */
 constexpr uint8_t ARP_FRAME_BYTES = 42;
 constexpr uint16_t ETHERTYPE_ARP = 0x0806;
