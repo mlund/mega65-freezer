@@ -60,6 +60,7 @@ constexpr uint8_t LOG_MAC = 8;
 constexpr uint8_t LOG_CTRL = 16;
 constexpr uint8_t LOG_ANSWERED = 26;
 constexpr uint8_t LOG_REPLY_MAC = 32;
+constexpr uint8_t LOG_SENT = 20;
 constexpr uint8_t LOG_DHCP_STAGE = 40;
 constexpr uint8_t LOG_DHCP_OFFERS = 41;
 constexpr uint8_t LOG_DHCP_ACKS = 43;
@@ -70,9 +71,15 @@ static_assert(LOG_LEASE + LOG_LEASE_FIELDS * IPV4_BYTES <= LOG_HEADER,
     "the log header has run into the first frame slice");
 
 /* Long enough to see ordinary LAN traffic, short enough that a run finishes
- * while the host is still waiting for it. */
-constexpr uint16_t POLLS = 2000;
-constexpr uint32_t POLL_US = 1000;
+ * while the host is still waiting for it.  Counted in video frames rather than
+ * in poll iterations: the poll has to run tight, because the controller holds
+ * only three queued frames and three of them arrive in 19 microseconds, so a
+ * loop that sleeps between looks drops what it is there to count. */
+constexpr uint16_t LISTEN_FRAMES = 100; /* about two seconds */
+/* How often to say it again while the exchange has not moved on.  A broadcast
+ * from an unconfigured host is lost in the ordinary course of things, and one
+ * attempt per run means a single loss costs the whole run. */
+constexpr uint16_t RESEND_FRAMES = 25;
 
 /* Far too much for the 16-bit window.  src/link.ld puts .netbuf above the code
  * at $A200 for the tools; this PRG links the platform's own script and its
@@ -86,6 +93,24 @@ constexpr uint32_t POLL_US = 1000;
  * datagram is refused rather than half-read. */
 static __attribute__((section(".netbuf"))) uint8_t net_out[UDP_PAYLOAD_AT + DHCP_PAYLOAD_BYTES];
 static __attribute__((section(".netbuf"))) uint8_t net_in[ETH_MAX_FRAME];
+
+/* Video frames since the last reset.  The raster line runs up and wraps once
+ * per frame, so a wrap is a frame; nothing here needs finer time than that. */
+static uint8_t last_raster;
+static uint16_t frames_elapsed;
+
+static void tick(void) {
+    const uint8_t now = VICIV.rasterline;
+    if (now < last_raster) {
+        frames_elapsed++;
+    }
+    last_raster = now;
+}
+
+static void restart_clock(void) {
+    last_raster = VICIV.rasterline;
+    frames_elapsed = 0;
+}
 
 static void log_put16(uint8_t at, uint16_t value) {
     sector_buffer[at] = (uint8_t)value;
@@ -136,17 +161,16 @@ int main(void) {
     bool answered = false;
     uint8_t reply_mac[MAC_BYTES] = {0};
 
-    for (uint16_t poll = 0; poll < POLLS; poll++) {
-        if (poll == POLLS / 4) {
-            const uint16_t length = arp_request(net_out, mac, SENDER, TARGET);
-            eth_send(net_out, length);
+    const uint16_t asked = arp_request(net_out, mac, SENDER, TARGET);
+    eth_send(net_out, asked);
+    sector_buffer[LOG_SENT] = 1;
 
-        }
-
+    restart_clock();
+    while (frames_elapsed < LISTEN_FRAMES && !(answered && logged == FRAMES_LOGGED)) {
+        tick();
         uint8_t rx_flags = 0;
         const uint16_t got = eth_receive(net_in, sizeof net_in, &rx_flags);
         if (!got) {
-            usleep(POLL_US);
             continue;
         }
         frames++;
@@ -188,13 +212,23 @@ int main(void) {
     length = udp_build(net_out, &us, &server, &net_out[UDP_PAYLOAD_AT], length);
     eth_send(net_out, length);
 
-    for (uint16_t poll = 0; poll < POLLS && stage < 2; poll++) {
+    restart_clock();
+    uint16_t said_at = 0;
+    while (frames_elapsed < LISTEN_FRAMES && stage < 2) {
+        tick();
+        /* Still waiting on the same step: ask again rather than spend the whole
+         * budget on one lost broadcast. */
+        if (frames_elapsed - said_at >= RESEND_FRAMES) {
+            said_at = frames_elapsed;
+            length = (stage == 0) ? dhcp_discover(&net_out[UDP_PAYLOAD_AT], mac, xid)
+                                  : dhcp_request(&net_out[UDP_PAYLOAD_AT], mac, xid, &lease);
+            length = udp_build(net_out, &us, &server, &net_out[UDP_PAYLOAD_AT], length);
+            eth_send(net_out, length);
+        }
+
         uint8_t rx = 0;
         const uint16_t got = eth_receive(net_in, sizeof net_in, &rx);
-        /* A datagram too long for the buffer is not half-parsed: the headers
-         * would check out and the payload would be somebody else's memory. */
-        if (!got || (rx & ETH_RX_TRUNCATED)) {
-            usleep(POLL_US);
+        if (!got) {
             continue;
         }
         struct UdpDatagram datagram;

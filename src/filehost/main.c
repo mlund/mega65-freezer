@@ -218,10 +218,10 @@ static constexpr uint8_t PROBE_SENDER[IPV4_BYTES] = {192, 168, 68, 234};
 static constexpr uint16_t PROBE_POLLS = 200;
 static constexpr uint32_t PROBE_POLL_US = 10000;
 
-/* Only ever holds an ARP exchange.  A longer frame is counted and not read:
- * eth_receive() copies what fits and says so in ETH_RX_TRUNCATED, so a short
- * buffer costs information rather than safety.  A 1500-byte one here would be
- * budget the code cannot have -- see cmake/checkbuffers.cmake. */
+/* Only ever holds an ARP exchange.  A longer frame is dropped by eth_receive()
+ * rather than half-delivered, so a short buffer here costs sight of the LAN's
+ * bigger frames and nothing else.  A 1500-byte one would be budget the code
+ * cannot have -- see cmake/checkbuffers.cmake. */
 static uint8_t probe_frame[ARP_FRAME_BYTES];
 /* Separate from the frame that is sent: sharing one buffer is how a read that
  * copied nothing came back looking like our own transmission. */

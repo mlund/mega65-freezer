@@ -39,32 +39,37 @@ static constexpr uint8_t OPTION_END = 255;
 static constexpr uint8_t DHCPDISCOVER = 1;
 static constexpr uint8_t DHCPREQUEST = 3;
 
-/* What is asked for.  Option 66 is absent deliberately: it names a TFTP server
- * rather than addressing one, and resolving a name needs a resolver this does
- * not have yet.  Option 6 is asked for even so -- it is the address of the
- * resolver, so it is the thing that would make 66 usable rather than another
- * thing that needs one. */
-static const uint8_t WANTED[] = {OPTION_NETMASK, OPTION_ROUTER, OPTION_DNS, OPTION_TFTP_ADDRESS};
-
+/* The options that carry one address and differ only in where it belongs.  A
+ * table rather than five near-identical cases: each case re-derived the source
+ * pointer, and five of them came to two fifths of the parser.
+ *
+ * The requested ones come first, so the parameter list is a prefix of this
+ * table rather than a second copy of it.  Asking for an option the walk cannot
+ * store, and storing one never asked for, are both silent -- and the first is
+ * how option 66 came to be requested and dropped.
+ *
+ * 66 is absent deliberately: it names a TFTP server rather than addressing
+ * one, and resolving a name needs a resolver this does not have.  Option 6 is
+ * asked for even so, being the address of the resolver -- the thing that would
+ * make 66 usable rather than another thing that needs one. */
 static constexpr uint8_t ADDRESS_OPTIONS = 5;
-/* The options that carry one address and differ only in where it belongs.
- * A table rather than five near-identical cases: each case re-derives the
- * source pointer, and five of them came to two fifths of the parser. */
-static const uint8_t ADDRESS_OPTION[ADDRESS_OPTIONS] = {
-    OPTION_NETMASK, OPTION_ROUTER, OPTION_DNS, OPTION_SERVER_ID, OPTION_TFTP_ADDRESS};
+static constexpr uint8_t REQUESTED_OPTIONS = 4;
+static const uint8_t ADDRESS_OPTION[ADDRESS_OPTIONS] = {OPTION_NETMASK,
+    OPTION_ROUTER,
+    OPTION_DNS,
+    OPTION_TFTP_ADDRESS,
+    /* Always volunteered, never requested. */
+    OPTION_SERVER_ID};
 static const uint8_t ADDRESS_FIELD[ADDRESS_OPTIONS] = {
     offsetof(struct DhcpLease, netmask),
     offsetof(struct DhcpLease, router),
     offsetof(struct DhcpLease, dns),
-    offsetof(struct DhcpLease, server),
     offsetof(struct DhcpLease, tftp),
+    offsetof(struct DhcpLease, server),
 };
 
-/* A field of the lease, by its offset in the table above. */
-static uint8_t* out_field(struct DhcpLease* lease, uint8_t at) {
-    return (uint8_t*)lease + at;
-}
-
+/* Appends one option -- number, length, value -- and says where the next one
+ * goes. */
 static uint8_t* put_option(uint8_t* at, uint8_t option, const uint8_t* value, uint8_t length) {
     *at++ = option;
     *at++ = length;
@@ -92,7 +97,7 @@ static uint8_t* build(uint8_t* payload, const uint8_t* mac, uint32_t xid, uint8_
 
     uint8_t* at = &payload[DHCP_OPTIONS_AT];
     at = put_option(at, OPTION_MESSAGE_TYPE, &type, 1);
-    return put_option(at, OPTION_PARAMETER_LIST, WANTED, sizeof WANTED);
+    return put_option(at, OPTION_PARAMETER_LIST, ADDRESS_OPTION, REQUESTED_OPTIONS);
 }
 
 /* The length is always the full one: build() zeroed the buffer, so everything
@@ -131,9 +136,9 @@ enum DhcpMessage dhcp_parse(const uint8_t* payload,
     }
     /* Ours, and this run's: a LAN carries other clients' exchanges, and every
      * reply here is a broadcast that arrives whoever it was for. */
-    if (payload[BOOTP_XID + 0] != (uint8_t)(xid >> 24) ||
-        payload[BOOTP_XID + 1] != (uint8_t)(xid >> 16) ||
-        payload[BOOTP_XID + 2] != (uint8_t)(xid >> 8) || payload[BOOTP_XID + 3] != (uint8_t)xid) {
+    const uint8_t ours[4] = {
+        (uint8_t)(xid >> 24), (uint8_t)(xid >> 16), (uint8_t)(xid >> 8), (uint8_t)xid};
+    if (!net_same(&payload[BOOTP_XID], ours, sizeof ours)) {
         return DhcpNothing;
     }
     if (!net_same(&payload[BOOTP_CHADDR], mac, MAC_BYTES)) {
@@ -164,7 +169,10 @@ enum DhcpMessage dhcp_parse(const uint8_t* payload,
         }
         const uint8_t option_length = payload[at + 1];
         const uint16_t value = (uint16_t)(at + 2);
-        if ((uint32_t)value + option_length > length) {
+        /* Written as a subtraction, and in sixteen bits: the test above puts
+         * `value` no further than `length`, so this cannot wrap, and widening
+         * it to 32 bits cost a four-byte compare on every option. */
+        if (option_length > (uint16_t)(length - value)) {
             break;
         }
 
@@ -177,8 +185,7 @@ enum DhcpMessage dhcp_parse(const uint8_t* payload,
              * say -- gives up its first, which is the one to use. */
             for (uint8_t i = 0; i < ADDRESS_OPTIONS; i++) {
                 if (ADDRESS_OPTION[i] == option) {
-                    memcpy(
-                        (uint8_t*)out_field(&found, ADDRESS_FIELD[i]), &payload[value], IPV4_BYTES);
+                    memcpy((uint8_t*)&found + ADDRESS_FIELD[i], &payload[value], IPV4_BYTES);
                     if (option == OPTION_TFTP_ADDRESS) {
                         found.has_tftp = true;
                     }

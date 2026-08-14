@@ -79,11 +79,17 @@ uint16_t eth_receive(uint8_t* into, uint16_t limit, uint8_t* flags) {
      * nothing (src/dma.c), so it needs no test of its own. */
     if (!(high & ETH_RX_BAD_CRC)) {
         const uint16_t length = (uint16_t)(low | ((uint16_t)high << 8)) & ETH_RX_LENGTH_MASK;
-        copied = length < limit ? length : limit;
-        if (copied < length) {
+        if (length > limit) {
+            /* Dropped, like a failed CRC, rather than handed over in part.
+             * Both are "not a usable frame", and deciding one here and the
+             * other in every caller is how a caller comes to forget: a partial
+             * frame parses as a plausible short one, where nothing at all is
+             * unmistakable.  The flag still says it happened. */
             report |= ETH_RX_TRUNCATED;
+        } else {
+            copied = length;
+            lcopy((Addr28)(ETH_BUFFER + ETH_RX_LENGTH_BYTES), (Addr28)(uint16_t)into, copied);
         }
-        lcopy((Addr28)(ETH_BUFFER + ETH_RX_LENGTH_BYTES), (Addr28)(uint16_t)into, copied);
     }
 
     *flags = report;

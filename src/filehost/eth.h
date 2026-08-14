@@ -85,11 +85,11 @@ void eth_send(const uint8_t* frame, uint16_t length);
 /* The frame waiting in the receive buffer, or 0 when there is none and when
  * one arrived with a failed CRC.
  *
- * Returns how many bytes are in `into`, never more than `limit`: a caller
- * feeds the result to a parser, and a length longer than the buffer sends the
- * parser off the end of it.  A frame too long to fit sets ETH_RX_TRUNCATED in
- * `flags`, which is where the fact belongs -- in something a caller has to ask
- * for rather than in the number it will hand onwards.
+ * Returns how many bytes are in `into`.  A frame too long for the buffer is
+ * dropped rather than delivered in part -- it returns 0 and sets
+ * ETH_RX_TRUNCATED in `flags` -- so what comes back is always a whole frame a
+ * parser may walk, and a caller that ignores the flag loses information rather
+ * than safety.
  *
  * `flags` also takes the controller's own verdict -- ETH_RX_TO_US and friends
  * -- and is not optional: every caller wants it, and testing it for null on
