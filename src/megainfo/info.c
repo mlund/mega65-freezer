@@ -741,11 +741,15 @@ void draw_screen(void) {
         write_text(25, 7, SchemeValue, format_datestamp(14, 0x3f));
     }
 
+    // The machine's name on the wire, beside the other things that identify it.
+    // Not below: display_rtc_status() writes three rows from the one it is
+    // given -- state, ticking and the time at y + 2 -- so this side of rows 5
+    // to 7 is the RTC's.
+    write_text(40, 4, SchemeText, "ETHERNET MAC:");
+    write_text(54, 4, SchemeValue, format_ethernet_mac());
+
     // RTC (labels only, rest is done in mainloop)
     write_text(40, 5, SchemeText, "RTC STATUS:");
-
-    write_text(40, 6, SchemeText, "ETHERNET MAC:");
-    write_text(54, 6, SchemeValue, format_ethernet_mac());
 
     // HYPPO/HDOS Version
     write_text(0, 9, SchemeText, "HYPPO/HDOS:");
