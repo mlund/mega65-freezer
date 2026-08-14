@@ -17,14 +17,6 @@
 #include <stdio.h>
 #include <string.h>
 
-static void setup_menu_screen(void) {
-    setup_menu_screen_base();
-
-    VICIV.ctrlc = (VICIV.ctrlc & VIC4_CTRLC_MODE_MASK) | VIC4_CTRLC_16BIT_FULL_COLOUR;
-    VICIV.linestep = SCREEN_ROW_BYTES;
-    /* Colour RAM deliberately left alone here. */
-}
-
 static void draw_box(unsigned char left,
     unsigned char top,
     unsigned char right,
@@ -354,46 +346,13 @@ static void do_make_disk_image(bool is_d65, uint8_t drive_id) {
 }
 
 int main(void) {
-    /* Performs the $D02F knock; without it every later write to a VIC-IV
-     * register such as $D054 is silently ignored and the screen mode is
-     * never established. */
-    mega65_fast();
-
-    // Disable interrupts and interrupt sources
-    __asm__ volatile("sei" ::: "memory");
-    CIA1.icr = 0x7F;
-    CIA2.icr = 0x7F;
-    VICIV.imr = 0x00;
-    // XXX add missing C65 AND M65 peripherals
-    // C65 UART, ethernet etc
-
-    // Bank out BASIC ROM, leave KERNAL and IO in
-    CPU_PORTDDR = CPU_PORT_DDR_ALL_OUTPUTS;
-    CPU_PORT = CPU_PORT_KERNAL_AND_IO;
-
-    // No decimal mode!
-    __asm__ volatile("cld");
-
-    // Enable extended attributes so we can use reverse
-    VICIV.ctrlb = VICIV.ctrlb | 0x20;
-
-    // Correct horizontal scaling
-    VICIV.chrxscl = 0x78;
-
-    // Silence SIDs
-    SID1.amp = 0;
-    SID2.amp = 0;
-
-    set_palette();
+    freezer_tool_start();
 
     // Now find the start sector of the slot, and make a copy for safe keeping
     slot_number = 0;
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
-    // SD or SDHC card?
-    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) != 0;
-
-    setup_menu_screen();
+    setup_menu_screen_16bit();
 
     request_freeze_region_list();
 

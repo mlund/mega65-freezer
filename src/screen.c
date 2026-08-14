@@ -131,6 +131,23 @@ void colour_poke(uint16_t cell, uint8_t value) {
     lpoke(COLOUR_RAM_ADDRESS + cell, value);
 }
 
+/* The two text modes the tools draw in.  Neither touches colour RAM: MAKEDISK
+ * deliberately keeps what is already there, so the clear is the caller's. */
+void setup_menu_screen_16bit(void) {
+    setup_menu_screen_base();
+
+    VICIV.ctrlc = (VICIV.ctrlc & VIC4_CTRLC_MODE_MASK) | VIC4_CTRLC_16BIT_FULL_COLOUR;
+    VICIV.linestep = SCREEN_ROW_BYTES;
+}
+
+void setup_menu_screen_80col(void) {
+    setup_menu_screen_base();
+
+    VICIV.ctrlc = VICIV.ctrlc & VIC4_CTRLC_LEGACY_MASK;
+    VICIV.linestep = SCREEN_ROW_BYTES;
+    VICIV.ctrlb = VIC4_CTRLB_80_COLUMN;
+}
+
 /* Super-Extended Attribute Mode reads the high nibble as attributes, so the
  * fill has to stay a plain colour. */
 void clear_colour_ram(void) {

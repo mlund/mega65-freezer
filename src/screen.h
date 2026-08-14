@@ -94,6 +94,12 @@ extern char screen_column;
  * charset base, VIC bank.  Text mode differs per target, so callers set ctrlc
  * and friends themselves afterwards. */
 void setup_menu_screen_base(void);
+/* The two text modes built on it: 40 columns of 16-bit full-colour cells, and
+ * 80 columns of 8-bit ones.  Which a tool wants is the same choice as its
+ * SCREEN_CELL_BYTES.  Colour RAM is left alone, so a caller that wants it
+ * cleared says so. */
+void setup_menu_screen_16bit(void);
+void setup_menu_screen_80col(void);
 void clear_colour_ram(void);
 
 /* One colour cell.  Colour RAM is above the 64 KB window, so unlike SCREEN it

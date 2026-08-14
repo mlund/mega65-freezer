@@ -66,16 +66,6 @@ static struct CatalogRecord record;
  * case. */
 static bool slot_located;
 
-static void setup_menu_screen(void) {
-    setup_menu_screen_base();
-
-    VICIV.ctrlc = VICIV.ctrlc & VIC4_CTRLC_LEGACY_MASK;
-    VICIV.linestep = SCREEN_ROW_BYTES;
-    VICIV.ctrlb = VIC4_CTRLB_80_COLUMN;
-
-    clear_colour_ram();
-}
-
 /* One whole row, which is also how a row is cleared. */
 static void draw_line(uint8_t y, uint8_t colour, const char* text) {
     draw_field(SCREEN_CELL(0, y), colour, text, SCREEN_COLS);
@@ -296,28 +286,10 @@ static void browse(void) {
 }
 
 int main(void) {
-    /* Performs the $D02F knock; without it every later write to a VIC-IV
-     * register such as $D054 is silently ignored and the screen mode is
-     * never established. */
-    mega65_fast();
+    freezer_tool_start();
 
-    __asm__ volatile("sei" ::: "memory");
-    CIA1.icr = CIA_ICR_DISABLE_ALL;
-    CIA2.icr = CIA_ICR_DISABLE_ALL;
-    VICIV.imr = 0x00;
-
-    CPU_PORTDDR = CPU_PORT_DDR_ALL_OUTPUTS;
-    CPU_PORT = CPU_PORT_KERNAL_AND_IO;
-
-    __asm__ volatile("cld");
-
-    VICIV.ctrlb = VICIV.ctrlb | VIC4_CTRLB_EXTENDED_ATTRIBUTES;
-    VICIV.chrxscl = VIC4_CHRXSCL_80_COLUMN;
-
-    set_palette();
-    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) ? 1 : 0;
-
-    setup_menu_screen();
+    setup_menu_screen_80col();
+    clear_colour_ram();
     blank_screen();
     draw_fragments(menu_fixed_stream());
     draw_rule(SCREEN_CELL(0, LIST_TOP_Y - 1), SCREEN_COLS);

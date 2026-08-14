@@ -41,6 +41,16 @@ void apply_scheme(uint8_t scheme);
 /* The scheme currently loaded; index into SCHEMES[]. */
 extern uint8_t current_scheme;
 
+/* What every tool the freeze menu launches does before it draws anything: the
+ * I/O knock, interrupts off, BASIC banked out, decimal mode off, the SIDs
+ * silenced, the palette loaded and the card's kind established.
+ *
+ * FREEZER is not one of them and does this itself -- it installs an NMI
+ * handler rather than a bare SEI, silences four SIDs, restores $DD00's data
+ * direction and disables the cartridge, none of which a tool loaded over it
+ * has to repeat. */
+void freezer_tool_start(void);
+
 char* detect_rom(void);
 unsigned char detect_cpu_speed(void);
 unsigned char petscii_to_screen(unsigned char petscii);

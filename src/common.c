@@ -114,6 +114,38 @@ unsigned char detect_cpu_speed(void) {
     return 1;
 }
 
+void freezer_tool_start(void) {
+    /* Performs the $D02F knock; without it every later write to a VIC-IV
+     * register such as $D054 is silently ignored and the screen mode is never
+     * established. */
+    mega65_fast();
+
+    /* The two CIAs and the VIC only: the C65 UART and the ethernet controller
+     * can still raise an interrupt here. */
+    __asm__ volatile("sei" ::: "memory");
+    CIA1.icr = CIA_ICR_DISABLE_ALL;
+    CIA2.icr = CIA_ICR_DISABLE_ALL;
+    VICIV.imr = 0x00;
+
+    // Bank out BASIC ROM, leave KERNAL and IO in
+    CPU_PORTDDR = CPU_PORT_DDR_ALL_OUTPUTS;
+    CPU_PORT = CPU_PORT_KERNAL_AND_IO;
+
+    // No decimal mode!
+    __asm__ volatile("cld");
+
+    // Extended attributes, so a tool can draw in reverse
+    VICIV.ctrlb = VICIV.ctrlb | VIC4_CTRLB_EXTENDED_ATTRIBUTES;
+    VICIV.chrxscl = VIC4_CHRXSCL_80_COLUMN;
+
+    SID1.amp = 0;
+    SID2.amp = 0;
+
+    set_palette();
+
+    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) != 0;
+}
+
 static char default_error[] = "ERROR CODE XX";
 char* hyppoerror_to_screen(uint8_t error) {
     // Few messages: each costs its full width in the image.
