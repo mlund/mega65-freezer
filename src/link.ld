@@ -52,11 +52,14 @@ ASSERT(hyppo_page + hyppo_page_size <= ORIGIN(ram) - 2,
 SECTIONS {
     .thumbnail 0x9000 (NOLOAD) : { *(.thumbnail) } > highram
     .sdverify  0xA000 (NOLOAD) : { *(.sdverify) }  > highram
+    .netbuf    0xA200 (NOLOAD) : { *(.netbuf) }    > highram
 } INSERT AFTER .bss
 
 ASSERT(ADDR(.thumbnail) + SIZEOF(.thumbnail) <= ADDR(.sdverify),
     "high memory: the thumbnail buffer runs into the verify buffer")
-ASSERT(ADDR(.sdverify) + SIZEOF(.sdverify) <= 0xB800,
+ASSERT(ADDR(.sdverify) + SIZEOF(.sdverify) <= ADDR(.netbuf),
+    "high memory: the verify buffer runs into the network buffers")
+ASSERT(ADDR(.netbuf) + SIZEOF(.netbuf) <= 0xB800,
     "high memory: the buffers run into the screen at $B800")
 
 __stack = 0xd000;

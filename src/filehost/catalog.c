@@ -43,6 +43,11 @@ static void copy_field(char* out, const uint8_t* raw, uint8_t width, uint8_t pad
 }
 
 bool catalog_header(const uint8_t* raw, struct CatalogHeader* out) {
+    /* Nothing is left in `out` on refusal: a caller that carried on would
+     * index with a stride and a count taken from a file this just rejected. */
+    out->record_bytes = 0;
+    out->record_count = 0;
+
     for (uint8_t i = 0; i < MAGIC_BYTES; i++) {
         if (raw[i] != (uint8_t)MAGIC[i]) {
             return false;
@@ -51,11 +56,15 @@ bool catalog_header(const uint8_t* raw, struct CatalogHeader* out) {
     if (raw[8] != CATALOG_VERSION) {
         return false;
     }
-    out->record_bytes = le16(&raw[9]);
-    out->record_count = le16(&raw[11]);
+    const uint16_t record_bytes = le16(&raw[9]);
     /* A stride below the fields it must carry would overlap its neighbour, and
      * zero would put every record at the same offset. */
-    return out->record_bytes >= RECORD_MINIMUM;
+    if (record_bytes < RECORD_MINIMUM) {
+        return false;
+    }
+    out->record_bytes = record_bytes;
+    out->record_count = le16(&raw[11]);
+    return true;
 }
 
 uint32_t catalog_record_offset(uint16_t record_bytes, uint16_t index) {

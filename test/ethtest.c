@@ -31,6 +31,7 @@
 
 #include "arp.h"
 #include "common.h"
+#include "dhcp.h"
 #include "dma.h"
 #include "eth.h"
 #include "ip.h"
@@ -38,6 +39,7 @@
 #include "sdcard.h"
 
 #include <mega65.h>
+#include <string.h>
 
 /* The first sector of ETHLOG.DAT, worked out from its cluster and the card's
  * geometry, and checked by writing a pattern through the filesystem and
@@ -49,19 +51,41 @@ constexpr uint8_t FRAME_SLICE = 64; /* enough for the headers of anything */
  * the uint8_t the offset is held in and wraps onto the header. */
 constexpr uint8_t FRAMES_LOGGED = 3;
 constexpr uint8_t LOG_HEADER = 64;
+/* Where each thing goes in the header.  Named because the header is exactly
+ * full: the last lease field ends at 63 and LOG_HEADER is 64, so one more
+ * value would silently land on the first frame slice. */
+constexpr uint8_t LOG_FRAMES = 4;
+constexpr uint8_t LOG_LOGGED = 6;
+constexpr uint8_t LOG_MAC = 8;
+constexpr uint8_t LOG_CTRL = 16;
+constexpr uint8_t LOG_ANSWERED = 26;
+constexpr uint8_t LOG_REPLY_MAC = 32;
+constexpr uint8_t LOG_DHCP_STAGE = 40;
+constexpr uint8_t LOG_DHCP_OFFERS = 41;
+constexpr uint8_t LOG_DHCP_ACKS = 43;
+constexpr uint8_t LOG_HAS_TFTP = 45;
+constexpr uint8_t LOG_LEASE = 48;
+constexpr uint8_t LOG_LEASE_FIELDS = 4;
+static_assert(LOG_LEASE + LOG_LEASE_FIELDS * IPV4_BYTES <= LOG_HEADER,
+    "the log header has run into the first frame slice");
 
 /* Long enough to see ordinary LAN traffic, short enough that a run finishes
  * while the host is still waiting for it. */
 constexpr uint16_t POLLS = 2000;
 constexpr uint32_t POLL_US = 1000;
-constexpr uint16_t UDP_FROM_PORT = 4511;
-constexpr uint16_t UDP_TO_PORT = 4512;
-/* A frame takes microseconds to go out; this is only a bound, not a wait. */
-constexpr uint16_t TX_IDLE_POLLS = 100;
 
-static uint8_t frame[ETH_MIN_FRAME];
-/* Room for the headers and a short payload, for the UDP datagram below. */
-static uint8_t out_frame[UDP_PAYLOAD_AT + 16];
+/* Far too much for the 16-bit window.  src/link.ld puts .netbuf above the code
+ * at $A200 for the tools; this PRG links the platform's own script and its
+ * copy of the section lands wherever lld puts it, which is fine here -- a test
+ * PRG has no $9000 ceiling to respect.  Two buffers, because a reply is parsed
+ * while the request is still needed.
+ *
+ * What is sent is a DHCP datagram and its headers; what arrives is whatever
+ * the server chose to send, and a server's option list is longer than a
+ * client's -- sized at 342 the offers came back truncated, and a truncated
+ * datagram is refused rather than half-read. */
+static __attribute__((section(".netbuf"))) uint8_t net_out[UDP_PAYLOAD_AT + DHCP_PAYLOAD_BYTES];
+static __attribute__((section(".netbuf"))) uint8_t net_in[ETH_MAX_FRAME];
 
 static void log_put16(uint8_t at, uint16_t value) {
     sector_buffer[at] = (uint8_t)value;
@@ -94,11 +118,11 @@ int main(void) {
     uint8_t mac[MAC_BYTES];
     eth_mac(mac);
     for (uint8_t i = 0; i < MAC_BYTES; i++) {
-        sector_buffer[8 + i] = mac[i];
+        sector_buffer[LOG_MAC + i] = mac[i];
     }
-    sector_buffer[16] = ETHERNET.ctrl1;
-    sector_buffer[17] = ETHERNET.ctrl2;
-    sector_buffer[18] = ETHERNET.ctrl3;
+    sector_buffer[LOG_CTRL + 0] = ETHERNET.ctrl1;
+    sector_buffer[LOG_CTRL + 1] = ETHERNET.ctrl2;
+    sector_buffer[LOG_CTRL + 2] = ETHERNET.ctrl3;
 
     /* A quarter of the way in, one ARP request and one UDP broadcast go out,
      * and the rest of the run listens.  Per RX event the log takes the decoded
@@ -114,43 +138,19 @@ int main(void) {
 
     for (uint16_t poll = 0; poll < POLLS; poll++) {
         if (poll == POLLS / 4) {
-            const uint16_t length = arp_request(frame, mac, SENDER, TARGET);
-            eth_send(frame, length);
+            const uint16_t length = arp_request(net_out, mac, SENDER, TARGET);
+            eth_send(net_out, length);
 
-            /* And a UDP broadcast, whose checksum the listener's own kernel
-             * verifies before any socket sees it -- so its arrival is an
-             * account of the arithmetic that this code did not write. */
-            static const uint8_t hello[] = {'M', '6', '5', 'U', 'D', 'P', '1'};
-            struct NetEndpoint from = {.port = UDP_FROM_PORT};
-            struct NetEndpoint to = {.port = UDP_TO_PORT};
-            for (uint8_t i = 0; i < MAC_BYTES; i++) {
-                from.mac[i] = mac[i];
-                to.mac[i] = 0xFF; /* broadcast */
-            }
-            for (uint8_t i = 0; i < IPV4_BYTES; i++) {
-                from.ip[i] = SENDER[i];
-                to.ip[i] = 255;
-            }
-            const uint16_t datagram = udp_build(out_frame, &from, &to, hello, sizeof hello);
-            /* Bounded, like every other wait here: a transmitter that never
-             * reports idle would otherwise hang before the log is written, and
-             * a hung machine says less than a log that records the fact. */
-            for (uint16_t spin = 0; spin < TX_IDLE_POLLS && !eth_tx_idle(); spin++) {
-                usleep(POLL_US);
-            }
-            sector_buffer[27] = eth_tx_idle() ? 1 : 0;
-            eth_send(out_frame, datagram);
-            sector_buffer[20] = 1;
         }
 
         uint8_t rx_flags = 0;
-        const uint16_t got = eth_receive(frame, sizeof frame, &rx_flags);
+        const uint16_t got = eth_receive(net_in, sizeof net_in, &rx_flags);
         if (!got) {
             usleep(POLL_US);
             continue;
         }
         frames++;
-        if (!answered && arp_reply_from(frame, got, TARGET, reply_mac)) {
+        if (!answered && arp_reply_from(net_in, got, TARGET, reply_mac)) {
             answered = true;
         }
 
@@ -158,21 +158,80 @@ int main(void) {
             const uint8_t at = (uint8_t)(LOG_HEADER + logged * FRAME_SLICE);
             log_put16(at, got);
             sector_buffer[at + 2] = rx_flags;
-            for (uint8_t i = 0; i < sizeof frame; i++) {
-                sector_buffer[at + 4 + i] = frame[i];
+            for (uint8_t i = 0; i < FRAME_SLICE - 4; i++) {
+                sector_buffer[at + 4 + i] = net_in[i];
             }
             logged++;
         }
     }
 
+    /* And now a lease, from whatever answers on this LAN: the exchange the
+     * machine has to complete before it has an address of its own. */
+    struct NetEndpoint us = {.port = DHCP_CLIENT_PORT};
+    struct NetEndpoint server = {.port = DHCP_SERVER_PORT};
+    for (uint8_t i = 0; i < MAC_BYTES; i++) {
+        us.mac[i] = mac[i];
+        server.mac[i] = 0xFF;
+    }
+    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+        server.ip[i] = 255;
+    }
+    /* Distinct per machine, so two of them asking at once are told apart. */
+    const uint32_t xid = 0x4D360000u | ((uint32_t)mac[4] << 8) | mac[5];
+
+    struct DhcpLease lease = {0};
+    uint8_t stage = 0; /* 0 discovering, 1 requesting, 2 leased */
+    uint16_t offers = 0;
+    uint16_t acks = 0;
+
+    uint16_t length = dhcp_discover(&net_out[UDP_PAYLOAD_AT], mac, xid);
+    length = udp_build(net_out, &us, &server, &net_out[UDP_PAYLOAD_AT], length);
+    eth_send(net_out, length);
+
+    for (uint16_t poll = 0; poll < POLLS && stage < 2; poll++) {
+        uint8_t rx = 0;
+        const uint16_t got = eth_receive(net_in, sizeof net_in, &rx);
+        /* A datagram too long for the buffer is not half-parsed: the headers
+         * would check out and the payload would be somebody else's memory. */
+        if (!got || (rx & ETH_RX_TRUNCATED)) {
+            usleep(POLL_US);
+            continue;
+        }
+        struct UdpDatagram datagram;
+        if (!udp_parse(net_in, got, &us, &datagram)) {
+            continue;
+        }
+        const enum DhcpMessage message = dhcp_parse(
+            &net_in[UDP_PAYLOAD_AT], datagram.payload_length, xid, mac, &lease);
+        if (message == DhcpOffer && stage == 0) {
+            offers++;
+            stage = 1;
+            length = dhcp_request(&net_out[UDP_PAYLOAD_AT], mac, xid, &lease);
+            length = udp_build(net_out, &us, &server, &net_out[UDP_PAYLOAD_AT], length);
+            eth_send(net_out, length);
+        } else if (message == DhcpAck) {
+            acks++;
+            stage = 2;
+        }
+    }
+
+    sector_buffer[LOG_DHCP_STAGE] = stage;
+    log_put16(LOG_DHCP_OFFERS, offers);
+    log_put16(LOG_DHCP_ACKS, acks);
+    memcpy(&sector_buffer[LOG_LEASE + 0], lease.ip, IPV4_BYTES);
+    memcpy(&sector_buffer[LOG_LEASE + 4], lease.server, IPV4_BYTES);
+    memcpy(&sector_buffer[LOG_LEASE + 8], lease.router, IPV4_BYTES);
+    sector_buffer[LOG_HAS_TFTP] = lease.has_tftp ? 1 : 0;
+    memcpy(&sector_buffer[LOG_LEASE + 12], lease.tftp, IPV4_BYTES);
+
     /* The whole point: a reply to our own request, which needs the transmit
      * path, the wire, the target and the receive path all to work. */
-    sector_buffer[26] = answered ? 1 : 0;
+    sector_buffer[LOG_ANSWERED] = answered ? 1 : 0;
     for (uint8_t i = 0; i < MAC_BYTES; i++) {
-        sector_buffer[32 + i] = reply_mac[i];
+        sector_buffer[LOG_REPLY_MAC + i] = reply_mac[i];
     }
-    log_put16(4, frames);
-    log_put16(6, logged);
+    log_put16(LOG_FRAMES, frames);
+    log_put16(LOG_LOGGED, logged);
     sector_buffer[21] = ETHERNET.ctrl1;
     sector_buffer[22] = ETHERNET.ctrl2;
 

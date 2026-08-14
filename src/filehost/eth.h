@@ -46,6 +46,13 @@ constexpr uint8_t ETH_RX_BROADCAST = 0x20;
  * makes software filtering cheap while the receiver runs promiscuous. */
 constexpr uint8_t ETH_RX_TO_US = 0x40;
 constexpr uint8_t ETH_RX_BAD_CRC = 0x80;
+/* The flags occupy the high nibble; the low one is the top of the length, and
+ * eth_receive() masks it away rather than hand a caller a byte that is half
+ * flags and half arithmetic. */
+constexpr uint8_t ETH_RX_FLAGS = 0xF0;
+/* Not the controller's, which is why it fits in the nibble the length vacated:
+ * set when the frame was longer than the buffer it was given. */
+constexpr uint8_t ETH_RX_TRUNCATED = 0x01;
 
 constexpr uint16_t ETH_MAX_FRAME = 1500;
 /* Ethernet's own minimum, less the CRC the controller appends. */
@@ -76,11 +83,15 @@ bool eth_tx_idle(void);
 void eth_send(const uint8_t* frame, uint16_t length);
 
 /* The frame waiting in the receive buffer, or 0 when there is none and when
- * one arrived with a failed CRC.  Returns the frame's whole length even where
- * that is more than `limit`, so a caller can tell a truncated copy from a
- * short frame -- but never returns a length without having copied what it
- * could, because a caller cannot distinguish a stale buffer from a fresh one.
+ * one arrived with a failed CRC.
  *
- * `flags` takes the controller's own verdict on the frame when it is not null:
- * ETH_RX_TO_US and friends. */
+ * Returns how many bytes are in `into`, never more than `limit`: a caller
+ * feeds the result to a parser, and a length longer than the buffer sends the
+ * parser off the end of it.  A frame too long to fit sets ETH_RX_TRUNCATED in
+ * `flags`, which is where the fact belongs -- in something a caller has to ask
+ * for rather than in the number it will hand onwards.
+ *
+ * `flags` also takes the controller's own verdict -- ETH_RX_TO_US and friends
+ * -- and is not optional: every caller wants it, and testing it for null on
+ * each of four paths cost more than the pointer does. */
 uint16_t eth_receive(uint8_t* into, uint16_t limit, uint8_t* flags);

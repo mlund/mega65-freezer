@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 #pragma once
 
+#include "eth.h" /* MAC_BYTES */
+
 #include <stdbool.h>
 #include <stdint.h>
-
-#include "eth.h" /* MAC_BYTES */
 
 /* What every protocol above ethernet needs and none of them owns.
  *

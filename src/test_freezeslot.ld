@@ -9,4 +9,5 @@
  */
 SECTIONS {
     .sdverify (NOLOAD) : { *(.sdverify) }
+    .netbuf (NOLOAD) : { *(.netbuf) }
 } INSERT AFTER .bss

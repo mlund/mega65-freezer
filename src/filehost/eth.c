@@ -13,8 +13,13 @@
  * to our own ARP request never reaching us.  iomap.txt does not settle it
  * either: $D6E5.0 is annotated both "disable promiscuous mode" and "enable
  * filtering of unicast frames if MAC address does not match", and $D6E5.5 is
- * annotated as both the multicast and the unicast enable.  So the address
- * check is done in software, where what it does is written down. */
+ * annotated as both the multicast and the unicast enable.
+ *
+ * So every frame on the wire arrives here, and deciding which are ours is the
+ * caller's: udp_parse() matches the destination address, and the exchanges
+ * that run before there is an address to match -- DHCP -- match on their own
+ * transaction id instead.  ETH_RX_TO_US carries the controller's own verdict
+ * for a caller that wants a cheaper first test. */
 static constexpr uint8_t ETH_PHASE_ONE = 1;
 static constexpr uint8_t ETH_FILTER =
     ETH_BCST_MASK | ETH_MCST_MASK | (uint8_t)(ETH_PHASE_ONE << 2) | (uint8_t)(ETH_PHASE_ONE << 6);
@@ -53,6 +58,7 @@ void eth_send(const uint8_t* frame, uint16_t length) {
 }
 
 uint16_t eth_receive(uint8_t* into, uint16_t limit, uint8_t* flags) {
+    *flags = 0;
     if (!(ETHERNET.ctrl2 & ETH_RXQ_MASK)) {
         return 0;
     }
@@ -64,20 +70,22 @@ uint16_t eth_receive(uint8_t* into, uint16_t limit, uint8_t* flags) {
 
     const uint8_t low = lpeek(ETH_BUFFER);
     const uint8_t high = lpeek(ETH_BUFFER + 1);
-    if (flags) {
-        *flags = high;
-    }
-    /* Truncated or corrupted in transit, so there is nothing worth copying. */
-    if (high & ETH_RX_BAD_CRC) {
-        return 0;
+    uint8_t report = high & ETH_RX_FLAGS;
+    uint16_t copied = 0;
+
+    /* A failed CRC means truncated or corrupted in transit, so there is
+     * nothing worth copying and nothing worth reporting a length for.  A
+     * zero-length frame falls through the same way: lcopy of nothing is
+     * nothing (src/dma.c), so it needs no test of its own. */
+    if (!(high & ETH_RX_BAD_CRC)) {
+        const uint16_t length = (uint16_t)(low | ((uint16_t)high << 8)) & ETH_RX_LENGTH_MASK;
+        copied = length < limit ? length : limit;
+        if (copied < length) {
+            report |= ETH_RX_TRUNCATED;
+        }
+        lcopy((Addr28)(ETH_BUFFER + ETH_RX_LENGTH_BYTES), (Addr28)(uint16_t)into, copied);
     }
 
-    uint16_t length = (uint16_t)(low | ((uint16_t)high << 8)) & ETH_RX_LENGTH_MASK;
-    if (!length) {
-        return 0;
-    }
-    lcopy((Addr28)(ETH_BUFFER + ETH_RX_LENGTH_BYTES),
-        (Addr28)(uint16_t)into,
-        length < limit ? length : limit);
-    return length;
+    *flags = report;
+    return copied;
 }
