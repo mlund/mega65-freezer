@@ -38,15 +38,6 @@ static constexpr uint16_t IP_FRAGMENTED = 0x3FFF;
  * is no counter to keep, and udp_build() stays a function of its arguments. */
 static constexpr uint16_t IP_DONT_FRAGMENT = 0x4000;
 
-static bool is_zero(const uint8_t* a, uint8_t count) {
-    for (uint8_t i = 0; i < count; i++) {
-        if (a[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length) {
     uint16_t i = 0;
     for (; i + 1 < length; i += 2) {
@@ -143,7 +134,7 @@ bool udp_parse(
     }
     /* An all-zero address accepts any destination, for a machine that has not
      * been given one yet. */
-    if (!is_zero(us->ip, IPV4_BYTES) && !net_same(&frame[IP_DESTINATION], us->ip, IPV4_BYTES)) {
+    if (!net_zero(us->ip, IPV4_BYTES) && !net_same(&frame[IP_DESTINATION], us->ip, IPV4_BYTES)) {
         return false;
     }
     if (net_get16(&frame[UDP_DESTINATION_PORT]) != us->port) {

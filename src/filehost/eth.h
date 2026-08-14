@@ -42,8 +42,9 @@ constexpr uint16_t ETH_RX_LENGTH_BYTES = 2;
 constexpr uint16_t ETH_RX_LENGTH_MASK = 0x0FFF;
 constexpr uint8_t ETH_RX_MULTICAST = 0x10;
 constexpr uint8_t ETH_RX_BROADCAST = 0x20;
-/* The controller's own answer to "is this addressed to us", which is what
- * makes software filtering cheap while the receiver runs promiscuous. */
+/* The controller's own answer to "is this addressed to us", which spares a
+ * caller a parse while the receiver runs promiscuous.  It arrives with the
+ * frame, so it cannot spare the copy -- `limit` is what does that. */
 constexpr uint8_t ETH_RX_TO_US = 0x40;
 constexpr uint8_t ETH_RX_BAD_CRC = 0x80;
 /* The flags occupy the high nibble; the low one is the top of the length, and
@@ -55,8 +56,15 @@ constexpr uint8_t ETH_RX_FLAGS = 0xF0;
 constexpr uint8_t ETH_RX_TRUNCATED = 0x01;
 
 constexpr uint16_t ETH_MAX_FRAME = 1500;
-/* Ethernet's own minimum, less the CRC the controller appends. */
+/* Ethernet's own minimum, which a short frame is padded up to. */
 constexpr uint16_t ETH_MIN_FRAME = 60;
+/* The check sequence, which the length of a *received* frame includes and the
+ * length of a transmitted one does not: an ARP exchange is 42 bytes of
+ * content, goes out padded to 60, and comes back reported as 64.  A buffer
+ * sized to the wire minimum therefore receives nothing, because eth_receive()
+ * drops what will not fit. */
+constexpr uint16_t ETH_FCS_BYTES = 4;
+constexpr uint16_t ETH_MIN_RECEIVED = ETH_MIN_FRAME + ETH_FCS_BYTES;
 
 /* The frame header every protocol above sits behind.  Everything on the wire
  * is big-endian, which is the opposite of this CPU, so the two-byte fields are

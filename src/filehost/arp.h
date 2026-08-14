@@ -26,3 +26,14 @@ uint16_t arp_request(
 /* True when `frame` is an ARP reply from `ip`, and then `mac_out` is its
  * hardware address. */
 bool arp_reply_from(const uint8_t* frame, uint16_t length, const uint8_t* ip, uint8_t* mac_out);
+
+/* The answer, when `frame` is somebody asking who has `ip`, and 0 when it is
+ * not.  Built over `frame` itself, which is what a caller holding one received
+ * frame has to work with.
+ *
+ * Answering matters as soon as this machine has an address of its own: a
+ * server sending anything back to it asks this question first, and a machine
+ * that stays silent is one whose replies are never delivered.  Recognising and
+ * answering are one call so that no caller can answer something it has not
+ * recognised -- there is no runt frame to read past the end of. */
+uint16_t arp_answer(uint8_t* frame, uint16_t length, const uint8_t* mac, const uint8_t* ip);

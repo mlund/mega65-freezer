@@ -34,17 +34,19 @@ std::vector<uint8_t> request(const std::array<uint8_t, 4>& sender,
     return frame;
 }
 
-/* A reply built here rather than by the code under test, so the reader is
- * checked against the format and not against the writer. */
-std::vector<uint8_t> reply(const std::array<uint8_t, 6>& from_mac,
-                           const std::array<uint8_t, 4>& from_ip, uint16_t oper = 2,
-                           uint16_t ethertype = 0x0806) {
+/* An ARP frame built here rather than by the code under test, so the readers
+ * are checked against the format and not against the writer. */
+std::vector<uint8_t> arp_frame(uint16_t oper, const std::array<uint8_t, 6>& from_mac,
+                               const std::array<uint8_t, 4>& from_ip,
+                               const std::array<uint8_t, 4>& to_ip = {0, 0, 0, 0},
+                               uint16_t ethertype = 0x0806) {
+    const bool asking = oper == 1;
     std::vector<uint8_t> f(ARP_FRAME_BYTES, 0);
     for (int i = 0; i < 6; i++) {
-        f[0 + i] = OUR_MAC[i];
+        f[0 + i] = asking ? 0xFF : OUR_MAC[i];  // a question goes to everyone
         f[6 + i] = from_mac[i];
-        f[22 + i] = from_mac[i];  // ARP sender hardware address
-        f[32 + i] = OUR_MAC[i];   // ARP target hardware address
+        f[22 + i] = from_mac[i];                       // sender hardware address
+        f[32 + i] = asking ? 0 : OUR_MAC[i];           // target: the question itself
     }
     f[12] = static_cast<uint8_t>(ethertype >> 8);
     f[13] = static_cast<uint8_t>(ethertype);
@@ -54,10 +56,16 @@ std::vector<uint8_t> reply(const std::array<uint8_t, 6>& from_mac,
     f[20] = static_cast<uint8_t>(oper >> 8);
     f[21] = static_cast<uint8_t>(oper);
     for (int i = 0; i < 4; i++) {
-        f[28 + i] = from_ip[i];    // sender protocol address
-        f[38 + i] = 0;             // target protocol address
+        f[28 + i] = from_ip[i];  // sender protocol address
+        f[38 + i] = to_ip[i];    // target protocol address
     }
     return f;
+}
+
+std::vector<uint8_t> reply(const std::array<uint8_t, 6>& from_mac,
+                           const std::array<uint8_t, 4>& from_ip, uint16_t oper = 2,
+                           uint16_t ethertype = 0x0806) {
+    return arp_frame(oper, from_mac, from_ip, {0, 0, 0, 0}, ethertype);
 }
 
 }  // namespace
@@ -135,6 +143,67 @@ TEST_CASE("anything that is not that reply is turned away") {
 
     const auto full = reply(theirs, GATEWAY);
     CHECK_FALSE(arp_reply_from(full.data(), ARP_FRAME_BYTES - 1, GATEWAY.data(), got));
+}
+
+/* Answering matters as soon as this machine has an address: anything sending
+ * to it asks this question first, and a machine that stays silent is one whose
+ * replies are never delivered. */
+TEST_CASE("the answer is the question turned round") {
+    const std::array<uint8_t, 6> asker = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    const std::array<uint8_t, 4> ours = {192, 168, 68, 60};
+    const std::array<uint8_t, 4> theirs = {192, 168, 68, 1};
+
+    /* Answered in the buffer it arrived in, which is all a caller holding one
+     * received frame has. */
+    auto frame = arp_frame(1, asker, theirs, ours);
+    REQUIRE(arp_answer(frame.data(), ARP_FRAME_BYTES, OUR_MAC.data(), ours.data())
+            == ARP_FRAME_BYTES);
+
+    for (int i = 0; i < 6; i++) {
+        CHECK(frame[0 + i] == asker[i]);     // straight back to whoever asked
+        CHECK(frame[6 + i] == OUR_MAC[i]);
+        CHECK(frame[22 + i] == OUR_MAC[i]);  // sender hardware address: us
+        CHECK(frame[32 + i] == asker[i]);    // target hardware address: them
+    }
+    CHECK(((frame[20] << 8) | frame[21]) == 2);  // a reply
+    for (int i = 0; i < 4; i++) {
+        CHECK(frame[28 + i] == ours[i]);    // sender protocol address
+        CHECK(frame[38 + i] == theirs[i]);  // target protocol address
+    }
+
+    /* And the asker can read it as the answer to what they asked. */
+    uint8_t got[6] = {};
+    REQUIRE(arp_reply_from(frame.data(), ARP_FRAME_BYTES, ours.data(), got));
+    for (int i = 0; i < 6; i++) {
+        CHECK(got[i] == OUR_MAC[i]);
+    }
+}
+
+TEST_CASE("a question about somebody else goes unanswered") {
+    const std::array<uint8_t, 6> asker = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    const std::array<uint8_t, 4> ours = {192, 168, 68, 60};
+    const std::array<uint8_t, 4> theirs = {192, 168, 68, 1};
+    const std::array<uint8_t, 4> someone_else = {192, 168, 68, 99};
+
+    auto frame = arp_frame(1, asker, theirs, someone_else);
+    CHECK(arp_answer(frame.data(), ARP_FRAME_BYTES, OUR_MAC.data(), ours.data()) == 0);
+
+    /* A reply is not a question, however much of it looks the same. */
+    auto answered = arp_frame(2, asker, theirs, ours);
+    CHECK(arp_answer(answered.data(), ARP_FRAME_BYTES, OUR_MAC.data(), ours.data()) == 0);
+
+    auto runt = arp_frame(1, asker, theirs, ours);
+    CHECK(arp_answer(runt.data(), ARP_FRAME_BYTES - 1, OUR_MAC.data(), ours.data()) == 0);
+}
+
+/* Before a lease there is no address to defend, and answering for 0.0.0.0
+ * would claim one that is not ours. */
+TEST_CASE("nothing is answered before there is an address") {
+    const std::array<uint8_t, 6> asker = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    const std::array<uint8_t, 4> theirs = {192, 168, 68, 1};
+
+    auto frame = arp_frame(1, asker, theirs, NO_IP);
+    CHECK(arp_answer(frame.data(), ARP_FRAME_BYTES, OUR_MAC.data(), NO_IP.data()) == 0);
 }
 
 }  // TEST_SUITE

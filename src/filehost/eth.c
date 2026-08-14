@@ -19,7 +19,9 @@
  * caller's: udp_parse() matches the destination address, and the exchanges
  * that run before there is an address to match -- DHCP -- match on their own
  * transaction id instead.  ETH_RX_TO_US carries the controller's own verdict
- * for a caller that wants a cheaper first test. */
+ * for a caller that would rather not parse, though it arrives with the frame
+ * and so cannot save the copy; the cheap way to refuse a frame before it is
+ * copied is a small `limit`. */
 static constexpr uint8_t ETH_PHASE_ONE = 1;
 static constexpr uint8_t ETH_FILTER =
     ETH_BCST_MASK | ETH_MCST_MASK | (uint8_t)(ETH_PHASE_ONE << 2) | (uint8_t)(ETH_PHASE_ONE << 6);
@@ -46,6 +48,17 @@ bool eth_tx_idle(void) {
 }
 
 void eth_send(const uint8_t* frame, uint16_t length) {
+    /* A bound, not a wait: the longest frame this sends clocks out in about
+     * 46 microseconds and this covers 71, while a longer ceiling would block
+     * the receive queue -- three frames deep -- for milliseconds. */
+    static constexpr uint8_t TX_IDLE_LIMIT = 255;
+
+    /* The transmit buffer is one buffer: writing a second frame into it while
+     * the first is still going out replaces a frame the wire never saw, and
+     * nothing downstream can tell.  Bounded, so a controller that never
+     * reports idle costs a frame rather than the machine. */
+    for (uint8_t spin = 0; spin < TX_IDLE_LIMIT && !eth_tx_idle(); spin++) {
+    }
     lcopy((Addr28)(uint16_t)frame, (Addr28)ETH_BUFFER, length);
     /* Padded in the transmit buffer rather than by the caller, so a short
      * frame does not oblige every caller to own a 60-byte array. */

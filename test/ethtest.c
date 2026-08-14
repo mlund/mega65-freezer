@@ -23,7 +23,12 @@
  * Then, as often as wanted, with no keypresses on the machine:
  *
  *   etherload -r ethtest.prg
+ *   ...wait: the run listens, leases and then answers ARP for a while...
  *   mega65_ftp -e -y -c "secdump out.bin <sector> 1" -c "exit"
+ *
+ * The sector reads BUSY until the run finishes and ETH2 once it has, so a
+ * readback taken too early is obvious rather than plausible.  The border goes
+ * green at the end.
  *
  * The addresses below are a LAN's, too: SENDER has to be free on it and TARGET
  * has to be something that answers.
@@ -65,6 +70,7 @@ constexpr uint8_t LOG_DHCP_STAGE = 40;
 constexpr uint8_t LOG_DHCP_OFFERS = 41;
 constexpr uint8_t LOG_DHCP_ACKS = 43;
 constexpr uint8_t LOG_HAS_TFTP = 45;
+constexpr uint8_t LOG_ARP_SERVED = 46;
 constexpr uint8_t LOG_LEASE = 48;
 constexpr uint8_t LOG_LEASE_FIELDS = 4;
 static_assert(LOG_LEASE + LOG_LEASE_FIELDS * IPV4_BYTES <= LOG_HEADER,
@@ -80,6 +86,9 @@ constexpr uint16_t LISTEN_FRAMES = 100; /* about two seconds */
  * from an unconfigured host is lost in the ordinary course of things, and one
  * attempt per run means a single loss costs the whole run. */
 constexpr uint16_t RESEND_FRAMES = 25;
+/* Long enough for a person to ping the leased address from the other end and
+ * see whether it answers. */
+constexpr uint16_t SERVE_FRAMES = 600;
 
 /* Far too much for the 16-bit window.  src/link.ld puts .netbuf above the code
  * at $A200 for the tools; this PRG links the platform's own script and its
@@ -94,21 +103,32 @@ constexpr uint16_t RESEND_FRAMES = 25;
 static __attribute__((section(".netbuf"))) uint8_t net_out[UDP_PAYLOAD_AT + DHCP_PAYLOAD_BYTES];
 static __attribute__((section(".netbuf"))) uint8_t net_in[ETH_MAX_FRAME];
 
-/* Video frames since the last reset.  The raster line runs up and wraps once
- * per frame, so a wrap is a frame; nothing here needs finer time than that. */
-static uint8_t last_raster;
+/* Video frames since the last reset.
+ *
+ * Only the physical raster's high bits ($D053.0-2, iomap.txt:220), which count
+ * 0 for lines 0-255 and 1 above that, so one register read says where in the
+ * frame we are and a 1 -> 0 step is a frame boundary.  Not $D012: that is
+ * eight bits of a 312-line frame, so it wraps twice per frame and a clock
+ * counting its wraps runs at double speed.  Not the two registers together
+ * either: they cannot be read at the same instant, and a read that straddles
+ * line 256 sees the old high bits with the new low ones and invents a frame.
+ *
+ * The cost of one register is that the high window is only ~3.6ms wide, so a
+ * loop must look at least that often.  These poll in microseconds. */
+static constexpr uint8_t RASTER_HIGH = 0x07;
+static uint8_t last_high;
 static uint16_t frames_elapsed;
 
 static void tick(void) {
-    const uint8_t now = VICIV.rasterline;
-    if (now < last_raster) {
+    const uint8_t now = VICIV.fn_raster_msb & RASTER_HIGH;
+    if (now < last_high) {
         frames_elapsed++;
     }
-    last_raster = now;
+    last_high = now;
 }
 
 static void restart_clock(void) {
-    last_raster = VICIV.rasterline;
+    last_high = VICIV.fn_raster_msb & RASTER_HIGH;
     frames_elapsed = 0;
 }
 
@@ -134,6 +154,16 @@ int main(void) {
     for (uint16_t i = 0; i < SD_SECTOR_SIZE; i++) {
         sector_buffer[i] = 0;
     }
+    /* Claim the sector before anything else, so a readback taken too early
+     * says so.  The run now lasts tens of seconds, and the alternative is a
+     * host reading the previous run's sector -- valid magic, plausible lease,
+     * entirely stale -- and believing it. */
+    sector_buffer[0] = 'B';
+    sector_buffer[1] = 'U';
+    sector_buffer[2] = 'S';
+    sector_buffer[3] = 'Y';
+    sdcard_writesector(LOG_SECTOR, 0);
+
     sector_buffer[0] = 'E';
     sector_buffer[1] = 'T';
     sector_buffer[2] = 'H';
@@ -248,6 +278,39 @@ int main(void) {
             stage = 2;
         }
     }
+
+    /* The lease becomes this machine's address here and nowhere else: `us` is
+     * what every later exchange means by "who we are", and an address left in
+     * the lease alone is one udp_parse() would never match against. */
+    if (stage == 2) {
+        memcpy(us.ip, lease.ip, IPV4_BYTES);
+    }
+
+    /* Now answer for the address just taken.  Nothing can send anything back
+     * to this machine until it does: a server with a datagram for us asks who
+     * has our address first, and silence there means the reply is never
+     * delivered however well the rest of the stack works. */
+    uint16_t served = 0;
+    if (stage == 2) {
+        restart_clock();
+        while (frames_elapsed < SERVE_FRAMES) {
+            tick();
+            uint8_t rx = 0;
+            /* Bounded to what an ARP exchange is on the wire rather than to
+             * the buffer: eth_receive() drops what will not fit before copying
+             * it, which is the cheapest way to not spend a 1500-byte DMA on
+             * every neighbour's traffic.  ETH_MIN_RECEIVED and not
+             * ETH_MIN_FRAME -- the reported length carries the check sequence,
+             * and 60 here answered nothing at all. */
+            const uint16_t got = eth_receive(net_in, ETH_MIN_RECEIVED, &rx);
+            const uint16_t answer = got ? arp_answer(net_in, got, us.mac, us.ip) : 0;
+            if (answer) {
+                eth_send(net_in, answer);
+                served++;
+            }
+        }
+    }
+    log_put16(LOG_ARP_SERVED, served);
 
     sector_buffer[LOG_DHCP_STAGE] = stage;
     log_put16(LOG_DHCP_OFFERS, offers);
