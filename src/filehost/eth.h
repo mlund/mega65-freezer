@@ -15,6 +15,7 @@
  * mega65-libc later; the browser around it is GPL-3 like the rest of the
  * repository. */
 
+/* Ethernet's largest payload -- the MTU, not the largest frame. */
 constexpr uint16_t ETH_MAX_FRAME = 1500;
 /* Ethernet's own minimum, which a short frame is padded up to. */
 constexpr uint16_t ETH_MIN_FRAME = 60;
@@ -34,6 +35,11 @@ constexpr uint8_t ETH_DESTINATION = 0;
 constexpr uint8_t ETH_SOURCE = 6;
 constexpr uint8_t ETH_TYPE = 12;
 constexpr uint8_t ETH_HEADER_BYTES = 14;
+
+/* And the same reasoning at the other end, which is the size a buffer meaning
+ * "anything at all" wants: a full-MTU frame is reported as 1518, so a buffer of
+ * ETH_MAX_FRAME drops exactly the frames it was sized to hold. */
+constexpr uint16_t ETH_MAX_RECEIVED = ETH_HEADER_BYTES + ETH_MAX_FRAME + ETH_FCS_BYTES;
 
 /* Sets the receive filter, and nothing else -- see eth.c for why this must not
  * reset the controller.  Interrupts are already masked by the time a freezer
@@ -57,7 +63,9 @@ void eth_send(const uint8_t* frame, uint16_t length);
  * All three are "no usable frame", and the over-long one is dropped rather
  * than delivered in part: a partial frame parses as a plausible short one,
  * where nothing at all is unmistakable.  So what comes back is always a whole
- * frame a parser may walk, and `limit` is also the cheap way to refuse a frame
- * before it is copied -- the receiver runs promiscuous, so most of what
- * arrives is somebody else's. */
+ * frame a parser may walk.
+ *
+ * `limit` is worth choosing rather than always passing the buffer size: the
+ * receiver is promiscuous, so most of what arrives is somebody else's, and a
+ * small limit refuses it before the DMA rather than after. */
 [[nodiscard]] uint16_t eth_receive(uint8_t* into, uint16_t limit);

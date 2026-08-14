@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 #pragma once
 
+#include "ip.h"
 #include "net.h"
 
 #include <stdbool.h>
@@ -8,27 +9,19 @@
 
 /* DHCP, RFC 2131: how the machine is told an address to call its own.
  *
- * Building and reading the messages is separate from sending them, so this
- * compiles for the host and is tested there.  The exchange is
- * discover -> offer -> request -> acknowledge, and the client half of it is
- * four function calls with the caller owning the waiting and retrying.
+ * A whole frame goes in and a whole frame comes out.  The sequencing, which
+ * reply is ours, and the transport -- both reserved ports, the broadcast a
+ * client with no address must use, the UDP and IPv4 headers -- are all fixed by
+ * the RFC, so a caller asked to supply them could supply only one answer.  The
+ * clock is the exception, and stays the caller's.
  *
- * The messages carry a BOOTP header of 236 bytes before a single option is
- * reached, which is why a datagram runs to 300 and its buffer belongs in far
- * memory rather than in the 16-bit window. */
+ * Frames are built and read, never sent, so this is tested on the host,
+ * sequencing included. */
 
-constexpr uint16_t DHCP_CLIENT_PORT = 68;
-constexpr uint16_t DHCP_SERVER_PORT = 67;
-/* What RFC 2131 asks a client to be able to send and accept.  Also what is
- * built: the message is padded to it. */
-constexpr uint16_t DHCP_PAYLOAD_BYTES = 300;
-
-enum DhcpMessage : uint8_t {
-    DhcpNothing = 0,
-    DhcpOffer = 2,
-    DhcpAck = 5,
-    DhcpNak = 6,
-};
+/* What a caller gives dhcp_step() to build into, and the most it returns.  A
+ * BOOTP header runs 236 bytes before the first option, so the datagram is 300
+ * and the frame this -- far memory, not the 16-bit window. */
+constexpr uint16_t DHCP_FRAME_BYTES = UDP_PAYLOAD_AT + 300;
 
 /* What a server told us.  `tftp` is the point of asking: options 150 and 66
  * are how a DHCP server names a TFTP server, which is the standard answer to
@@ -45,20 +38,45 @@ struct DhcpLease {
     bool has_tftp;
 };
 
-/* Fills `payload` with a DHCPDISCOVER and returns its length.  The caller owns
- * DHCP_PAYLOAD_BYTES. */
-[[nodiscard]] uint16_t dhcp_discover(uint8_t* payload, const uint8_t* mac, uint32_t xid);
+/* How far the exchange got.  More than dhcp_leased() gives: still discovering
+ * means nothing was offered, still requesting means an offer nobody
+ * acknowledged -- two different failures. */
+enum DhcpStage : uint8_t {
+    DhcpDiscovering,
+    DhcpRequesting,
+    DhcpLeased,
+};
 
-/* The same for the DHCPREQUEST that accepts `offer`. */
-[[nodiscard]] uint16_t dhcp_request(
-    uint8_t* payload, const uint8_t* mac, uint32_t xid, const struct DhcpLease* offer);
+/* The exchange in progress.  A caller reads `stage` and `lease`; `xid` and
+ * `mac` are how a reply is recognised, and are public only so a test can forge
+ * one that will be. */
+struct DhcpClient {
+    uint8_t xid[4]; /* wire order, so no byte-splitting at either end */
+    uint8_t mac[MAC_BYTES];
+    enum DhcpStage stage;
+    struct DhcpLease lease;
+};
 
-/* What `payload` is, and what it said.  Anything that is not a reply to this
- * machine's own exchange -- another client's, or another run of ours -- reads
- * as DhcpNothing, because a LAN carries other people's DHCP traffic and a
- * broadcast reply arrives whether or not it was meant for us. */
-[[nodiscard]] enum DhcpMessage dhcp_parse(const uint8_t* payload,
-    uint16_t length,
-    uint32_t xid,
-    const uint8_t* mac,
-    struct DhcpLease* out);
+/* Begins an exchange for `mac`.
+ *
+ * The identifier a server echoes back is all that marks a reply as ours.  The
+ * address separates this machine from its neighbours; `seed` separates this run
+ * from the last, without which a late reply to the previous run reads as an
+ * answer to this one.  Any value the caller has that moves will do. */
+void dhcp_start(struct DhcpClient* client, const uint8_t* mac, uint16_t seed);
+
+/* Cranks the exchange: returns the length of the frame left in `out`, or 0 when
+ * there is nothing to send.  `in` is a received frame; `in_length` 0 means a
+ * timeout, so say the current step again.  Anything not this exchange's reply
+ * is dropped here, which is most of what arrives -- the receiver is promiscuous
+ * and a DHCP reply is a broadcast that lands whoever it was for.
+ *
+ * The whole loop: start, step with nothing, send what comes back; then step
+ * with every frame and on every timeout, sending anything non-zero, until
+ * dhcp_leased(). */
+[[nodiscard]] uint16_t dhcp_step(
+    struct DhcpClient* client, const uint8_t* in, uint16_t in_length, uint8_t* out);
+
+[[nodiscard]] static inline bool dhcp_leased(const struct DhcpClient* client) {
+    return client->stage == DhcpLeased;
+}

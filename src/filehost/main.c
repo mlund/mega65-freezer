@@ -296,6 +296,10 @@ static void ethernet_probe(bool transmit) {
     uint8_t last_from[MAC_BYTES] = {0};
     uint16_t last_type = 0;
     bool answered = false;
+    /* eth_receive() and not net_poll(), which is what every loop holding an
+     * address should use: this one holds none, so there is nothing to answer
+     * for, and what the probe is measuring is the frames themselves -- a poll
+     * that quietly swallowed some would be measuring itself. */
     for (uint16_t poll = 0; poll < PROBE_POLLS && !answered; poll++) {
         const uint16_t got = eth_receive(probe_received, sizeof probe_received);
         if (!got) {

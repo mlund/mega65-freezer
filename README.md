@@ -156,10 +156,13 @@ less.
   read off the card as `CATALOG.M65`. Fetching it and the files it names over
   TFTP is not here yet, so for now something else has to put both on the card.
   The layers under it are: the 45E100 driver, ARP with a responder, IPv4, UDP
-  and DHCP, each checked on the host against its RFC and on hardware, where the
-  controller turns out to send and receive perfectly well from inside the
-  freezer, the machine takes a real lease from the router, and it answers when
-  something on the LAN asks who holds that address. `E` runs an
+  and a DHCP client, each checked on the host against its RFC and on hardware,
+  where the controller turns out to send and receive perfectly well from inside
+  the freezer, the machine takes a real lease from the router, and it answers
+  when something on the LAN asks who holds that address. The DHCP client owns
+  the whole exchange — a frame goes in, a frame comes out, and the ports and
+  broadcast addresses RFC 2131 fixes never reach a caller — so the sequencing
+  is checked on the host too, not only the message formats. `E` runs an
   ethernet probe and `R` listens without transmitting. `test/ethtest.c` is how
   the wire is seen at all — Xemu has no ethernet on macOS, so it runs on the
   machine under `etherload` and writes what arrived to a sector the host reads

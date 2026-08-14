@@ -41,6 +41,7 @@
 #include "eth.h"
 #include "ip.h"
 #include "mega65_regs.h"
+#include "netpoll.h"
 #include "sdcard.h"
 
 #include <mega65.h>
@@ -67,10 +68,9 @@ constexpr uint8_t LOG_ANSWERED = 26;
 constexpr uint8_t LOG_REPLY_MAC = 32;
 constexpr uint8_t LOG_SENT = 20;
 constexpr uint8_t LOG_DHCP_STAGE = 40;
-constexpr uint8_t LOG_DHCP_OFFERS = 41;
-constexpr uint8_t LOG_DHCP_ACKS = 43;
 constexpr uint8_t LOG_HAS_TFTP = 45;
-constexpr uint8_t LOG_ARP_SERVED = 46;
+constexpr uint8_t LOG_SERVE_SEEN = 46;
+constexpr uint8_t LOG_ARP_ANSWERED = 28;
 constexpr uint8_t LOG_LEASE = 48;
 constexpr uint8_t LOG_LEASE_FIELDS = 4;
 static_assert(LOG_LEASE + LOG_LEASE_FIELDS * IPV4_BYTES <= LOG_HEADER,
@@ -100,8 +100,8 @@ constexpr uint16_t SERVE_FRAMES = 600;
  * the server chose to send, and a server's option list is longer than a
  * client's -- sized at 342 the offers came back truncated, and a truncated
  * datagram is refused rather than half-read. */
-static __attribute__((section(".netbuf"))) uint8_t net_out[UDP_PAYLOAD_AT + DHCP_PAYLOAD_BYTES];
-static __attribute__((section(".netbuf"))) uint8_t net_in[ETH_MAX_FRAME];
+static __attribute__((section(".netbuf"))) uint8_t net_out[DHCP_FRAME_BYTES];
+static __attribute__((section(".netbuf"))) uint8_t net_in[ETH_MAX_RECEIVED];
 
 /* Video frames since the last reset.
  *
@@ -209,112 +209,97 @@ int main(void) {
         if (logged < FRAMES_LOGGED) {
             const uint8_t at = (uint8_t)(LOG_HEADER + logged * FRAME_SLICE);
             log_put16(at, got);
-            for (uint8_t i = 0; i < FRAME_SLICE - 4; i++) {
-                sector_buffer[at + 4 + i] = net_in[i];
+            for (uint8_t i = 0; i < FRAME_SLICE - 2; i++) {
+                sector_buffer[at + 2 + i] = net_in[i];
             }
             logged++;
         }
     }
 
     /* And now a lease, from whatever answers on this LAN: the exchange the
-     * machine has to complete before it has an address of its own. */
-    struct NetEndpoint us = {.port = DHCP_CLIENT_PORT};
-    struct NetEndpoint server = {.port = DHCP_SERVER_PORT};
-    for (uint8_t i = 0; i < MAC_BYTES; i++) {
-        us.mac[i] = mac[i];
-        server.mac[i] = 0xFF;
-    }
-    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
-        server.ip[i] = 255;
-    }
-    /* Distinct per machine, so two of them asking at once are told apart. */
-    const uint32_t xid = 0x4D360000u | ((uint32_t)mac[4] << 8) | mac[5];
+     * machine has to complete before it has an address of its own.  `us` is
+     * only who we are for answering ARP -- the DHCP transport is dhcp_step()'s
+     * own business now, so nothing here knows a port or a broadcast address. */
+    struct NetEndpoint us = {0};
+    memcpy(us.mac, mac, MAC_BYTES);
 
-    struct DhcpLease lease = {0};
-    uint8_t stage = 0; /* 0 discovering, 1 requesting, 2 leased */
-    uint16_t offers = 0;
-    uint16_t acks = 0;
-
-    uint16_t length = dhcp_discover(&net_out[UDP_PAYLOAD_AT], mac, xid);
-    length = udp_build(net_out, &us, &server, &net_out[UDP_PAYLOAD_AT], length);
-    eth_send(net_out, length);
+    struct DhcpClient client;
+    /* Where the beam happened to be is the only thing aboard that differs
+     * between two runs of a program loaded at the same address by the same
+     * command.  Eight bits of it, so two runs in 256 still collide -- enough
+     * to tell this run's replies from the last one's, not a random number. */
+    dhcp_start(&client, mac, VICIV.fn_raster_lsb);
 
     restart_clock();
-    uint16_t said_at = 0;
-    while (frames_elapsed < LISTEN_FRAMES && stage < 2) {
+    /* One resend period in the past, so the first tick speaks rather than
+     * waiting a quarter of the budget out.  Deliberately wrapping: the compare
+     * below is a difference, so any value that far behind reads as due. */
+    uint16_t said_at = (uint16_t)(0 - RESEND_FRAMES);
+    uint16_t said = 0;
+    while (frames_elapsed < LISTEN_FRAMES && !dhcp_leased(&client)) {
         tick();
-        /* Still waiting on the same step: ask again rather than spend the whole
-         * budget on one lost broadcast. */
-        if (frames_elapsed - said_at >= RESEND_FRAMES) {
-            said_at = frames_elapsed;
-            length = (stage == 0) ? dhcp_discover(&net_out[UDP_PAYLOAD_AT], mac, xid)
-                                  : dhcp_request(&net_out[UDP_PAYLOAD_AT], mac, xid, &lease);
-            length = udp_build(net_out, &us, &server, &net_out[UDP_PAYLOAD_AT], length);
-            eth_send(net_out, length);
-        }
+        /* Polled every tick, not only on the ticks nothing else happens: the
+         * queue is three frames deep and three arrive in 19 microseconds, so a
+         * tick that skips the wire can lose the very offer it is waiting for --
+         * and can leave an ARP question unanswered. */
+        const uint16_t got = net_poll(net_in, sizeof net_in, &us);
+        said = got ? dhcp_step(&client, net_in, got, net_out) : 0;
 
-        const uint16_t got = eth_receive(net_in, sizeof net_in);
-        if (!got) {
-            continue;
+        /* Nothing moved for a while: say the current step again rather than
+         * spend the whole budget on one lost broadcast. */
+        if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
+            said = dhcp_step(&client, nullptr, 0, net_out);
         }
-        struct UdpDatagram datagram;
-        if (!udp_parse(net_in, got, &us, &datagram)) {
-            continue;
-        }
-        const enum DhcpMessage message = dhcp_parse(
-            &net_in[UDP_PAYLOAD_AT], datagram.payload_length, xid, mac, &lease);
-        if (message == DhcpOffer && stage == 0) {
-            offers++;
-            stage = 1;
-            length = dhcp_request(&net_out[UDP_PAYLOAD_AT], mac, xid, &lease);
-            length = udp_build(net_out, &us, &server, &net_out[UDP_PAYLOAD_AT], length);
-            eth_send(net_out, length);
-        } else if (message == DhcpAck) {
-            acks++;
-            stage = 2;
+        if (said) {
+            eth_send(net_out, said);
+            /* When we last spoke, not when we last timed out -- otherwise the
+             * request an offer provokes leaves the clock where it was and the
+             * next resend fires early. */
+            said_at = frames_elapsed;
         }
     }
 
     /* The lease becomes this machine's address here and nowhere else: `us` is
      * what every later exchange means by "who we are", and an address left in
      * the lease alone is one udp_parse() would never match against. */
-    if (stage == 2) {
-        memcpy(us.ip, lease.ip, IPV4_BYTES);
+    if (dhcp_leased(&client)) {
+        memcpy(us.ip, client.lease.ip, IPV4_BYTES);
     }
 
     /* Now answer for the address just taken.  Nothing can send anything back
      * to this machine until it does: a server with a datagram for us asks who
      * has our address first, and silence there means the reply is never
      * delivered however well the rest of the stack works. */
-    uint16_t served = 0;
-    if (stage == 2) {
+    uint16_t seen = 0;
+    if (dhcp_leased(&client)) {
         restart_clock();
         while (frames_elapsed < SERVE_FRAMES) {
             tick();
             /* Bounded to what an ARP exchange is on the wire rather than to
-             * the buffer: eth_receive() drops what will not fit before copying
-             * it, which is the cheapest way to not spend a 1500-byte DMA on
-             * every neighbour's traffic.  ETH_MIN_RECEIVED and not
-             * ETH_MIN_FRAME -- the reported length carries the check sequence,
-             * and 60 here answered nothing at all. */
-            const uint16_t got = eth_receive(net_in, ETH_MIN_RECEIVED);
-            const uint16_t answer = got ? arp_answer(net_in, got, us.mac, us.ip) : 0;
-            if (answer) {
-                eth_send(net_in, answer);
-                served++;
-            }
+             * the buffer, which is what a small `limit` is for.
+             * ETH_MIN_RECEIVED and not ETH_MIN_FRAME -- the reported length
+             * carries the check sequence, and 60 here answered nothing at all.
+             *
+             * The answering itself is net_poll()'s, and what proves it is a
+             * ping of the leased address from the other end during this
+             * window: an unanswered question means no reply is ever delivered,
+             * so a ping that comes back is the whole test.  What is counted
+             * here is the traffic that was not that. */
+            seen += net_poll(net_in, ETH_MIN_RECEIVED, &us) ? 1 : 0;
         }
     }
-    log_put16(LOG_ARP_SERVED, served);
+    log_put16(LOG_SERVE_SEEN, seen);
+    log_put16(LOG_ARP_ANSWERED, net_answers());
 
-    sector_buffer[LOG_DHCP_STAGE] = stage;
-    log_put16(LOG_DHCP_OFFERS, offers);
-    log_put16(LOG_DHCP_ACKS, acks);
-    memcpy(&sector_buffer[LOG_LEASE + 0], lease.ip, IPV4_BYTES);
-    memcpy(&sector_buffer[LOG_LEASE + 4], lease.server, IPV4_BYTES);
-    memcpy(&sector_buffer[LOG_LEASE + 8], lease.router, IPV4_BYTES);
-    sector_buffer[LOG_HAS_TFTP] = lease.has_tftp ? 1 : 0;
-    memcpy(&sector_buffer[LOG_LEASE + 12], lease.tftp, IPV4_BYTES);
+    /* The stage is the whole account of how far the exchange got: still
+     * discovering means nothing offered, still requesting means an offer that
+     * was never acknowledged. */
+    sector_buffer[LOG_DHCP_STAGE] = client.stage;
+    memcpy(&sector_buffer[LOG_LEASE + 0], client.lease.ip, IPV4_BYTES);
+    memcpy(&sector_buffer[LOG_LEASE + 4], client.lease.server, IPV4_BYTES);
+    memcpy(&sector_buffer[LOG_LEASE + 8], client.lease.router, IPV4_BYTES);
+    sector_buffer[LOG_HAS_TFTP] = client.lease.has_tftp ? 1 : 0;
+    memcpy(&sector_buffer[LOG_LEASE + 12], client.lease.tftp, IPV4_BYTES);
 
     /* The whole point: a reply to our own request, which needs the transmit
      * path, the wire, the target and the receive path all to work. */

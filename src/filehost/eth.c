@@ -19,8 +19,8 @@
  * caller's: udp_parse() matches the destination address, and the exchanges
  * that run before there is an address to match -- DHCP -- match on their own
  * transaction id instead.  The controller offers its own verdict in the frame's
- * flag nibble below, but it arrives with the frame and so cannot save the copy;
- * the cheap way to refuse a frame before it is copied is a small `limit`. */
+ * flag nibble below, but it arrives with the frame and so saves nothing; the
+ * cheap refusal is eth_receive()'s `limit`. */
 static constexpr uint8_t ETH_PHASE_ONE = 1;
 static constexpr uint8_t ETH_FILTER =
     ETH_BCST_MASK | ETH_MCST_MASK | (uint8_t)(ETH_PHASE_ONE << 2) | (uint8_t)(ETH_PHASE_ONE << 6);
@@ -66,7 +66,7 @@ void eth_init(void) {
 }
 
 void eth_mac(uint8_t* out) {
-    for (uint8_t i = 0; i < 6; i++) {
+    for (uint8_t i = 0; i < MAC_BYTES; i++) {
         out[i] = ETHERNET.macaddr[i];
     }
 }
