@@ -125,13 +125,26 @@ class FAT32:
             self.set(cluster, FREE)
 
     def alloc(self, count: int, after: int | None = None) -> list[int]:
-        """`count` free clusters, linked, optionally continuing an existing chain."""
+        """`count` free clusters, linked, optionally continuing an existing chain.
+
+        One unbroken run when the card can supply one, which is what a real card
+        does with a fresh file and what hyppo requires of a disk image it is
+        asked to attach -- dos_checkimage refuses a scattered one.  A card too
+        fragmented to manage it still gets its clusters, just not in a row.
+        """
         out: list[int] = []
-        for cluster in range(2, self.clusters + 2):
-            if self.get(cluster) == FREE:
+        for run_start in (True, False):
+            for cluster in range(2, self.clusters + 2):
+                if self.get(cluster) != FREE:
+                    if run_start:
+                        out = []
+                    continue
                 out.append(cluster)
                 if len(out) == count:
                     break
+            if len(out) == count:
+                break
+            out = []
         if len(out) != count:
             raise RuntimeError(f"card full: wanted {count} clusters, found {len(out)}")
 
@@ -212,8 +225,15 @@ class FAT32:
         have = self.chain(first) if first >= 2 else []
         want = (len(data) + self.cbytes - 1) // self.cbytes
 
+        # Replacing a file starts over rather than extending: allocating only
+        # the shortfall would leave a gap where the old clusters end, and a
+        # scattered image is one hyppo will not attach.
+        if have and want > len(have):
+            self.free(have)
+            have = []
+
         if want > len(have):
-            more = self.alloc(want - len(have), after=have[-1] if have else None)
+            more = self.alloc(want - len(have), have[-1] if have else None)
             have = have + more
         elif want < len(have):
             self.free(have[want:])

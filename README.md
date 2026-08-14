@@ -27,10 +27,14 @@ rest. Each tool is a separate program loaded from the SD card:
 | `SPRITED`  | sprite editor                               |
 | `ROMLOAD`  | ROM chooser                                 |
 | `MAKEDISK` | empty disk image                            |
+| `FILEHOST` | FileHost catalogue browser                  |
 
 Two kinds of data are read off the card at run time and built here too:
 `IOMAP.M65`, the I/O register names and descriptions, and `M65THUMB.M65`,
 `C65THUMB.M65` and `C64THUMB.M65`, the frames drawn around a slot's thumbnail.
+`FILEHOST` reads a third, `CATALOG.M65`, which is not built here: it is the
+catalogue described below, and the network side that fetches it does not exist
+yet.
 
 ## Building
 
@@ -145,6 +149,16 @@ less.
 
   <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
   
+- `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue with `D`
+  and attach a disk image from it to the frozen machine's drive. The catalogue is
+  the fixed-width `catalog` file of
+  [ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md),
+  read off the card as `CATALOG.M65`. Fetching it and the files it names over
+  TFTP is the next step and is not here yet, so for now something else has to
+  put both on the card. An image is named on the card by five characters of its
+  catalogue path and three of a hash of the whole path: the writer here emits
+  8.3 short names only, and truncation alone would land two catalogue entries on
+  one file.
 - `MAKEDISK`: the border reports while the card is busy.
 - SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
   a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a

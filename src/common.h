@@ -44,6 +44,10 @@ extern uint8_t current_scheme;
 char* detect_rom(void);
 unsigned char detect_cpu_speed(void);
 unsigned char petscii_to_screen(unsigned char petscii);
+/* What a hyppo error code means, in ASCII, or "ERROR CODE XX" with the code in
+ * hex when it is one of the many not worth its own string.  Shared so that two
+ * tools reporting the same failure do not grow two lists of hyppo's codes. */
+char* hyppoerror_to_screen(uint8_t error);
 void screen_of_death(const char* msg);
 
 /* Overrides for copy_imageproc_to_freezeregion(), OR-ed together. */

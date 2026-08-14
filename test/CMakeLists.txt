@@ -14,11 +14,12 @@
 # To add a test: write t_<name>.cpp and add its source here.  The stem names
 # the suite and the test file, so `format.c` means TEST_SUITE("format") in
 # t_format.cpp.
-set(HOST_TESTS sprited/lineedit.c makedisk/layout.c monitor/blockmove.c format.c)
+set(HOST_TESTS sprited/lineedit.c makedisk/layout.c monitor/blockmove.c format.c
+    screencode.c filehost/catalog.c filehost/shortname.c)
 
 # doctest is fetched at configure time, so a checkout with no network loses
-# these four rather than failing.  Said out loud: four silently absent tests
-# read exactly like four passing ones.
+# these rather than failing.  Said out loud: a silently absent test reads
+# exactly like a passing one.
 if(NOT DOCTEST_INCLUDE_DIR)
     message(STATUS "host tests: skipped, doctest was not fetched")
 elseif(NOT (HOST_C_COMPILER AND HOST_CXX_COMPILER))
@@ -28,7 +29,7 @@ endif()
 if(HOST_C_COMPILER AND HOST_CXX_COMPILER AND DOCTEST_INCLUDE_DIR)
     # Named once: the compile lines and the header glob below all derive from
     # this, so a new subdirectory is added here and nowhere else.
-    set(HOST_DIRS ${SRC} ${SRC}/monitor ${SRC}/makedisk ${SRC}/sprited)
+    set(HOST_DIRS ${SRC} ${SRC}/monitor ${SRC}/makedisk ${SRC}/sprited ${SRC}/filehost)
     set(HOST_INCLUDES "")
     set(HOST_HEADER_GLOBS "")
     foreach(dir IN LISTS HOST_DIRS)
@@ -276,6 +277,16 @@ if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
                     --build $<TARGET_FILE_DIR:MAKEDISK>)
         set_tests_properties(sdcount PROPERTIES TIMEOUT 600)
     endif()
+
+    # The FileHost browser over a catalogue staged onto the clone, and the
+    # attach it performs.  The network half has no emulator route -- xemu's
+    # ethernet is Linux-only -- so this is the whole of the tool that can be
+    # judged here.
+    add_test(NAME filehost_browse
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_filehost_xemu.py
+                --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                --build $<TARGET_FILE_DIR:FILEHOST>)
+    set_tests_properties(filehost_browse PROPERTIES TIMEOUT 300)
 
     # Assemble in the monitor and read the bytes back off the card.
     add_test(NAME monitor_assemble

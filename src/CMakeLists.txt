@@ -116,7 +116,7 @@ set(LTO_ZP 210 CACHE STRING "Zero-page bytes the LTO allocator may use")
 add_link_options(-mlto-zp=${LTO_ZP} -Wl,--gc-sections)
 
 set(COMMON
-    slot.c slotmap.c dma.c screen.c format.c
+    slot.c slotmap.c dma.c screen.c format.c screencode.c
     sdcard.c common.c
     helper.S version.c
 )
@@ -157,6 +157,8 @@ add_m65(MAKEDISK makedisk/main.c makedisk/fat32.c makedisk/layout.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c sprited/textout.c sprited/lineedit.c)
 add_m65(MEGAINFO megainfo/main.c megainfo/info.c)
+add_m65(FILEHOST filehost/main.c filehost/catalog.c filehost/shortname.c
+                 filehost/menu.cpp)
 
 # Card payloads: not linked into any tool, but built here because they are
 # loaded off the card at run time and staged from this directory.
@@ -194,7 +196,7 @@ endif()
 foreach(t FREEZER AUDIOMIX MAKEDISK ROMLOAD)
     target_compile_definitions(${t} PRIVATE SCREEN_CELL_BYTES=2)
 endforeach()
-foreach(t MONITOR MEGAINFO SPRITED)
+foreach(t MONITOR MEGAINFO SPRITED FILEHOST)
     target_compile_definitions(${t} PRIVATE SCREEN_CELL_BYTES=1)
 endforeach()
 

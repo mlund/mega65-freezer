@@ -78,16 +78,16 @@ def symbol_reader(build: str):
 
 
 @contextmanager
-def staged_card(args, *, with_iomap: bool = True):
+def staged_card(args, *, with_iomap: bool = True, extras: dict[str, bytes] | None = None):
     """A clone of the card carrying this build.
 
     The clone outlives the machine, so a check on what a tool wrote can read it
     back after the emulator has closed the image.  `with_iomap` leaves the bit
     editor's database off, which must degrade to an unnamed table rather than
-    an error.
+    an error.  `extras` adds files the build does not produce.
     """
     with tempfile.TemporaryDirectory() as tmp:
-        yield card.inject(args.sdimg, tmp, args.build, with_iomap), tmp
+        yield card.inject(args.sdimg, tmp, args.build, with_iomap=with_iomap, extras=extras), tmp
 
 
 @contextmanager
@@ -120,10 +120,10 @@ def staged_machine(description: str):
         yield args, machine
 
 
-def run(description: str, prg: str, steps) -> int:
+def run(description: str, prg: str, steps, *, extras: dict[str, bytes] | None = None) -> int:
     """Stage the build onto a card clone, run `steps` against `prg`, report."""
     args = add_arguments(argparse.ArgumentParser(description=description)).parse_args()
-    with staged_card(args) as (clone, _tmp):
+    with staged_card(args, extras=extras) as (clone, _tmp):
         wanted_files = [s[1:] for s in steps if s[0] == "expect_file"]
         for name, _ in wanted_files:
             if _entry_size(clone, name) is not None:

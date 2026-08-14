@@ -939,6 +939,11 @@ int main(void) {
                     start_freezer_tool("SPRITED.M65");
                     break;
 
+                case 'D':
+                case 'd': // FileHost browser
+                    start_freezer_tool("FILEHOST.M65");
+                    break;
+
                 case 'J':
                 case 'j': // Toggle joystick swap
                     UART_MISC = (UART_MISC ^ UART_MISC_JOYSWAP) & (uint8_t)~UART_MISC_OSKDEBUG;

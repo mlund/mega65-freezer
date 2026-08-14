@@ -61,8 +61,19 @@ def clone(base_image: str, work_dir: str) -> str:
     return out
 
 
-def inject(base_image: str, work_dir: str, build_dir: str, with_iomap: bool = True) -> str:
-    """Clone the image and copy the build onto its filesystem."""
+def inject(
+    base_image: str,
+    work_dir: str,
+    build_dir: str,
+    with_iomap: bool = True,
+    extras: dict[str, bytes] | None = None,
+) -> str:
+    """Clone the image and copy the build onto its filesystem.
+
+    `extras` are files a test supplies itself -- a data payload the build does
+    not produce, or an image to be read back -- written after the build so a
+    test can also replace one of its files.
+    """
     card = clone(base_image, work_dir)
     with open(card, "r+b") as handle:
         fs = fat32.FAT32(handle, partition_offset(card))
@@ -79,5 +90,9 @@ def inject(base_image: str, work_dir: str, build_dir: str, with_iomap: bool = Tr
             when = datetime.datetime.fromtimestamp(os.path.getmtime(built))
             with open(built, "rb") as source:
                 fs.write(name, source.read(), when)
+        # No build time to give these: they are the test's own bytes, not a
+        # tool, so they are dated when they were written.
+        for name, data in sorted((extras or {}).items()):
+            fs.write(name, data)
         fs.flush()
     return card

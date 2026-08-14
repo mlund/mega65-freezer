@@ -59,68 +59,6 @@ static char disk_name_return[33];
 static char old_disk_name[33];
 static uint8_t old_disk_flags, old_disk_len;
 
-static char default_error[] = "ERROR CODE XX";
-char* hyppoerror_to_screen(uint8_t error) {
-    // Few messages: each costs its full width in the image.
-    switch (error) {
-            /*
-              case 0x07:
-                return "READ TIMEOUT";
-              case 0x11:
-                return "ILLEGAL VALUE";
-            */
-        case 0x20:
-            return "READ ERROR";
-            /*
-              case 0x21:
-                return "WRITE ERROR";
-              case 0x80:
-                return "NO SUCH DRIVE";
-              case 0x81:
-                return "NAME TO LONG";
-              case 0x82:
-                return "NOT IMPLEMENTED";
-              case 0x83:
-                return "FILE TO LONG";
-              case 0x84:
-                return "TO MANY OPEN FILES";
-            */
-        case 0x85:
-            return "INVALID CLUSTER";
-            /*
-              case 0x86:
-                return "IS A DIRECTORY";
-              case 0x87:
-                return "NOT A DIRECTORY";
-            */
-        case 0x88:
-            return "FILE NOT FOUND";
-            /*
-              case 0x89:
-                return "INVALID FILE DESCR";
-            */
-        case 0x8a:
-            return "WRONG IMAGE LENGTH";
-        case 0x8b:
-            return "IMAGE FRAGMENTED";
-            /*
-              case 0x8c:
-                return "NO SPACE LEFT";
-              case 0x8d:
-                return "FILE EXISTS";
-              case 0x8e:
-                return "DIRECTORY FULL";
-              case 0xff:
-                return "NO SUCH TRAP / EOF";
-            */
-        default:
-            break;
-    }
-    default_error[11] = (error >> 4) + (((error >> 4) < 10) ? 0x30 : 0x37);
-    default_error[12] = (error & 0xf) + (((error & 0xf) < 10) ? 0x30 : 0x37);
-    return default_error;
-}
-
 /* The disk image formats the chooser can create. */
 enum DiskType : uint8_t {
     DiskTypeD81 = 0,

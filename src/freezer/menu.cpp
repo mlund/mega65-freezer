@@ -39,6 +39,7 @@ constexpr auto FIXED = menu::stream(
     menu::fragment(21, 9, SchemeText, "L - LOAD ROM/CHAR"),
     menu::fragment(1, 10, SchemeText, "A - AUDIO & VOLUME"),
     menu::fragment(21, 10, SchemeText, "F1 - THEME"),
+    menu::fragment(21, 11, SchemeText, "D - FILEHOST"),
     menu::fragment(1, 11, SchemeText, "S - SPRITE EDITOR"),
 
     // The frozen program, to the right of the thumbnail.

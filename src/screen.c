@@ -5,6 +5,7 @@
 #include "dma.h"
 #include "format.h"
 #include "mega65_regs.h"
+#include "screencode.h"
 
 uint16_t screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
@@ -58,6 +59,23 @@ void draw_text(uint16_t cell, uint8_t colour, const char* text, uint8_t length) 
         SCREEN[cell] = (uint8_t)c;
         cell += SCREEN_CELL_BYTES;
     }
+}
+
+/* A table cell: ASCII in, truncated or space-padded to the column's width, so
+ * a shorter value cannot leave the previous one's tail behind it.  The padding
+ * is a fill because it converts nothing -- only the text needs the per-byte
+ * loop draw_text() also uses. */
+void draw_field(uint16_t cell, uint8_t colour, const char* text, uint8_t width) {
+    lfill_skip(
+        COLOUR_RAM_ADDRESS + cell + (SCREEN_CELL_BYTES - 1), colour, width, SCREEN_CELL_BYTES);
+
+    uint8_t length = 0;
+    while (length < width && text[length]) {
+        SCREEN[cell] = ascii_to_screen((uint8_t)text[length]);
+        cell += SCREEN_CELL_BYTES;
+        length++;
+    }
+    lfill_skip(SCREEN_ADDRESS + cell, ' ', width - length, SCREEN_CELL_BYTES);
 }
 
 void draw_fragments(const uint8_t* stream) {

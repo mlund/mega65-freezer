@@ -78,6 +78,11 @@ void draw_fragments(const uint8_t* stream);
  * as it goes, where a fragment carries codes converted at compile time. */
 void draw_text(uint16_t cell, uint8_t colour, const char* text, uint8_t length);
 
+/* One cell of a table: ASCII rather than PETSCII, NUL-terminated rather than
+ * counted, and padded to the column's width.  See src/screencode.h for why
+ * text off the card cannot go through draw_text(). */
+void draw_field(uint16_t cell, uint8_t colour, const char* text, uint8_t width);
+
 void screen_hex(uint16_t addr, int32_t value);
 void screen_decimal(uint16_t addr, uint16_t value);
 void draw_decimal(uint16_t cell, uint8_t colour, uint16_t value);
