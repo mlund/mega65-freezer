@@ -304,7 +304,7 @@ static void ethernet_probe(bool transmit) {
         frames++;
         /* What was actually read, not just that something was: a count alone
          * cannot tell a real frame from a stale buffer read back. */
-        last_type = (uint16_t)(((uint16_t)probe_received[12] << 8) | probe_received[13]);
+        last_type = net_get16(&probe_received[ETH_TYPE]);
         for (uint8_t i = 0; i < MAC_BYTES; i++) {
             last_to[i] = probe_received[i];
             last_from[i] = probe_received[MAC_BYTES + i];

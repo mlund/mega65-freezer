@@ -65,7 +65,11 @@ constexpr uint8_t ETH_HEADER_BYTES = 14;
  * tool runs, which is what makes polling safe. */
 void eth_init(void);
 
+/* The controller's own address, six bytes, which is this machine's name on
+ * the wire. */
 void eth_mac(uint8_t* out);
+
+/* Whether the transmitter has finished with the last frame it was given. */
 bool eth_tx_idle(void);
 
 /* Copies `length` bytes to the transmit buffer and starts the transmitter. */

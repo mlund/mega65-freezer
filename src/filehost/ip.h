@@ -32,6 +32,7 @@ constexpr uint8_t UDP_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES + UDP_HE
  * Only the final piece may have an odd length: an odd piece is padded to the
  * next word, which is only the same answer when nothing follows it. */
 uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length);
+/* Folds an accumulated sum into the sixteen bits a header carries. */
 uint16_t ip_sum_final(uint32_t sum);
 
 /* Fills `frame` with an ethernet/IPv4/UDP datagram carrying `payload`, and

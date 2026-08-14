@@ -16,15 +16,18 @@
 
 constexpr uint8_t IPV4_BYTES = 4;
 
+/* Stores a 16-bit field in wire order. */
 static inline void net_put16(uint8_t* at, uint16_t value) {
     at[0] = (uint8_t)(value >> 8);
     at[1] = (uint8_t)value;
 }
 
+/* Reads one back. */
 static inline uint16_t net_get16(const uint8_t* at) {
     return (uint16_t)(((uint16_t)at[0] << 8) | at[1]);
 }
 
+/* Whether two addresses -- a MAC, an IP -- are the same one. */
 static inline bool net_same(const uint8_t* a, const uint8_t* b, uint8_t count) {
     for (uint8_t i = 0; i < count; i++) {
         if (a[i] != b[i]) {

@@ -4,18 +4,19 @@
 #include <string.h>
 
 /* Offsets into the IPv4 header, which follows the ethernet one. */
-static constexpr uint8_t IP_VERSION_IHL = ETH_HEADER_BYTES + 0;
-static constexpr uint8_t IP_TOTAL_LENGTH = ETH_HEADER_BYTES + 2;
-static constexpr uint8_t IP_IDENTIFICATION = ETH_HEADER_BYTES + 4;
-static constexpr uint8_t IP_FRAGMENT = ETH_HEADER_BYTES + 6;
-static constexpr uint8_t IP_TTL = ETH_HEADER_BYTES + 8;
-static constexpr uint8_t IP_PROTOCOL = ETH_HEADER_BYTES + 9;
-static constexpr uint8_t IP_CHECKSUM = ETH_HEADER_BYTES + 10;
-static constexpr uint8_t IP_SOURCE = ETH_HEADER_BYTES + 12;
-static constexpr uint8_t IP_DESTINATION = ETH_HEADER_BYTES + 16;
+static constexpr uint8_t IP_AT = ETH_HEADER_BYTES;
+static constexpr uint8_t IP_VERSION_IHL = IP_AT + 0;
+static constexpr uint8_t IP_TOTAL_LENGTH = IP_AT + 2;
+static constexpr uint8_t IP_IDENTIFICATION = IP_AT + 4;
+static constexpr uint8_t IP_FRAGMENT = IP_AT + 6;
+static constexpr uint8_t IP_TTL = IP_AT + 8;
+static constexpr uint8_t IP_PROTOCOL = IP_AT + 9;
+static constexpr uint8_t IP_CHECKSUM = IP_AT + 10;
+static constexpr uint8_t IP_SOURCE = IP_AT + 12;
+static constexpr uint8_t IP_DESTINATION = IP_AT + 16;
 
 /* And into the UDP header, which follows a 20-byte IPv4 one. */
-static constexpr uint8_t UDP_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES;
+static constexpr uint8_t UDP_AT = IP_AT + IPV4_HEADER_BYTES;
 static constexpr uint8_t UDP_SOURCE_PORT = UDP_AT + 0;
 static constexpr uint8_t UDP_DESTINATION_PORT = UDP_AT + 2;
 static constexpr uint8_t UDP_LENGTH = UDP_AT + 4;
@@ -99,8 +100,7 @@ uint16_t udp_build(uint8_t* frame,
     net_put16(&frame[IP_CHECKSUM], 0); /* zero while it is being computed over */
     memcpy(&frame[IP_SOURCE], from->ip, IPV4_BYTES);
     memcpy(&frame[IP_DESTINATION], to->ip, IPV4_BYTES);
-    net_put16(
-        &frame[IP_CHECKSUM], ip_sum_final(ip_sum(0, &frame[IP_VERSION_IHL], IPV4_HEADER_BYTES)));
+    net_put16(&frame[IP_CHECKSUM], ip_sum_final(ip_sum(0, &frame[IP_AT], IPV4_HEADER_BYTES)));
 
     net_put16(&frame[UDP_SOURCE_PORT], from->port);
     net_put16(&frame[UDP_DESTINATION_PORT], to->port);
@@ -138,7 +138,7 @@ bool udp_parse(
     if (net_get16(&frame[IP_FRAGMENT]) & IP_FRAGMENTED) {
         return false;
     }
-    if (ip_sum_final(ip_sum(0, &frame[IP_VERSION_IHL], IPV4_HEADER_BYTES))) {
+    if (ip_sum_final(ip_sum(0, &frame[IP_AT], IPV4_HEADER_BYTES))) {
         return false;
     }
     /* An all-zero address accepts any destination, for a machine that has not
