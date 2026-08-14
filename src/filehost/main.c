@@ -6,11 +6,13 @@
  * without a wire, so for now CATALOG.M65 and the images it names have to be put
  * on the card by something else. */
 
+#include "arp.h"
 #include "browser.h"
 #include "catalog.h"
 #include "colours.h"
 #include "common.h"
 #include "dma.h"
+#include "eth.h"
 #include "format.h"
 #include "mega65_regs.h"
 #include "screen.h"
@@ -140,6 +142,9 @@ static void move_to(uint16_t index) {
 /* One clamp for every key that moves the selection, so the ends of the list
  * cannot be guarded four different ways. */
 static void move_by(int16_t delta) {
+    if (!header.record_count) {
+        return;
+    }
     int16_t at = (int16_t)selected + delta;
     if (at < 0) {
         at = 0;
@@ -193,6 +198,169 @@ static void attach_selected(void) {
     at = append_str(at, name);
     *at = 0;
     show_status(SchemeHighlight, text);
+}
+
+/* Whether the ethernet controller works from the frozen state, which no source
+ * answers and only hardware can.  An ARP request needs no address of our own
+ * and no checksum, and its reply proves both directions at once: a machine that
+ * hears one has transmitted and received while a freezer tool was running.
+ *
+ * The frame count beside it is the weaker but unconditional half -- a LAN
+ * broadcasts constantly, so frames arriving proves the receiver alone even if
+ * nothing answers us. */
+static constexpr uint8_t PROBE_TARGET[IPV4_BYTES] = {192, 168, 68, 57};
+/* A real address rather than zeros: an ARP probe with a zero sender is
+ * answered by some stacks and ignored by others, and a request carrying a
+ * sender is also cached by whoever receives it -- which makes the target's own
+ * ARP table a witness that the frame was transmitted, without needing anything
+ * privileged listening on the wire. */
+static constexpr uint8_t PROBE_SENDER[IPV4_BYTES] = {192, 168, 68, 234};
+static constexpr uint16_t PROBE_POLLS = 200;
+static constexpr uint32_t PROBE_POLL_US = 10000;
+
+/* Only ever holds an ARP exchange: a longer frame is counted, not read, and
+ * eth_receive() reports the true length whatever it managed to copy.  A
+ * 1500-byte buffer here would be budget the code cannot have -- see
+ * cmake/checkbuffers.cmake. */
+static uint8_t probe_frame[ARP_FRAME_BYTES];
+/* Separate from the frame that is sent: sharing one buffer is how a read that
+ * copied nothing came back looking like our own transmission. */
+static uint8_t probe_received[ARP_FRAME_BYTES];
+
+static char* append_byte_hex(char* at, uint8_t value) {
+    static const char digits[] = "0123456789ABCDEF";
+    *at++ = digits[value >> 4];
+    *at++ = digits[value & 0x0F];
+    return at;
+}
+
+static char* append_mac(char* at, const uint8_t* mac) {
+    for (uint8_t i = 0; i < MAC_BYTES; i++) {
+        if (i) {
+            *at++ = ':';
+        }
+        at = append_byte_hex(at, mac[i]);
+    }
+    return at;
+}
+
+static void probe_line(uint8_t row, uint8_t colour, const char* text) {
+    draw_line(LIST_TOP_Y + row, colour, text);
+}
+
+static void ethernet_probe(bool transmit) {
+    char text[64];
+    uint8_t mac[MAC_BYTES];
+    uint8_t found[MAC_BYTES];
+
+    for (uint8_t row = 0; row < LIST_ROWS; row++) {
+        probe_line(row, SchemeText, "");
+    }
+    show_status(SchemeText, "");
+
+    eth_init();
+    eth_mac(mac);
+
+    char* at = append_str(text, "MAC ");
+    at = append_mac(at, mac);
+    *at = 0;
+    probe_line(0, SchemeValue, text);
+    probe_line(1, SchemeValue, eth_tx_idle() ? "TRANSMITTER IDLE" : "TRANSMITTER BUSY");
+
+    at = append_str(text, "ASKING WHO HAS ");
+    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+        if (i) {
+            *at++ = '.';
+        }
+        at = append_dec(at, PROBE_TARGET[i]);
+    }
+    *at = 0;
+    probe_line(2, SchemeText, text);
+
+    /* Listening without transmitting tells the two apart: if what arrives is
+     * the same ARP broadcast either way, it is our own frame being read back
+     * out of the buffer rather than anything off the wire. */
+    if (transmit) {
+        const uint16_t length = arp_request(probe_frame, mac, PROBE_SENDER, PROBE_TARGET);
+        eth_send(probe_frame, length);
+        probe_line(3, SchemeText, "SENT");
+    } else {
+        probe_line(3, SchemeText, "LISTENING ONLY, NOTHING SENT");
+    }
+
+    uint16_t frames = 0;
+    uint16_t arps = 0;
+    uint8_t last_to[MAC_BYTES] = {0};
+    uint8_t last_from[MAC_BYTES] = {0};
+    uint16_t last_type = 0;
+    bool answered = false;
+    for (uint16_t poll = 0; poll < PROBE_POLLS && !answered; poll++) {
+        uint8_t rx_flags = 0;
+        const uint16_t got = eth_receive(probe_received, sizeof probe_received, &rx_flags);
+        if (!got) {
+            usleep(PROBE_POLL_US);
+            continue;
+        }
+        frames++;
+        /* What was actually read, not just that something was: a count alone
+         * cannot tell a real frame from a stale buffer read back. */
+        last_type = (uint16_t)(((uint16_t)probe_received[12] << 8) | probe_received[13]);
+        for (uint8_t i = 0; i < MAC_BYTES; i++) {
+            last_to[i] = probe_received[i];
+            last_from[i] = probe_received[MAC_BYTES + i];
+        }
+        if (last_type == ETHERTYPE_ARP) {
+            arps++;
+        }
+        answered = arp_reply_from(probe_received, got, PROBE_TARGET, found);
+    }
+
+    at = append_str(text, "FRAMES ");
+    at = append_dec(at, frames);
+    at = append_str(at, "  ARP ");
+    at = append_dec(at, arps);
+    at = append_str(at, "  LAST TYPE ");
+    at = append_byte_hex(at, (uint8_t)(last_type >> 8));
+    at = append_byte_hex(at, (uint8_t)last_type);
+    *at = 0;
+    probe_line(4, frames ? SchemeValue : SchemeWarning, text);
+
+    at = append_str(text, "LAST TO ");
+    at = append_mac(at, last_to);
+    *at = 0;
+    probe_line(6, SchemeValue, text);
+
+    at = append_str(text, "LAST FROM ");
+    at = append_mac(at, last_from);
+    *at = 0;
+    /* Our own address here means the read came back with what we transmitted,
+     * not with anything the wire delivered. */
+    bool ours = true;
+    for (uint8_t i = 0; i < MAC_BYTES; i++) {
+        ours = ours && last_from[i] == mac[i];
+    }
+    probe_line(7, ours ? SchemeError : SchemeValue, text);
+    if (ours) {
+        probe_line(8, SchemeError, "THAT IS OUR OWN FRAME READ BACK");
+    }
+
+    if (answered) {
+        at = append_str(text, "REPLY FROM ");
+        at = append_mac(at, found);
+        *at = 0;
+        probe_line(5, SchemeHighlight, text);
+        show_status(SchemeHighlight, "ETHERNET WORKS FROM THE FROZEN STATE");
+    } else {
+        probe_line(5, SchemeWarning, "NO REPLY");
+        show_status(
+            SchemeWarning, frames ? "RECEIVES BUT NOTHING ANSWERED" : "NOTHING HEARD, PRESS A KEY");
+    }
+
+    while (!ASCIIKEY) {
+        ;
+    }
+    ASCIIKEY = 0;
+    draw_list();
 }
 
 /* True when there is a catalogue to browse.
@@ -274,7 +442,17 @@ static void browse(void) {
                 move_to(0);
                 break;
             case KEY_RETURN:
-                attach_selected();
+                if (header.record_count) {
+                    attach_selected();
+                }
+                break;
+            case 'E':
+            case 'e':
+                ethernet_probe(true);
+                break;
+            case 'R':
+            case 'r':
+                ethernet_probe(false);
                 break;
             case KEY_RUN_STOP:
             case KEY_ESC:
@@ -299,16 +477,12 @@ int main(void) {
      * be established here; the freeze slot waits until an attach needs it. */
     mega65_dos_init();
 
-    if (load_catalog()) {
-        draw_count();
-        browse();
-    } else {
-        /* The message is already on screen; wait so it can be read. */
-        while (!ASCIIKEY) {
-            ;
-        }
-        ASCIIKEY = 0;
-    }
+    /* Browsing runs whether or not a catalogue was found: with none, the list
+     * is empty and the message says why, but the ethernet probe -- the one
+     * thing that does not need a catalogue -- is still reachable. */
+    load_catalog();
+    draw_count();
+    browse();
 
     mega65_dos_exechelper("FREEZER.M65");
     return 0;

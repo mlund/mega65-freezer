@@ -6,6 +6,7 @@
 #include "sdcard.h"
 #include "slot.h"
 
+#include <mega65.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -217,6 +218,23 @@ char* format_rom_version(void) {
 }
 
 /* Hyppo and HDOS version as "hyppo.major.minor / hdos.major.minor". */
+/* The 45E100's own address, read straight out of $D6E9 without disturbing the
+ * controller: an information screen has no business resetting it.  Worth
+ * showing because nothing else on the machine says what it is, and a machine
+ * being loaded over ethernet is identified by it. */
+char* format_ethernet_mac(void) {
+    char* at = buffer;
+    constexpr uint8_t MAC_BYTES = sizeof ETHERNET.macaddr;
+    for (uint8_t i = 0; i < MAC_BYTES; i++) {
+        if (i) {
+            *at++ = ':';
+        }
+        at = append_hex(at, ETHERNET.macaddr[i], 2);
+    }
+    *at = '\0';
+    return buffer;
+}
+
 char* format_hyppo_version(void) {
     struct hyppo_version v = {0xff, 0xff, 0xff, 0xff};
 
@@ -725,6 +743,9 @@ void draw_screen(void) {
 
     // RTC (labels only, rest is done in mainloop)
     write_text(40, 5, SchemeText, "RTC STATUS:");
+
+    write_text(40, 6, SchemeText, "ETHERNET MAC:");
+    write_text(54, 6, SchemeValue, format_ethernet_mac());
 
     // HYPPO/HDOS Version
     write_text(0, 9, SchemeText, "HYPPO/HDOS:");
