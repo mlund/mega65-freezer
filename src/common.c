@@ -151,6 +151,12 @@ void freezer_tool_start(void) {
 }
 
 static char default_error[] = "ERROR CODE XX";
+bool hyppo_file_absent(uint8_t error) {
+    /* Not folded into hyppoerror_to_screen(): $FF is also "no such trap", so
+     * the two are the same answer only where a file was being looked for. */
+    return error == 0x88 || error == 0xFF;
+}
+
 char* hyppoerror_to_screen(uint8_t error) {
     // Few messages: each costs its full width in the image.
     switch (error) {

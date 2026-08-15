@@ -48,6 +48,9 @@ constexpr uint8_t TFTP_NAME_MAX = 48;
 constexpr uint16_t TFTP_SEND_BYTES =
     UDP_PAYLOAD_AT + 2 + (TFTP_NAME_MAX + 1) + sizeof "octet" + sizeof "tsize" + sizeof "0";
 
+/* Where a request goes when a caller names no port of its own. */
+constexpr uint16_t TFTP_PORT = 69;
+
 /* What a refusal this client made itself carries, in place of a code from the
  * server: outside the codes RFC 1350 §5 gives a server, so the two cannot be
  * confused -- and 0 is one of them, meaning "not defined, see the message". */

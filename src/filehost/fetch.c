@@ -74,17 +74,27 @@ static uint8_t told_server[IPV4_BYTES];
 static uint16_t told_port;
 static uint8_t error_code;
 
-void fetch_set_server(const uint8_t* ip, uint16_t port) {
+/* Out of line although it is short: three callers each inlined the copy setup,
+ * which measured 6 bytes more than one body and three calls. */
+__attribute__((noinline)) void fetch_set_server(const uint8_t* ip, uint16_t port) {
     memcpy(told_server, ip, IPV4_BYTES);
-    told_port = port;
+    /* Resolved here rather than passed on as a zero: three modules holding an
+     * opinion about what port 0 means is two too many. */
+    told_port = port ? port : TFTP_PORT;
     /* A server named after one was resolved is a different machine, so what
      * was resolved is no longer the answer. */
     memset(server_mac, 0, MAC_BYTES);
 }
 
-/* Whom to ask, the lease first. */
+/* Whom to ask, the lease first.  A lease names an address and no port with it,
+ * so one it named is asked at TFTP's own. */
 static const uint8_t* server_address(void) {
     return lease.lease.has_tftp ? lease.lease.tftp : told_server;
+}
+
+const uint8_t* fetch_server(uint16_t* port) {
+    *port = lease.lease.has_tftp ? TFTP_PORT : told_port;
+    return server_address();
 }
 
 uint8_t fetch_error(void) {
@@ -171,10 +181,7 @@ enum FetchResult fetch_file(const char* name, Addr28 into, uint32_t limit, uint3
 
     struct NetEndpoint server = {0};
     memcpy(server.mac, server_mac, MAC_BYTES);
-    memcpy(server.ip, server_address(), IPV4_BYTES);
-    /* A lease names an address and no port with it, so one it named is asked at
-     * the reserved port; a told one is asked wherever it was put. */
-    server.port = lease.lease.has_tftp ? 0 : told_port;
+    memcpy(server.ip, fetch_server(&server.port), IPV4_BYTES);
     struct TftpClient transfer;
     tftp_start(&transfer, &us, &server, name, VICIV.fn_raster_lsb);
 

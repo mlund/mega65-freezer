@@ -133,7 +133,7 @@ static constexpr uint8_t SPRITE_MAX_COUNT = 8;
 static constexpr uint8_t DEFAULT_BACK_COLOR = 11;
 
 static constexpr uint8_t TRANS_CHARACTER = 230;
-static constexpr uint8_t SOLID_BLOCK_CHARACTER = 224;
+static constexpr uint8_t SOLID_BLOCK_CHARACTER = LINE_EDIT_CARET;
 static constexpr uint8_t SHAPE_PREVIEW_CHARACTER = 32;
 static constexpr uint8_t SIDEBAR_COLUMN = 65;
 static constexpr uint8_t SIDEBAR_WIDTH = SCREEN_COLS - SIDEBAR_COLUMN;

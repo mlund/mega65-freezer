@@ -35,10 +35,17 @@ enum FetchResult : uint8_t {
  * a household router hands out addresses and has never heard of RFC 5859's
  * option 150.  All zeros, until something says otherwise.
  *
- * `port` is the reserved 69 unless a gateway was put somewhere else -- one on a
- * port of its own needs no root to run.  A leased address still wins, at 69,
- * since a lease names an address and no port to go with it. */
+ * `port` 0 means TFTP's own, which is what a bare address means; a gateway put
+ * somewhere else is named with the port it was put on, since one above 1024
+ * needs no root to run. */
 void fetch_set_server(const uint8_t* ip, uint16_t port);
+
+/* The server a fetch would go to, and through `port` the port it would be asked
+ * at.  Not always the one last told: a lease that names a TFTP server beats
+ * anything a card or a keyboard said, since whoever runs the network is the
+ * better authority.  This is the one to put on a screen -- showing what was
+ * typed instead would show an address nothing is fetching from. */
+[[nodiscard]] const uint8_t* fetch_server(uint16_t* port);
 
 /* Reads `name` into `into`, writing at most `limit` bytes, and says how many
  * arrived.

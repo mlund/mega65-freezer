@@ -13,3 +13,8 @@
  *
  * Returns true when RETURN has ended the line. */
 bool line_edit(char* buffer, uint8_t capacity, uint8_t* length, uint8_t key);
+
+/* The block a caller draws after the text to show where the next character
+ * goes.  Here rather than in either screen, so the two tools that edit a line
+ * draw the same caret. */
+constexpr uint8_t LINE_EDIT_CARET = 224;

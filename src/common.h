@@ -58,6 +58,16 @@ unsigned char petscii_to_screen(unsigned char petscii);
  * hex when it is one of the many not worth its own string.  Shared so that two
  * tools reporting the same failure do not grow two lists of hyppo's codes. */
 char* hyppoerror_to_screen(uint8_t error);
+
+/* Whether a hyppo error says the file is not there.
+ *
+ * Two codes mean it, and which one comes back depends on whose hyppo: the
+ * machine answers with the end of the directory, since dos_findfile() walks
+ * entries until one matches and running out of them is EOF (mega65-core
+ * src/hyppo/dos.asm:2450 and :2498), while Xemu's answers file-not-found.  A
+ * screen that knows only one of them shows a bare code for the commonest
+ * failure there is. */
+[[nodiscard]] bool hyppo_file_absent(uint8_t error);
 void screen_of_death(const char* msg);
 
 /* Overrides for copy_imageproc_to_freezeregion(), OR-ed together. */

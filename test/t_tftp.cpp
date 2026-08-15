@@ -207,8 +207,6 @@ TEST_CASE("a server may be asked at a port of its own") {
     const uint16_t n = tftp_step(&client, nullptr, 0, out.data());
     REQUIRE(n);
     CHECK(((out[36] << 8) | out[37]) == 6969);
-    /* And the transfer still moves to whatever port the server answers from,
-     * which is not the one it was asked at. */
     CHECK(client.server.port == 6969);
 }
 

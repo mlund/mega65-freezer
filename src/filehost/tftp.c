@@ -17,9 +17,6 @@ static constexpr uint8_t TFTP_OPTION_ACK = 6;
 static constexpr uint8_t TFTP_OPCODE_BYTES = 2;
 static constexpr uint8_t TFTP_HEADER_BYTES = 4;
 
-/* The reserved port a transfer opens at when the caller names none, before the
- * server names its own. */
-static constexpr uint16_t TFTP_PORT = 69;
 /* The dynamic range of RFC 6335, which is where a port a client picks for
  * itself belongs.  Seeded with anything that moves, the whole range is
  * reachable and two runs a moment apart do not collide. */

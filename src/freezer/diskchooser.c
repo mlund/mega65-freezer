@@ -83,7 +83,10 @@ void display_error(void) {
     char* errstr;
 
     VICIV.bordercol = SchemeError;
-    errstr = hyppoerror_to_screen(mega65_geterrorcode());
+    const uint8_t code = mega65_geterrorcode();
+    /* The commonest failure here, and the one hyppo reports as the end of the
+     * directory on hardware, so the code alone would be shown for it. */
+    errstr = hyppo_file_absent(code) ? "FILE NOT FOUND" : hyppoerror_to_screen(code);
     /* No message hyppoerror_to_screen returns exceeds the 19-cell field: the
      * longest are 18, and the fallback is "ERROR CODE XX". */
     draw_text(SCREEN_CELL(21, 0), SchemeError, errstr, (uint8_t)strlen(errstr));
