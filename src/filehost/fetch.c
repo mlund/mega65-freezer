@@ -181,9 +181,12 @@ enum FetchResult fetch_file(const char* name, Addr28 into, uint32_t limit, uint3
         said = got ? tftp_step(&transfer, net_in, got, net_out) : 0;
         /* Read where the step is made: data_length answers for that step, and
          * this loop polls many times between blocks. */
+        /* Refused before a byte is written where the server said how big the
+         * file is, and at the brink where it did not. */
+        if (got && transfer.has_size && transfer.size > limit) {
+            return FetchTooBig;
+        }
         if (got && transfer.data_length) {
-            /* Refused before a byte is written where the server said how big
-             * the file is, and at the brink where it did not. */
             if (written + transfer.data_length > limit) {
                 return FetchTooBig;
             }
@@ -194,10 +197,6 @@ enum FetchResult fetch_file(const char* name, Addr28 into, uint32_t limit, uint3
         }
         if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
             said = tftp_step(&transfer, nullptr, 0, net_out);
-        }
-        /* Nothing will fit and nothing more need arrive. */
-        if (transfer.has_size && transfer.size > limit) {
-            return FetchTooBig;
         }
     }
     /* The acknowledgement the last block earned: the loop ends on it rather

@@ -439,6 +439,8 @@ static void fetch_catalog(void) {
             "THE TRANSFER STOPPED PART WAY",
             "THE CATALOGUE IS LARGER THAN THE BUFFER",
         };
+        static_assert(sizeof why / sizeof *why == FetchTooBig + 1,
+            "a fetch result with no message would index past this table");
         show_status(SchemeError, why[result]);
         /* Whatever landed is half a catalogue, and the browser is still
          * pointing into it. */
