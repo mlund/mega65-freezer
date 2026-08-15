@@ -2,6 +2,22 @@
 # tool loses that test rather than the suite: a run that skipped everything
 # looks exactly like a run that passed.  `ctest -N` lists what registered.
 
+# --- The machine itself, over its serial monitor.  Registered only when a
+# device is named, because it freezes whatever the machine is doing: nobody
+# running `ctest` for the host tests should have their MEGA65 taken over.
+#
+#   cmake -DMEGA65_SERIAL=/dev/cu.usbserial-XXXXXXX -B build
+#
+# It also needs a TFTP server the machine can reach; see the script's header.
+if(MEGA65_SERIAL AND Python3_FOUND)
+    add_test(NAME filehost_fetch_hw
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_filehost_hw.py
+                --device ${MEGA65_SERIAL})
+    set_tests_properties(filehost_fetch_hw PROPERTIES TIMEOUT 300)
+else()
+    message(STATUS "hardware tests: skipped, set MEGA65_SERIAL to a serial monitor device")
+endif()
+
 # --- doctest: the pure logic, called directly.  One binary, one TEST_SUITE per
 # subject, so `--test-suite=` gives ctest the same per-subject entries as before
 # and `ctest -R layout` still means what it did. -------------------------------

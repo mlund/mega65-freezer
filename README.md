@@ -6,8 +6,8 @@ An unofficial rewrite of [MEGA65/mega65-freezemenu](https://github.com/MEGA65/me
 in modern C for the llvm-mos toolchain. The tools do what the cc65 originals do
 in 32-64% fewer bytes for the same work ([table below](#size)), which leaves
 room inside the 34817-byte budget for new work. Most of the C compiles on the host and is tested
-there; the rest is driven through the MEGA65 serial link by a test harness, so
-far under Xemu, though the same harness would drive hardware. `MONITOR` spends
+there; the rest is driven through the MEGA65 serial link by a test harness,
+under Xemu and, down a serial cable, on the machine itself. `MONITOR` spends
 the freed bytes on a syntax-highlighted 45GS02 (dis)assembler; memory map; and a bit editor
 that names registers and bits from mega65-core's `iomap.txt`. The rewrite also
 exposed several bugs in the original, listed below. Every push is built under
@@ -33,8 +33,8 @@ Two kinds of data are read off the card at run time and built here too:
 `IOMAP.M65`, the I/O register names and descriptions, and `M65THUMB.M65`,
 `C65THUMB.M65` and `C64THUMB.M65`, the frames drawn around a slot's thumbnail.
 `FILEHOST` reads a third, `CATALOG.M65`, which is not built here: it is the
-catalogue described below, and the network side that fetches it does not exist
-yet.
+catalogue described below.  `FILEHOST` can also fetch it over the network with
+`F`, into memory rather than onto the card.
 
 ## Building
 
@@ -153,10 +153,14 @@ less.
   and attach a disk image from it to the frozen machine's drive. The catalogue is
   the fixed-width `catalog` file of
   [ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md),
-  read off the card as `CATALOG.M65`. The TFTP client that fetches it and the
-  files it names is here, checked on the host against RFC 1350 and driven on
-  hardware by `test/ethtest.c`, but the browser does not call it yet, so for
-  now something else has to put both on the card.
+  read off the card as `CATALOG.M65`, or fetched over TFTP with `F` — a lease,
+  the server's hardware address and the transfer, into the same buffer the card
+  copy occupies, so a fetch that fails costs the list on screen and not the copy
+  on the card. `S` names the server, since a household router hands out
+  addresses and has never heard of RFC 5859's option 150; `TFTP-IP.TXT` on the
+  card says it without typing. The images the catalogue names still have to be
+  put on the card by something else — that is the next piece, and the one that
+  needs a FAT writer.
   The layers under it are: the 45E100 driver, ARP with a responder, IPv4, UDP
   and a DHCP client, each checked on the host against its RFC and on hardware,
   where the controller turns out to send and receive perfectly well from inside
@@ -282,6 +286,16 @@ Defects found in original:
 - Emulator tests drive Xemu over its serial monitor, typing at the freezer and
   asserting on the screen dump and, with `FREEZER_TRACE`, on the hypervisor
   serial channel. They clone the SD image rather than writing to it.
+- Hardware tests drive the machine itself down the same monitor protocol, over
+  a serial cable rather than a socket: `test/m65harness.py` reaches either, and
+  a scenario written against one runs against the other. Holding `$52` in
+  `$D615` freezes the machine, which is how a run reaches the freezer with
+  nobody at the keyboard. They register only with
+  `-DMEGA65_SERIAL=/dev/cu.usbserial-XXXXXXX`, since a run takes the machine
+  over. What earns the trip is the network: Xemu has no ethernet on macOS, so
+  `verify_filehost_hw.py` fetching a catalogue over TFTP is the only check the
+  wire ever gets. It writes nothing to the card and resumes the frozen program
+  whatever happens.
 
 ### Static analysis
 

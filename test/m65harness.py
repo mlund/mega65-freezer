@@ -403,11 +403,63 @@ class Machine:
 
     # --- the screen ----------------------------------------------------------
 
+    def screen_pointer(self) -> int:
+        """Where the VIC is actually drawing from, $D060-$D063 (SCRNPTR).
+
+        Worth asking rather than inferring from what is in a screen buffer:
+        nothing clears the last one, so a freezer tool's screen is still
+        legible at $B800 long after the machine went back to BASIC, and a
+        scenario deciding where it is from the bytes it finds there decides
+        wrong.
+        """
+        raw = self.read(0xFFD3060, 4)
+        return int.from_bytes(raw[:3], "little") | ((raw[3] & 0x0F) << 24)
+
+    def freeze(self, held: float = 0.8) -> None:
+        """Freeze the machine, as holding RESTORE does.
+
+        Held rather than tapped: a tap is an NMI to whatever is running, and
+        only a hold reaches the hypervisor.  $52 in a virtual key slot holds
+        RESTORE down and $72 taps it (mega65-core virtual_to_matrix.vhdl:73),
+        which is the same register a keypress goes through.
+
+        Emulated or real, but only real hardware makes it interesting: an
+        emulator has no wire for the frozen program's tools to use.
+        """
+        self._sock.sendall(f"sffd3615 52 {NO_KEY:02x} {NO_KEY:02x}\n".encode())
+        time.sleep(held)
+        self._sock.sendall(f"sffd3615 {NO_KEY:02x} {NO_KEY:02x} {NO_KEY:02x}\n".encode())
+
+    def resume(self) -> None:
+        """Put the frozen program back, which is F3 on the freeze menu."""
+        self.press("f3")
+
     def snapshot(self) -> Snapshot:
         """The screen now, at whatever cell width the machine is in."""
         wide = self.read(self.screen.cell_width_at, 1)[0] & 0x01
         memory = self.read(self.screen.at, self.screen.size)
         return Snapshot(memory, 2 if wide else 1, self.screen)
+
+    def settled(self, timeout: float = DEFAULT_TIMEOUT) -> Snapshot:
+        """A snapshot that read the same twice, so it is one screen and not two.
+
+        A snapshot is nine monitor reads and the machine runs between them, so
+        one taken while something is redrawing can hold the old and the new at
+        once -- a count from before a list arrived, beside the list.  Rare, and
+        rare in the way that matters: it passes until the day it does not.
+
+        For a phrase, `wait_until` is enough, since the phrase either read or
+        did not.  This is for reading several fields that have to agree.
+        """
+        deadline = time.time() + timeout
+        before = self.snapshot()
+        while True:
+            after = self.snapshot()
+            if after.whole() == before.whole():
+                return after
+            if time.time() >= deadline:
+                raise Failure(f"the screen was still changing after {timeout:g}s", after.whole())
+            before = after
 
     def wait_until(
         self, wants: Callable[[Snapshot], bool], timeout: float = DEFAULT_TIMEOUT, what: str = ""
