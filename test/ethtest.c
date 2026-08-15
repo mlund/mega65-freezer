@@ -31,11 +31,15 @@
  * readback taken too early is obvious rather than plausible.  The border goes
  * green at the end.
  *
- * The addresses below are a LAN's, too: SENDER has to be free on it and TARGET
- * has to be something that answers.  The transfer needs no address of its own
- * here -- the lease names the TFTP server, in option 150 -- so a LAN whose
- * DHCP server says nothing about TFTP runs everything but that, and says so in
- * the log rather than inventing a server to ask.
+ * The addresses below are a LAN's, too: SENDER has to be free on it, TARGET has
+ * to be something that answers, and TFTP_TOLD has to be serving `catalog` --
+ * a household router leases addresses and has never heard of option 150, so
+ * the lease names a TFTP server only where somebody configured one.  The log
+ * says which of the two was used.  On macOS:
+ *
+ *   sudo cp catalog /private/tftpboot/
+ *   sudo launchctl load -w /System/Library/LaunchDaemons/tftp.plist
+ *   ...and unload -w afterwards, since it serves the directory to the LAN
  */
 
 #include "arp.h"
@@ -96,9 +100,12 @@ constexpr uint16_t LOG_TFTP_BLOCKS = LOG_TFTP + 20;
 constexpr uint16_t LOG_TFTP_SUM = LOG_TFTP + 22;
 constexpr uint16_t LOG_TFTP_FIRST = LOG_TFTP + 24;
 constexpr uint8_t LOG_TFTP_FIRST_BYTES = 16;
+/* The address fetched from, and whether the lease named it or this file did. */
+constexpr uint16_t LOG_TFTP_SERVER_IP = LOG_TFTP + 40;
+constexpr uint16_t LOG_TFTP_LEASED = LOG_TFTP + 44;
 static_assert(LOG_TFTP >= LOG_HEADER + FRAMES_LOGGED * FRAME_SLICE,
     "the transfer's fields have run into the last frame slice");
-static_assert(LOG_TFTP_FIRST + LOG_TFTP_FIRST_BYTES <= SD_SECTOR_SIZE,
+static_assert(LOG_TFTP_LEASED < SD_SECTOR_SIZE,
     "the transfer's fields have run off the end of the sector");
 
 /* Long enough to see ordinary LAN traffic, short enough that a run finishes
@@ -309,12 +316,19 @@ int main(void) {
      */
     static_assert(sizeof net_out >= TFTP_SEND_BYTES, "no room to build a request");
     static_assert(sizeof net_in >= TFTP_RECEIVE_BYTES, "a full block would be dropped");
+    /* Where to fetch from when the lease names nobody.  The log records which
+     * of the two was used, so a dump cannot be read as proof that a server was
+     * discovered. */
+    static constexpr uint8_t TFTP_TOLD[IPV4_BYTES] = {192, 168, 68, 57};
+    const bool leased_tftp = dhcp_leased(&client) && client.lease.has_tftp;
+    const uint8_t* tftp_ip = leased_tftp ? client.lease.tftp : TFTP_TOLD;
+
     uint8_t server_mac[MAC_BYTES] = {0};
-    if (dhcp_leased(&client) && client.lease.has_tftp) {
+    if (dhcp_leased(&client)) {
         /* Whose hardware address the frames must carry, which is not the
          * address they are sent to. */
-        const uint8_t* hop = ip_next_hop(
-            client.lease.tftp, us.ip, client.lease.netmask, client.lease.router);
+        const uint8_t* hop
+            = ip_next_hop(tftp_ip, us.ip, client.lease.netmask, client.lease.router);
         restart_clock();
         uint16_t asked_at = (uint16_t)(0 - RESEND_FRAMES);
         while (frames_elapsed < LISTEN_FRAMES && net_zero(server_mac, MAC_BYTES)) {
@@ -337,7 +351,7 @@ int main(void) {
     if (!net_zero(server_mac, MAC_BYTES)) {
         struct NetEndpoint server = {0};
         memcpy(server.mac, server_mac, MAC_BYTES);
-        memcpy(server.ip, client.lease.tftp, IPV4_BYTES);
+        memcpy(server.ip, tftp_ip, IPV4_BYTES);
         tftp_start(&transfer, &us, &server, "catalog", VICIV.fn_raster_lsb);
 
         restart_clock();
@@ -358,10 +372,10 @@ int main(void) {
              * before the DMA rather than after. */
             const uint16_t got = net_poll(net_in, TFTP_RECEIVE_BYTES, &us);
             said = got ? tftp_step(&transfer, net_in, got, net_out) : 0;
-            if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
-                said = tftp_step(&transfer, nullptr, 0, net_out);
-            }
-            if (transfer.data_length) {
+            /* Only where a frame was stepped: data_length answers for the
+             * step just made, and this loop polls many times between blocks,
+             * so counting it anywhere else counts one block many times. */
+            if (got && transfer.data_length) {
                 if (!blocks) {
                     for (uint8_t i = 0; i < LOG_TFTP_FIRST_BYTES; i++) {
                         sector_buffer[LOG_TFTP_FIRST + i] = net_in[TFTP_DATA_AT + i];
@@ -372,6 +386,11 @@ int main(void) {
                 for (uint16_t i = 0; i < transfer.data_length; i++) {
                     sum = (uint16_t)(sum + net_in[TFTP_DATA_AT + i]);
                 }
+            }
+            /* Saying it again, which here is acknowledging the last block so
+             * the server sends the next one. */
+            if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
+                said = tftp_step(&transfer, nullptr, 0, net_out);
             }
         }
         /* The acknowledgement the last block earned: the loop above ends on it
@@ -389,6 +408,8 @@ int main(void) {
     log_put32(LOG_TFTP_BYTES, fetched);
     log_put16(LOG_TFTP_BLOCKS, blocks);
     log_put16(LOG_TFTP_SUM, sum);
+    memcpy(&sector_buffer[LOG_TFTP_SERVER_IP], tftp_ip, IPV4_BYTES);
+    sector_buffer[LOG_TFTP_LEASED] = leased_tftp ? 1 : 0;
 
     /* Now answer for the address just taken.  Nothing can send anything back
      * to this machine until it does: a server with a datagram for us asks who

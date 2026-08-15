@@ -74,7 +74,9 @@ enum TftpStage : uint8_t {
  * `has_size` false.  `data_length` is the bytes of the file the last step
  * delivered, at TFTP_DATA_AT in the same buffer that step was given: zero on
  * every step that delivered none, which is a repeat the server sent again, an
- * option acknowledgement, or a timeout.
+ * option acknowledgement, or a timeout.  It answers for the step just made and
+ * nothing else: read between steps it still holds the previous answer, so a
+ * caller counts where it steps.
  *
  * `error` is the code the server refused with, or TFTP_REFUSED. */
 struct TftpClient {
