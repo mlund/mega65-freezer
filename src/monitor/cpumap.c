@@ -1,3 +1,6 @@
+/* The four translation steps in the order gs4510.vhdl applies them, and the
+ * run of addresses around one that share its answer. */
+
 #include "cpumap.h"
 
 static uint16_t frozen_map_lo = 0;

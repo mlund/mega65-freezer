@@ -1,5 +1,8 @@
 #pragma once
 
+/* Enough FAT32 to put a disk image on the card: mount the filesystem the
+ * machine boots from, and create one contiguous file in it. */
+
 #include "errors.h"
 
 #include <stdint.h>

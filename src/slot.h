@@ -1,5 +1,11 @@
 #pragma once
 
+/* The frozen machine, reached through the hypervisor.
+ *
+ * A freeze slot is a run of SD sectors rather than memory, so every read and
+ * write here goes through a sector rather than an address; slotmap.h is what
+ * turns a frozen address into an offset in that run. */
+
 #include "errors.h"
 #include "helper.h"
 #include "slotmap.h"

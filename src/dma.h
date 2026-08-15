@@ -1,5 +1,9 @@
 #pragma once
 
+/* Moving bytes across the 28-bit bus: DMAgic copies and fills, and the
+ * byte-at-a-time load and store they replace once there is more than a byte to
+ * move. */
+
 #include "addr28.h"
 
 #include <stdint.h>

@@ -1,5 +1,9 @@
 #pragma once
 
+/* The screen the tools draw on: 80 by 25 characters with colour RAM beside it,
+ * addressed by cell rather than by row and column, and the rules and text
+ * fragments the menus are built from. */
+
 #include "dma.h"
 #include "format.h"
 

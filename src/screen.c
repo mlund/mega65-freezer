@@ -1,3 +1,6 @@
+/* Drawing into the screen and its colour RAM -- a cell at a time, or by DMA
+ * where a whole row or screen goes at once. */
+
 #include "screen.h"
 
 #include "colours.h"

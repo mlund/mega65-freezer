@@ -1,3 +1,6 @@
+/* Working the SD controller: open the card, move a sector through the one
+ * buffer the hardware offers, and say on the border that it is busy. */
+
 #include "sdcard.h"
 
 #include "dma.h"

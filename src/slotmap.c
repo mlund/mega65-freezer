@@ -1,3 +1,6 @@
+/* Walking the region table: how much of the slot each region takes, and which
+ * of them an address falls in. */
+
 #include "slotmap.h"
 
 struct FreezeRegion freeze_region_list[MAX_REGIONS];

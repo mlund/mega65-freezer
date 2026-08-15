@@ -1,3 +1,7 @@
+/* What every tool needs before it can get to its own work: the palette and
+ * colour scheme, which machine and ROM this is, and the pieces of frozen state
+ * a tool reads or hands back. */
+
 #include "common.h"
 
 #include "colours.h"

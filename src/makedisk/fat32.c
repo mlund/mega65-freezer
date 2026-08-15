@@ -1,3 +1,6 @@
+/* Finding the filesystem the machine boots from, and laying a file into it
+ * whose sectors run back to back. */
+
 #include "fat32.h"
 
 #include "dma.h"

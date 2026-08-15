@@ -1,5 +1,8 @@
 #pragma once
 
+/* The SD card as the tools use it: whole sectors, one at a time, through a
+ * single buffer the hardware and the caller share. */
+
 #include "dma.h"
 
 #include <ctype.h>

@@ -1,3 +1,5 @@
+/* Which ASCII codes the charset can show, and where in it each one sits. */
+
 #include "screencode.h"
 
 uint8_t ascii_to_screen(uint8_t c) {

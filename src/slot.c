@@ -1,3 +1,6 @@
+/* Reaching into the frozen machine through the hypervisor: a byte, an I/O
+ * register, or a whole sector of the freeze slot. */
+
 #include "slot.h"
 
 #include "common.h"

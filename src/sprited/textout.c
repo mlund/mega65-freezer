@@ -1,3 +1,6 @@
+/* A cursor, a current colour and the attributes the editor sets, over the
+ * cells screen.c draws. */
+
 #include "textout.h"
 
 #include "colours.h"
