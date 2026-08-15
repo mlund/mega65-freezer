@@ -41,6 +41,12 @@ CATALOG = fhc.catalogue(
         # Mixed case, so the render has to fold it.
         fhc.record("Attack of the Robots", "Somebody", IMAGE_PATH, fhc.D81, 819200),
         fhc.record("Hello World", "Nobody", "files/h/hello.prg", fhc.PRG, 4096),
+        # Named by the catalogue and not staged, which is every row until
+        # something fetches images.  Which code hyppo gives for a name it never
+        # found depends on whose hyppo: this emulator says file-not-found and
+        # the machine says end-of-directory, so both are read as "not here yet"
+        # and only one of the two is exercised here.
+        fhc.record("Not Fetched Yet", "Nobody", "files/n/not_fetched.d81", fhc.D81, 819200),
     ]
 )
 
@@ -63,6 +69,9 @@ STEPS = [
     ("key", "down"),
     ("key", "return"),
     ("expect", "ONLY DISK IMAGES"),
+    ("key", "down"),
+    ("key", "return"),
+    ("expect", "NOT ON THE CARD YET"),
     # A fetch with no network at all.  Xemu has no ethernet, so nothing answers
     # the lease and the tool has to say so and put the card's catalogue back
     # rather than sit waiting -- the one part of the network path that can be
@@ -74,7 +83,7 @@ STEPS = [
     # the prompt says the second time is the only proof from outside that what
     # was typed the first time was kept rather than merely echoed.
     ("key", "s"),
-    ("expect", "NOW 192.168.68.57"),
+    ("expect", "NOW 192.168.68.57:6969"),
     # With a port, since a gateway on one of its own needs no root to run.
     ("type", "10.1.2.3:6969"),
     ("key", "return"),

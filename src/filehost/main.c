@@ -43,9 +43,11 @@ static constexpr uint8_t SERVER_TEXT_BYTES = 24;
 /* Where TFTP is looked for when nothing says otherwise, RFC 1350's own. */
 static constexpr uint16_t TFTP_RESERVED_PORT = 69;
 /* Where the address starts before anything else says otherwise -- the machine
- * this was developed against.  A starting point for the editor rather than a
- * guess at the network: a lease, the card and the keyboard all override it. */
+ * this was developed against, at the port megatalk-tftpd runs on without root.
+ * A starting point for the editor rather than a guess at the network: a lease,
+ * the card and the keyboard all override it. */
 static constexpr uint8_t DEFAULT_SERVER[IPV4_BYTES] = {192, 168, 68, 57};
+static constexpr uint16_t DEFAULT_SERVER_PORT = 6969;
 
 /* Read whole and indexed in place.  Chip RAM the tool has to itself: hyppo's
  * 384KB freeze region covers it, so the resume puts the frozen program's own
@@ -68,9 +70,14 @@ static constexpr uint8_t KILOBYTE_SHIFT = 10;
  * freeze menu's own chooser is what picks between the two. */
 static constexpr uint8_t ATTACH_DRIVE = 0;
 
-/* Hyppo's own code, from mega65-core src/hyppo/constants.asm.  The only one
- * this screen says anything of its own about -- see attach_selected(). */
+/* Hyppo's own codes, from mega65-core src/hyppo/constants.asm.  A name that is
+ * not on the card gives either one, and which depends on whose hyppo: the
+ * machine answers with the end of the directory, since dos_findfile() walks
+ * entries until one matches and running out of them is EOF (src/hyppo/dos.asm
+ * :2450 and :2498), while Xemu's answers file-not-found.  Both are the same
+ * thing to say here -- see attach_selected(). */
 static constexpr uint8_t DOS_FILE_NOT_FOUND = 0x88;
+static constexpr uint8_t DOS_END_OF_DIRECTORY = 0xFF;
 
 /* record_count is the header's, clamped in load_catalog() to what the buffer
  * holds, so it is the count the browser may index rather than the count the
@@ -95,7 +102,7 @@ static bool slot_located;
 static uint8_t server_ip[IPV4_BYTES];
 /* And where on it.  The reserved port unless somebody names another, which is
  * what lets a gateway run without root. */
-static uint16_t server_port = 69;
+static uint16_t server_port = DEFAULT_SERVER_PORT;
 
 /* One whole row, which is also how a row is cleared. */
 static void draw_line(uint8_t y, uint8_t colour, const char* text) {
@@ -211,8 +218,10 @@ static void attach_selected(void) {
         /* Only this one is worth its own wording: to the freezer's disk chooser
          * a missing file is a missing file, but here it means the catalogue
          * named something the card has not been given yet. */
+        const bool absent = code == DOS_FILE_NOT_FOUND || code == DOS_END_OF_DIRECTORY;
         show_status(SchemeError,
-            code == DOS_FILE_NOT_FOUND ? "NOT ON THE CARD YET" : hyppoerror_to_screen(code));
+            absent ? "NOT ON THE CARD YET -- NOTHING FETCHES IMAGES SO FAR"
+                   : hyppoerror_to_screen(code));
         return;
     }
 
