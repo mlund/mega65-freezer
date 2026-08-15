@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Browse the FileHost catalogue and attach a disk image from it.
+"""Browse the FileHost catalogue, fetch with no network, and attach an image.
 
 The whole of the tool that needs no network: the freeze menu launches it, it
 reads a catalogue off the card, renders records the machine has never seen, and
@@ -63,6 +63,12 @@ STEPS = [
     ("key", "down"),
     ("key", "return"),
     ("expect", "ONLY DISK IMAGES"),
+    # A fetch with no network at all.  Xemu has no ethernet, so nothing answers
+    # the lease and the tool has to say so and put the card's catalogue back
+    # rather than sit waiting -- the one part of the network path that can be
+    # tested without a wire, and the part a user meets most often.
+    ("key", "f"),
+    ("expect", "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK", 30),
     # Back to the top.  Not cursor-up: that is SHIFT plus cursor-down on this
     # keyboard, and the modifier does not reach the key queue.
     ("key", ","),

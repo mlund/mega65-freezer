@@ -1,10 +1,9 @@
 /* The FileHost browser: a catalogue of downloadable titles, and the disk image
  * one of them attaches to the frozen machine's drive.
  *
- * The catalogue is read off the card rather than the network.  Fetching it, and
- * the files it names, comes later; what is here is the half that can be tested
- * without a wire, so for now CATALOG.M65 and the images it names have to be put
- * on the card by something else. */
+ * The catalogue comes off the card at start-up and over the network on demand;
+ * the images it names still have to be put on the card by something else.  Only
+ * the fetch needs a wire, so everything else here is testable without one. */
 
 #include "arp.h"
 #include "browser.h"
@@ -13,6 +12,7 @@
 #include "common.h"
 #include "dma.h"
 #include "eth.h"
+#include "fetch.h"
 #include "format.h"
 #include "mega65_regs.h"
 #include "screen.h"
@@ -25,6 +25,10 @@
 /* The catalogue as it sits on the card.  A payload rather than a program, which
  * is the convention IOMAP.M65 and M65THUMB.M65 already follow. */
 #define CATALOG_FILE "CATALOG.M65"
+/* What the same catalogue is called on the server, which ether65's
+ * docs/FILEHOST.md §1 fixes: the card needs an 8.3 name and the server does
+ * not, so the two differ and neither is derived from the other. */
+#define CATALOG_NAME "catalog"
 
 /* Read whole and indexed in place.  Chip RAM the tool has to itself: hyppo's
  * 384KB freeze region covers it, so the resume puts the frozen program's own
@@ -414,6 +418,48 @@ static void draw_count(void) {
     draw_field(SCREEN_CELL(COUNT_X, COUNT_Y), SchemeTextDim, text, 5);
 }
 
+/* The catalogue over the wire, into the buffer the card copy would occupy.
+ *
+ * Nothing is written to the card: the browser reads the catalogue from this
+ * buffer either way, so a fetch that fails costs the list on screen and not the
+ * copy on the card.  What the buffer holds afterwards is whatever the fetch
+ * left, so the card copy is read back rather than trusted. */
+static void fetch_catalog(void) {
+    show_status(SchemeText, "FETCHING THE CATALOGUE...");
+
+    uint32_t got = 0;
+    const enum FetchResult result =
+        fetch_file(CATALOG_NAME, CATALOG_BUFFER, CATALOG_BUFFER_BYTES, &got);
+    if (result != FetchOk) {
+        static const char* const why[] = {
+            "",
+            "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK",
+            "NO TFTP SERVER: THE LEASE NAMED NONE",
+            "THE SERVER REFUSED TO SEND IT",
+            "THE TRANSFER STOPPED PART WAY",
+            "THE CATALOGUE IS LARGER THAN THE BUFFER",
+        };
+        show_status(SchemeError, why[result]);
+        /* Whatever landed is half a catalogue, and the browser is still
+         * pointing into it. */
+        (void)load_catalog();
+        draw_count();
+        draw_list();
+        return;
+    }
+
+    lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)raw_record, CATALOG_HEADER_BYTES);
+    if (!catalog_header(raw_record, &header)) {
+        show_status(SchemeError, "WHAT CAME BACK IS NOT A CATALOGUE");
+        return;
+    }
+    move_to(0);
+    first_shown = 0;
+    draw_count();
+    draw_list();
+    show_status(SchemeHighlight, "FETCHED");
+}
+
 static void browse(void) {
     draw_list();
 
@@ -450,6 +496,10 @@ static void browse(void) {
                 if (header.record_count) {
                     attach_selected();
                 }
+                break;
+            case 'F':
+            case 'f':
+                fetch_catalog();
                 break;
             case 'E':
             case 'e':
