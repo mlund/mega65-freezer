@@ -45,9 +45,11 @@ static constexpr uint8_t SERVER_TEXT_BYTES = 24;
  * was developed against, at the port megatalk-tftpd runs on without root.
  *
  * Installed rather than merely offered as the editor's opening text, so a fetch
- * works with nothing typed.  The cost is that this tool never has no server:
- * the only way to reach FetchNoServer, and the advice that comes with it, is to
- * type an address of zeros. */
+ * works with nothing typed.  Temporary, and not to be released: while it stands
+ * the tool never has no server, so the advice that comes with FetchNoServer is
+ * reachable only by typing an address of zeros -- and on any other 192.168.68
+ * network the machine would talk to whoever holds .57.  Before a release this
+ * becomes a build option, or goes. */
 static constexpr uint8_t DEFAULT_SERVER[IPV4_BYTES] = {192, 168, 68, 57};
 static constexpr uint16_t DEFAULT_SERVER_PORT = 6969;
 
