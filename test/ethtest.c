@@ -170,18 +170,6 @@ static void log_put32(uint16_t at, uint32_t value) {
     log_put16((uint16_t)(at + 2), (uint16_t)(value >> 16));
 }
 
-/* Whether `there` can be reached without a router: the same network number
- * under the mask the lease came with.  A TFTP server elsewhere is asked for
- * through the router, which is the address to put on the wire instead. */
-static bool on_subnet(const uint8_t* there, const uint8_t* here, const uint8_t* netmask) {
-    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
-        if ((there[i] ^ here[i]) & netmask[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
 int main(void) {
     mega65_fast();
     __asm__ volatile("sei" ::: "memory");
@@ -323,12 +311,10 @@ int main(void) {
     static_assert(sizeof net_in >= TFTP_RECEIVE_BYTES, "a full block would be dropped");
     uint8_t server_mac[MAC_BYTES] = {0};
     if (dhcp_leased(&client) && client.lease.has_tftp) {
-        /* Who to ask on the wire is not who to address the datagram to: a
-         * server off this subnet is reached through the router, and it is the
-         * router's hardware address the frames must carry. */
-        const uint8_t* hop = on_subnet(client.lease.tftp, us.ip, client.lease.netmask)
-            ? client.lease.tftp
-            : client.lease.router;
+        /* Whose hardware address the frames must carry, which is not the
+         * address they are sent to. */
+        const uint8_t* hop = ip_next_hop(
+            client.lease.tftp, us.ip, client.lease.netmask, client.lease.router);
         restart_clock();
         uint16_t asked_at = (uint16_t)(0 - RESEND_FRAMES);
         while (frames_elapsed < LISTEN_FRAMES && net_zero(server_mac, MAC_BYTES)) {

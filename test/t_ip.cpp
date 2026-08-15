@@ -301,4 +301,34 @@ TEST_CASE("a datagram from elsewhere parses and verifies") {
     CHECK(elsewhere[UDP_PAYLOAD_AT] == 0x12);  // the DNS transaction id
 }
 
+/* Which address carries the frame, as against which address the datagram is
+ * for.  Getting this backwards asks ARP for a machine nobody on the wire holds,
+ * and the answer never comes -- so the mask is worth a test of its own rather
+ * than only the two obvious cases. */
+TEST_CASE("the next hop is the target on this network and the router off it") {
+    const std::array<uint8_t, 4> us = {192, 168, 68, 120};
+    const std::array<uint8_t, 4> router = {192, 168, 68, 1};
+    const std::array<uint8_t, 4> mask24 = {255, 255, 255, 0};
+
+    const std::array<uint8_t, 4> here = {192, 168, 68, 57};
+    CHECK(ip_next_hop(here.data(), us.data(), mask24.data(), router.data()) == here.data());
+
+    const std::array<uint8_t, 4> away = {192, 168, 69, 57};
+    CHECK(ip_next_hop(away.data(), us.data(), mask24.data(), router.data()) == router.data());
+
+    /* A mask that is not a whole number of bytes, which is where a hand-rolled
+     * comparison goes wrong: 192.168.68.120/25 holds .126 and not .130. */
+    const std::array<uint8_t, 4> mask25 = {255, 255, 255, 128};
+    const std::array<uint8_t, 4> low = {192, 168, 68, 126};
+    const std::array<uint8_t, 4> high = {192, 168, 68, 130};
+    CHECK(ip_next_hop(low.data(), us.data(), mask25.data(), router.data()) == low.data());
+    CHECK(ip_next_hop(high.data(), us.data(), mask25.data(), router.data()) == router.data());
+
+    /* A machine given no mask at all -- a lease that carried none -- reaches
+     * everything directly, which is what an all-zero mask means and is better
+     * than routing every datagram to an address that may also be zero. */
+    const std::array<uint8_t, 4> none = {0, 0, 0, 0};
+    CHECK(ip_next_hop(away.data(), us.data(), none.data(), router.data()) == away.data());
+}
+
 }  // TEST_SUITE

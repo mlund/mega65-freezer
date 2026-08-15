@@ -55,6 +55,18 @@ uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length) {
     return sum;
 }
 
+const uint8_t* ip_next_hop(
+    const uint8_t* target, const uint8_t* us, const uint8_t* netmask, const uint8_t* router) {
+    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+        /* The bits the mask keeps are the network number; a difference in any
+         * of them puts the target on somebody else's. */
+        if ((target[i] ^ us[i]) & netmask[i]) {
+            return router;
+        }
+    }
+    return target;
+}
+
 uint16_t ip_sum_final(uint32_t sum) {
     while (sum >> 16) {
         sum = (sum & 0xFFFF) + (sum >> 16);

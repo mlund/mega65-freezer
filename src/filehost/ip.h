@@ -7,7 +7,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* IPv4 and UDP: enough of RFC 791 and RFC 768 to carry TFTP, and no more.
+/* IPv4 and UDP: enough of RFC 791 and RFC 768 to carry TFTP, and no more --
+ * building a datagram, reading one, and the one question about an address that
+ * has to be answered before either.
  *
  * Building and reading datagrams is separate from putting them on the wire
  * (eth.h), so this compiles for the host and is tested there.  That matters
@@ -31,10 +33,26 @@ constexpr uint8_t UDP_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES + UDP_HE
  * header that is nowhere in the datagram.
  *
  * Only the final piece may have an odd length: an odd piece is padded to the
- * next word, which is only the same answer when nothing follows it. */
+ * next word, which is only the same answer when nothing follows it.
+ *
+ * Public although udp_build() is the only caller: a wrong checksum is a
+ * datagram discarded in silence at the far end, so the sum is worth checking
+ * against RFC 1071's own worked example directly rather than only through a
+ * datagram built with it. */
 [[nodiscard]] uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length);
 /* Folds an accumulated sum into the sixteen bits a header carries. */
 [[nodiscard]] uint16_t ip_sum_final(uint32_t sum);
+
+/* Which address to put on the wire to reach `target`: `target` itself when it
+ * shares this machine's network, and `router` when it does not.
+ *
+ * Two addresses are in play whenever a datagram leaves the subnet -- the one it
+ * is addressed to and the one whose hardware address carries it -- and asking
+ * ARP for the wrong one gets no answer at all.  Returned as the address to ask
+ * for, rather than as a yes or no, so a caller cannot take the answer the wrong
+ * way round. */
+[[nodiscard]] const uint8_t* ip_next_hop(
+    const uint8_t* target, const uint8_t* us, const uint8_t* netmask, const uint8_t* router);
 
 /* Fills `frame` with an ethernet/IPv4/UDP datagram carrying `payload`, and
  * returns the whole frame's length.  The caller owns at least
