@@ -70,14 +70,23 @@ static constexpr uint16_t TRANSFER_FRAMES = 1800; /* half a minute */
 static struct DhcpClient lease;
 static struct NetEndpoint us;
 static uint8_t server_mac[MAC_BYTES];
+static uint8_t told_server[IPV4_BYTES];
 static uint8_t error_code;
+
+void fetch_set_server(const uint8_t* ip) {
+    memcpy(told_server, ip, IPV4_BYTES);
+    /* A server named after one was resolved is a different machine, so what
+     * was resolved is no longer the answer. */
+    memset(server_mac, 0, MAC_BYTES);
+}
+
+/* Whom to ask, the lease first. */
+static const uint8_t* server_address(void) {
+    return lease.lease.has_tftp ? lease.lease.tftp : told_server;
+}
 
 uint8_t fetch_error(void) {
     return error_code;
-}
-
-const uint8_t* fetch_address(void) {
-    return us.ip;
 }
 
 /* An address of our own, from whatever answers on this LAN. */
@@ -125,11 +134,8 @@ static bool resolved(void) {
     if (!net_zero(server_mac, MAC_BYTES)) {
         return true;
     }
-    if (!lease.lease.has_tftp) {
-        return false;
-    }
     const uint8_t* hop =
-        ip_next_hop(lease.lease.tftp, us.ip, lease.lease.netmask, lease.lease.router);
+        ip_next_hop(server_address(), us.ip, lease.lease.netmask, lease.lease.router);
     restart_clock();
     uint16_t asked_at = (uint16_t)(0 - RESEND_FRAMES);
     while (frames_elapsed < WAIT_FRAMES && net_zero(server_mac, MAC_BYTES)) {
@@ -154,13 +160,16 @@ enum FetchResult fetch_file(const char* name, Addr28 into, uint32_t limit, uint3
     if (!leased()) {
         return FetchNoLease;
     }
-    if (!resolved()) {
+    if (net_zero(server_address(), IPV4_BYTES)) {
         return FetchNoServer;
+    }
+    if (!resolved()) {
+        return FetchNoAnswer;
     }
 
     struct NetEndpoint server = {0};
     memcpy(server.mac, server_mac, MAC_BYTES);
-    memcpy(server.ip, lease.lease.tftp, IPV4_BYTES);
+    memcpy(server.ip, server_address(), IPV4_BYTES);
     struct TftpClient transfer;
     tftp_start(&transfer, &us, &server, name, VICIV.fn_raster_lsb);
 

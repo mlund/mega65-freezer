@@ -301,6 +301,31 @@ TEST_CASE("a datagram from elsewhere parses and verifies") {
     CHECK(elsewhere[UDP_PAYLOAD_AT] == 0x12);  // the DNS transaction id
 }
 
+/* An address typed by a person and read off the card, so every way of getting
+ * it wrong arrives here rather than on the wire. */
+TEST_CASE("an address is read from text, or refused") {
+    std::array<uint8_t, 4> got = {9, 9, 9, 9};
+
+    REQUIRE(ip_parse("192.168.68.57", got.data()));
+    CHECK(got == std::array<uint8_t, 4>{192, 168, 68, 57});
+    CHECK(ip_parse("0.0.0.0", got.data()));
+    CHECK(ip_parse("255.255.255.255", got.data()));
+    /* A file has a line ending, and an editor may leave a space. */
+    CHECK(ip_parse("10.0.0.1\n", got.data()));
+    CHECK(ip_parse("10.0.0.1\r\n", got.data()));
+    CHECK(ip_parse("10.0.0.1 ", got.data()));
+    CHECK(got == std::array<uint8_t, 4>{10, 0, 0, 1});
+
+    /* And everything that is not an address leaves the last one standing. */
+    for (const char* bad : {"", "192.168.68", "192.168.68.57.1", "256.1.1.1", "1.2.3.4x",
+                            "1..2.3", ".1.2.3", "1.2.3.", "a.b.c.d", "1 2 3 4",
+                            "99999.1.1.1", "-1.2.3.4"}) {
+        CAPTURE(bad);
+        CHECK_FALSE(ip_parse(bad, got.data()));
+        CHECK(got == std::array<uint8_t, 4>{10, 0, 0, 1});
+    }
+}
+
 /* Which address carries the frame, as against which address the datagram is
  * for.  Getting this backwards asks ARP for a machine nobody on the wire holds,
  * and the answer never comes -- so the mask is worth a test of its own rather

@@ -17,8 +17,10 @@ constexpr auto FIXED = menu::stream(menu::fragment(0, 0, SchemeTextDim, "MEGA65 
     menu::fragment(COLUMN_KIND, HEADING_Y, SchemeTextDim, "TYPE"),
     menu::fragment(COLUMN_SIZE, HEADING_Y, SchemeTextDim, "SIZE"),
 
-    menu::fragment(
-        0, FOOTER_Y, SchemeText, "CURSOR - MOVE   RETURN - ATTACH   F - FETCH   RUN/STOP - BACK"));
+    menu::fragment(0,
+        FOOTER_Y,
+        SchemeText,
+        "CURSOR - MOVE  RETURN - ATTACH  F - FETCH  S - SERVER  RUN/STOP - BACK"));
 
 static_assert(FIXED.data[0] == 15, "the banner is the first fragment");
 static_assert(FIXED.data[sizeof FIXED.data - 1] == 0, "stream terminator");

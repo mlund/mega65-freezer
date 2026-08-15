@@ -55,6 +55,34 @@ uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length) {
     return sum;
 }
 
+bool ip_parse(const char* text, uint8_t* out) {
+    /* Into a copy, so a refusal partway leaves the caller's address alone --
+     * half an address is worse than none, and the caller may be holding the
+     * one it is already using. */
+    uint8_t parsed[IPV4_BYTES];
+    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+        if (*text < '0' || *text > '9') {
+            return false;
+        }
+        uint16_t value = 0;
+        while (*text >= '0' && *text <= '9') {
+            value = (uint16_t)(value * 10 + (uint8_t)(*text++ - '0'));
+            if (value > 255) {
+                return false;
+            }
+        }
+        parsed[i] = (uint8_t)value;
+        if (i < IPV4_BYTES - 1 && *text++ != '.') {
+            return false;
+        }
+    }
+    if (*text && *text != ' ' && *text != '\r' && *text != '\n') {
+        return false;
+    }
+    memcpy(out, parsed, IPV4_BYTES);
+    return true;
+}
+
 const uint8_t* ip_next_hop(
     const uint8_t* target, const uint8_t* us, const uint8_t* netmask, const uint8_t* router) {
     for (uint8_t i = 0; i < IPV4_BYTES; i++) {

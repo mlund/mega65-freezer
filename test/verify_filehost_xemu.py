@@ -69,6 +69,20 @@ STEPS = [
     # tested without a wire, and the part a user meets most often.
     ("key", "f"),
     ("expect", "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK", 30),
+    # And an address typed in, since a household router names no TFTP server.
+    # The field opens empty with the one in force named in the prompt, so what
+    # the prompt says the second time is the only proof from outside that what
+    # was typed the first time was kept rather than merely echoed.
+    ("key", "s"),
+    ("expect", "NOW 192.168.68.57"),
+    ("type", "10.1.2.3"),
+    ("key", "return"),
+    ("expect", "SERVER SET"),
+    ("key", "s"),
+    ("expect", "NOW 10.1.2.3"),
+    ("type", "NOT.AN.ADDRESS"),
+    ("key", "return"),
+    ("expect", "THAT IS NOT AN ADDRESS"),
     # Back to the top.  Not cursor-up: that is SHIFT plus cursor-down on this
     # keyboard, and the modifier does not reach the key queue.
     ("key", ","),

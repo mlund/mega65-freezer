@@ -14,6 +14,8 @@
 #include "eth.h"
 #include "fetch.h"
 #include "format.h"
+#include "ip.h"
+#include "lineedit.h"
 #include "mega65_regs.h"
 #include "screen.h"
 #include "sdcard.h"
@@ -21,6 +23,7 @@
 #include "slot.h"
 
 #include <mega65.h>
+#include <string.h>
 
 /* The catalogue as it sits on the card.  A payload rather than a program, which
  * is the convention IOMAP.M65 and M65THUMB.M65 already follow. */
@@ -29,6 +32,18 @@
  * docs/FILEHOST.md §1 fixes: the card needs an 8.3 name and the server does
  * not, so the two differ and neither is derived from the other. */
 #define CATALOG_NAME "catalog"
+/* Where to fetch from, when whoever runs the network does not say.  A file
+ * rather than a screen to type on: the address is settled once per network and
+ * a card is easier to edit than a machine with no keyboard driver of its own.
+ * One line, an address in figures -- there is no resolver here to turn a name
+ * into one. */
+#define SERVER_FILE "TFTP-IP.TXT"
+/* "255.255.255.255", its line ending, and a terminator. */
+static constexpr uint8_t SERVER_TEXT_BYTES = 18;
+/* Where the address starts before anything else says otherwise -- the machine
+ * this was developed against.  A starting point for the editor rather than a
+ * guess at the network: a lease, the card and the keyboard all override it. */
+static constexpr uint8_t DEFAULT_SERVER[IPV4_BYTES] = {192, 168, 68, 57};
 
 /* Read whole and indexed in place.  Chip RAM the tool has to itself: hyppo's
  * 384KB freeze region covers it, so the resume puts the frozen program's own
@@ -71,6 +86,11 @@ static struct CatalogRecord record;
  * partition, which is SD reads, and browsing without attaching is the common
  * case. */
 static bool slot_located;
+
+/* The TFTP server as this screen knows it, which is the default until the card
+ * or the keyboard says otherwise.  A lease that names one beats all three, and
+ * fetch.c is where that is decided. */
+static uint8_t server_ip[IPV4_BYTES];
 
 /* One whole row, which is also how a row is cleared. */
 static void draw_line(uint8_t y, uint8_t colour, const char* text) {
@@ -382,27 +402,132 @@ static void ethernet_probe(bool transmit) {
  * shows as blank and refuses to attach.  The load itself is still unbounded,
  * which only hyppo could fix; a fetch over the network is told the length by
  * TFTP's `tsize` before it writes a byte. */
-static bool load_catalog(void) {
+/* The server address off the card, if the card names one.
+ *
+ * Read into the catalogue buffer because load_catalog() is about to clear it
+ * anyway, and because read_file_from_sdcard() is unbounded: a file left there
+ * by mistake lands in 128KB of scratch rather than over something. */
+/* The address as text, for the editor and for the screen. */
+static uint8_t write_server_text(char* text) {
+    char* at = text;
+    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+        if (i) {
+            *at++ = '.';
+        }
+        at = append_dec(at, server_ip[i]);
+    }
+    *at = 0;
+    return (uint8_t)(at - text);
+}
+
+/* Typing the server's address, on the status line.
+ *
+ * The field opens empty with the address in force named in the prompt, rather
+ * than opening on that address: an editor prefilled with thirteen characters
+ * is thirteen backspaces before the first useful keystroke, and RETURN on an
+ * empty field is then the way to leave it alone.
+ *
+ * Kept for this session only.  Writing it back to the card wants a FAT writer
+ * that can replace a file, where MAKEDISK's can only create one, so TFTP-IP.TXT
+ * is how an address survives a reset until then.
+ *
+ * line_edit() owns the buffer while this owns the screen and the keyboard,
+ * which is what lets a full field and a backspace on an empty one be tested on
+ * the host rather than typed at an emulator. */
+static void edit_server_address(void) {
+    /* The reverse space, which is the caret sprited's editor uses too. */
+    static constexpr uint8_t CARET = 224;
+
+    char prompt[32 + SERVER_TEXT_BYTES];
+    char* at = append_str(prompt, "NEW TFTP SERVER (NOW ");
+    at += write_server_text(at);
+    at = append_str(at, "): ");
+    *at = 0;
+    const uint8_t field = (uint8_t)(at - prompt);
+
+    char text[SERVER_TEXT_BYTES];
+    uint8_t length = 0;
+    text[0] = 0;
+    for (;;) {
+        char shown[sizeof prompt + SERVER_TEXT_BYTES];
+        char* end = append_str(shown, prompt);
+        end = append_str(end, text);
+        *end = 0;
+        draw_line(STATUS_Y, SchemeHighlight, shown);
+        const uint8_t caret = CARET;
+        draw_fragment(SCREEN_CELL(field + length, STATUS_Y), SchemeHighlight, &caret, 1);
+
+        uint8_t key;
+        while (!(key = ASCIIKEY)) {
+            ;
+        }
+        ASCIIKEY = 0;
+        if (key == KEY_RUN_STOP || key == KEY_ESC) {
+            show_status(SchemeText, "");
+            return;
+        }
+        if (line_edit(text, sizeof text, &length, key)) {
+            break;
+        }
+    }
+
+    if (!length) {
+        show_status(SchemeText, "");
+    } else if (ip_parse(text, server_ip)) {
+        fetch_set_server(server_ip);
+        show_status(SchemeHighlight, "SERVER SET -- F FETCHES THE CATALOGUE");
+    } else {
+        show_status(SchemeError, "THAT IS NOT AN ADDRESS");
+    }
+}
+
+static void read_server_address(void) {
+    /* Cleared first: the loader says nothing about the length, so without this
+     * the bytes after the file's own are whatever the frozen machine left at
+     * this address -- and a digit among them lengthens the address read. */
+    lfill(CATALOG_BUFFER, 0, SERVER_TEXT_BYTES);
+    if (read_file_from_sdcard(SERVER_FILE, CATALOG_BUFFER)) {
+        return;
+    }
+    char text[SERVER_TEXT_BYTES];
+    lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)text, sizeof text);
+    text[sizeof text - 1] = 0;
+
+    if (ip_parse(text, server_ip)) {
+        fetch_set_server(server_ip);
+    } else {
+        show_status(SchemeWarning, SERVER_FILE " IS NOT AN ADDRESS");
+    }
+}
+
+static void clear_buffer(void) {
     for (uint32_t at = 0; at < CATALOG_BUFFER_BYTES; at += CLEAR_STEP) {
         lfill(CATALOG_BUFFER + (Addr28)at, 0, CLEAR_STEP);
     }
+}
 
-    if (read_file_from_sdcard(CATALOG_FILE, CATALOG_BUFFER)) {
-        show_status(SchemeError, "NO " CATALOG_FILE " ON THE CARD");
-        return false;
+/* Whether what is in the buffer is a catalogue this browser may index, given
+ * that `bytes` of it are real.
+ *
+ * The count is the file's claim and the browser's bound: fetch_record() reads
+ * at the offset it names, so a count past what arrived -- a truncated transfer,
+ * or a header that simply says more than it brought -- reads whatever lies
+ * beyond the buffer and offers it as a title to attach. */
+static bool accept_catalog(uint32_t bytes) {
+    if (bytes > CATALOG_BUFFER_BYTES) {
+        bytes = CATALOG_BUFFER_BYTES;
     }
-
     lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)raw_record, CATALOG_HEADER_BYTES);
-    if (!catalog_header(raw_record, &header)) {
-        show_status(SchemeError, CATALOG_FILE " IS NOT A CATALOGUE");
+    if (bytes < CATALOG_HEADER_BYTES || !catalog_header(raw_record, &header)) {
+        header = (struct CatalogHeader){0};
+        show_status(SchemeError, "THAT IS NOT A CATALOGUE");
         return false;
     }
 
-    const uint16_t fits =
-        hw_div16(CATALOG_BUFFER_BYTES - CATALOG_HEADER_BYTES, header.record_bytes);
+    const uint16_t fits = hw_div16(bytes - CATALOG_HEADER_BYTES, header.record_bytes);
     if (header.record_count > fits) {
         header.record_count = fits;
-        show_status(SchemeWarning, "CATALOGUE TOO LARGE, SHOWING WHAT FITS");
+        show_status(SchemeWarning, "CATALOGUE CUT SHORT, SHOWING WHAT ARRIVED");
     }
     if (!header.record_count) {
         show_status(SchemeWarning, "THE CATALOGUE IS EMPTY");
@@ -411,11 +536,31 @@ static bool load_catalog(void) {
     return true;
 }
 
+static bool load_catalog(void) {
+    clear_buffer();
+    if (read_file_from_sdcard(CATALOG_FILE, CATALOG_BUFFER)) {
+        show_status(SchemeError, "NO " CATALOG_FILE " ON THE CARD");
+        return false;
+    }
+    /* The loader says nothing about the length, so the whole buffer is what
+     * may have been filled. */
+    return accept_catalog(CATALOG_BUFFER_BYTES);
+}
+
 static void draw_count(void) {
     char text[8];
     char* at = append_dec(text, header.record_count);
     *at = 0;
     draw_field(SCREEN_CELL(COUNT_X, COUNT_Y), SchemeTextDim, text, 5);
+}
+
+/* Back to the top of a list that has just been replaced.  Not move_to(), which
+ * clears the status line: what a fetch has to say outlives its redraw. */
+static void show_from_top(void) {
+    selected = 0;
+    first_shown = 0;
+    draw_count();
+    draw_list();
 }
 
 /* The catalogue over the wire, into the buffer the card copy would occupy.
@@ -427,6 +572,9 @@ static void draw_count(void) {
 static void fetch_catalog(void) {
     show_status(SchemeText, "FETCHING THE CATALOGUE...");
 
+    /* Cleared first, so a catalogue shorter than the last one does not leave
+     * the tail of the old one readable behind it. */
+    clear_buffer();
     uint32_t got = 0;
     const enum FetchResult result =
         fetch_file(CATALOG_NAME, CATALOG_BUFFER, CATALOG_BUFFER_BYTES, &got);
@@ -434,32 +582,38 @@ static void fetch_catalog(void) {
         static const char* const why[] = {
             "",
             "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK",
-            "NO TFTP SERVER: THE LEASE NAMED NONE",
+            "NO TFTP SERVER: PUT ONE IN TFTP-IP.TXT ON THE CARD",
+            "THE TFTP SERVER DID NOT ANSWER",
             "THE SERVER REFUSED TO SEND IT",
             "THE TRANSFER STOPPED PART WAY",
             "THE CATALOGUE IS LARGER THAN THE BUFFER",
         };
         static_assert(sizeof why / sizeof *why == FetchTooBig + 1,
             "a fetch result with no message would index past this table");
-        show_status(SchemeError, why[result]);
-        /* Whatever landed is half a catalogue, and the browser is still
-         * pointing into it. */
+        /* Whatever landed is half a catalogue, so the card's copy goes back
+         * first -- and its own complaints are said before the one the user
+         * pressed a key to hear. */
         (void)load_catalog();
-        draw_count();
-        draw_list();
+        show_from_top();
+        if (result == FetchRefused) {
+            /* The code is the difference between a file that is not there and
+             * a server that will not part with it. */
+            char text[40];
+            char* at = append_str(text, "THE SERVER REFUSED IT, CODE ");
+            at = append_dec(at, fetch_error());
+            *at = 0;
+            show_status(SchemeError, text);
+        } else {
+            show_status(SchemeError, why[result]);
+        }
         return;
     }
 
-    lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)raw_record, CATALOG_HEADER_BYTES);
-    if (!catalog_header(raw_record, &header)) {
-        show_status(SchemeError, "WHAT CAME BACK IS NOT A CATALOGUE");
-        return;
+    const bool usable = accept_catalog(got);
+    show_from_top();
+    if (usable) {
+        show_status(SchemeHighlight, "FETCHED");
     }
-    move_to(0);
-    first_shown = 0;
-    draw_count();
-    draw_list();
-    show_status(SchemeHighlight, "FETCHED");
 }
 
 static void browse(void) {
@@ -499,6 +653,10 @@ static void browse(void) {
                     attach_selected();
                 }
                 break;
+            case 'S':
+            case 's':
+                edit_server_address();
+                break;
             case 'F':
             case 'f':
                 fetch_catalog();
@@ -537,6 +695,9 @@ int main(void) {
     /* Browsing runs whether or not a catalogue was found: with none, the list
      * is empty and the message says why, but the ethernet probe -- the one
      * thing that does not need a catalogue -- is still reachable. */
+    memcpy(server_ip, DEFAULT_SERVER, IPV4_BYTES);
+    fetch_set_server(server_ip);
+    read_server_address();
     load_catalog();
     draw_count();
     browse();

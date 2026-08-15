@@ -14,7 +14,7 @@
 # To add a test: write t_<name>.cpp and add its source here.  The stem names
 # the suite and the test file, so `format.c` means TEST_SUITE("format") in
 # t_format.cpp.
-set(HOST_TESTS sprited/lineedit.c makedisk/layout.c monitor/blockmove.c format.c
+set(HOST_TESTS lineedit.c makedisk/layout.c monitor/blockmove.c format.c
     screencode.c filehost/catalog.c filehost/shortname.c filehost/arp.c filehost/ip.c filehost/dhcp.c
     filehost/tftp.c)
 

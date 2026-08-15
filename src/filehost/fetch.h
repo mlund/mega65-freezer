@@ -18,16 +18,26 @@
  *
  * The lease is taken once and kept, so a second fetch is only a transfer. */
 
-/* How it went.  Told apart because they are four different things to do about
- * it: no network, no server, a server that refused, and one that stopped. */
+/* How it went.  Told apart because each is a different thing to do about it:
+ * join a network, name a server, start the one named, ask for something else,
+ * or try again. */
 enum FetchResult : uint8_t {
     FetchOk,
     FetchNoLease,  /* nothing answered, so this machine has no address */
-    FetchNoServer, /* the lease named no TFTP server, or nobody holds its address */
+    FetchNoServer, /* no server address: the lease named none and none was told */
+    FetchNoAnswer, /* an address, but nobody on the wire holds it */
     FetchRefused,  /* the server said no; fetch_error() is its code */
     FetchLost,     /* it stopped part way, and what was written is incomplete */
     FetchTooBig,   /* more than the caller offered room for, refused before writing */
 };
+
+/* The TFTP server to use when a lease names none, which is the ordinary case:
+ * a household router hands out addresses and has never heard of RFC 5859's
+ * option 150.  All zeros, until something says otherwise.
+ *
+ * A leased address still wins: whoever runs the network is a better authority
+ * on it than a file left on a card. */
+void fetch_set_server(const uint8_t* ip);
 
 /* Reads `name` into `into`, writing at most `limit` bytes, and says how many
  * arrived.
@@ -42,8 +52,3 @@ enum FetchResult : uint8_t {
 /* The code behind FetchRefused, RFC 1350 §5: 1 is no such file, 2 is a file the
  * server will not part with. */
 [[nodiscard]] uint8_t fetch_error(void);
-
-/* The address a lease was taken for, all zeros until one is.  Worth showing on
- * a screen: it is the difference between a network that is not there and a
- * server that is not. */
-[[nodiscard]] const uint8_t* fetch_address(void);
