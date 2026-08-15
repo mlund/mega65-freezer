@@ -1,21 +1,27 @@
 # SPDX-License-Identifier: MIT OR Apache-2.0
-# Copyright (c) 2026 Mikael Lund aka Wombat
+# Copyright 2026 Mikael Lund aka Wombat
 #
 # Deliberately more permissive than the project around it:
 # this file is meant to be copied out and used elsewhere.
-"""Drive a MEGA65 program under Xemu, and look at the machine while it runs.
+"""Drive a MEGA65 and look at it while it runs, emulated or real.
 
-Copy this file into any project that tests MEGA65 code under Xemu; it depends on
-nothing but the standard library and nothing in it is specific to one program.
-What varies between projects is where the screen lives, what the machine is and
-what the tools are called, and those are the `Screen` dataclass and the
-arguments to `launch`.
+Copy this file into any project that tests MEGA65 code; it depends on nothing
+but the standard library and nothing in it is specific to one program.  What
+varies between projects is where the screen lives, what the machine is and what
+the tools are called, and those are the `Screen` dataclass and the arguments to
+`launch`.
 
-Two primitives carry everything: Xemu's serial monitor, which reads and writes
-any 28-bit address while the machine runs, and the core's synthetic key slots at
+Two primitives carry everything: the serial monitor, which reads and writes any
+28-bit address while the machine runs, and the core's synthetic key slots at
 $D615, which are indistinguishable from someone pressing the key.  Both belong
-to the machine rather than to the emulator, so a scenario written here describes
-something real hardware could be driven through given a serial transport.
+to the machine rather than to the emulator, which is why the same steps drive
+either -- `launch` starts an emulator and speaks to it through a socket, and
+`attach` speaks to a real machine down its serial port.  Everything above the
+channel is the same code.
+
+What a real machine does not give you is a known starting state: `launch`
+stages a card and boots the program, where `attach` finds the machine wherever
+it was left.
 
 A test is a list of steps:
 
@@ -33,6 +39,11 @@ or, when the check is more than a phrase on screen, the same primitives by hand:
         machine.press("right")
         after = machine.wait_until(lambda s: s.text(7) != cold.text(7))
 
+and the same against the machine on the desk:
+
+    with attach("/dev/cu.usbserial-AQ027F6E") as machine:
+        print(machine.snapshot().whole())
+
 Nothing here waits a fixed number of seconds for the machine to do something.
 `-sleepless` runs flat out and real hardware runs in real time, so a constant
 that is generous on one is an intermittent failure on the other; every wait is a
@@ -42,12 +53,17 @@ poll against a deadline instead.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import os
 import re
+import select
 import signal
 import socket
+import struct
 import subprocess
 import sys
+import termios
 import time
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import ExitStack, contextmanager
@@ -75,6 +91,9 @@ READY_TIMEOUT = 30.0
 # does and the Failure below is unreachable.
 ANSWER_TIMEOUT = 5.0
 PACKET_TIMEOUT = 1.0
+# What the bitstream's monitor runs at.  m65's own default, and wrong here means
+# the machine answers nothing rather than answering badly.
+MONITOR_BAUD = 2000000
 
 SHIFT = 0x0F
 NO_KEY = 0x7F
@@ -156,7 +175,9 @@ SHIFTED = {
 # agrees, and its virtkey() repacks row*8+col into row*16+col, which is how 67
 # becomes the $83 in its headers.  But 67 arrives as though it were `A`, and 10
 # for `a` does nothing, so something between the register and the key queue is
-# not what these tables describe.  Add one here only after measuring it.
+# not what these tables describe.  Add one here only after measuring it -- and
+# measure it on both, since only the emulator was to hand when this was written
+# and the two need not agree about the key queue.
 #
 # No up or left either: both are the shifted form of their opposite on a CBM
 # keyboard, and SHIFT in the modifier slot does not reach the key queue.
@@ -267,8 +288,9 @@ class Result:
 class Machine:
     """A running machine, reachable over its serial monitor.
 
-    Built by `launch`, or around a socket that is already open -- which is how
-    the step runner is tested with no emulator behind it.
+    Built by `launch` or by `attach`, or around any channel with a socket's
+    `sendall`, `recv` and `settimeout` -- which is how the step runner is tested
+    with no machine of either kind behind it.
     """
 
     def __init__(
@@ -296,8 +318,8 @@ class Machine:
         same way, so anything past a single line is asked for in 256-byte
         blocks: a screen is nine requests rather than a hundred and twenty-five,
         and each request costs two emulated frames.  Both Xemu and the MEGA65's
-        own monitor ROM read `M` as sixteen lines, so this stays true of a real
-        machine over its serial port.
+        own monitor read `M` as sixteen lines, which is what lets the same reads
+        serve a real machine down a serial port -- checked against one.
 
         Anything a line or shorter still goes through `m`.  That keeps the
         probe of a hardware register to the byte asked for -- an `M` there would
@@ -511,6 +533,82 @@ def connect(path: str, timeout: float = READY_TIMEOUT, proc=None, log: str | Non
         if time.time() >= deadline:
             raise Failure(f"no monitor socket at {path} after {timeout:g}s{_tail(log)}")
         time.sleep(POLL)
+
+
+class SerialChannel:
+    """A MEGA65's serial monitor, wearing the three methods a socket wears.
+
+    The monitor speaks the same commands down a wire as Xemu's does down a
+    socket, so nothing above this needs to know which is behind it: `Machine`
+    asks only for `sendall`, `recv` and `settimeout`.
+
+    macOS reaches 2000000 baud through an ioctl rather than through termios,
+    the speed a bitstream uses not being one POSIX has a name for.
+
+    Usable as a context manager, and closed when it is collected either way.
+    """
+
+    _IOSSIOSPEED = 0x80045402
+
+    def __init__(self, device: str, baud: int = MONITOR_BAUD, timeout: float = PACKET_TIMEOUT):
+        self.timeout = timeout
+        self._fd = os.open(device, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+        with contextlib.ExitStack() as undo:
+            undo.callback(os.close, self._fd)
+            attributes = termios.tcgetattr(self._fd)
+            # Raw: a terminal helpfully translating a monitor's bytes is a
+            # terminal corrupting them.
+            attributes[:4] = [0, 0, termios.CS8 | termios.CREAD | termios.CLOCAL, 0]
+            attributes[6][termios.VMIN] = attributes[6][termios.VTIME] = 0
+            termios.tcsetattr(self._fd, termios.TCSANOW, attributes)
+            fcntl.ioctl(self._fd, self._IOSSIOSPEED, struct.pack("I", baud))
+            termios.tcflush(self._fd, termios.TCIOFLUSH)
+            undo.pop_all()
+
+    def settimeout(self, seconds: float) -> None:
+        """Named for the socket it stands in for, not for PEP 8."""
+        self.timeout = seconds
+
+    def sendall(self, data: bytes) -> None:
+        while data:
+            data = data[os.write(self._fd, data) :]
+
+    def recv(self, most: int) -> bytes:
+        """What arrived before the timeout.
+
+        Raised rather than returned empty, as a socket does: `Machine` reads
+        until it has a whole answer and tells the two apart by the exception.
+        """
+        readable, _, _ = select.select([self._fd], [], [], self.timeout)
+        if not readable:
+            raise TimeoutError("the monitor said nothing")
+        return os.read(self._fd, most)
+
+    def close(self) -> None:
+        if self._fd >= 0:
+            os.close(self._fd)
+            self._fd = -1
+
+    __del__ = close
+
+    def __enter__(self) -> "SerialChannel":
+        return self
+
+    def __exit__(self, *_) -> None:
+        self.close()
+
+
+@contextmanager
+def attach(device: str, baud: int = MONITOR_BAUD, **machine_args):
+    """A machine that is already running, reached down a wire.
+
+    Nothing is launched and nothing is staged: the card is the one in the slot,
+    and whatever is on screen is where the run starts.  That is the difference
+    from `launch`, and the reason a scenario wanting a known starting state has
+    to put the machine in one itself.
+    """
+    with SerialChannel(device, baud) as channel:
+        yield Machine(channel, **machine_args)
 
 
 def _tail(log: str | None, lines: int = 6) -> str:

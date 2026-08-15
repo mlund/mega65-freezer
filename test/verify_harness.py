@@ -15,8 +15,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import xemuharness
-from xemuharness import Failure, Machine, Screen
+import m65harness
+from m65harness import Failure, Machine, Screen
 
 # Screen codes: A-Z are $01-$1A, and space is $20.
 SCREEN = Screen()
@@ -225,7 +225,7 @@ def main() -> int:
     # and reports a bare traceback instead.
     check(
         "packet wait is shorter than answer wait",
-        xemuharness.PACKET_TIMEOUT < xemuharness.ANSWER_TIMEOUT,
+        m65harness.PACKET_TIMEOUT < m65harness.ANSWER_TIMEOUT,
         True,
     )
 
@@ -236,14 +236,14 @@ def main() -> int:
             pass
 
     silent = Machine(Mute())
-    xemuharness.ANSWER_TIMEOUT = 0.3
+    m65harness.ANSWER_TIMEOUT = 0.3
     try:
         result = silent.drive([("expect", "ANYTHING", 1.0)])
         check("a silent monitor fails as a step", result.ok, False)
         check("and names the step", str(result.failure).startswith("step 0 "), True)
         check("and says what it was doing", "no answer reading" in str(result.failure), True)
     finally:
-        xemuharness.ANSWER_TIMEOUT = 5.0
+        m65harness.ANSWER_TIMEOUT = 5.0
 
     # A misspelled verb is an error rather than a step that quietly does
     # nothing, which would otherwise leave a scenario passing on fewer checks
@@ -281,7 +281,7 @@ def main() -> int:
     check(
         "upper case holds shift",
         fake.written[0],
-        f"sffd3615 {xemuharness.MATRIX['a']:02x} {xemuharness.SHIFT:02x}\n".encode(),
+        f"sffd3615 {m65harness.MATRIX['a']:02x} {m65harness.SHIFT:02x}\n".encode(),
     )
 
     # A key that has no matrix position is refused rather than sent as

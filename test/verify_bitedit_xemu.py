@@ -38,8 +38,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import scenario
-import xemuharness
-from xemuharness import Failure
+import m65harness
+from m65harness import Failure
 
 # $D011 in the frozen machine.  Its bit 5 is BMM, which the database names, so
 # a screen carrying "BMM" proves the lookup and the abbreviation as well as the
@@ -210,7 +210,7 @@ def main() -> int:
                 try:
                     screen = drive(machine, required).whole()
                 except Failure as failed:
-                    return xemuharness.report_failure(failed)
+                    return m65harness.report_failure(failed)
 
         serial = ""
         if args.expect_serial:

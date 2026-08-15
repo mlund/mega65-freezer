@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive a tool the way a person would, as a list of steps.
 
-This is what the freezer's tests add to xemuharness.py: the card.  A tool is
+This is what the freezer's tests add to m65harness.py: the card.  A tool is
 loaded off the card by the freeze menu, so a test that means to exercise ours
 has to stage ours onto a clone of a real image first, and a check on what the
 tool wrote has to read that image back afterwards.
@@ -23,7 +23,7 @@ must not already be on the card -- a test that finds what it meant to create
 proves nothing.  `count` reads a counter out of the running tool by name:
 ("count", "MAKEDISK.sd_reads", 1600) looks the symbol up in that tool's ELF.
 
-The step vocabulary and the polling are the harness's; see xemuharness.py.
+The step vocabulary and the polling are the harness's; see m65harness.py.
 """
 
 import argparse
@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import card
 import elf
 import fat32
-import xemuharness
+import m65harness
 
 # The freeze menu's banner, which says the menu has drawn and will not drop the
 # first keypress a scenario sends.
@@ -62,7 +62,7 @@ def _entry_size(image: str, name: str) -> int | None:
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """What every test here takes, so a script with its own flags can add them
     to the same parser rather than building a second one."""
-    xemuharness.add_arguments(parser)
+    m65harness.add_arguments(parser)
     parser.add_argument("--sdimg", required=True, help="an SD image to clone, never written to")
     return parser
 
@@ -100,7 +100,7 @@ def machine_on(args, clone: str, prg: str = "FREEZER.M65", **launch_args):
     and lose the symbol resolver on the way.
     """
     launch_args.setdefault("ready", READY)
-    with xemuharness.launch(
+    with m65harness.launch(
         args.emulator,
         os.path.join(args.build, prg),
         sdimg=clone,
@@ -129,7 +129,7 @@ def run(description: str, prg: str, steps, *, extras: dict[str, bytes] | None = 
             if _entry_size(clone, name) is not None:
                 sys.exit(f"{name} is already on the card; the test would prove nothing")
 
-        status = xemuharness.run(
+        status = m65harness.run(
             args,
             prg,
             [s for s in steps if s[0] != "expect_file"],
