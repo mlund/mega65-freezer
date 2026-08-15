@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// Copyright 2026 Mikael Lund aka Wombat
+/* The BOOTP frame DHCP rides on, the options this client speaks, and the
+ * sequencing that turns four messages into a lease. */
+
 #include "dhcp.h"
 
 #include <stddef.h>

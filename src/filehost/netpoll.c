@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// Copyright 2026 Mikael Lund aka Wombat
+/* One frame off the wire, with the question about our own address answered
+ * before the rest is handed on. */
+
 #include "netpoll.h"
 
 #include "arp.h"

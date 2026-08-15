@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// Copyright 2026 Mikael Lund aka Wombat
+/* Where the fields of an IPv4 and a UDP header are, the one's-complement sum
+ * that covers them, and the datagram built and checked from both. */
+
 #include "ip.h"
 
 #include <string.h>

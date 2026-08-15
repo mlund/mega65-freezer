@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// Copyright 2026 Mikael Lund aka Wombat
+/* Where the fields of an ARP frame are, and the three things built from that
+ * one layout: a question, an answer, and the reading of a reply. */
+
 #include "arp.h"
 
 #include <string.h>

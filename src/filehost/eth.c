@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
+// Copyright 2026 Mikael Lund aka Wombat
+/* The 45E100 itself: the receive filter, the two buffers the controller
+ * offers a page at a time, and the DMA that moves a frame across. */
+
 #include "eth.h"
 
 #include "dma.h"
