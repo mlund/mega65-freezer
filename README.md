@@ -153,8 +153,10 @@ less.
   and attach a disk image from it to the frozen machine's drive. The catalogue is
   the fixed-width `catalog` file of
   [ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md),
-  read off the card as `CATALOG.M65`. Fetching it and the files it names over
-  TFTP is not here yet, so for now something else has to put both on the card.
+  read off the card as `CATALOG.M65`. The TFTP client that fetches it and the
+  files it names is here, checked on the host against RFC 1350 and driven on
+  hardware by `test/ethtest.c`, but the browser does not call it yet, so for
+  now something else has to put both on the card.
   The layers under it are: the 45E100 driver, ARP with a responder, IPv4, UDP
   and a DHCP client, each checked on the host against its RFC and on hardware,
   where the controller turns out to send and receive perfectly well from inside
@@ -162,10 +164,17 @@ less.
   when something on the LAN asks who holds that address. The DHCP client owns
   the whole exchange — a frame goes in, a frame comes out, and the ports and
   broadcast addresses RFC 2131 fixes never reach a caller — so the sequencing
-  is checked on the host too, not only the message formats. `E` runs an
+  is checked on the host too, not only the message formats. The TFTP client is
+  the same shape, and owns rather more: the port the server moves a transfer
+  to, which block is new and which the server saying it again, and asking how
+  big the file is before its first block is written down. `E` runs an
   ethernet probe and `R` listens without transmitting. `test/ethtest.c` is how
   the wire is seen at all — Xemu has no ethernet on macOS, so it runs on the
   machine under `etherload` and writes what arrived to a sector the host reads
+  back. It now takes a lease, resolves the TFTP server the lease named — or the
+  router in front of it — and fetches `catalog`, logging the block count, the
+  byte count, a sum to compare against the file on the server, and the first
+  sixteen bytes, which are the catalogue's own magic if the right file came
   back. An image is named on the card by five characters of its
   catalogue path and three of a hash of the whole path: the writer here emits
   8.3 short names only, and truncation alone would land two catalogue entries on

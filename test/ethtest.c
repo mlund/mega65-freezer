@@ -23,7 +23,8 @@
  * Then, as often as wanted, with no keypresses on the machine:
  *
  *   etherload -r ethtest.prg
- *   ...wait: the run listens, leases and then answers ARP for a while...
+ *   ...wait: the run listens, leases, fetches the catalogue, then answers ARP
+ *   for a while...
  *   mega65_ftp -e -y -c "secdump out.bin <sector> 1" -c "exit"
  *
  * The sector reads BUSY until the run finishes and ETH2 once it has, so a
@@ -31,7 +32,10 @@
  * green at the end.
  *
  * The addresses below are a LAN's, too: SENDER has to be free on it and TARGET
- * has to be something that answers.
+ * has to be something that answers.  The transfer needs no address of its own
+ * here -- the lease names the TFTP server, in option 150 -- so a LAN whose
+ * DHCP server says nothing about TFTP runs everything but that, and says so in
+ * the log rather than inventing a server to ask.
  */
 
 #include "arp.h"
@@ -43,6 +47,7 @@
 #include "mega65_regs.h"
 #include "netpoll.h"
 #include "sdcard.h"
+#include "tftp.h"
 
 #include <mega65.h>
 #include <string.h>
@@ -76,6 +81,26 @@ constexpr uint8_t LOG_LEASE_FIELDS = 4;
 static_assert(LOG_LEASE + LOG_LEASE_FIELDS * IPV4_BYTES <= LOG_HEADER,
     "the log header has run into the first frame slice");
 
+/* What the transfer left behind, in the half of the sector the frame slices
+ * stop short of.  Sixteen bytes of the first block because for `catalog` those
+ * are the magic and the version ether65's docs/FILEHOST.md §2 fixes, so the
+ * dump says not only that a transfer completed but that it brought back the
+ * file it asked for. */
+constexpr uint16_t LOG_TFTP = 256;
+constexpr uint16_t LOG_TFTP_STAGE = LOG_TFTP + 0;
+constexpr uint16_t LOG_TFTP_ERROR = LOG_TFTP + 2;
+constexpr uint16_t LOG_TFTP_SERVER_MAC = LOG_TFTP + 4;
+constexpr uint16_t LOG_TFTP_SIZE = LOG_TFTP + 12;
+constexpr uint16_t LOG_TFTP_BYTES = LOG_TFTP + 16;
+constexpr uint16_t LOG_TFTP_BLOCKS = LOG_TFTP + 20;
+constexpr uint16_t LOG_TFTP_SUM = LOG_TFTP + 22;
+constexpr uint16_t LOG_TFTP_FIRST = LOG_TFTP + 24;
+constexpr uint8_t LOG_TFTP_FIRST_BYTES = 16;
+static_assert(LOG_TFTP >= LOG_HEADER + FRAMES_LOGGED * FRAME_SLICE,
+    "the transfer's fields have run into the last frame slice");
+static_assert(LOG_TFTP_FIRST + LOG_TFTP_FIRST_BYTES <= SD_SECTOR_SIZE,
+    "the transfer's fields have run off the end of the sector");
+
 /* Long enough to see ordinary LAN traffic, short enough that a run finishes
  * while the host is still waiting for it.  Counted in video frames rather than
  * in poll iterations: the poll has to run tight, because the controller holds
@@ -89,6 +114,9 @@ constexpr uint16_t RESEND_FRAMES = 25;
 /* Long enough for a person to ping the leased address from the other end and
  * see whether it answers. */
 constexpr uint16_t SERVE_FRAMES = 600;
+/* And long enough for a catalogue: 33 KB is 65 blocks, one outstanding at a
+ * time, so what this budget really covers is the retransmissions. */
+constexpr uint16_t TRANSFER_FRAMES = 300;
 
 /* Far too much for the 16-bit window.  src/link.ld puts .netbuf above the code
  * at $A200 for the tools; this PRG links the platform's own script and its
@@ -132,9 +160,26 @@ static void restart_clock(void) {
     frames_elapsed = 0;
 }
 
-static void log_put16(uint8_t at, uint16_t value) {
+static void log_put16(uint16_t at, uint16_t value) {
     sector_buffer[at] = (uint8_t)value;
     sector_buffer[at + 1] = (uint8_t)(value >> 8);
+}
+
+static void log_put32(uint16_t at, uint32_t value) {
+    log_put16(at, (uint16_t)value);
+    log_put16((uint16_t)(at + 2), (uint16_t)(value >> 16));
+}
+
+/* Whether `there` can be reached without a router: the same network number
+ * under the mask the lease came with.  A TFTP server elsewhere is asked for
+ * through the router, which is the address to put on the wire instead. */
+static bool on_subnet(const uint8_t* there, const uint8_t* here, const uint8_t* netmask) {
+    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+        if ((there[i] ^ here[i]) & netmask[i]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 int main(void) {
@@ -265,6 +310,99 @@ int main(void) {
     if (dhcp_leased(&client)) {
         memcpy(us.ip, client.lease.ip, IPV4_BYTES);
     }
+
+    /* And now the point of the lease: fetch the catalogue over TFTP from the
+     * server the lease named.  Nothing is stored -- what is under test is the
+     * transfer, so the blocks are counted and summed and the first sixteen
+     * bytes kept, which for `catalog` are the magic that says the right file
+     * came back.  Sum the same file on the server to compare:
+     *
+     *   python3 -c "print(sum(open('catalog','rb').read()) & 0xFFFF)"
+     */
+    static_assert(sizeof net_out >= TFTP_SEND_BYTES, "no room to build a request");
+    static_assert(sizeof net_in >= TFTP_RECEIVE_BYTES, "a full block would be dropped");
+    uint8_t server_mac[MAC_BYTES] = {0};
+    if (dhcp_leased(&client) && client.lease.has_tftp) {
+        /* Who to ask on the wire is not who to address the datagram to: a
+         * server off this subnet is reached through the router, and it is the
+         * router's hardware address the frames must carry. */
+        const uint8_t* hop = on_subnet(client.lease.tftp, us.ip, client.lease.netmask)
+            ? client.lease.tftp
+            : client.lease.router;
+        restart_clock();
+        uint16_t asked_at = (uint16_t)(0 - RESEND_FRAMES);
+        while (frames_elapsed < LISTEN_FRAMES && net_zero(server_mac, MAC_BYTES)) {
+            tick();
+            if (frames_elapsed - asked_at >= RESEND_FRAMES) {
+                eth_send(net_out, arp_request(net_out, mac, us.ip, hop));
+                asked_at = frames_elapsed;
+            }
+            const uint16_t got = net_poll(net_in, ETH_MIN_RECEIVED, &us);
+            if (got) {
+                (void)arp_reply_from(net_in, got, hop, server_mac);
+            }
+        }
+    }
+
+    struct TftpClient transfer = {0};
+    uint16_t blocks = 0;
+    uint32_t fetched = 0;
+    uint16_t sum = 0;
+    if (!net_zero(server_mac, MAC_BYTES)) {
+        struct NetEndpoint server = {0};
+        memcpy(server.mac, server_mac, MAC_BYTES);
+        memcpy(server.ip, client.lease.tftp, IPV4_BYTES);
+        tftp_start(&transfer, &us, &server, "catalog", VICIV.fn_raster_lsb);
+
+        restart_clock();
+        uint16_t said = tftp_step(&transfer, nullptr, 0, net_out);
+        uint16_t said_at = 0;
+        while (frames_elapsed < TRANSFER_FRAMES && !tftp_done(&transfer)
+            && !tftp_failed(&transfer)) {
+            tick();
+            if (said) {
+                eth_send(net_out, said);
+                said_at = frames_elapsed;
+            }
+            /* net_poll() and not eth_receive(): this machine has an address
+             * now, and a transfer is exactly when the server asks who holds
+             * it -- an unanswered question there stops the blocks arriving
+             * however well the rest of this works.  The limit is the largest
+             * frame the transfer can be, so the LAN's other traffic is refused
+             * before the DMA rather than after. */
+            const uint16_t got = net_poll(net_in, TFTP_RECEIVE_BYTES, &us);
+            said = got ? tftp_step(&transfer, net_in, got, net_out) : 0;
+            if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
+                said = tftp_step(&transfer, nullptr, 0, net_out);
+            }
+            if (transfer.data_length) {
+                if (!blocks) {
+                    for (uint8_t i = 0; i < LOG_TFTP_FIRST_BYTES; i++) {
+                        sector_buffer[LOG_TFTP_FIRST + i] = net_in[TFTP_DATA_AT + i];
+                    }
+                }
+                blocks++;
+                fetched += transfer.data_length;
+                for (uint16_t i = 0; i < transfer.data_length; i++) {
+                    sum = (uint16_t)(sum + net_in[TFTP_DATA_AT + i]);
+                }
+            }
+        }
+        /* The acknowledgement the last block earned: the loop above ends on it
+         * rather than sending it, and a server that never hears it retries the
+         * whole of its last block and records a failure for a file that
+         * arrived whole. */
+        if (said) {
+            eth_send(net_out, said);
+        }
+    }
+    log_put16(LOG_TFTP_STAGE, transfer.stage);
+    log_put16(LOG_TFTP_ERROR, transfer.error);
+    memcpy(&sector_buffer[LOG_TFTP_SERVER_MAC], server_mac, MAC_BYTES);
+    log_put32(LOG_TFTP_SIZE, transfer.size);
+    log_put32(LOG_TFTP_BYTES, fetched);
+    log_put16(LOG_TFTP_BLOCKS, blocks);
+    log_put16(LOG_TFTP_SUM, sum);
 
     /* Now answer for the address just taken.  Nothing can send anything back
      * to this machine until it does: a server with a datagram for us asks who
