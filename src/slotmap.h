@@ -8,7 +8,7 @@
  * so finding an address means walking them and accumulating.
  *
  * Split from slot.c because none of this touches hardware and the host can run
- * it under test -- the same reason makedisk/layout.c is separate from the rest
+ * it under test -- the same reason layout.c is separate from the rest
  * of MAKEDISK. */
 
 #include <stdint.h>

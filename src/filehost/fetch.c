@@ -7,7 +7,6 @@
 
 #include "arp.h"
 #include "dhcp.h"
-#include "dma.h"
 #include "eth.h"
 #include "ip.h"
 #include "netpoll.h"
@@ -166,7 +165,7 @@ static bool resolved(void) {
     return !net_zero(server_mac, MAC_BYTES);
 }
 
-enum FetchResult fetch_file(const char* name, Addr28 into, uint32_t limit, uint32_t* length) {
+enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) {
     *length = 0;
     error_code = 0;
     if (!leased()) {
@@ -211,10 +210,13 @@ enum FetchResult fetch_file(const char* name, Addr28 into, uint32_t limit, uint3
             if (written + transfer.data_length > limit) {
                 return FetchTooBig;
             }
-            lcopy((Addr28)(uint16_t)&net_in[TFTP_DATA_AT],
-                into + (Addr28)written,
-                transfer.data_length);
+            fetch_store(written, &net_in[TFTP_DATA_AT], transfer.data_length);
             written += transfer.data_length;
+            /* `size` is zero until a server states one, so it says "not
+             * stated" by itself; testing has_size as well measured 23 bytes
+             * for an answer that cannot differ.  Read per block rather than
+             * held, which measured 53 bytes more. */
+            fetch_progress(written, transfer.size);
         }
         if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
             said = tftp_step(&transfer, nullptr, 0, net_out);

@@ -9,7 +9,7 @@ constexpr uint8_t SHORT_NAME_BYTES = 13;
  * nothing asked of the user.
  *
  * It has to be 8.3: fat32_create_contiguous_file() writes a short directory
- * entry and no long-name ones (src/makedisk/layout.c, fat_name_to_entry), and
+ * entry and no long-name ones (src/layout.c, fat_name_to_entry), and
  * hyppo's reader keeps only the first long-name block anyway (mega65-core
  * src/hyppo/dos.asm, "2nd and subsequent LFN blocks are not used"), so a longer
  * name is one mega65_dos_attach() may not find again.  The catalogue's own

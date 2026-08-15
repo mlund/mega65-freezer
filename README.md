@@ -153,14 +153,16 @@ less.
   and attach a disk image from it to the frozen machine's drive. The catalogue is
   the fixed-width `catalog` file of
   [ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md),
-  read off the card as `CATALOG.M65`, or fetched over TFTP with `F` — a lease,
-  the server's hardware address and the transfer, into the same buffer the card
-  copy occupies, so a fetch that fails costs the list on screen and not the copy
-  on the card. `S` names the server, since a household router hands out
-  addresses and has never heard of RFC 5859's option 150; `TFTP-IP.TXT` on the
-  card says it without typing. The images the catalogue names still have to be
-  put on the card by something else — that is the next piece, and the one that
-  needs a FAT writer.
+  read off the card as `CATALOG.M65` at start-up and fetched over TFTP on top of
+  it — a lease, the server's hardware address and the transfer, into the same
+  buffer the card copy occupies, so a fetch that fails costs the list on screen
+  and not the copy on the card. `F` fetches it again. Attaching an image the
+  card has not got fetches that too, onto the card under the 8.3 name derived
+  from its catalogue path, with a counter on the status line: the file has to be
+  contiguous, because a mounted image is read by counting sectors from a base.
+  `S` names the server, since a household router hands out addresses and has
+  never heard of RFC 5859's option 150; `TFTP-IP.TXT` on the card says it
+  without typing.
   The layers under it are: the 45E100 driver, ARP with a responder, IPv4, UDP
   and a DHCP client, each checked on the host against its RFC and on hardware,
   where the controller turns out to send and receive perfectly well from inside

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Browse the FileHost catalogue, fetch with no network, and attach an image.
 
-The whole of the tool that needs no network: the freeze menu launches it, it
+Everything the tool does when the wire is not there, which is a case worth
+holding still: start-up fetches and fails, so the list is the card's copy, and
+attaching an image the card has not got fetches and fails too.  The network path
+that works is checked on hardware by verify_filehost_hw.py.
+
+The rest of it: the freeze menu launches it, it
 reads a catalogue off the card, renders records the machine has never seen, and
 attaches the image one of them names.  The catalogue is written by
 test/filehost_catalog.py, which shares no code with the decoder under test.
@@ -41,11 +46,11 @@ CATALOG = fhc.catalogue(
         # Mixed case, so the render has to fold it.
         fhc.record("Attack of the Robots", "Somebody", IMAGE_PATH, fhc.D81, 819200),
         fhc.record("Hello World", "Nobody", "files/h/hello.prg", fhc.PRG, 4096),
-        # Named by the catalogue and not staged, which is every row until
-        # something fetches images.  Which code hyppo gives for a name it never
-        # found depends on whose hyppo: this emulator says file-not-found and
-        # the machine says end-of-directory, so both are read as "not here yet"
-        # and only one of the two is exercised here.
+        # Named by the catalogue and not staged, so attaching it is a fetch.
+        # Which code hyppo gives for a name it never found depends on whose
+        # hyppo: this emulator says file-not-found and the machine says
+        # end-of-directory, and both have to read as "fetch it" -- only one of
+        # the two is exercised here.
         fhc.record("Not Fetched Yet", "Nobody", "files/n/not_fetched.d81", fhc.D81, 819200),
     ]
 )
@@ -69,14 +74,22 @@ STEPS = [
     ("key", "down"),
     ("key", "return"),
     ("expect", "ONLY DISK IMAGES"),
+    # An image the card has not got is fetched rather than refused, so what
+    # comes back here is the network's answer -- and Xemu has no network.
     ("key", "down"),
     ("key", "return"),
-    ("expect", "NOT ON THE CARD YET"),
+    # Both halves on one line: why it failed, and that the file it created is
+    # still there and will not work.
+    ("expect", "A BAD FILE IS LEFT ON THE CARD", 60),
     # A fetch with no network at all.  Xemu has no ethernet, so nothing answers
     # the lease and the tool has to say so and put the card's catalogue back
     # rather than sit waiting -- the one part of the network path that can be
     # tested without a wire, and the part a user meets most often.
+    # Seen starting before its failure means anything: start-up has already
+    # left the same message on the status line, so without this the step passes
+    # on the previous screen even if the key did nothing.
     ("key", "f"),
+    ("expect", "FETCHING THE CATALOGUE"),
     ("expect", "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK", 30),
     # And an address typed in, since a household router names no TFTP server.
     # The field opens empty with the one in force named in the prompt, so what

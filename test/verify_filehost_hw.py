@@ -40,7 +40,8 @@ TOOL_SCREEN = h.Screen(at=0xB800)
 FETCH_TIMEOUT = 45.0
 # What fetch_catalog() can leave on the status line, from main.c's table.
 DONE = ("FETCHED", "NO ADDRESS", "NO TFTP SERVER", "DID NOT ANSWER", "REFUSED",
-        "STOPPED PART WAY", "LARGER THAN THE BUFFER", "NOT A CATALOGUE")
+        "STOPPED PART WAY", "MORE THAN THERE IS ROOM FOR", "NOT A CATALOGUE",
+        "CATALOGUE CUT SHORT", "THE CATALOGUE IS EMPTY")
 
 
 def to_freeze_menu(machine: h.Machine) -> None:

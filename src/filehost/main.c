@@ -1,9 +1,10 @@
 /* The FileHost browser: a catalogue of downloadable titles, and the disk image
  * one of them attaches to the frozen machine's drive.
  *
- * The catalogue comes off the card at start-up and over the network on demand;
- * the images it names still have to be put on the card by something else.  Only
- * the fetch needs a wire, so everything else here is testable without one. */
+ * The card's catalogue is shown at start-up and the network's fetched over it,
+ * and an image the catalogue names is fetched onto the card when attaching it
+ * finds it is not there.  Only the fetching needs a wire, so everything else
+ * here is testable without one. */
 
 #include "arp.h"
 #include "browser.h"
@@ -12,6 +13,7 @@
 #include "common.h"
 #include "dma.h"
 #include "eth.h"
+#include "fat32.h"
 #include "fetch.h"
 #include "format.h"
 #include "ip.h"
@@ -91,6 +93,10 @@ static struct CatalogRecord record;
  * case. */
 static bool slot_located;
 
+/* Which file a fetch is filling, or 0 for the catalogue buffer.  fetch.c owns
+ * the network and nothing else, so where the bytes land is decided here. */
+static uint32_t store_sector;
+
 /* Reads an address, and a port after it if the text names one, and tells
  * fetch.c.  Every way of naming a server goes through here, so none of them can
  * set one without the fetch hearing about it.
@@ -125,12 +131,16 @@ static void fetch_record(uint16_t index) {
     catalog_record(raw_record, &record);
 }
 
-/* Rounded up, so a file always reads as at least 1KB. */
+/* Kilobytes, rounded up so that a file always reads as at least 1KB, and a
+ * transfer never reads as having fetched nothing. */
+static char* append_kb(char* at, uint32_t bytes) {
+    at = append_dec(at, (uint16_t)((bytes + (1 << KILOBYTE_SHIFT) - 1) >> KILOBYTE_SHIFT));
+    return append_str(at, "KB");
+}
+
 static void draw_size(uint16_t cell, uint8_t colour, uint32_t bytes) {
     char text[WIDTH_SIZE + 1];
-    char* at = append_dec(text, (uint16_t)((bytes + (1 << KILOBYTE_SHIFT) - 1) >> KILOBYTE_SHIFT));
-    at = append_str(at, "KB");
-    *at = 0;
+    *append_kb(text, bytes) = 0;
     draw_field(cell, colour, text, WIDTH_SIZE);
 }
 
@@ -195,10 +205,86 @@ static void move_by(int16_t delta) {
     move_to((uint16_t)at);
 }
 
+/* Why a fetch did not happen, in the same words wherever it was asked for.
+ *
+ * A refusal is the one that carries a number: RFC 1350's code is the difference
+ * between a file the server has not got and one it will not part with, and only
+ * the second is worth arguing with. */
+static void say_fetch_failed(enum FetchResult result, const char* also) {
+    static const char* const why[] = {
+        "",
+        "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK",
+        "NO TFTP SERVER: PUT ONE IN TFTP-IP.TXT ON THE CARD",
+        "THE TFTP SERVER DID NOT ANSWER",
+        "", /* refused: the code is named below instead */
+        "THE TRANSFER STOPPED PART WAY",
+        "MORE THAN THERE IS ROOM FOR",
+    };
+    static_assert(sizeof why / sizeof *why == FetchTooBig + 1,
+        "a fetch result with no message would index past this table");
+
+    char text[SCREEN_COLS + 1];
+    char* at = append_str(text, why[result]);
+    if (result == FetchRefused) {
+        at = append_dec(append_str(text, "THE SERVER REFUSED IT, CODE "), fetch_error());
+    }
+    /* Both on one line: the reason is what to do something about, and what is
+     * now on the card is what to know before trying again. */
+    if (also) {
+        at = append_str(at, " -- ");
+        at = append_str(at, also);
+    }
+    *at = 0;
+    show_status(SchemeError, text);
+}
+
+/* The image the selected record names, onto the card under `name`.
+ *
+ * Contiguous because the hardware reads a mounted image by counting sectors
+ * from a base rather than by walking the FAT (mega65-core sdcardio.vhdl:380),
+ * which is also why nothing can be mounted out of memory.
+ *
+ * The length comes from the catalogue rather than from the server, the file
+ * having to exist at its full size before the first block arrives.
+ *
+ * That is a trap, and an unfixed one: a transfer failing part way leaves a file
+ * of the right name and the right length holding whatever arrived.  Hyppo
+ * checks an image's length and never its contents, so the next attach mounts it
+ * -- and cannot re-fetch it, since creating a file that exists is refused.  The
+ * writer can create and not remove, and until it can delete, the only honest
+ * thing this can do is say so. */
+static bool fetch_image(const char* name) {
+    if (!record.size) {
+        show_status(SchemeError, "THE CATALOGUE DOES NOT SAY HOW BIG IT IS");
+        return false;
+    }
+    if (fat32_open_file_system() != FreezerOk) {
+        show_status(SchemeError, "CANNOT READ THE CARD'S FILESYSTEM");
+        return false;
+    }
+
+    store_sector = fat32_create_contiguous_file(name, record.size);
+    if (!store_sector) {
+        /* No room, or the name is taken by a fetch that failed before -- the
+         * writer answers 0 to both and this cannot tell them apart. */
+        show_status(SchemeError, "COULD NOT MAKE THE FILE ON THE CARD");
+        return false;
+    }
+
+    uint32_t got = 0;
+    const enum FetchResult result = fetch_file(record.path, record.size, &got);
+    store_sector = 0;
+    if (result != FetchOk) {
+        say_fetch_failed(result, "A BAD FILE IS LEFT ON THE CARD");
+        return false;
+    }
+    return true;
+}
+
 /* Attaching writes the frozen process descriptor as well as the live one: the
  * unfreeze path re-reads those fields and reattaches from them, so a mount that
  * only happened live would not survive the resume.  This is the pair
- * src/makedisk/main.c performs after creating an image. */
+ * makedisk/main.c performs after creating an image. */
 static void attach_selected(void) {
     char name[SHORT_NAME_BYTES];
 
@@ -218,17 +304,22 @@ static void attach_selected(void) {
 
     catalog_short_name(record.path, record.kind, name);
     if (mega65_dos_attach(name, ATTACH_DRIVE)) {
+        /* Not on the card is the ordinary case rather than a failure: the
+         * catalogue names what FileHost has and the card holds what has been
+         * fetched, so the first attach is also how the question is asked.
+         * Anything else is a failure and is reported as one. */
         const uint8_t code = mega65_geterrorcode();
-        /* Only this one is worth its own wording: to the freezer's disk chooser
-         * a missing file is a missing file, but here it means the catalogue
-         * named something the card has not been given yet. */
-        /* Worth its own wording: to the freezer's disk chooser a missing file
-         * is a missing file, but here it means the catalogue named something
-         * the card has not been given yet. */
-        show_status(SchemeError,
-            hyppo_file_absent(code) ? "NOT ON THE CARD YET -- NOTHING FETCHES IMAGES SO FAR"
-                                    : hyppoerror_to_screen(code));
-        return;
+        if (!hyppo_file_absent(code)) {
+            show_status(SchemeError, hyppoerror_to_screen(code));
+            return;
+        }
+        if (!fetch_image(name)) {
+            return; /* which said why */
+        }
+        if (mega65_dos_attach(name, ATTACH_DRIVE)) {
+            show_status(SchemeError, hyppoerror_to_screen(mega65_geterrorcode()));
+            return;
+        }
     }
 
     if (hdos_new_attach) {
@@ -417,21 +508,46 @@ static void ethernet_probe(bool transmit) {
     draw_list();
 }
 
-/* True when there is a catalogue to browse.
+/* Where a fetch puts what arrives: the card when an image is being written,
+ * and the buffer the browser indexes otherwise.
  *
- * The buffer is cleared first because the load reports success or failure and
- * not a length: a truncated catalogue -- which is what an interrupted download
- * leaves behind -- would otherwise leave the records past its end reading
- * whatever the last tool left in this bank, and ROMLOAD stages a 128KB ROM image
- * here.  Cleared, those rows decode to empty text and kind 0, which the browser
- * shows as blank and refuses to attach.  The load itself is still unbounded,
- * which only hyppo could fix; a fetch over the network is told the length by
- * TFTP's `tsize` before it writes a byte. */
-/* The server address off the card, if the card names one.
+ * Which of the two is decided by `store_sector`, a file's first sector never
+ * being 0 -- fat32_create_contiguous_file() answers 0 for failure, so there is
+ * no second flag to keep in step with it.
  *
- * Read into the catalogue buffer because load_catalog() is about to clear it
- * anyway, and because read_file_from_sdcard() is unbounded: a file left there
- * by mistake lands in 128KB of scratch rather than over something. */
+ * A block is a sector, which is why the block size was left at 512 rather than
+ * negotiated up to a whole frame's worth. */
+void fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
+    static_assert(TFTP_BLOCK_BYTES == SD_SECTOR_SIZE,
+        "a block that is not a sector needs the offset carried between calls");
+    if (store_sector) {
+        fat32_write_file_sector(store_sector, offset, bytes, length);
+    } else {
+        lcopy((Addr28)(uint16_t)bytes, CATALOG_BUFFER + (Addr28)offset, length);
+    }
+}
+
+/* Kilobytes as they arrive.  Not every block: an image is sixteen hundred of
+ * them, and a redraw each would cost more than the transfer.  Every 8KB moves
+ * often enough to say the machine is alive. */
+void fetch_progress(uint32_t so_far, uint32_t total) {
+    static constexpr uint32_t EVERY = 0x2000;
+    /* Every 8KB, and always the last.  A short block is the last one, which is
+     * how the end is known when the server declined to say how big the file is
+     * and `total` is 0 -- without that the line would stop at the last
+     * multiple rather than at what arrived. */
+    if ((so_far & (EVERY - 1)) && so_far != total && so_far % TFTP_BLOCK_BYTES == 0) {
+        return;
+    }
+    char text[40];
+    char* at = append_kb(append_str(text, "FETCHED "), so_far);
+    if (total) {
+        at = append_kb(append_str(at, " OF "), total);
+    }
+    *at = 0;
+    show_status(SchemeText, text);
+}
+
 /* The server a fetch would go to, as text.  Asked of fetch.c rather than
  * remembered here: a lease can name one, and a screen showing what was typed
  * instead would name an address nothing is fetching from. */
@@ -533,8 +649,16 @@ static void clear_buffer(void) {
     }
 }
 
-/* Whether what is in the buffer is a catalogue this browser may index, given
- * that `bytes` of it are real.
+enum CatalogVerdict : uint8_t {
+    CatalogUnusable,
+    /* Indexable, and less than it says it is: the rows that arrived are worth
+     * showing, and calling that a clean fetch is not. */
+    CatalogPartial,
+    CatalogWhole,
+};
+
+/* What is in the buffer, read as a catalogue, given that `bytes` of it are
+ * real.
  *
  * The count is the file's claim and the browser's bound: fetch_record() reads
  * at the offset it names, so a count past what arrived -- a truncated transfer,
@@ -544,35 +668,41 @@ static void clear_buffer(void) {
  * `bytes` is what is in the buffer, so it is never more than the buffer holds:
  * the card path passes the buffer's own size and the fetch is refused above
  * that before a block is written. */
-static bool accept_catalog(uint32_t bytes) {
+
+static enum CatalogVerdict accept_catalog(uint32_t bytes) {
     lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)raw_record, CATALOG_HEADER_BYTES);
     if (bytes < CATALOG_HEADER_BYTES || !catalog_header(raw_record, &header)) {
         header = (struct CatalogHeader){0};
         show_status(SchemeError, "THAT IS NOT A CATALOGUE");
-        return false;
+        return CatalogUnusable;
     }
 
     const uint16_t fits = hw_div16(bytes - CATALOG_HEADER_BYTES, header.record_bytes);
-    if (header.record_count > fits) {
+    const bool cut = header.record_count > fits;
+    if (cut) {
         header.record_count = fits;
         show_status(SchemeWarning, "CATALOGUE CUT SHORT, SHOWING WHAT ARRIVED");
     }
     if (!header.record_count) {
         show_status(SchemeWarning, "THE CATALOGUE IS EMPTY");
-        return false;
+        return CatalogUnusable;
     }
-    return true;
+    return cut ? CatalogPartial : CatalogWhole;
 }
 
 static bool load_catalog(void) {
     clear_buffer();
     if (read_file_from_sdcard(CATALOG_FILE, CATALOG_BUFFER)) {
+        /* The buffer is cleared by now, so a count left over from whatever was
+         * in it would draw that many blank rows and claim they are records. */
+        header = (struct CatalogHeader){0};
         show_status(SchemeError, "NO " CATALOG_FILE " ON THE CARD");
         return false;
     }
     /* The loader says nothing about the length, so the whole buffer is what
      * may have been filled. */
-    return accept_catalog(CATALOG_BUFFER_BYTES);
+    /* Cut short is still worth browsing, and the warning already said so. */
+    return accept_catalog(CATALOG_BUFFER_BYTES) != CatalogUnusable;
 }
 
 static void draw_count(void) {
@@ -603,43 +733,25 @@ static void fetch_catalog(void) {
     /* Cleared first, so a catalogue shorter than the last one does not leave
      * the tail of the old one readable behind it. */
     clear_buffer();
+    store_sector = 0;
     uint32_t got = 0;
-    const enum FetchResult result =
-        fetch_file(CATALOG_NAME, CATALOG_BUFFER, CATALOG_BUFFER_BYTES, &got);
+    const enum FetchResult result = fetch_file(CATALOG_NAME, CATALOG_BUFFER_BYTES, &got);
     if (result != FetchOk) {
-        static const char* const why[] = {
-            "",
-            "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK",
-            "NO TFTP SERVER: PUT ONE IN TFTP-IP.TXT ON THE CARD",
-            "THE TFTP SERVER DID NOT ANSWER",
-            "", /* refused: the branch below names the code instead */
-            "THE TRANSFER STOPPED PART WAY",
-            "THE CATALOGUE IS LARGER THAN THE BUFFER",
-        };
-        static_assert(sizeof why / sizeof *why == FetchTooBig + 1,
-            "a fetch result with no message would index past this table");
         /* Whatever landed is half a catalogue, so the card's copy goes back
          * first -- and its own complaints are said before the one the user
          * pressed a key to hear. */
         (void)load_catalog();
         show_from_top();
-        if (result == FetchRefused) {
-            /* The code is the difference between a file that is not there and
-             * a server that will not part with it. */
-            char text[40];
-            char* at = append_str(text, "THE SERVER REFUSED IT, CODE ");
-            at = append_dec(at, fetch_error());
-            *at = 0;
-            show_status(SchemeError, text);
-        } else {
-            show_status(SchemeError, why[result]);
-        }
+        say_fetch_failed(result, nullptr);
         return;
     }
 
-    const bool usable = accept_catalog(got);
+    const enum CatalogVerdict verdict = accept_catalog(got);
     show_from_top();
-    if (usable) {
+    /* Only when there is nothing to say against it: accept_catalog() has
+     * already warned about a catalogue cut short, and "FETCHED" written over
+     * that warning reads as a clean transfer of half a list. */
+    if (verdict == CatalogWhole) {
         show_status(SchemeHighlight, "FETCHED");
     }
 }
@@ -728,11 +840,22 @@ int main(void) {
      * file waits until after, so the catalogue's own does not bury it. */
     fetch_set_server(DEFAULT_SERVER, DEFAULT_SERVER_PORT);
     const bool addressed = read_server_address();
-    load_catalog();
+    /* The card's copy on screen first, then the wire over the top of it.  The
+     * server's catalogue is what FileHost has now and the card's is as old as
+     * whenever it was put there, so the fetch is the source and the copy is the
+     * fallback -- but a lease and a transfer take seconds, and a list that is
+     * merely out of date beats a blank screen for the length of them.
+     *
+     * The address file's complaint is said before the fetch rather than after:
+     * whatever the fetch has to say is the newer news and the more actionable,
+     * so it is what stays on screen. */
+    if (load_catalog()) {
+        show_from_top();
+    }
     if (!addressed) {
         show_status(SchemeWarning, SERVER_FILE " IS NOT AN ADDRESS");
     }
-    draw_count();
+    fetch_catalog();
     browse();
 
     mega65_dos_exechelper("FREEZER.M65");

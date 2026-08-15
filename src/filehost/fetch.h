@@ -2,12 +2,10 @@
 // Copyright 2026 Mikael Lund aka Wombat
 #pragma once
 
-#include "addr28.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Fetching a named file off the network into memory, in one call.
+/* Fetching a named file off the network, in one call.
  *
  * Everything underneath is sans-io and tested on the host; this is where those
  * layers meet the wire, and so the one part of the stack that can only be tried
@@ -47,15 +45,28 @@ void fetch_set_server(const uint8_t* ip, uint16_t port);
  * typed instead would show an address nothing is fetching from. */
 [[nodiscard]] const uint8_t* fetch_server(uint16_t* port);
 
-/* Reads `name` into `into`, writing at most `limit` bytes, and says how many
- * arrived.
+/* Where the bytes go, and how far along it is.  Both are defined by whoever
+ * links this rather than passed in, so that fetching owns the network and the
+ * caller owns the destination: a buffer for a catalogue, the card itself for a
+ * disk image, and neither known here.
+ *
+ * `offset` counts from the start of the file, so a store need keep no position
+ * of its own.  A block is 512 bytes -- one sector -- until the last, which is
+ * shorter unless the file divides exactly.
+ *
+ * `total` is what the server said the file is, or 0 where it declined to say.
+ * An image is a thousand blocks and more, and a screen with nothing moving on
+ * it reads as a machine that has hung. */
+void fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length);
+void fetch_progress(uint32_t so_far, uint32_t total);
+
+/* Reads `name`, storing at most `limit` bytes, and says how many arrived.
  *
  * `length` is set on FetchOk and on FetchLost, where it says how far the
- * transfer got -- the bytes are there, but nothing should be read from them.
- * A file whose size the server states up front is refused before the first
- * block when it would not fit, which is what the tsize option is asked for. */
-[[nodiscard]] enum FetchResult fetch_file(
-    const char* name, Addr28 into, uint32_t limit, uint32_t* length);
+ * transfer got -- those bytes were stored, and nothing should be read from
+ * them.  A file whose size the server states up front is refused before the
+ * first block when it would not fit, which is what tsize is asked for. */
+[[nodiscard]] enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length);
 
 /* The code behind FetchRefused, RFC 1350 §5: 1 is no such file, 2 is a file the
  * server will not part with. */

@@ -601,12 +601,16 @@ class SerialChannel:
     """
 
     _IOSSIOSPEED = 0x80045402
+    _fd = -1  # a class attribute, so __del__ has one even if os.open() raised
 
     def __init__(self, device: str, baud: int = MONITOR_BAUD, timeout: float = PACKET_TIMEOUT):
         self.timeout = timeout
         self._fd = os.open(device, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
         with contextlib.ExitStack() as undo:
-            undo.callback(os.close, self._fd)
+            # Through close() rather than os.close, so a failure below forgets
+            # the descriptor as well as shutting it: closing it here and again
+            # from __del__ would shut whatever holds the number by then.
+            undo.callback(self.close)
             attributes = termios.tcgetattr(self._fd)
             # Raw: a terminal helpfully translating a monitor's bytes is a
             # terminal corrupting them.

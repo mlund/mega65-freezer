@@ -1,6 +1,6 @@
 #pragma once
 
-/* The parts of MAKEDISK that touch no hardware: FAT32 record encoding and the
+/* The parts of writing a disk image that touch no hardware: FAT32 record encoding and the
  * D81/D65 geometry.  Split out so the host can run them under test, the same
  * reason format.c is separate from screen.c. */
 

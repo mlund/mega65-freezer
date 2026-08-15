@@ -157,7 +157,16 @@ static uint32_t fat32_allocate_cluster(uint32_t cluster) {
   XXX -- Should allow creation of files in sub-directories
 
 */
-uint32_t fat32_create_contiguous_file(char* name, uint32_t size) {
+void fat32_write_file_sector(
+    uint32_t first_sector, uint32_t offset, const uint8_t* bytes, uint16_t length) {
+    lcopy((Addr28)(uint16_t)bytes, (Addr28)(uint16_t)sector_buffer, length);
+    if (length < SD_SECTOR_SIZE) {
+        lfill((Addr28)(uint16_t)&sector_buffer[length], 0, SD_SECTOR_SIZE - length);
+    }
+    sdcard_writesector(first_sector + offset / SD_SECTOR_SIZE, 0);
+}
+
+uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
     unsigned char i;
     unsigned char sn;
     uint16_t offset;
