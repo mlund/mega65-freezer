@@ -302,27 +302,45 @@ TEST_CASE("a datagram from elsewhere parses and verifies") {
 }
 
 /* An address typed by a person and read off the card, so every way of getting
- * it wrong arrives here rather than on the wire. */
+ * it wrong arrives here rather than on the wire.  A port may follow it, since
+ * a gateway on a port of its own is a gateway needing no root to run. */
 TEST_CASE("an address is read from text, or refused") {
     std::array<uint8_t, 4> got = {9, 9, 9, 9};
+    uint16_t port = 69;
 
-    REQUIRE(ip_parse("192.168.68.57", got.data()));
+    REQUIRE(ip_parse("192.168.68.57", got.data(), &port));
     CHECK(got == std::array<uint8_t, 4>{192, 168, 68, 57});
-    CHECK(ip_parse("0.0.0.0", got.data()));
-    CHECK(ip_parse("255.255.255.255", got.data()));
+    CHECK(port == 69);  // no port named, so the caller's own stands
+    CHECK(ip_parse("0.0.0.0", got.data(), &port));
+    CHECK(ip_parse("255.255.255.255", got.data(), &port));
     /* A file has a line ending, and an editor may leave a space. */
-    CHECK(ip_parse("10.0.0.1\n", got.data()));
-    CHECK(ip_parse("10.0.0.1\r\n", got.data()));
-    CHECK(ip_parse("10.0.0.1 ", got.data()));
+    CHECK(ip_parse("10.0.0.1\n", got.data(), &port));
+    CHECK(ip_parse("10.0.0.1\r\n", got.data(), &port));
+    CHECK(ip_parse("10.0.0.1 ", got.data(), &port));
     CHECK(got == std::array<uint8_t, 4>{10, 0, 0, 1});
+    CHECK(port == 69);
 
-    /* And everything that is not an address leaves the last one standing. */
+    /* And with a port, which is the whole point of allowing one. */
+    REQUIRE(ip_parse("10.0.0.2:6969", got.data(), &port));
+    CHECK(got == std::array<uint8_t, 4>{10, 0, 0, 2});
+    CHECK(port == 6969);
+    CHECK(ip_parse("10.0.0.2:65535\n", got.data(), &port));
+    CHECK(port == 65535);
+    /* One named once stays named: a later text without one does not put the
+     * reserved port back, it leaves what the caller is holding. */
+    CHECK(ip_parse("10.0.0.3", got.data(), &port));
+    CHECK(port == 65535);
+
+    /* And everything that is not an address leaves both alone. */
+    port = 6969;
     for (const char* bad : {"", "192.168.68", "192.168.68.57.1", "256.1.1.1", "1.2.3.4x",
                             "1..2.3", ".1.2.3", "1.2.3.", "a.b.c.d", "1 2 3 4",
-                            "99999.1.1.1", "-1.2.3.4"}) {
+                            "99999.1.1.1", "-1.2.3.4", "1.2.3.4:", "1.2.3.4:0",
+                            "1.2.3.4:70000", "1.2.3.4:69x", "1.2.3.4::69"}) {
         CAPTURE(bad);
-        CHECK_FALSE(ip_parse(bad, got.data()));
-        CHECK(got == std::array<uint8_t, 4>{10, 0, 0, 1});
+        CHECK_FALSE(ip_parse(bad, got.data(), &port));
+        CHECK(got == std::array<uint8_t, 4>{10, 0, 0, 3});
+        CHECK(port == 6969);
     }
 }
 

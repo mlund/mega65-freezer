@@ -43,11 +43,15 @@ constexpr uint8_t UDP_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES + UDP_HE
 /* Folds an accumulated sum into the sixteen bits a header carries. */
 [[nodiscard]] uint16_t ip_sum_final(uint32_t sum);
 
-/* The dotted-quad in `text` as four bytes, and false when it is not one -- in
- * which case `out` is left alone.  Whatever ends the line does not have to be
+/* The address in `text`, and the port after a colon if it names one: "10.0.0.1"
+ * or "10.0.0.1:6969".  False when it is neither, and then both outputs are left
+ * alone -- half an address is worse than the one already in use.
+ *
+ * `port` is untouched where no port is given, so a caller's own default stands
+ * without having to be spelled twice.  Whatever ends the line need not be
  * removed first: a terminator, a space or either newline character ends the
- * address, and anything else after it means the text is not an address. */
-[[nodiscard]] bool ip_parse(const char* text, uint8_t* out);
+ * text, and anything else after it means it is not an address. */
+[[nodiscard]] bool ip_parse(const char* text, uint8_t* out, uint16_t* port);
 
 /* Which address to put on the wire to reach `target`: `target` itself when it
  * shares this machine's network, and `router` when it does not.

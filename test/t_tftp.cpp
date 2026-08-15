@@ -195,6 +195,23 @@ TEST_CASE("a request travels as RFC 1350 says it must") {
     CHECK(other.us.port != client.c.us.port);  // a later run is not this one
 }
 
+/* A gateway on a port of its own is a gateway that needs no root, and RFC 1350
+ * fixes 69 only as where the request goes. */
+TEST_CASE("a server may be asked at a port of its own") {
+    TftpClient client{};
+    std::vector<uint8_t> out(TFTP_SEND_BYTES + 8, 0xEE);
+    const NetEndpoint us = endpoint(OUR_MAC, OUR_IP);
+    const NetEndpoint server = endpoint(SERVER_MAC, SERVER_IP, 6969);
+    tftp_start(&client, &us, &server, "catalog", SEED);
+
+    const uint16_t n = tftp_step(&client, nullptr, 0, out.data());
+    REQUIRE(n);
+    CHECK(((out[36] << 8) | out[37]) == 6969);
+    /* And the transfer still moves to whatever port the server answers from,
+     * which is not the one it was asked at. */
+    CHECK(client.server.port == 6969);
+}
+
 TEST_CASE("a timeout asks again") {
     Client client;
     const auto first = client.timeout();

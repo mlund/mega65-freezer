@@ -93,10 +93,12 @@ struct TftpClient {
 
 /* Begins a read of `name` from `server`.
  *
- * Both endpoints are addresses only: the ports are this module's, the server's
- * being the reserved one until the server names another and ours being chosen
- * from `seed` so that a late block from a previous transfer is not read as this
- * one's.  Any value the caller has that moves will do.
+ * Our own port is this module's, chosen from `seed` so that a late block from a
+ * previous transfer is not read as this one's; any value the caller has that
+ * moves will do.  The server's is the reserved one unless `server->port` names
+ * another -- a gateway on a port of its own needs no root to run, and RFC 1350
+ * fixes 69 only as where a request is sent.  Either way the server moves the
+ * transfer to a port it picks, and that one is nobody's to choose.
  *
  * `name` is not copied -- it is re-read on every retransmission, so it must
  * outlive the transfer.  A name too long for TFTP_NAME_MAX, or a machine that

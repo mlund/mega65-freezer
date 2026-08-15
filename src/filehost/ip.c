@@ -55,7 +55,7 @@ uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length) {
     return sum;
 }
 
-bool ip_parse(const char* text, uint8_t* out) {
+bool ip_parse(const char* text, uint8_t* out, uint16_t* port) {
     /* Into a copy, so a refusal partway leaves the caller's address alone --
      * half an address is worse than none, and the caller may be holding the
      * one it is already using. */
@@ -76,10 +76,34 @@ bool ip_parse(const char* text, uint8_t* out) {
             return false;
         }
     }
+    uint16_t named = 0;
+    if (*text == ':') {
+        text++;
+        if (*text < '0' || *text > '9') {
+            return false;
+        }
+        uint32_t value = 0;
+        while (*text >= '0' && *text <= '9') {
+            value = value * 10 + (uint8_t)(*text++ - '0');
+            if (value > 65535) {
+                return false;
+            }
+        }
+        /* Port zero is reserved and nothing listens on it, so a text that says
+         * so is a mistake rather than an instruction. */
+        if (!value) {
+            return false;
+        }
+        named = (uint16_t)value;
+    }
     if (*text && *text != ' ' && *text != '\r' && *text != '\n') {
         return false;
     }
+
     memcpy(out, parsed, IPV4_BYTES);
+    if (named) {
+        *port = named;
+    }
     return true;
 }
 

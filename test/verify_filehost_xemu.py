@@ -75,11 +75,12 @@ STEPS = [
     # was typed the first time was kept rather than merely echoed.
     ("key", "s"),
     ("expect", "NOW 192.168.68.57"),
-    ("type", "10.1.2.3"),
+    # With a port, since a gateway on one of its own needs no root to run.
+    ("type", "10.1.2.3:6969"),
     ("key", "return"),
     ("expect", "SERVER SET"),
     ("key", "s"),
-    ("expect", "NOW 10.1.2.3"),
+    ("expect", "NOW 10.1.2.3:6969"),
     ("type", "NOT.AN.ADDRESS"),
     ("key", "return"),
     ("expect", "THAT IS NOT AN ADDRESS"),

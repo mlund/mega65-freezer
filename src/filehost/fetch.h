@@ -35,9 +35,10 @@ enum FetchResult : uint8_t {
  * a household router hands out addresses and has never heard of RFC 5859's
  * option 150.  All zeros, until something says otherwise.
  *
- * A leased address still wins: whoever runs the network is a better authority
- * on it than a file left on a card. */
-void fetch_set_server(const uint8_t* ip);
+ * `port` is the reserved 69 unless a gateway was put somewhere else -- one on a
+ * port of its own needs no root to run.  A leased address still wins, at 69,
+ * since a lease names an address and no port to go with it. */
+void fetch_set_server(const uint8_t* ip, uint16_t port);
 
 /* Reads `name` into `into`, writing at most `limit` bytes, and says how many
  * arrived.

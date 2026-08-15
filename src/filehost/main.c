@@ -38,8 +38,10 @@
  * One line, an address in figures -- there is no resolver here to turn a name
  * into one. */
 #define SERVER_FILE "TFTP-IP.TXT"
-/* "255.255.255.255", its line ending, and a terminator. */
-static constexpr uint8_t SERVER_TEXT_BYTES = 18;
+/* "255.255.255.255:65535", its line ending, and a terminator. */
+static constexpr uint8_t SERVER_TEXT_BYTES = 24;
+/* Where TFTP is looked for when nothing says otherwise, RFC 1350's own. */
+static constexpr uint16_t TFTP_RESERVED_PORT = 69;
 /* Where the address starts before anything else says otherwise -- the machine
  * this was developed against.  A starting point for the editor rather than a
  * guess at the network: a lease, the card and the keyboard all override it. */
@@ -91,6 +93,9 @@ static bool slot_located;
  * or the keyboard says otherwise.  A lease that names one beats all three, and
  * fetch.c is where that is decided. */
 static uint8_t server_ip[IPV4_BYTES];
+/* And where on it.  The reserved port unless somebody names another, which is
+ * what lets a gateway run without root. */
+static uint16_t server_port = 69;
 
 /* One whole row, which is also how a row is cleared. */
 static void draw_line(uint8_t y, uint8_t colour, const char* text) {
@@ -416,6 +421,11 @@ static uint8_t write_server_text(char* text) {
         }
         at = append_dec(at, server_ip[i]);
     }
+    /* The reserved port is left unsaid, being what a bare address means. */
+    if (server_port != TFTP_RESERVED_PORT) {
+        *at++ = ':';
+        at = append_dec(at, server_port);
+    }
     *at = 0;
     return (uint8_t)(at - text);
 }
@@ -473,8 +483,8 @@ static void edit_server_address(void) {
 
     if (!length) {
         show_status(SchemeText, "");
-    } else if (ip_parse(text, server_ip)) {
-        fetch_set_server(server_ip);
+    } else if (ip_parse(text, server_ip, &server_port)) {
+        fetch_set_server(server_ip, server_port);
         show_status(SchemeHighlight, "SERVER SET -- F FETCHES THE CATALOGUE");
     } else {
         show_status(SchemeError, "THAT IS NOT AN ADDRESS");
@@ -493,8 +503,8 @@ static void read_server_address(void) {
     lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)text, sizeof text);
     text[sizeof text - 1] = 0;
 
-    if (ip_parse(text, server_ip)) {
-        fetch_set_server(server_ip);
+    if (ip_parse(text, server_ip, &server_port)) {
+        fetch_set_server(server_ip, server_port);
     } else {
         show_status(SchemeWarning, SERVER_FILE " IS NOT AN ADDRESS");
     }
@@ -696,7 +706,7 @@ int main(void) {
      * is empty and the message says why, but the ethernet probe -- the one
      * thing that does not need a catalogue -- is still reachable. */
     memcpy(server_ip, DEFAULT_SERVER, IPV4_BYTES);
-    fetch_set_server(server_ip);
+    fetch_set_server(server_ip, server_port);
     read_server_address();
     load_catalog();
     draw_count();

@@ -17,7 +17,8 @@ static constexpr uint8_t TFTP_OPTION_ACK = 6;
 static constexpr uint8_t TFTP_OPCODE_BYTES = 2;
 static constexpr uint8_t TFTP_HEADER_BYTES = 4;
 
-/* The reserved port a transfer opens at, before the server names its own. */
+/* The reserved port a transfer opens at when the caller names none, before the
+ * server names its own. */
 static constexpr uint16_t TFTP_PORT = 69;
 /* The dynamic range of RFC 6335, which is where a port a client picks for
  * itself belongs.  Seeded with anything that moves, the whole range is
@@ -229,7 +230,9 @@ void tftp_start(struct TftpClient* client,
     client->server = *server;
     client->name = name;
     client->us.port = (uint16_t)(EPHEMERAL_FIRST | seed);
-    client->server.port = TFTP_PORT;
+    if (!client->server.port) {
+        client->server.port = TFTP_PORT;
+    }
     /* An address of our own is as necessary as a name that fits: udp_parse()
      * reads an all-zero one as "accept any destination", which is what a
      * machine still asking for a lease needs and the opposite of what a

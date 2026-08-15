@@ -71,10 +71,12 @@ static struct DhcpClient lease;
 static struct NetEndpoint us;
 static uint8_t server_mac[MAC_BYTES];
 static uint8_t told_server[IPV4_BYTES];
+static uint16_t told_port;
 static uint8_t error_code;
 
-void fetch_set_server(const uint8_t* ip) {
+void fetch_set_server(const uint8_t* ip, uint16_t port) {
     memcpy(told_server, ip, IPV4_BYTES);
+    told_port = port;
     /* A server named after one was resolved is a different machine, so what
      * was resolved is no longer the answer. */
     memset(server_mac, 0, MAC_BYTES);
@@ -170,6 +172,9 @@ enum FetchResult fetch_file(const char* name, Addr28 into, uint32_t limit, uint3
     struct NetEndpoint server = {0};
     memcpy(server.mac, server_mac, MAC_BYTES);
     memcpy(server.ip, server_address(), IPV4_BYTES);
+    /* A lease names an address and no port with it, so one it named is asked at
+     * the reserved port; a told one is asked wherever it was put. */
+    server.port = lease.lease.has_tftp ? 0 : told_port;
     struct TftpClient transfer;
     tftp_start(&transfer, &us, &server, name, VICIV.fn_raster_lsb);
 
