@@ -53,6 +53,11 @@ endif()
 # Counting SD transactions.  Off by default so a shipping build carries neither
 # the counters nor the increments; on, a scenario can read them by name and say
 # how much traffic an operation costs.  See test/verify_sdcount_xemu.py.
+option(ETH_COUNTERS "Count frames sent, and frames sent over a busy transmitter" OFF)
+if(ETH_COUNTERS)
+    add_compile_definitions(ETH_COUNTERS)
+endif()
+
 option(SDCARD_COUNTERS "Count SD card reads and writes" OFF)
 if(SDCARD_COUNTERS)
     add_compile_definitions(SDCARD_COUNTERS)

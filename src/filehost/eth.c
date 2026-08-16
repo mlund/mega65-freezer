@@ -79,6 +79,18 @@ bool eth_tx_idle(void) {
     return (ETHERNET.ctrl1 & ETH_TXIDLE_MASK) != 0;
 }
 
+#ifdef ETH_COUNTERS
+/* Whether the bounded wait below ever runs out, which is the question these
+ * answer: a frame written over one still going out is a frame the wire never
+ * saw, and a lost acknowledgement mid-transfer is indistinguishable from the
+ * server never having been answered.  `eth_sends` is the denominator. */
+uint32_t eth_sends = 0;
+uint32_t eth_tx_busy = 0;
+#define COUNT_ETH(counter) ((counter)++)
+#else
+#define COUNT_ETH(counter) ((void)0)
+#endif
+
 void eth_send(const uint8_t* frame, uint16_t length) {
     /* A bound, not a wait: the longest frame this sends clocks out in about
      * 46 microseconds and this covers 71, while a longer ceiling would block
@@ -89,7 +101,12 @@ void eth_send(const uint8_t* frame, uint16_t length) {
      * the first is still going out replaces a frame the wire never saw, and
      * nothing downstream can tell.  Bounded, so a controller that never
      * reports idle costs a frame rather than the machine. */
-    for (uint8_t spin = 0; spin < TX_IDLE_LIMIT && !eth_tx_idle(); spin++) {
+    uint8_t spin = 0;
+    for (; spin < TX_IDLE_LIMIT && !eth_tx_idle(); spin++) {
+    }
+    COUNT_ETH(eth_sends);
+    if (spin >= TX_IDLE_LIMIT) {
+        COUNT_ETH(eth_tx_busy);
     }
     lcopy((Addr28)(uint16_t)frame, (Addr28)ETH_BUFFER, length);
     /* Padded in the transmit buffer rather than by the caller, so a short
