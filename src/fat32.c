@@ -12,6 +12,10 @@
 #include <mega65.h>
 #include <string.h>
 
+/* layout.c reads directory and FAT sectors out of the same buffer this fills,
+ * and cannot see sdcard.h to learn how big one is. */
+static_assert(FAT_SECTOR_BYTES == SD_SECTOR_SIZE, "layout.c would scan the wrong length");
+
 uint32_t root_dir_sector = 0;
 uint32_t fat1_sector = 0;
 uint32_t fat2_sector = 0;
@@ -144,6 +148,118 @@ static uint32_t fat32_allocate_cluster(uint32_t cluster) {
     return 0;
 }
 
+/* Which FAT sector the buffer holds, and whether it holds one at all -- a flag
+ * beside it rather than a biased number, since sector 0 is a real answer. */
+static uint32_t fat_held_at;
+static bool fat_held;
+
+/* Both FATs, since either copy is the one a reader may believe. */
+static void flush_fat(void) {
+    if (fat_held) {
+        sdcard_writesector(fat1_sector + fat_held_at, 0);
+        sdcard_writesector(fat2_sector + fat_held_at, 0);
+    }
+}
+
+/* Gives a chain's clusters back, a FAT sector at a time rather than a cluster at
+ * a time: a contiguous 800KB file is two sectors, not two hundred reads.
+ *
+ * The count is what stops a damaged chain that leads back into itself, and is
+ * flat rather than the FAT's own cluster count: 65535 clusters is a quarter of
+ * a gigabyte at the usual 4KB, far past anything this deletes, and a 16-bit
+ * counter measured 132 bytes less than the 32-bit one it takes to be exact. */
+static void free_chain(uint32_t cluster) {
+    uint16_t left = 0xffff;
+    fat_held = false;
+    while (left-- && cluster >= 2 && !fat_is_end_of_chain(cluster)) {
+        const uint32_t sector = cluster / SECTORS_PER_FAT_SECTOR;
+        if (!fat_held || fat_held_at != sector) {
+            flush_fat();
+            sdcard_readsector(fat1_sector + sector);
+            fat_held_at = sector;
+            fat_held = true;
+        }
+        uint32_t* const link =
+            (uint32_t*)&sector_buffer[(cluster & (SECTORS_PER_FAT_SECTOR - 1)) << 2];
+        cluster = *link & FAT_CLUSTER_MASK;
+        *link = 0;
+    }
+    flush_fat();
+}
+
+/* What find_in_root() answers with, beside its verdict.  Held here rather than
+ * returned through pointers: four out-parameters measured 51 bytes more than
+ * these do, the 6502 addressing a global directly and a pointer not. */
+static uint32_t found_sector;
+static uint16_t found_offset;
+static uint32_t last_dir_cluster;
+
+/* The root directory, sector by sector, for a name.
+ *
+ * FatSlotFound and FatSlotFree answer where -- an entry, or where a new one
+ * goes -- in found_sector and found_offset, and leave that sector in the
+ * buffer, which is what both callers go on to write to.  FatSlotAbsent means
+ * the directory ran out with neither, so last_dir_cluster is the one to chain
+ * another onto; only creating cares.
+ *
+ * One walk rather than two: removing a file asks the same question as creating
+ * one, and a second copy is a second place for the cluster arithmetic to be
+ * wrong.
+ *
+ * Out of line: MAKEDISK has only the one caller, and letting it inline there
+ * measured 104 bytes more. */
+__attribute__((noinline)) static enum FatSlot find_in_root(const char* name) {
+    uint32_t cluster = 2;
+    while (cluster >= 2 && !fat_is_end_of_chain(cluster)) {
+        // Invariant across the sector loop, so the cluster-to-sector multiply is
+        // done once per cluster on the accelerator rather than per sector in
+        // software.
+        const uint32_t base = root_dir_sector + hw_mul32(cluster - 2, sectors_per_cluster);
+        for (uint8_t sn = 0; sn < sectors_per_cluster; sn++) {
+            sdcard_readsector(base + sn);
+            const enum FatSlot slot = fat_find_in_sector(sector_buffer, name, &found_offset);
+            if (slot != FatSlotAbsent) {
+                found_sector = base + sn;
+                return slot;
+            }
+        }
+        last_dir_cluster = cluster;
+        cluster = fat32_follow_cluster(cluster);
+    }
+    return FatSlotAbsent;
+}
+
+/* The length FAT32 records for a file, at offset $1C of its entry. */
+static constexpr uint8_t FAT_ENTRY_SIZE_AT = 0x1c;
+
+uint32_t fat32_file_first_sector(const char* name, uint32_t size) {
+    if (find_in_root(name) != FatSlotFound) {
+        return 0;
+    }
+    if (*(uint32_t*)&sector_buffer[found_offset + FAT_ENTRY_SIZE_AT] != size) {
+        return 0;
+    }
+    return fat_cluster_first_sector(root_dir_sector,
+        fat_entry_first_cluster(&sector_buffer[found_offset]), sectors_per_cluster);
+}
+
+bool fat32_delete_file(const char* name) {
+    if (find_in_root(name) != FatSlotFound) {
+        return false;
+    }
+
+    // Read before it is stamped over: the entry is the only record of where the
+    // chain begins, and the search left its sector in the buffer.
+    const uint32_t first = fat_entry_first_cluster(&sector_buffer[found_offset]);
+    sector_buffer[found_offset] = FAT_ENTRY_DELETED;
+    sdcard_writesector(found_sector, 0);
+
+    // The entry goes first: clusters freed under a name still in the directory
+    // would be handed to the next file while this one can still be opened.
+    free_chain(first);
+    return true;
+}
+
 /*
   Create a file in the root directory of the new FAT32 filesystem
   with the indicated name and size.
@@ -167,82 +283,41 @@ void fat32_write_file_sector(
 }
 
 uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
-    unsigned char i;
-    unsigned char sn;
     uint16_t offset;
     uint16_t j;
     uint16_t clusters;
     uint32_t k;
     uint32_t start_cluster = 0;
-    uint32_t dir_cluster = 2;
-    uint32_t last_dir_cluster = 2;
     uint32_t contiguous_clusters = 0;
     uint32_t fat_sector_num = 0;
     uint32_t fat_sector_count = 0;
 
-    unsigned char have_dir_slot = 0;
-    uint32_t free_dir_sector_num = 0;
-    uint16_t free_dir_sector_ofs = 0;
     struct M65Tm tm = {};
-
-    char message[FAT_NAME_TEXT];
 
     clusters = hw_div16_ceil(size, (uint32_t)sectors_per_cluster << 9);
 
-    // Look for a free directory slot.
-    // Also complain if the file already exists
-    while (dir_cluster >= 2 && !fat_is_end_of_chain(dir_cluster)) {
-        // Invariant across the sector loop, so the cluster-to-sector multiply is
-        // done once per cluster on the accelerator rather than per sector in
-        // software.
-        const uint32_t dir_sector =
-            root_dir_sector + hw_mul32(dir_cluster - 2, sectors_per_cluster);
-        for (sn = 0; sn < sectors_per_cluster; sn++) {
-            sdcard_readsector(dir_sector + sn);
-            for (offset = 0; offset < SD_SECTOR_SIZE; offset += 32) {
-                fat_name_from_entry(&sector_buffer[offset], message);
-                if (!strcmp(message, name)) {
-                    // ERROR: Name already exists
-                    TRACE("file already exists");
-                    return 0;
-                }
-                // Is the slot free?
-                if (sector_buffer[offset] == 0) {
-                    free_dir_sector_num = dir_sector + sn;
-                    free_dir_sector_ofs = offset;
-                    have_dir_slot = 1;
-                    break;
-                }
-            }
-            if (have_dir_slot) {
-                break;
-            }
+    // Where the entry goes, and a refusal if the name is taken.
+    const enum FatSlot slot = find_in_root(name);
+    if (slot == FatSlotFound) {
+        TRACE("file already exists");
+        return 0;
+    }
+    if (slot == FatSlotAbsent) {
+        // Every slot taken, so the directory gets another cluster.  Zeroed, so
+        // its first entry is the free one -- no need to go looking again.
+        /* Zero is the only failure it can answer: what it returns otherwise is
+         * an index into the FAT it just searched, which cannot reach the
+         * end-of-chain values. */
+        const uint32_t dir_cluster = fat32_allocate_cluster(last_dir_cluster);
+        if (!dir_cluster) {
+            TRACE("no room to extend the directory");
+            return 0;
         }
-        // Stop once we have found a free directory slot
-        if (have_dir_slot) {
-            break;
-        }
-
-        // Chain to next directory cluster, and extend directory
-        // if required.
-        last_dir_cluster = dir_cluster;
-        dir_cluster = fat32_follow_cluster(dir_cluster);
-        if ((!dir_cluster) || fat_is_end_of_chain(dir_cluster)) {
-            // End of directory --
-            dir_cluster = fat32_allocate_cluster(last_dir_cluster);
-
-            if ((!dir_cluster) || fat_is_end_of_chain(dir_cluster)) {
-                // Disk full
-                return 0;
-            } else {
-                // Zero out new directory cluster
-                clear_sector_buffer();
-                const uint32_t new_dir_sector =
-                    root_dir_sector + hw_mul32(dir_cluster - 2, sectors_per_cluster);
-                for (sn = 0; sn < sectors_per_cluster; sn++) {
-                    sdcard_writesector(new_dir_sector + sn, 0);
-                }
-            }
+        clear_sector_buffer();
+        found_sector = root_dir_sector + hw_mul32(dir_cluster - 2, sectors_per_cluster);
+        found_offset = 0;
+        for (uint8_t sn = 0; sn < sectors_per_cluster; sn++) {
+            sdcard_writesector(found_sector + sn, 0);
         }
     }
 
@@ -307,31 +382,24 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
     }
 
     // Build directory entry
-    sdcard_readsector(free_dir_sector_num);
-    // Clear entry
-    for (i = 0; i < 32; i++) {
-        sector_buffer[free_dir_sector_ofs + i] = 0x00;
-    }
-    fat_name_to_entry(name, &sector_buffer[free_dir_sector_ofs]);
-    sector_buffer[free_dir_sector_ofs + 0x0b] = 0x20; // Archive bit set
+    sdcard_readsector(found_sector);
+    memset(&sector_buffer[found_offset], 0, FAT_ENTRY_BYTES);
+    fat_name_to_entry(name, &sector_buffer[found_offset]);
+    sector_buffer[found_offset + 0x0b] = 0x20; // Archive bit set
 
     getrtc(&tm);
 
     // Create time 0x0e -- 0x0f, create date 0x10 -- 0x11
-    *(uint16_t*)&sector_buffer[free_dir_sector_ofs + 0x0e] = fat_pack_time(&tm);
-    *(uint16_t*)&sector_buffer[free_dir_sector_ofs + 0x10] = fat_pack_date(&tm);
-    // Start cluster
-    sector_buffer[free_dir_sector_ofs + 0x1A] = (uint8_t)start_cluster;
-    sector_buffer[free_dir_sector_ofs + 0x1B] = (uint8_t)(start_cluster >> 8);
-    sector_buffer[free_dir_sector_ofs + 0x14] = (uint8_t)(start_cluster >> 16);
-    sector_buffer[free_dir_sector_ofs + 0x15] = start_cluster >> 24;
+    *(uint16_t*)&sector_buffer[found_offset + 0x0e] = fat_pack_time(&tm);
+    *(uint16_t*)&sector_buffer[found_offset + 0x10] = fat_pack_date(&tm);
+    fat_entry_set_first_cluster(&sector_buffer[found_offset], start_cluster);
     // File length
-    sector_buffer[free_dir_sector_ofs + 0x1C] = (size >> 0) & 0xff;
-    sector_buffer[free_dir_sector_ofs + 0x1D] = (size >> 8L) & 0xff;
-    sector_buffer[free_dir_sector_ofs + 0x1E] = (size >> 16L) & 0xff;
-    sector_buffer[free_dir_sector_ofs + 0x1F] = (size >> 24l) & 0xff;
+    sector_buffer[found_offset + 0x1C] = (size >> 0) & 0xff;
+    sector_buffer[found_offset + 0x1D] = (size >> 8L) & 0xff;
+    sector_buffer[found_offset + 0x1E] = (size >> 16L) & 0xff;
+    sector_buffer[found_offset + 0x1F] = (size >> 24l) & 0xff;
 
-    sdcard_writesector(free_dir_sector_num, 0);
+    sdcard_writesector(found_sector, 0);
 
     return fat_cluster_first_sector(root_dir_sector, start_cluster, sectors_per_cluster);
 }

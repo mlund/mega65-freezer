@@ -20,8 +20,11 @@ A test is the steps and nothing else:
 
 `expect_file` is checked after the run, once the image is closed, and its name
 must not already be on the card -- a test that finds what it meant to create
-proves nothing.  `count` reads a counter out of the running tool by name:
-("count", "MAKEDISK.sd_reads", 1600) looks the symbol up in that tool's ELF.
+proves nothing.  ("expect_no_file", NAME) is the mirror, for a tool that removes
+one: the name must be on the card before the run, and afterwards both the entry
+and the clusters it held have to be gone.  `count` reads a counter out of the
+running tool by name: ("count", "MAKEDISK.sd_reads", 1600) looks the symbol up
+in that tool's ELF.
 
 The step vocabulary and the polling are the harness's; see m65harness.py.
 """
@@ -43,20 +46,44 @@ import m65harness
 # first keypress a scenario sends.
 READY = "MEGA65 FREEZE MENU"
 
-# Offset of the size field in a FAT32 directory entry.
+# Fields of a FAT32 directory entry.  The first cluster is in two pieces.
 _ENTRY_SIZE_AT = 28
+_ENTRY_CLUSTER_HIGH_AT = 20
+_ENTRY_CLUSTER_LOW_AT = 26
+
+# Steps checked against the card once the emulator has closed the image, rather
+# than sent to the machine.
+_CARD_CHECKS = ("expect_file", "expect_no_file")
 
 
-def _entry_size(image: str, name: str) -> int | None:
-    """What FAT32 records for a file, read independently of whatever wrote it."""
+def _entry(image: str, name: str) -> bytes | None:
+    """A file's directory entry, read independently of whatever wrote it."""
     with open(image, "rb") as handle:
         fs = fat32.FAT32(handle, card.partition_offset(image))
         at, _ = fs.find(fat32.short_name(name))
         if at is None:
             return None
         handle.seek(at)
-        entry = handle.read(32)
+        return handle.read(32)
+
+
+def _entry_size(entry: bytes) -> int:
     return struct.unpack_from("<I", entry, _ENTRY_SIZE_AT)[0]
+
+
+def _entry_cluster(entry: bytes) -> int:
+    return (struct.unpack_from("<H", entry, _ENTRY_CLUSTER_HIGH_AT)[0] << 16) | struct.unpack_from(
+        "<H", entry, _ENTRY_CLUSTER_LOW_AT
+    )[0]
+
+
+def _cluster_is_free(image: str, cluster: int) -> bool:
+    """Whether the FAT has the cluster back.  Asked as well as whether the name
+    is gone: a delete that stamps the directory and leaks the chain loses the
+    card's free space a file at a time, and the name alone would not show it."""
+    with open(image, "rb") as handle:
+        fs = fat32.FAT32(handle, card.partition_offset(image))
+        return fs.get(cluster) == fat32.FREE
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -126,13 +153,23 @@ def run(description: str, prg: str, steps, *, extras: dict[str, bytes] | None = 
     with staged_card(args, extras=extras) as (clone, _tmp):
         wanted_files = [s[1:] for s in steps if s[0] == "expect_file"]
         for name, _ in wanted_files:
-            if _entry_size(clone, name) is not None:
+            if _entry(clone, name) is not None:
                 sys.exit(f"{name} is already on the card; the test would prove nothing")
+
+        # The mirror: a file has to be there before the run, or a delete that
+        # never happened reads exactly like one that worked.  Where its chain
+        # begins is taken now, the entry being what says so and about to go.
+        doomed = []
+        for (name,) in [s[1:] for s in steps if s[0] == "expect_no_file"]:
+            entry = _entry(clone, name)
+            if entry is None:
+                sys.exit(f"{name} is not on the card; deleting it would prove nothing")
+            doomed.append((name, _entry_cluster(entry)))
 
         status = m65harness.run(
             args,
             prg,
-            [s for s in steps if s[0] != "expect_file"],
+            [s for s in steps if s[0] not in _CARD_CHECKS],
             sdimg=clone,
             ready=READY,
             symbol=symbol_reader(args.build),
@@ -142,11 +179,16 @@ def run(description: str, prg: str, steps, *, extras: dict[str, bytes] | None = 
             return status
         problems = []
         for name, size in wanted_files:
-            got = _entry_size(clone, name)
-            if got is None:
+            entry = _entry(clone, name)
+            if entry is None:
                 problems.append(f"{name} is not on the card")
-            elif got != size:
-                problems.append(f"{name} is {got} bytes, expected {size}")
+            elif _entry_size(entry) != size:
+                problems.append(f"{name} is {_entry_size(entry)} bytes, expected {size}")
+        for name, cluster in doomed:
+            if _entry(clone, name) is not None:
+                problems.append(f"{name} is still on the card")
+            elif not _cluster_is_free(clone, cluster):
+                problems.append(f"{name} is gone but cluster {cluster} is still taken")
 
     if problems:
         sys.stdout.write("\n".join(problems) + "\n")

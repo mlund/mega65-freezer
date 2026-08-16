@@ -14,11 +14,24 @@ constexpr uint8_t FAT_NAME_STEM = 8;
 /* "STEM.EXT" plus terminator. */
 constexpr uint8_t FAT_NAME_TEXT = 13;
 
+/* One SD sector, which is also one directory sector and one FAT sector.  Named
+ * here rather than taken from sdcard.h, which the host cannot compile; fat32.c
+ * asserts the two agree. */
+constexpr uint16_t FAT_SECTOR_BYTES = 512;
 constexpr uint16_t SECTORS_PER_FAT_SECTOR = 128; /* 512 bytes / 4 per entry */
+/* Name, attributes, timestamps, first cluster and length. */
+constexpr uint8_t FAT_ENTRY_BYTES = 32;
+/* Written over the first byte of the name to remove a file, which is why a
+ * deleted entry still reads as most of what it was called. */
+constexpr uint8_t FAT_ENTRY_DELETED = 0xe5;
 
 /* A cluster number at or above this ends a chain.  The top four bits of a FAT32
  * entry are reserved, so only the low 28 count. */
 constexpr uint32_t FAT_END_OF_CHAIN = 0x0ffffff8;
+/* Which is what this keeps: a formatter may leave the reserved bits set, and a
+ * chain read without dropping them has neither a cluster number nor an
+ * end-of-chain marker that compares as either. */
+constexpr uint32_t FAT_CLUSTER_MASK = 0x0fffffff;
 
 /* The clock fields the directory entry stamps.  The RTC also reports weekday
  * and daylight saving; nothing here reads them. */
@@ -68,3 +81,27 @@ uint32_t fat_cluster_first_sector(
 void fat_name_from_entry(const uint8_t* entry, char* out);
 /* The reverse: "STEM.EXT" into 11 space-padded bytes. */
 void fat_name_to_entry(const char* name, uint8_t* entry);
+
+/* What one directory sector says about a name. */
+enum FatSlot : uint8_t {
+    FatSlotAbsent, /* not here, and the directory carries on past this sector */
+    FatSlotFound,  /* `offset` is the entry */
+    FatSlotFree,   /* `offset` is an unused entry, and since one ends the
+                      directory, the name is nowhere at all */
+};
+
+/* Where `name` sits in one directory sector, or where a new entry would go.
+ *
+ * Both questions in one pass because both callers ask them together: creating a
+ * file must not take a name that exists, and removing one must not stop at an
+ * entry that was merely deleted -- $E5 replaces the first byte of the name and
+ * leaves the rest readable, so a deleted entry is skipped rather than matched.
+ * It is not reused either: remembering one across sectors until the directory's
+ * end costs more than the entry it would save. */
+[[nodiscard]] enum FatSlot fat_find_in_sector(
+    const uint8_t* sector, const char* name, uint16_t* offset);
+
+/* An entry's first cluster, which FAT32 stores in two pieces: the low word
+ * where FAT16 kept the whole of it, and the high word sixteen bytes earlier. */
+[[nodiscard]] uint32_t fat_entry_first_cluster(const uint8_t* entry);
+void fat_entry_set_first_cluster(uint8_t* entry, uint32_t cluster);

@@ -78,9 +78,9 @@ STEPS = [
     # comes back here is the network's answer -- and Xemu has no network.
     ("key", "down"),
     ("key", "return"),
-    # Both halves on one line: why it failed, and that the file it created is
-    # still there and will not work.
-    ("expect", "A BAD FILE IS LEFT ON THE CARD", 60),
+    # Both halves on one line: why it failed, and that nothing half-written was
+    # left behind to be mounted as a working image later.
+    ("expect", "THE FILE WAS REMOVED", 60),
     # A fetch with no network at all.  Xemu has no ethernet, so nothing answers
     # the lease and the tool has to say so and put the card's catalogue back
     # rather than sit waiting -- the one part of the network path that can be
@@ -110,11 +110,26 @@ STEPS = [
     # keyboard, and the modifier does not reach the key queue.
     ("key", ","),
     ("key", "return"),
+    # The card already holds this one, so the choice is offered rather than
+    # taken: a fetched image can be attached, or replaced when what arrived was
+    # rubbish, which is the only repair a machine without a PC beside it has.
+    ("expect", "ATTACH OR REPLACE"),
+    ("key", "a"),
     ("expect", f"ATTACHED {IMAGE}", 30),
     # Out, and the freeze menu's drive row has to agree.
     ("key", "stop"),
     ("expect", "MEGA65 FREEZE MENU", 30),
     ("expect_row", 21, IMAGE),
+    # Last, because it destroys what the steps above needed: replacing writes
+    # over the file and, with no network, the fetch that follows fails -- so
+    # what this proves is the removal, on a file that really was there.
+    ("key", "d"),
+    ("expect_row", FIRST, "ATTACK OF THE ROBOTS", 30),
+    ("key", "return"),
+    ("expect", "ATTACH OR REPLACE"),
+    ("key", "r"),
+    ("expect", "THE FILE WAS REMOVED", 60),
+    ("expect_no_file", IMAGE),
 ]
 
 if __name__ == "__main__":

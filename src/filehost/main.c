@@ -97,6 +97,17 @@ static bool slot_located;
  * the network and nothing else, so where the bytes land is decided here. */
 static uint32_t store_sector;
 
+/* One keypress, with the queue left empty behind it so the next wait is not
+ * answered by this one. */
+static uint8_t wait_key(void) {
+    uint8_t key;
+    while (!(key = ASCIIKEY)) {
+        ;
+    }
+    ASCIIKEY = 0;
+    return key;
+}
+
 /* Reads an address, and a port after it if the text names one, and tells
  * fetch.c.  Every way of naming a server goes through here, so none of them can
  * set one without the fetch hearing about it.
@@ -223,7 +234,11 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
     static_assert(sizeof why / sizeof *why == FetchTooBig + 1,
         "a fetch result with no message would index past this table");
 
-    char text[SCREEN_COLS + 1];
+    /* Wider than the row on purpose: the two halves together run past 80
+     * characters -- naming no server and then what is left on the card is 84 --
+     * and draw_field() clips what will not fit.  The buffer is what must not be
+     * the thing that gives. */
+    char text[SCREEN_COLS + 16];
     char* at = append_str(text, why[result]);
     if (result == FetchRefused) {
         at = append_dec(append_str(text, "THE SERVER REFUSED IT, CODE "), fetch_error());
@@ -238,22 +253,28 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
     show_status(SchemeError, text);
 }
 
-/* The image the selected record names, onto the card under `name`.
+/* The image the selected record names, onto the card under `name`, whole or not
+ * at all.
  *
  * Contiguous because the hardware reads a mounted image by counting sectors
  * from a base rather than by walking the FAT (mega65-core sdcardio.vhdl:380),
  * which is also why nothing can be mounted out of memory.
  *
  * The length comes from the catalogue rather than from the server, the file
- * having to exist at its full size before the first block arrives.
+ * having to exist at its full size before the first block arrives.  So a
+ * transfer that stops part way leaves a file of the right name and length
+ * holding a correct head and a stale tail, and hyppo checks an image's length
+ * and never its contents -- it would mount as a working disk.  Removing it is
+ * the whole of the answer: this owns the cleanup so that no caller can be the
+ * one that forgot it.
  *
- * That is a trap, and an unfixed one: a transfer failing part way leaves a file
- * of the right name and the right length holding whatever arrived.  Hyppo
- * checks an image's length and never its contents, so the next attach mounts it
- * -- and cannot re-fetch it, since creating a file that exists is refused.  The
- * writer can create and not remove, and until it can delete, the only honest
- * thing this can do is say so. */
-static bool fetch_image(const char* name) {
+ * `replace` is the file that is already there and wrong.  It is written over
+ * where it lies rather than removed and remade: the file is the length the
+ * catalogue names and hyppo has just mounted it, so it is contiguous and the
+ * right size, and remaking it could fail after the delete had already destroyed
+ * it -- the writer takes only wholly free FAT sectors, so the space a delete
+ * returns is usually not space it can take again. */
+static bool fetch_image(const char* name, bool replace) {
     if (!record.size) {
         show_status(SchemeError, "THE CATALOGUE DOES NOT SAY HOW BIG IT IS");
         return false;
@@ -263,11 +284,12 @@ static bool fetch_image(const char* name) {
         return false;
     }
 
-    store_sector = fat32_create_contiguous_file(name, record.size);
+    store_sector = replace ? fat32_file_first_sector(name, record.size)
+                           : fat32_create_contiguous_file(name, record.size);
     if (!store_sector) {
-        /* No room, or the name is taken by a fetch that failed before -- the
-         * writer answers 0 to both and this cannot tell them apart. */
-        show_status(SchemeError, "COULD NOT MAKE THE FILE ON THE CARD");
+        show_status(SchemeError,
+            replace ? "THE FILE ON THE CARD IS NOT THE RIGHT SIZE"
+                    : "COULD NOT MAKE THE FILE ON THE CARD");
         return false;
     }
 
@@ -275,10 +297,57 @@ static bool fetch_image(const char* name) {
     const enum FetchResult result = fetch_file(record.path, record.size, &got);
     store_sector = 0;
     if (result != FetchOk) {
-        say_fetch_failed(result, "A BAD FILE IS LEFT ON THE CARD");
+        /* Said as it happened rather than as it was meant to: a delete that
+         * fails leaves exactly the file this was written to prevent. */
+        say_fetch_failed(result,
+            fat32_delete_file(name) ? "THE FILE WAS REMOVED"
+                                    : "A BAD FILE IS LEFT ON THE CARD");
         return false;
     }
     return true;
+}
+
+/* Mounts it, saying why if it will not.  Not the first attach of all, which is
+ * a question rather than an instruction and reads its own answer.
+ *
+ * `name` is not const because hyppo's attach takes it as it is given. */
+static bool attached(char* name) {
+    if (mega65_dos_attach(name, ATTACH_DRIVE)) {
+        show_status(SchemeError, hyppoerror_to_screen(mega65_geterrorcode()));
+        return false;
+    }
+    return true;
+}
+
+/* The card already holds this image, so which of the two was meant.
+ *
+ * Asked rather than assumed because neither answer is safe to guess: attaching
+ * a corrupt image mounts rubbish, and fetching over a good one costs an 800KB
+ * transfer nobody asked for.  A file that arrived wrong cannot be told from one
+ * that arrived whole -- hyppo checks length and never contents -- so the user
+ * is the only judge of which this is.
+ *
+ * The mount has already happened by the time this is asked -- the attach is
+ * how the card was asked whether it holds the file at all.  Answering A only
+ * has to write the descriptor that survives the resume.  Answering R writes
+ * over a file the drive is still attached to, and if the fetch then fails the
+ * file is removed under it; what the frozen machine resumes with is unaffected,
+ * that descriptor being written only on the way out. */
+static bool attach_or_replace(char* name) {
+    char text[SHORT_NAME_BYTES + 32];
+    char* at = append_str(text, "ATTACH OR REPLACE ");
+    at = append_str(at, name);
+    at = append_str(at, "? A/R");
+    *at = 0;
+    show_status(SchemeWarning, text);
+
+    const uint8_t key = wait_key();
+    if (key == 'R' || key == 'r') {
+        return fetch_image(name, true) && attached(name);
+    }
+    /* Anything else leaves the mount as it is; only A and RETURN go on to write
+     * the descriptor, so a mistyped key does nothing rather than something. */
+    return key == 'A' || key == 'a' || key == KEY_RETURN;
 }
 
 /* Attaching writes the frozen process descriptor as well as the live one: the
@@ -313,13 +382,11 @@ static void attach_selected(void) {
             show_status(SchemeError, hyppoerror_to_screen(code));
             return;
         }
-        if (!fetch_image(name)) {
+        if (!fetch_image(name, false) || !attached(name)) {
             return; /* which said why */
         }
-        if (mega65_dos_attach(name, ATTACH_DRIVE)) {
-            show_status(SchemeError, hyppoerror_to_screen(mega65_geterrorcode()));
-            return;
-        }
+    } else if (!attach_or_replace(name)) {
+        return;
     }
 
     if (hdos_new_attach) {
@@ -501,10 +568,7 @@ static void ethernet_probe(bool transmit) {
             SchemeWarning, frames ? "RECEIVES BUT NOTHING ANSWERED" : "NOTHING HEARD, PRESS A KEY");
     }
 
-    while (!ASCIIKEY) {
-        ;
-    }
-    ASCIIKEY = 0;
+    (void)wait_key();
     draw_list();
 }
 
@@ -760,13 +824,7 @@ static void browse(void) {
     draw_list();
 
     for (;;) {
-        uint8_t key;
-        while (!(key = ASCIIKEY)) {
-            ;
-        }
-        ASCIIKEY = 0;
-
-        switch (key) {
+        switch (wait_key()) {
             case KEY_CURSOR_UP:
                 move_by(-1);
                 break;

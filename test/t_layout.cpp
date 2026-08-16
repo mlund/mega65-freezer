@@ -8,6 +8,7 @@
  * written out rather than shifted together the way fat_pack_time() does them --
  * an oracle that packs them the same way cannot disagree with the packer. */
 
+#include <cstdio>
 #include <cstring>
 #include <string>
 
@@ -43,6 +44,33 @@ std::string rendered(const char (&entry)[FAT_NAME_BYTES + 1]) {
     out[sizeof out - 1] = '\0';
     fat_name_from_entry(reinterpret_cast<const uint8_t*>(entry), out);
     return out;
+}
+
+constexpr uint16_t SECTOR_BYTES = 512;
+constexpr uint8_t ENTRIES_PER_SECTOR = SECTOR_BYTES / FAT_ENTRY_BYTES;
+
+/* A directory sector built entry by entry.  Everything past the last one placed
+ * reads as unused, which is what a cleared directory cluster holds. */
+struct Directory {
+    uint8_t bytes[SECTOR_BYTES] = {};
+
+    void put(uint8_t index, const char* name) {
+        fat_name_to_entry(name, &bytes[index * FAT_ENTRY_BYTES]);
+    }
+    /* What a delete leaves behind: the name's first byte replaced. */
+    void erase(uint8_t index) { bytes[index * FAT_ENTRY_BYTES] = 0xE5; }
+};
+
+struct Slot {
+    FatSlot verdict;
+    uint16_t offset;
+};
+
+Slot look_for(const Directory& dir, const char* name) {
+    /* Poisoned, so an answer that carries no offset cannot pass by accident. */
+    uint16_t offset = 0xFFFF;
+    const FatSlot verdict = fat_find_in_sector(dir.bytes, name, &offset);
+    return {verdict, offset};
 }
 
 /* Spaces shown as _ so padding is visible in a failure message. */
@@ -193,10 +221,88 @@ TEST_CASE("a directory entry renders as 8.3 text") {
     CHECK(rendered("README     ") == "README");        /* no extension, no dot */
 }
 
+/* What a directory sector means, in one place: both the writer looking for a
+ * free slot and the delete looking for a name read it through this. */
+TEST_CASE("finding a name in a directory sector") {
+    Directory dir;
+    dir.put(0, "FIRST.D81");
+    dir.put(1, "SECOND.D81");
+    dir.put(2, "THIRD.PRG");
+
+    SUBCASE("a name is found where it was put") {
+        CHECK(look_for(dir, "FIRST.D81").verdict == FatSlotFound);
+        CHECK(look_for(dir, "FIRST.D81").offset == 0);
+        CHECK(look_for(dir, "SECOND.D81").offset == 32);
+        CHECK(look_for(dir, "THIRD.PRG").offset == 64);
+    }
+    /* Where a new entry goes, and proof the name is nowhere further on: an
+     * unused entry ends the directory, so what follows is what it held before. */
+    SUBCASE("a name that is not there stops at the first unused entry") {
+        const Slot got = look_for(dir, "FOURTH.D81");
+        CHECK(got.verdict == FatSlotFree);
+        CHECK(got.offset == 96);
+    }
+    /* The trap: $E5 over the first byte leaves the rest of the name readable. */
+    SUBCASE("a deleted entry is not a name, and does not end the scan") {
+        dir.erase(1);
+        CHECK(look_for(dir, "SECOND.D81").verdict == FatSlotFree);
+        CHECK(look_for(dir, "THIRD.PRG").verdict == FatSlotFound);
+        CHECK(look_for(dir, "THIRD.PRG").offset == 64);
+    }
+    SUBCASE("a sector with no unused entry says the directory goes on") {
+        Directory full;
+        for (uint8_t i = 0; i < ENTRIES_PER_SECTOR; i++) {
+            char name[FAT_NAME_TEXT];
+            snprintf(name, sizeof name, "FILE%02u.D81", i);
+            full.put(i, name);
+        }
+        CHECK(look_for(full, "ABSENT.D81").verdict == FatSlotAbsent);
+        CHECK(look_for(full, "FILE07.D81").verdict == FatSlotFound);
+        CHECK(look_for(full, "FILE07.D81").offset == 7 * 32);
+        CHECK(look_for(full, "FILE15.D81").offset == 15 * 32);
+    }
+}
+
+/* The one 32-bit field FAT32 does not store in one piece: the high half sits at
+ * $14, six words away from the low half at $1A.  A file below 65536 clusters
+ * reads correctly whichever half is dropped, so the large value is the test. */
+TEST_CASE("an entry's first cluster") {
+    uint8_t entry[FAT_ENTRY_BYTES] = {};
+
+    SUBCASE("a cluster above 65535 uses both halves") {
+        fat_entry_set_first_cluster(entry, 0x0123ABCD);
+        CHECK(entry[0x1A] == 0xCD);
+        CHECK(entry[0x1B] == 0xAB);
+        CHECK(entry[0x14] == 0x23);
+        CHECK(entry[0x15] == 0x01);
+        CHECK(fat_entry_first_cluster(entry) == 0x0123ABCD);
+    }
+    SUBCASE("a small cluster leaves the high half zero") {
+        fat_entry_set_first_cluster(entry, 3);
+        CHECK(entry[0x1A] == 3);
+        CHECK(entry[0x1B] == 0);
+        CHECK(entry[0x14] == 0);
+        CHECK(entry[0x15] == 0);
+        CHECK(fat_entry_first_cluster(entry) == 3);
+    }
+    /* Read back from bytes another writer left, which is what a delete meets. */
+    SUBCASE("a cluster this did not write reads back") {
+        entry[0x14] = 0x02;
+        entry[0x15] = 0x00;
+        entry[0x1A] = 0x00;
+        entry[0x1B] = 0x10;
+        CHECK(fat_entry_first_cluster(entry) == 0x00021000);
+    }
+}
+
 TEST_CASE("8.3 text packs back into an entry") {
     CHECK(packed_name("TEST.D81") == "TEST____D81");   /* the dot becomes padding */
     CHECK(packed_name("AB.D65") == "AB______D65");
     CHECK(packed_name("12345678.D81") == "12345678D81");
+    /* Shorter than the field: what follows the name is padding, and reading
+     * past the terminator to fill it put NULs there instead. */
+    CHECK(packed_name("README") == "README_____");
+    CHECK(packed_name("A") == "A__________");
 }
 
 }  // TEST_SUITE

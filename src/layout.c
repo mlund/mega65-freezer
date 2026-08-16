@@ -1,3 +1,6 @@
+/* The disk and FAT arithmetic that touches no hardware: geometry, the clock
+ * fields a directory entry stamps, and what one entry means. */
+
 #include "layout.h"
 
 #include <string.h>
@@ -104,11 +107,56 @@ void fat_name_from_entry(const uint8_t* entry, char* out) {
 
 void fat_name_to_entry(const char* name, uint8_t* entry) {
     memset(entry, ' ', FAT_NAME_BYTES);
-    for (uint8_t i = 0, j = 0; i < FAT_NAME_BYTES; i++, j++) {
+    /* Stopping at the terminator, not merely at eleven bytes: a name with no
+     * extension is shorter than the field, and running to the end of it read
+     * past the string and left NULs where the padding should be. */
+    for (uint8_t i = 0, j = 0; i < FAT_NAME_BYTES && name[j]; i++, j++) {
         if (name[j] == '.') {
             i = FAT_NAME_STEM - 1;
         } else {
             entry[i] = (uint8_t)name[j];
         }
     }
+}
+
+/* Where FAT32 put the two halves of the first cluster. */
+constexpr uint8_t FAT_ENTRY_CLUSTER_LOW = 0x1a;
+constexpr uint8_t FAT_ENTRY_CLUSTER_HIGH = 0x14;
+
+/* Compared as text, not by packing the wanted name and matching the eleven
+ * stored bytes.  The packed form is 316 bytes smaller in FILEHOST and 145 in
+ * MAKEDISK and must not be taken: it fails verify_filehost_xemu.py at the exec
+ * back into the freezer, reproducibly, and nothing here explains why -- every
+ * entry on the test card round-trips render-then-pack except the volume label.
+ * Whatever the two disagree about is something these tests do not describe. */
+enum FatSlot fat_find_in_sector(const uint8_t* sector, const char* name, uint16_t* offset) {
+    char text[FAT_NAME_TEXT];
+    for (uint16_t at = 0; at < FAT_SECTOR_BYTES; at += FAT_ENTRY_BYTES) {
+        if (!sector[at]) {
+            *offset = at;
+            return FatSlotFree;
+        }
+        /* A deleted entry keeps all but the first byte of its name, and that
+         * byte is what differs, so nothing else is needed to skip one. */
+        fat_name_from_entry(&sector[at], text);
+        if (!strcmp(text, name)) {
+            *offset = at;
+            return FatSlotFound;
+        }
+    }
+    return FatSlotAbsent;
+}
+
+uint32_t fat_entry_first_cluster(const uint8_t* entry) {
+    return (uint32_t)entry[FAT_ENTRY_CLUSTER_LOW] |
+        ((uint32_t)entry[FAT_ENTRY_CLUSTER_LOW + 1] << 8) |
+        ((uint32_t)entry[FAT_ENTRY_CLUSTER_HIGH] << 16) |
+        ((uint32_t)entry[FAT_ENTRY_CLUSTER_HIGH + 1] << 24);
+}
+
+void fat_entry_set_first_cluster(uint8_t* entry, uint32_t cluster) {
+    entry[FAT_ENTRY_CLUSTER_LOW] = (uint8_t)cluster;
+    entry[FAT_ENTRY_CLUSTER_LOW + 1] = (uint8_t)(cluster >> 8);
+    entry[FAT_ENTRY_CLUSTER_HIGH] = (uint8_t)(cluster >> 16);
+    entry[FAT_ENTRY_CLUSTER_HIGH + 1] = (uint8_t)(cluster >> 24);
 }
