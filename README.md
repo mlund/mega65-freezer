@@ -167,9 +167,18 @@ less.
   An image the card already holds offers `A` to attach it or `R` to fetch it
   again over the top — the repair for a transfer that stopped part way, which
   leaves a file of the right length holding a stale tail that hyppo will mount.
+  A program goes somewhere else entirely: a `.prg` needs no file on the card,
+  so it is fetched whole into a buffer and then written straight into the frozen
+  machine's memory, with BASIC's end-of-program pointer set behind it. Its load
+  address says which BASIC it came from — `$0801` is C64, `$2001` is MEGA65 —
+  and one saved from the other mode is refused rather than loaded somewhere it
+  cannot run. It is not started: the frozen program counter is wherever the
+  machine was, so the tool says `LOADED -- RESUME AND TYPE RUN` and leaves that
+  to the user.
   `T` names the server, since a household router hands out addresses and has
   never heard of RFC 5859's option 150; `TFTP-IP.TXT` on the card says it
-  without typing.
+  without typing. [`docs/TFTP-SERVER.md`](docs/TFTP-SERVER.md) is the other end:
+  running the server the machine fetches from.
   The layers under it are: the 45E100 driver, ARP with a responder, IPv4, UDP
   and a DHCP client, each checked on the host against its RFC and on hardware,
   where the controller turns out to send and receive perfectly well from inside
