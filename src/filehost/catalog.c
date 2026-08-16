@@ -6,7 +6,12 @@
 
 static constexpr uint8_t MAGIC_BYTES = 8;
 static const char MAGIC[MAGIC_BYTES] = {'M', '6', '5', 'F', 'H', 'C', 'A', 'T'};
-static constexpr uint8_t CATALOG_VERSION = 1;
+/* Both are read, and by the same code.  Version 2 filled three bytes version 1
+ * had reserved and required to be zero, and zero is what both of them mean by
+ * "not stated" -- so an older catalogue on a card decodes as one with no
+ * category and no year rather than needing a case of its own. */
+static constexpr uint8_t CATALOG_VERSION_MIN = 1;
+static constexpr uint8_t CATALOG_VERSION = 2;
 
 /* Offsets within a record.  Quoted from FILEHOST.md section 2 rather than
  * derived from the widths, so a change to one is not silently a change to the
@@ -16,9 +21,13 @@ static constexpr uint8_t RECORD_AUTHOR = 40;
 static constexpr uint8_t RECORD_PATH = 56;
 static constexpr uint8_t RECORD_KIND = 104;
 static constexpr uint8_t RECORD_SIZE = 105;
+static constexpr uint8_t RECORD_CATEGORY = 109;
+static constexpr uint8_t RECORD_YEAR = 110;
 /* The last field a record must carry, so a stride shorter than this could not
- * hold one. */
-static constexpr uint8_t RECORD_MINIMUM = RECORD_SIZE + 4;
+ * hold one.  Through the year even for a version 1 file: the two fields are
+ * read without asking which version wrote them, so a stride that stopped short
+ * of them would have this reading the next record instead. */
+static constexpr uint8_t RECORD_MINIMUM = RECORD_YEAR + 2;
 
 static uint16_t le16(const uint8_t* at) {
     return (uint16_t)(at[0] | ((uint16_t)at[1] << 8));
@@ -53,7 +62,7 @@ bool catalog_header(const uint8_t* raw, struct CatalogHeader* out) {
             return false;
         }
     }
-    if (raw[8] != CATALOG_VERSION) {
+    if (raw[8] < CATALOG_VERSION_MIN || raw[8] > CATALOG_VERSION) {
         return false;
     }
     const uint16_t record_bytes = le16(&raw[9]);
@@ -85,4 +94,25 @@ void catalog_record(const uint8_t* raw, struct CatalogRecord* out) {
     copy_field(out->path, &raw[RECORD_PATH], CATALOG_PATH_BYTES, 0);
     out->kind = raw[RECORD_KIND];
     out->size = le32(&raw[RECORD_SIZE]);
+    out->category = raw[RECORD_CATEGORY];
+    out->year = le16(&raw[RECORD_YEAR]);
+}
+
+const char* catalog_category_name(uint8_t category) {
+    /* Indexed by the file's own value, so the order here is the format's and
+     * not a choice.  A value past the end is a category invented after this was
+     * written: nothing is the honest thing to draw for it. */
+    static const char* const NAMES[] = {
+        "",
+        "GAME",
+        "DEMO",
+        "APPLICATION",
+        "TOOL",
+        "MANUAL",
+        "OTHER",
+        "FIRMWARE",
+    };
+    static_assert(sizeof NAMES / sizeof *NAMES == CatalogFirmware + 1,
+        "a category the format defines with no name would index past this table");
+    return category < sizeof NAMES / sizeof *NAMES ? NAMES[category] : "";
 }

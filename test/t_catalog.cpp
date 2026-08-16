@@ -27,6 +27,10 @@ struct Entry {
     std::string path;
     uint8_t kind;
     uint32_t size;
+    /* Version 2's two fields.  Defaulted to what version 1 left in those bytes,
+     * so the older records below state the older format by saying nothing. */
+    uint8_t category = 0;
+    uint16_t year = 0;
 };
 
 void put_le16(std::vector<uint8_t>& out, size_t at, uint16_t v) {
@@ -47,7 +51,7 @@ void put_text(std::vector<uint8_t>& out, size_t at, const std::string& text, siz
     }
 }
 
-std::vector<uint8_t> catalogue(const std::vector<Entry>& entries, uint8_t version = 1,
+std::vector<uint8_t> catalogue(const std::vector<Entry>& entries, uint8_t version = 2,
                                uint16_t record_bytes = 128,
                                const char* magic = "M65FHCAT") {
     /* Room for the fields even when the stride under test is too small to hold
@@ -68,6 +72,8 @@ std::vector<uint8_t> catalogue(const std::vector<Entry>& entries, uint8_t versio
         put_text(out, at + 56, entries[i].path, 48, 0);
         out[at + 104] = entries[i].kind;
         put_le32(out, at + 105, entries[i].size);
+        out[at + 109] = entries[i].category;
+        put_le16(out, at + 110, entries[i].year);
     }
     return out;
 }
@@ -96,13 +102,85 @@ TEST_CASE("a catalogue says what it is before it says anything else") {
 
 TEST_CASE("anything that is not a catalogue is refused") {
     CatalogHeader header{};
-    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 1, 128, "M65FHCAU").data(), &header));
-    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 2).data(), &header));
+    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 2, 128, "M65FHCAU").data(), &header));
+    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 3).data(), &header));
+    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 0).data(), &header));
 
     /* A record smaller than the fields it must hold could not be indexed into,
      * and zero would put every record at the same place. */
-    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 1, 0).data(), &header));
-    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 1, 64).data(), &header));
+    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 2, 0).data(), &header));
+    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 2, 64).data(), &header));
+    /* Through the size field but not through the year: the fields are read
+     * without asking which version wrote them, so a stride that stops between
+     * the two would have this reading its neighbour. */
+    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 2, 109).data(), &header));
+    CHECK_FALSE(catalog_header(catalogue({ROBOTS}, 2, 111).data(), &header));
+}
+
+/* Both versions, one decoder.  Version 1 reserved these three bytes and wrote
+ * zeros, and zero is how version 2 spells "not stated" -- so a card carrying
+ * the older file keeps working and simply shows no category and no year. */
+TEST_CASE("version 1 and version 2 are both read") {
+    CatalogHeader header{};
+    CHECK(catalog_header(catalogue({ROBOTS}, 1).data(), &header));
+    CHECK(header.record_count == 1);
+    CHECK(catalog_header(catalogue({ROBOTS}, 2).data(), &header));
+    CHECK(header.record_count == 1);
+}
+
+TEST_CASE("a record's category and year") {
+    const Entry GAME = {"SOME GAME", "SOMEBODY", "files/s/game.d81", CatalogD81, 819200,
+                        CatalogGame, 2021};
+    const auto raw = catalogue({GAME});
+    const CatalogRecord got = decoded(raw, 0);
+    CHECK(got.category == CatalogGame);
+    CHECK(got.year == 2021);
+
+    SUBCASE("a version 1 record states neither") {
+        const CatalogRecord old = decoded(catalogue({ROBOTS}, 1), 0);
+        CHECK(old.category == CatalogNoCategory);
+        CHECK(old.year == 0);
+    }
+    /* Passed through rather than clamped: what the client cannot name it shows
+     * as nothing, and a renderer that learns an eighth category should not need
+     * this one changed to stay readable. */
+    SUBCASE("a category this client does not know is not mistaken for one it does") {
+        const Entry ODD = {"ODD", "NOBODY", "files/o/odd.prg", CatalogPrg, 1, 99, 2024};
+        const CatalogRecord got_odd = decoded(catalogue({ODD}), 0);
+        CHECK(got_odd.category == 99);
+        CHECK(std::string(catalog_category_name(got_odd.category)).empty());
+    }
+    SUBCASE("a year the renderer did not state") {
+        const Entry UNDATED = {"UNDATED", "NOBODY", "files/u/u.d81", CatalogD81, 819200,
+                               CatalogDemo, 0};
+        const CatalogRecord got_undated = decoded(catalogue({UNDATED}), 0);
+        CHECK(got_undated.category == CatalogDemo);
+        CHECK(got_undated.year == 0);
+    }
+    /* Little-endian, and wide enough for a year past 255. */
+    SUBCASE("the year uses both of its bytes") {
+        const auto wide_year = catalogue({{"Y", "N", "files/y.prg", CatalogPrg, 1, CatalogTool,
+                                           2026}});
+        CHECK(wide_year[128 + 110] == 0xEA);
+        CHECK(wide_year[128 + 111] == 0x07);
+        CHECK(decoded(wide_year, 0).year == 2026);
+    }
+}
+
+/* Names the client draws, from the enumeration the file carries.  Eleven
+ * characters is the column, and APPLICATION is exactly that. */
+TEST_CASE("every category the format defines has a name that fits") {
+    CHECK(std::string(catalog_category_name(CatalogGame)) == "GAME");
+    CHECK(std::string(catalog_category_name(CatalogDemo)) == "DEMO");
+    CHECK(std::string(catalog_category_name(CatalogApplication)) == "APPLICATION");
+    CHECK(std::string(catalog_category_name(CatalogTool)) == "TOOL");
+    CHECK(std::string(catalog_category_name(CatalogManual)) == "MANUAL");
+    CHECK(std::string(catalog_category_name(CatalogOther)) == "OTHER");
+    CHECK(std::string(catalog_category_name(CatalogFirmware)) == "FIRMWARE");
+    CHECK(std::string(catalog_category_name(CatalogNoCategory)).empty());
+    for (uint8_t value = 0; value <= CatalogFirmware; value++) {
+        CHECK(std::strlen(catalog_category_name(value)) <= 11);
+    }
 }
 
 /* The rule the document states and a client gets wrong by hard-coding 128.

@@ -25,6 +25,21 @@ enum CatalogKind : uint8_t {
     CatalogD81 = 1,
 };
 
+/* What a title is, as version 2 enumerates it.  Not text in the file: the
+ * column is eleven characters wide and upstream's spelling is not this client's
+ * business.  Zero is "not stated", which is also what version 1 left in the
+ * byte, so one decoder reads both versions. */
+enum CatalogCategory : uint8_t {
+    CatalogNoCategory = 0,
+    CatalogGame = 1,
+    CatalogDemo = 2,
+    CatalogApplication = 3,
+    CatalogTool = 4,
+    CatalogManual = 5,
+    CatalogOther = 6,
+    CatalogFirmware = 7,
+};
+
 struct CatalogHeader {
     uint16_t record_bytes;
     uint16_t record_count;
@@ -37,7 +52,16 @@ struct CatalogRecord {
     char path[CATALOG_PATH_BYTES + 1];
     uint8_t kind;
     uint32_t size;
+    /* Both 0 where the file did not say, which is every record of a version 1
+     * catalogue and any record a renderer had nothing to put here. */
+    uint8_t category;
+    uint16_t year;
 };
+
+/* What to draw for a category, and "" for one this client has no name for --
+ * including a value a later renderer invents, which is shown as nothing rather
+ * than as the wrong thing. */
+[[nodiscard]] const char* catalog_category_name(uint8_t category);
 
 /* True, and fills `out`, when the 128 bytes are a catalogue this client can
  * read.  Refuses an unknown version, and a record size it could not index. */

@@ -11,7 +11,7 @@ Used to stage a fixture onto a card clone; not part of any build.
 import struct
 
 MAGIC = b"M65FHCAT"
-VERSION = 1
+VERSION = 2
 HEADER = 128
 RECORD = 128
 TITLE = 40
@@ -21,6 +21,17 @@ PATH = 48
 PRG = 0
 D81 = 1
 
+# Category, as version 2 enumerates it.  0 is "not stated", which is also what a
+# version 1 record's reserved bytes say.
+NO_CATEGORY = 0
+GAME = 1
+DEMO = 2
+APPLICATION = 3
+TOOL = 4
+MANUAL = 5
+OTHER = 6
+FIRMWARE = 7
+
 
 def _fixed(text: str, width: int, pad: bytes) -> bytes:
     """Printable ASCII or a question mark, truncated to fit, then padded."""
@@ -28,9 +39,19 @@ def _fixed(text: str, width: int, pad: bytes) -> bytes:
     return clean.encode("ascii") + pad * (width - len(clean))
 
 
-def record(title: str, author: str, path: str, kind: int, size: int) -> bytes:
+def record(
+    title: str,
+    author: str,
+    path: str,
+    kind: int,
+    size: int,
+    category: int = NO_CATEGORY,
+    year: int = 0,
+) -> bytes:
+    """One record.  Category and year default to "not stated", which is byte for
+    byte what a version 1 record held in those three reserved bytes."""
     out = _fixed(title, TITLE, b" ") + _fixed(author, AUTHOR, b" ") + _fixed(path, PATH, b"\0")
-    out += struct.pack("<BI", kind, size)
+    out += struct.pack("<BIBH", kind, size, category, year)
     return out + bytes(RECORD - len(out))
 
 
@@ -63,13 +84,14 @@ def catalog_short_name(path: str, kind: int) -> str:
     return f"{kept}{tail}.{'D81' if kind == D81 else 'PRG'}"
 
 
-def catalogue(records: list[bytes]) -> bytes:
+def catalogue(records: list[bytes], version: int = VERSION) -> bytes:
     """The header, then the records, in the order given.
 
     The document sorts by title; a fixture states the order it wants instead,
-    so a test can pin which row a record lands on.
+    so a test can pin which row a record lands on.  `version` is settable so a
+    test can stage the older file a card may still be carrying.
     """
     # Generation time zero: no reader looks at it, and a fixture that changed
     # every run would make a card clone differ for no reason.
-    header = struct.pack("<8sBHHI", MAGIC, VERSION, RECORD, len(records), 0)
+    header = struct.pack("<8sBHHI", MAGIC, version, RECORD, len(records), 0)
     return header + bytes(HEADER - len(header)) + b"".join(records)
