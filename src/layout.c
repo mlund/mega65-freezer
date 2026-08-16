@@ -136,6 +136,11 @@ enum FatSlot fat_find_in_sector(const uint8_t* sector, const char* name, uint16_
             *offset = at;
             return FatSlotFree;
         }
+        /* A long name is not a name: its bytes are UTF-16 halves, so it is
+         * skipped by what it says it is rather than by what it looks like. */
+        if (sector[at + FAT_ENTRY_ATTRIBUTES] == FAT_ATTRIBUTE_LONG_NAME) {
+            continue;
+        }
         /* A deleted entry keeps all but the first byte of its name, and that
          * byte is what differs, so nothing else is needed to skip one. */
         fat_name_from_entry(&sector[at], text);

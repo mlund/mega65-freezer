@@ -236,6 +236,31 @@ __attribute__((noinline)) static enum FatSlot find_in_root(const char* name) {
 /* The length FAT32 records for a file, at offset $1C of its entry. */
 static constexpr uint8_t FAT_ENTRY_SIZE_AT = 0x1c;
 
+/* Whether `size` bytes from `first` really do run back to back.
+ *
+ * Asked rather than assumed: a caller that writes over a file writes forward
+ * from one sector, so a file another writer left in two pieces would have the
+ * second half of the write land on whatever follows the first piece.  A file
+ * this module made is contiguous, and hyppo will not mount one that is not --
+ * but neither of those is a fact this function can check, and the cost of
+ * being wrong is somebody else's file. */
+static bool contiguous_run(uint32_t first, uint32_t size) {
+    uint16_t clusters = hw_div16_ceil(size, (uint32_t)sectors_per_cluster << 9);
+    if (first < 2 || !clusters) {
+        return false;
+    }
+    uint32_t cluster = first;
+    while (--clusters) {
+        if (fat32_follow_cluster(cluster) != cluster + 1) {
+            return false;
+        }
+        cluster++;
+    }
+    /* And it ends where the length says, rather than running on into a longer
+     * file that merely starts the same way. */
+    return fat_is_end_of_chain(fat32_follow_cluster(cluster));
+}
+
 uint32_t fat32_file_first_sector(const char* name, uint32_t size) {
     if (find_in_root(name) != FatSlotFound) {
         return 0;
@@ -243,8 +268,12 @@ uint32_t fat32_file_first_sector(const char* name, uint32_t size) {
     if (*(uint32_t*)&sector_buffer[found_offset + FAT_ENTRY_SIZE_AT] != size) {
         return 0;
     }
-    return fat_cluster_first_sector(root_dir_sector,
-        fat_entry_first_cluster(&sector_buffer[found_offset]), sectors_per_cluster);
+    /* Read before the walk below reads FAT sectors over the directory one. */
+    const uint32_t first = fat_entry_first_cluster(&sector_buffer[found_offset]);
+    if (!contiguous_run(first, size)) {
+        return 0;
+    }
+    return fat_cluster_first_sector(root_dir_sector, first, sectors_per_cluster);
 }
 
 bool fat32_delete_file(const char* name) {

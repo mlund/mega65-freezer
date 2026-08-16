@@ -28,9 +28,11 @@ extern uint32_t fat2_sector;
 uint32_t fat32_create_contiguous_file(const char* name, uint32_t size);
 
 /* Where an existing file's data begins, for writing over it where it lies --
- * but only if it is exactly `size` bytes, and 0 otherwise, since a file shorter
- * than what is about to be written into it would be overrun into whatever
- * follows it on the card.
+ * but only if it is exactly `size` bytes and its clusters run back to back,
+ * and 0 otherwise.  Both are checked here rather than argued for by the
+ * caller: a write over a file goes forward from one sector, so a file that is
+ * shorter or in two pieces would have the rest of that write land on somebody
+ * else's.
  *
  * Replacing a file this way rather than removing and remaking it is not an
  * optimisation: the writer above takes only wholly free FAT sectors, so the

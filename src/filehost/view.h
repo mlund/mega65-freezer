@@ -14,9 +14,10 @@
  * contains and what the user typed both arrive through the seams below, so all
  * of this compiles for the host and is tested there. */
 
-/* The catalogue can name more records than this -- a 128KB buffer holds 1023 of
- * them at the format's own stride -- so the browser shows the first VIEW_MAX
- * and the count on screen says "N OF M" when it is not showing all of them.
+/* The catalogue can name more records than the browser shows: it takes the
+ * first VIEW_MAX and the count on screen says "N OF M" when that is not all of
+ * them.  In practice the buffer runs out first -- it holds 511 records at the
+ * format's own stride -- so this is the looser of the two bounds.
  *
  * A round number under two bounds rather than either of them: the region
  * link.ld sets aside would hold 682 rows and their keys, and the sort reads

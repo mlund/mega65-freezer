@@ -43,12 +43,25 @@ void freeze_poke(uint32_t addr, unsigned char v);
  * register number: freeze_io_peek(0x3054) is its $FFD3054.  Still the freeze
  * slot, not live hardware -- see freeze_peek. */
 unsigned char freeze_io_peek(uint16_t reg);
+/* $D030, which says which ROM the frozen machine had mapped and so which BASIC
+ * it was running. */
+constexpr uint16_t FROZEN_D030 = 0x3030;
 void freeze_io_poke(uint16_t reg, unsigned char v);
 void freeze_io_update(uint16_t reg, uint8_t and_mask, uint8_t or_mask);
 enum FreezerError freeze_fetch_sector(uint32_t addr, unsigned char* buffer);
 enum FreezerError freeze_fetch_sector_partial(uint32_t addr, uint32_t dest, uint16_t count);
 enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer);
 enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint16_t count);
+
+/* Any run at any address, split into stores that each stay inside one sector.
+ *
+ * The splitting lives here because the rule being obeyed is the one above: a
+ * caller that did it itself would have to know the sector size, the mask and
+ * where the boundaries fall, to satisfy an invariant it did not set.  The
+ * frozen machine is not written atomically -- there is no transaction on the
+ * slot -- so a failure part way leaves part of the run stored, and the caller
+ * has to say so rather than retry. */
+enum FreezerError freeze_store_range(uint32_t addr, uint32_t src, uint32_t bytes);
 void do_audio_mixer(void);
 void do_sprite_editor(void);
 unsigned char do_rom_loader(void);

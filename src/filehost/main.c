@@ -1,11 +1,13 @@
-/* The FileHost browser: a catalogue of downloadable titles, and the disk image
- * one of them attaches to the frozen machine's drive.
+/* The FileHost browser: a catalogue of downloadable titles, and what one of
+ * them does to the frozen machine.
  *
  * The catalogue is fetched at start-up and the card's copy is the fallback when
- * the wire has nothing to say.  An image the catalogue names is fetched onto
- * the card when attaching it finds it is not there, and one already there can
- * be replaced when what arrived was rubbish.  Only the fetching needs a wire,
- * so everything else here is testable without one. */
+ * the wire has nothing to say.  A disk image goes onto the card and is attached
+ * to the frozen machine's drive -- fetched first if the card has not got it,
+ * and written over again if what arrived was rubbish.  A program goes nowhere
+ * near the card: it is staged in far memory and then stored into the frozen
+ * machine's own, which is what a .prg is.  Only the fetching needs a wire, so
+ * everything else here is testable without one. */
 
 #include "arp.h"
 #include "browser.h"
@@ -20,6 +22,7 @@
 #include "ip.h"
 #include "lineedit.h"
 #include "mega65_regs.h"
+#include "prgload.h"
 #include "screen.h"
 #include "sdcard.h"
 #include "shortname.h"
@@ -66,7 +69,18 @@ static constexpr uint16_t DEFAULT_SERVER_PORT = 6969;
  * 28-bit DMA target.  ROM_CHARSET and CHARGEN_ADDRESS are constants for that
  * reason too. */
 static constexpr Addr28 CATALOG_BUFFER = 0x40000;
-static constexpr uint32_t CATALOG_BUFFER_BYTES = 0x20000;
+static constexpr uint32_t CATALOG_BUFFER_BYTES = 0x10000;
+/* Where a program is staged, above the catalogue in the same bank.  Whole
+ * before any of it reaches the frozen machine: there is no transaction on the
+ * freeze slot, so half a program written into it resumes as a broken machine,
+ * and a transfer that fails here costs nothing but the buffer.
+ *
+ * 64KB is also all a program can be, the frozen machine's memory being 16 bits
+ * wide.  It leaves the catalogue 511 records at the format's own stride, one
+ * under what the browser can index, so the buffer is the bound that bites and
+ * the index never is. */
+static constexpr Addr28 PRG_BUFFER = CATALOG_BUFFER + CATALOG_BUFFER_BYTES;
+static constexpr uint32_t PRG_BUFFER_BYTES = 0x10000;
 /* One DMA fill's worth: lfill counts in 16 bits, and the buffer is wider. */
 static constexpr uint16_t CLEAR_STEP = 0x8000;
 
@@ -95,9 +109,12 @@ static struct CatalogRecord record;
  * case. */
 static bool slot_located;
 
-/* Which file a fetch is filling, or 0 for the catalogue buffer.  fetch.c owns
- * the network and nothing else, so where the bytes land is decided here. */
+/* Which file a fetch is filling, or 0 for far memory.  fetch.c owns the
+ * network and nothing else, so where the bytes land is decided here. */
 static uint32_t store_sector;
+/* Which far buffer a fetch fills when it is not filling a file: the catalogue's
+ * own, or the one a program is staged in. */
+static Addr28 store_buffer;
 
 /* What was typed at the `/` prompt, folded to upper case once so the comparison
  * against each title does not fold it again per record.  Empty is no search,
@@ -364,11 +381,18 @@ static bool fetch_image(const char* name, bool replace) {
     const enum FetchResult result = fetch_file(record.path, record.size, &got);
     store_sector = 0;
     if (result != FetchOk) {
-        /* Said as it happened rather than as it was meant to: a delete that
+        /* Only a file this call created is removed.  One being replaced is
+         * already the right length and contiguous, so leaving it lets the user
+         * press R again and write over it a second time -- where deleting it
+         * would give back space the writer usually cannot take again, and lose
+         * the only slot the repair could have used.
+         *
+         * Said as it happened rather than as it was meant to: a delete that
          * fails leaves exactly the file this was written to prevent. */
-        say_fetch_failed(result,
-            fat32_delete_file(name) ? "THE FILE WAS REMOVED"
-                                    : "A BAD FILE IS LEFT ON THE CARD");
+        const char* also = replace                  ? "IT IS STILL WRONG -- R TRIES AGAIN"
+            : fat32_delete_file(name)               ? "THE FILE WAS REMOVED"
+                                                    : "A BAD FILE IS LEFT ON THE CARD";
+        say_fetch_failed(result, also);
         return false;
     }
     return true;
@@ -417,6 +441,76 @@ static bool attach_or_replace(char* name) {
     return fetch_image(name, true) && attached(name);
 }
 
+/* Slot 0 is the live freeze: writing to a stored slot would change a machine
+ * nobody is about to resume.  Deferred until something needs it, since locating
+ * it makes hyppo walk the system partition. */
+static void locate_slot(void) {
+    if (!slot_located) {
+        request_freeze_region_list();
+        freeze_slot_start_sector = read_freeze_slot_start_sector(0);
+        slot_located = true;
+    }
+}
+
+/* The selected program into the frozen machine's memory, which is where a .prg
+ * belongs: no file on the card, and so nothing of the FAT involved.
+ *
+ * Fetched whole into a buffer first.  There is no transaction on the freeze
+ * slot -- half a program stored into it resumes as a broken machine -- so the
+ * transfer has to have finished before the first byte goes in, and every rule
+ * that could refuse it is settled before that too.
+ *
+ * It is not started.  The frozen program counter is wherever the machine was,
+ * which may be mid-interrupt or inside the KERNAL, and swapping a program in
+ * under it is undefined; in MEGA65 mode the ROM's own source says the $02B0
+ * keyboard buffer is no longer generally honoured.  So the machine is left
+ * loaded and the user resumes and types RUN, which is a thing they can see. */
+static void load_program(void) {
+    show_status(SchemeText, "FETCHING THE PROGRAM...");
+    store_sector = 0;
+    store_buffer = PRG_BUFFER;
+    uint32_t got = 0;
+    const enum FetchResult result = fetch_file(record.path, PRG_BUFFER_BYTES, &got);
+    if (result != FetchOk) {
+        /* Nothing to clear up: the frozen machine has not been touched. */
+        say_fetch_failed(result, nullptr);
+        return;
+    }
+
+    locate_slot();
+
+    uint8_t head[2];
+    lcopy(PRG_BUFFER, (Addr28)(uint16_t)head, sizeof head);
+    struct PrgPlan plan;
+    const enum PrgVerdict verdict = prg_plan(head, got, freeze_io_peek(FROZEN_D030), &plan);
+    if (verdict != PrgOk) {
+        show_status(SchemeError, prg_verdict_text(verdict));
+        return;
+    }
+
+    /* The border says the card is busy, as the ROM loader's own copy does. */
+    VICIV.bordercol = SchemeHighlight;
+    const enum FreezerError stored =
+        freeze_store_range(plan.load, PRG_BUFFER + sizeof head, got - sizeof head);
+    VICIV.bordercol = SchemeBorder;
+    if (stored != FreezerOk) {
+        /* Said as strongly as it deserves: the slot has no transaction, so what
+         * is in the frozen machine now is part of this program over part of
+         * whatever was there, and resuming runs that. */
+        show_status(SchemeError, "WRITE FAILED -- THE MACHINE IS PART WRITTEN, DO NOT RESUME");
+        return;
+    }
+
+    /* Where the program ends, which is what BASIC reads to find the end of it.
+     * Both bytes in one store: they share a sector, and each freeze_poke() is a
+     * read and a write of the whole of it.  The line links need no repair, the
+     * program going back to the address it was saved from. */
+    const uint16_t end = plan.end;
+    (void)freeze_store_range(plan.pointer, (Addr28)(uint16_t)&end, sizeof end);
+
+    show_status(SchemeHighlight, "LOADED -- RESUME AND TYPE RUN");
+}
+
 /* Attaching writes the frozen process descriptor as well as the live one: the
  * unfreeze path re-reads those fields and reattaches from them, so a mount that
  * only happened live would not survive the resume.  This is the pair
@@ -425,18 +519,16 @@ static void attach_selected(void) {
     char name[SHORT_NAME_BYTES];
 
     fetch_record(view_row(selected));
+    if (record.kind == CatalogPrg) {
+        load_program();
+        return;
+    }
     if (record.kind != CatalogD81) {
-        show_status(SchemeWarning, "ONLY DISK IMAGES CAN BE ATTACHED");
+        show_status(SchemeWarning, "ONLY DISK IMAGES AND PROGRAMS CAN BE USED");
         return;
     }
 
-    if (!slot_located) {
-        request_freeze_region_list();
-        /* Slot 0 is the live freeze: attaching to a stored slot would change a
-         * machine nobody is about to resume. */
-        freeze_slot_start_sector = read_freeze_slot_start_sector(0);
-        slot_located = true;
-    }
+    locate_slot();
 
     catalog_short_name(record.path, record.kind, name);
     if (mega65_dos_attach(name, ATTACH_DRIVE)) {
@@ -654,7 +746,7 @@ void fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
     if (store_sector) {
         fat32_write_file_sector(store_sector, offset, bytes, length);
     } else {
-        lcopy((Addr28)(uint16_t)bytes, CATALOG_BUFFER + (Addr28)offset, length);
+        lcopy((Addr28)(uint16_t)bytes, store_buffer + (Addr28)offset, length);
     }
 }
 
@@ -796,7 +888,7 @@ static void edit_server_address(void) {
  *
  * Read into the catalogue buffer, which load_catalog() clears and fills
  * afterwards: read_file_from_sdcard() is unbounded, so a file left under this
- * name by mistake lands in 128KB of scratch rather than over something.
+ * name by mistake lands in 64KB of scratch rather than over something.
  *
  * A whole sector is cleared first rather than the text's own width, because
  * hyppo writes a file a sector at a time: the bytes after the file's last are
@@ -953,6 +1045,7 @@ static void fetch_catalog(void) {
      * the tail of the old one readable behind it. */
     clear_buffer();
     store_sector = 0;
+    store_buffer = CATALOG_BUFFER;
     uint32_t got = 0;
     const enum FetchResult result = fetch_file(CATALOG_NAME, CATALOG_BUFFER_BYTES, &got);
     if (result != FetchOk) {

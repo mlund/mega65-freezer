@@ -167,6 +167,25 @@ enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint1
     return FreezerOk;
 }
 
+enum FreezerError freeze_store_range(uint32_t addr, uint32_t src, uint32_t bytes) {
+    while (bytes) {
+        /* Up to the next boundary, so no store ever spans two sectors.  The
+         * first run is short unless the address is already on one; the rest are
+         * whole sectors, which skips the read the partial store would otherwise
+         * need to keep the bytes it is not replacing. */
+        const uint16_t room = SD_SECTOR_SIZE - (uint16_t)(addr & (SD_SECTOR_SIZE - 1));
+        const uint16_t count = bytes < room ? (uint16_t)bytes : room;
+        const enum FreezerError failed = freeze_store_sector_partial(addr, src, count);
+        if (failed != FreezerOk) {
+            return failed;
+        }
+        addr += count;
+        src += count;
+        bytes -= count;
+    }
+    return FreezerOk;
+}
+
 void freeze_poke(uint32_t addr, unsigned char v) {
     uint32_t freeze_slot_offset = address_to_freeze_slot_offset(addr);
     uint16_t offset;

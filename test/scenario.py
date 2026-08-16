@@ -21,8 +21,10 @@ A test is the steps and nothing else:
 `expect_file` is checked after the run, once the image is closed, and its name
 must not already be on the card -- a test that finds what it meant to create
 proves nothing.  ("expect_no_file", NAME) is the mirror, for a tool that removes
-one: the name must be on the card before the run, and afterwards both the entry
-and the clusters it held have to be gone.  `count` reads a counter out of the
+one: afterwards neither the entry nor the clusters it held may remain.  Where
+the name is on the card before the run, the clusters are checked too; where the
+run creates it and then removes it, pair this with an `expect` on what the tool
+said, since absence on its own would also pass for a tool that did nothing.  `count` reads a counter out of the
 running tool by name: ("count", "MAKEDISK.sd_reads", 1600) looks the symbol up
 in that tool's ELF.
 
@@ -156,15 +158,14 @@ def run(description: str, prg: str, steps, *, extras: dict[str, bytes] | None = 
             if _entry(clone, name) is not None:
                 sys.exit(f"{name} is already on the card; the test would prove nothing")
 
-        # The mirror: a file has to be there before the run, or a delete that
-        # never happened reads exactly like one that worked.  Where its chain
-        # begins is taken now, the entry being what says so and about to go.
+        # Where the chain begins is taken now, while the entry still says so.
+        # A file the run creates and then removes is not on the card yet, and
+        # for that case the step asserting what the tool said is what proves it
+        # ever existed -- absence alone would pass on a tool that did nothing.
         doomed = []
         for (name,) in [s[1:] for s in steps if s[0] == "expect_no_file"]:
             entry = _entry(clone, name)
-            if entry is None:
-                sys.exit(f"{name} is not on the card; deleting it would prove nothing")
-            doomed.append((name, _entry_cluster(entry)))
+            doomed.append((name, _entry_cluster(entry) if entry else None))
 
         status = m65harness.run(
             args,
@@ -187,7 +188,7 @@ def run(description: str, prg: str, steps, *, extras: dict[str, bytes] | None = 
         for name, cluster in doomed:
             if _entry(clone, name) is not None:
                 problems.append(f"{name} is still on the card")
-            elif not _cluster_is_free(clone, cluster):
+            elif cluster is not None and not _cluster_is_free(clone, cluster):
                 problems.append(f"{name} is gone but cluster {cluster} is still taken")
 
     if problems:

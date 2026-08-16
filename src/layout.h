@@ -24,6 +24,11 @@ constexpr uint8_t FAT_ENTRY_BYTES = 32;
 /* Written over the first byte of the name to remove a file, which is why a
  * deleted entry still reads as most of what it was called. */
 constexpr uint8_t FAT_ENTRY_DELETED = 0xe5;
+/* The attribute byte, and the value that says the slot is not a file at all but
+ * one piece of a long name: its other bytes are UTF-16 and none of them is a
+ * name this can match. */
+constexpr uint8_t FAT_ENTRY_ATTRIBUTES = 0x0b;
+constexpr uint8_t FAT_ATTRIBUTE_LONG_NAME = 0x0f;
 
 /* A cluster number at or above this ends a chain.  The top four bits of a FAT32
  * entry are reserved, so only the low 28 count. */

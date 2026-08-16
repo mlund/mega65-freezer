@@ -13,8 +13,9 @@ test/filehost_catalog.py, which shares no code with the decoder under test.
 
 Three things here are only visible through a screen dump.  Titles arrive as
 mixed-case ASCII and the screen is uppercase-only PETSCII, so "Attack of the
-Robots" rendering as letters at all is the conversion working.  Choosing a
-program rather than a disk image has to say so instead of failing quietly.  And
+Robots" rendering as letters at all is the conversion working.  A program goes
+into the frozen machine's memory rather than onto the card, so it says so as it
+starts rather than doing something else quietly.  And
 the mount is only real if the freeze menu's own drive row shows it afterwards --
 that row is drawn from the frozen process descriptor, which is what the unfreeze
 path reattaches from, so it is the thing that proves the attach will survive a
@@ -40,6 +41,10 @@ import scenario
 # the two derivations agree.
 IMAGE_PATH = "files/t/Attack_of_the_Robots_x1.d81"
 IMAGE = fhc.catalog_short_name(IMAGE_PATH, fhc.D81)
+# The image the catalogue names but the card has not got: created by the fetch
+# that then fails, and removed again by it.
+NOT_FETCHED_PATH = "files/n/not_fetched.d81"
+NOT_FETCHED = fhc.catalog_short_name(NOT_FETCHED_PATH, fhc.D81)
 
 CATALOG = fhc.catalogue(
     [
@@ -53,7 +58,7 @@ CATALOG = fhc.catalogue(
         # hyppo: this emulator says file-not-found and the machine says
         # end-of-directory, and both have to read as "fetch it" -- only one of
         # the two is exercised here.
-        fhc.record("Not Fetched Yet", "Nobody", "files/n/not_fetched.d81", fhc.D81, 819200,
+        fhc.record("Not Fetched Yet", "Nobody", NOT_FETCHED_PATH, fhc.D81, 819200,
                    fhc.DEMO, 2022),
     ]
 )
@@ -108,12 +113,15 @@ STEPS = [
     ("key", "/"),
     ("key", "return"),
     ("expect_row", FIRST + 2, "NOT FETCHED YET"),
-    # Down onto the program and in.  The refusal is also what proves the
-    # selection moved, which no screen dump shows directly -- the highlight is
-    # a colour, and colour RAM is not in the dump.
+    # Down onto the program and in.  A .prg goes into the frozen machine's
+    # memory rather than onto the card, so what it says first is the proof that
+    # the selection moved -- no screen dump shows the highlight, which is a
+    # colour, and colour RAM is not in the dump.  With no network the fetch
+    # then fails, and nothing has been written into the frozen machine.
     ("key", "down"),
     ("key", "return"),
-    ("expect", "ONLY DISK IMAGES"),
+    ("expect", "FETCHING THE PROGRAM"),
+    ("expect", "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK", 30),
     # An image the card has not got is fetched rather than refused, so what
     # comes back here is the network's answer -- and Xemu has no network.
     ("key", "down"),
@@ -121,6 +129,7 @@ STEPS = [
     # Both halves on one line: why it failed, and that nothing half-written was
     # left behind to be mounted as a working image later.
     ("expect", "THE FILE WAS REMOVED", 60),
+    ("expect_no_file", NOT_FETCHED),
     # A fetch with no network at all.  Xemu has no ethernet, so nothing answers
     # the lease and the tool has to say so and put the card's catalogue back
     # rather than sit waiting -- the one part of the network path that can be
@@ -171,16 +180,16 @@ STEPS = [
     ("key", "stop"),
     ("expect", "MEGA65 FREEZE MENU", 30),
     ("expect_row", 21, IMAGE),
-    # Last, because it destroys what the steps above needed: replacing writes
-    # over the file and, with no network, the fetch that follows fails -- so
-    # what this proves is the removal, on a file that really was there.
+    # And replacing, which fails with no network.  What it must not do is
+    # remove the image: it is the right length and contiguous, so it is the one
+    # slot a second attempt can be written into, and giving it back to a writer
+    # that takes only wholly free FAT sectors would strand the repair.
     ("key", "d"),
     ("expect_row", FIRST, "ATTACK OF THE ROBOTS", 30),
     ("key", "return"),
     ("expect", "ATTACH OR REPLACE"),
     ("key", "r"),
-    ("expect", "THE FILE WAS REMOVED", 60),
-    ("expect_no_file", IMAGE),
+    ("expect", "IT IS STILL WRONG", 60),
 ]
 
 if __name__ == "__main__":
