@@ -58,6 +58,25 @@ static constexpr uint16_t ETH_RX_LENGTH_BYTES = 2;
 static constexpr uint16_t ETH_RX_LENGTH_MASK = 0x0FFF;
 static constexpr uint8_t ETH_RX_BAD_CRC = 0x80;
 
+#ifdef ETH_COUNTERS
+/* The controller's debug window, which the SDK's fifteen-byte struct stops one
+ * byte short of -- named here rather than reached by indexing past the end of
+ * that struct, which would silently land elsewhere if a member were ever added.
+ *
+ * Not mega65_regs.h's REG8(), which is the same cast and exists for exactly
+ * this: that header is GPL-3 and this file is MIT OR Apache-2.0 so it can be
+ * lifted into mos-hardware or mega65-libc, which including it would prevent.
+ *
+ * What it reports is whatever was last written to it: 0 selects the buffer
+ * identities, of which the low two bits are the buffer the CPU reads through
+ * (ethernet.vhdl:1441-1443).  A value with both top bits set would set the
+ * preamble length instead (1870-1874), which 0 is not. */
+#define ETH_DEBUG (*(volatile uint8_t*)0xD6EF)
+static constexpr uint8_t ETH_DEBUG_BUFFERS = 0x00;
+static constexpr uint8_t ETH_CPU_BUFFER_MASK = 0b00000011;
+#define ETH_CPU_BUFFER (ETH_DEBUG & ETH_CPU_BUFFER_MASK)
+#endif
+
 void eth_init(void) {
     /* Setting the filter is the whole of it.  Deliberately no reset: the reset
      * lines are active low, so taking the controller down and bringing it back
@@ -67,6 +86,12 @@ void eth_init(void) {
      * frames all along, and a freezer tool is a guest on a running controller
      * rather than the thing that starts it. */
     ETHERNET.ctrl3 = ETH_FILTER;
+#ifdef ETH_COUNTERS
+    /* Asked for explicitly rather than assumed: a freezer tool inherits a
+     * controller something else has been using, and this register reports
+     * whatever that left selected. */
+    ETH_DEBUG = ETH_DEBUG_BUFFERS;
+#endif
 }
 
 void eth_mac(uint8_t* out) {
@@ -86,6 +111,22 @@ bool eth_tx_idle(void) {
  * server never having been answered.  `eth_sends` is the denominator. */
 uint32_t eth_sends = 0;
 uint32_t eth_tx_busy = 0;
+
+/* And whether the rotation below actually happens, which is the same shape of
+ * question at the other end.  The controller declines to advance the CPU's
+ * buffer when the ethernet side is filling the one it would advance into --
+ * ethernet.vhdl:1485-1503, the "safety straps" -- and reports the refusal
+ * nowhere eth_receive() looks, so a refused rotation reads as the frame just
+ * consumed arriving a second time.  `eth_rx_rotates` is the denominator.
+ *
+ * The two are counted apart because they want different answers: the window is
+ * registered and so lags the write by a cycle or more (ethernet.vhdl:1508),
+ * which waiting cures, while a refusal is a rotation that does not happen at
+ * all and which the receive path has to notice instead. */
+uint32_t eth_rx_rotates = 0;
+uint32_t eth_rx_late = 0;
+uint32_t eth_rx_norotate = 0;
+
 #define COUNT_ETH(counter) ((counter)++)
 #else
 #define COUNT_ETH(counter) ((void)0)
@@ -124,13 +165,39 @@ uint16_t eth_receive(uint8_t* into, uint16_t limit) {
         return 0;
     }
 
+#ifdef ETH_COUNTERS
+    const uint8_t before = ETH_CPU_BUFFER;
+#endif
+
     /* Rotating is what brings the frame into the window, so it comes before
      * the read rather than after it.  Two writes, for the 0 -> 1 edge. */
     ETHERNET.ctrl2 = 0;
     ETHERNET.ctrl2 = ETH_RX_ROTATE;
 
+#ifdef ETH_COUNTERS
+    /* Watched, not waited for.  A spin here would give the window time the
+     * shipping build never gives it, so the instrumented build would stop
+     * seeing the very lag it was built to find; the second look below is taken
+     * after two far reads this function performs anyway, which costs the
+     * measurement nothing and the timing nothing. */
+    COUNT_ETH(eth_rx_rotates);
+    const bool rotated = ETH_CPU_BUFFER != before;
+    if (!rotated) {
+        COUNT_ETH(eth_rx_late);
+    }
+#endif
+
     const uint8_t low = lpeek(ETH_BUFFER);
     const uint8_t high = lpeek(ETH_BUFFER + 1);
+
+#ifdef ETH_COUNTERS
+    /* Still where it was after all that: not slow to settle but refused, the
+     * controller having declined to advance into a buffer the ethernet side
+     * holds (ethernet.vhdl:1485-1503). */
+    if (!rotated && ETH_CPU_BUFFER == before) {
+        COUNT_ETH(eth_rx_norotate);
+    }
+#endif
 
     /* A failed CRC means truncated or corrupted in transit, so there is
      * nothing worth copying and nothing worth reporting a length for.  A

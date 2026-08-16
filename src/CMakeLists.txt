@@ -50,10 +50,10 @@ if(FREEZER_TRACE)
     add_compile_definitions(FREEZER_TRACE)
 endif()
 
-# Counting SD transactions.  Off by default so a shipping build carries neither
-# the counters nor the increments; on, a scenario can read them by name and say
-# how much traffic an operation costs.  See test/verify_sdcount_xemu.py.
-option(ETH_COUNTERS "Count frames sent, and frames sent over a busy transmitter" OFF)
+# Ethernet diagnostics.  Off by default so a shipping build carries neither
+# the counters nor the increments; on, the hardware scenario reads them by
+# name to separate controller, TFTP and transmit failures.
+option(ETH_COUNTERS "Count Ethernet and TFTP diagnostic events" OFF)
 if(ETH_COUNTERS)
     add_compile_definitions(ETH_COUNTERS)
 endif()
