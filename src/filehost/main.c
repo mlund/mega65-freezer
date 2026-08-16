@@ -893,26 +893,18 @@ int main(void) {
     /* Browsing runs whether or not a catalogue was found: with none, the list
      * is empty and the message says why, but the ethernet probe -- the one
      * thing that does not need a catalogue -- is still reachable. */
-    /* In this order: the card overrides the default, and load_catalog() wants
-     * the buffer the address was read through.  A complaint about the address
+    /* In this order: the card overrides the default, and reading the address
+     * wants the buffer a catalogue would occupy.  A complaint about the address
      * file waits until after, so the catalogue's own does not bury it. */
     fetch_set_server(DEFAULT_SERVER, DEFAULT_SERVER_PORT);
-    const bool addressed = read_server_address();
-    /* The card's copy on screen first, then the wire over the top of it.  The
-     * server's catalogue is what FileHost has now and the card's is as old as
-     * whenever it was put there, so the fetch is the source and the copy is the
-     * fallback -- but a lease and a transfer take seconds, and a list that is
-     * merely out of date beats a blank screen for the length of them.
-     *
-     * The address file's complaint is said before the fetch rather than after:
-     * whatever the fetch has to say is the newer news and the more actionable,
-     * so it is what stays on screen. */
-    if (load_catalog()) {
-        show_from_top();
-    }
-    if (!addressed) {
+    if (!read_server_address()) {
         show_status(SchemeWarning, SERVER_FILE " IS NOT AN ADDRESS");
     }
+    /* One list, not two.  The card's copy is the fallback rather than the
+     * opening screen: drawing it first and replacing it seconds later shows a
+     * list that was never what the tool went on to use, and the flash reads as
+     * the browser changing its mind.  fetch_catalog() puts the card's copy up
+     * itself when the wire has nothing to say. */
     fetch_catalog();
     browse();
 
