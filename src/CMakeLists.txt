@@ -159,7 +159,7 @@ add_m65(SPRITED  sprited/main.c sprited/editor.c sprited/textout.c lineedit.c)
 add_m65(MEGAINFO megainfo/main.c megainfo/info.c)
 add_m65(FILEHOST filehost/main.c filehost/catalog.c filehost/shortname.c
                  filehost/eth.c filehost/arp.c filehost/ip.c filehost/dhcp.c
-                 filehost/netpoll.c filehost/tftp.c filehost/fetch.c
+                 filehost/netpoll.c filehost/tftp.c filehost/fetch.c filehost/view.c
                  lineedit.c fat32.c layout.c filehost/menu.cpp)
 
 # Card payloads: not linked into any tool, but built here because they are

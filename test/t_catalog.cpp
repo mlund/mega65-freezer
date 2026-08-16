@@ -183,6 +183,35 @@ TEST_CASE("every category the format defines has a name that fits") {
     }
 }
 
+/* The rank is derived from the names, so the check is against the names rather
+ * than against a second list of numbers: sort the categories by rank and the
+ * names must come out in alphabetical order.  Nothing else keeps the two in
+ * step when a category is added. */
+TEST_CASE("categories rank alphabetically by the name shown") {
+    std::vector<uint8_t> by_rank;
+    for (uint8_t value = CatalogGame; value <= CatalogFirmware; value++) {
+        by_rank.push_back(value);
+    }
+    std::sort(by_rank.begin(), by_rank.end(), [](uint8_t a, uint8_t b) {
+        return catalog_category_rank(a) < catalog_category_rank(b);
+    });
+    for (size_t i = 1; i < by_rank.size(); i++) {
+        const std::string earlier = catalog_category_name(by_rank[i - 1]);
+        const std::string later = catalog_category_name(by_rank[i]);
+        CHECK(earlier < later);
+    }
+    /* Ranks are a permutation of 1..7, so no two categories share a place. */
+    std::vector<uint8_t> ranks;
+    for (uint8_t value = CatalogGame; value <= CatalogFirmware; value++) {
+        ranks.push_back(catalog_category_rank(value));
+    }
+    std::sort(ranks.begin(), ranks.end());
+    CHECK(ranks == std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7});
+    /* Nothing names it, so nothing ranks it; the browser sends it last. */
+    CHECK(catalog_category_rank(CatalogNoCategory) == 0);
+    CHECK(catalog_category_rank(200) == 0);
+}
+
 /* The rule the document states and a client gets wrong by hard-coding 128.
  * A later version may make records wider; the fields it already defines stay
  * where they are. */

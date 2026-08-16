@@ -44,14 +44,17 @@ IMAGE = fhc.catalog_short_name(IMAGE_PATH, fhc.D81)
 CATALOG = fhc.catalogue(
     [
         # Mixed case, so the render has to fold it.
-        fhc.record("Attack of the Robots", "Somebody", IMAGE_PATH, fhc.D81, 819200),
-        fhc.record("Hello World", "Nobody", "files/h/hello.prg", fhc.PRG, 4096),
+        fhc.record("Attack of the Robots", "Somebody", IMAGE_PATH, fhc.D81, 819200,
+                   fhc.GAME, 2021),
+        fhc.record("Hello World", "Nobody", "files/h/hello.prg", fhc.PRG, 4096,
+                   fhc.APPLICATION, 2024),
         # Named by the catalogue and not staged, so attaching it is a fetch.
         # Which code hyppo gives for a name it never found depends on whose
         # hyppo: this emulator says file-not-found and the machine says
         # end-of-directory, and both have to read as "fetch it" -- only one of
         # the two is exercised here.
-        fhc.record("Not Fetched Yet", "Nobody", "files/n/not_fetched.d81", fhc.D81, 819200),
+        fhc.record("Not Fetched Yet", "Nobody", "files/n/not_fetched.d81", fhc.D81, 819200,
+                   fhc.DEMO, 2022),
     ]
 )
 
@@ -65,9 +68,46 @@ STEPS = [
     ("expect_row", FIRST + 1, "HELLO WORLD"),
     ("expect_row", FIRST, "SOMEBODY"),
     # The columns, so a heading and its values cannot drift apart unnoticed.
-    ("expect_at", FIRST, 58, "D81"),
-    ("expect_at", FIRST + 1, 58, "PRG"),
-    ("expect_at", FIRST, 62, "800KB"),
+    # browser.h places these: TITLE 0, AUTHOR 41, CATEGORY 58, YEAR 70, TYPE 75.
+    ("expect_at", FIRST, 58, "GAME"),
+    ("expect_at", FIRST + 1, 58, "APPLICATION"),
+    ("expect_at", FIRST, 70, "2021"),
+    ("expect_at", FIRST, 75, "D81"),
+    ("expect_at", FIRST + 1, 75, "PRG"),
+    # Sorting.  Newest first puts the 2024 program above the 2021 game, which
+    # is the whole of the evidence: no message is printed, because the list is
+    # the answer.  Then category, where APPLICATION precedes DEMO and GAME by
+    # the enumeration's own order, and a third press is back to title order.
+    ("key", "s"),
+    ("expect_row", FIRST, "HELLO WORLD"),
+    ("key", "s"),
+    ("expect_row", FIRST, "HELLO WORLD"),
+    ("expect_at", FIRST, 58, "APPLICATION"),
+    ("expect_at", FIRST + 1, 58, "DEMO"),
+    ("key", "s"),
+    ("expect_row", FIRST, "ATTACK OF THE ROBOTS"),
+    # Searching, which hides rather than jumps: one row left, and the count
+    # says how many of how many so a filter in force cannot be forgotten.
+    ("key", "/"),
+    ("type", "HELLO"),
+    ("key", "return"),
+    ("expect_row", FIRST, "HELLO WORLD"),
+    ("expect_row", FIRST + 1, ""),
+    ("expect", "1 OF 3"),
+    # Case-insensitively, and anywhere in the title rather than at its start.
+    ("key", "/"),
+    ("type", "robots"),
+    ("key", "return"),
+    ("expect_row", FIRST, "ATTACK OF THE ROBOTS"),
+    # Nothing matching says so rather than showing an empty list in silence.
+    ("key", "/"),
+    ("type", "ZZZZ"),
+    ("key", "return"),
+    ("expect", "NOTHING MATCHES THAT"),
+    # An empty search is how the whole list comes back.
+    ("key", "/"),
+    ("key", "return"),
+    ("expect_row", FIRST + 2, "NOT FETCHED YET"),
     # Down onto the program and in.  The refusal is also what proves the
     # selection moved, which no screen dump shows directly -- the highlight is
     # a colour, and colour RAM is not in the dump.
@@ -106,13 +146,13 @@ STEPS = [
     # The field opens empty with the one in force named in the prompt, so what
     # the prompt says the second time is the only proof from outside that what
     # was typed the first time was kept rather than merely echoed.
-    ("key", "s"),
+    ("key", "t"),
     ("expect", "NOW 192.168.68.57:6969"),
     # With a port, since a gateway on one of its own needs no root to run.
     ("type", "10.1.2.3:6969"),
     ("key", "return"),
     ("expect", "SERVER SET"),
-    ("key", "s"),
+    ("key", "t"),
     ("expect", "NOW 10.1.2.3:6969"),
     ("type", "NOT.AN.ADDRESS"),
     ("key", "return"),

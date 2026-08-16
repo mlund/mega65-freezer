@@ -63,6 +63,13 @@ struct CatalogRecord {
  * than as the wrong thing. */
 [[nodiscard]] const char* catalog_category_name(uint8_t category);
 
+/* Where a category sorts: alphabetically by the name above, counting from 1,
+ * and 0 for one with no name.  Here rather than in the browser because it is
+ * derived from that table and would otherwise be a second copy of its order,
+ * kept in step by hand.  The enumeration's own numbering is the order upstream
+ * happens to list them in, which on screen reads as no order at all. */
+[[nodiscard]] uint8_t catalog_category_rank(uint8_t category);
+
 /* True, and fills `out`, when the 128 bytes are a catalogue this client can
  * read.  Refuses an unknown version, and a record size it could not index. */
 [[nodiscard]] bool catalog_header(const uint8_t* raw, struct CatalogHeader* out);

@@ -53,13 +53,20 @@ SECTIONS {
     .thumbnail 0x9000 (NOLOAD) : { *(.thumbnail) } > highram
     .sdverify  0xA000 (NOLOAD) : { *(.sdverify) }  > highram
     .netbuf    0xA200 (NOLOAD) : { *(.netbuf) }    > highram
+    /* The browser's index of record numbers, two bytes each.  Up here because
+     * it is a thousand of them: down among the C variables it would be the
+     * largest thing there by far, and the region they share is the one the
+     * soft stack grows into. */
+    .viewindex 0xB000 (NOLOAD) : { *(.viewindex) } > highram
 } INSERT AFTER .bss
 
 ASSERT(ADDR(.thumbnail) + SIZEOF(.thumbnail) <= ADDR(.sdverify),
     "high memory: the thumbnail buffer runs into the verify buffer")
 ASSERT(ADDR(.sdverify) + SIZEOF(.sdverify) <= ADDR(.netbuf),
     "high memory: the verify buffer runs into the network buffers")
-ASSERT(ADDR(.netbuf) + SIZEOF(.netbuf) <= 0xB800,
+ASSERT(ADDR(.netbuf) + SIZEOF(.netbuf) <= ADDR(.viewindex),
+    "high memory: the network buffers run into the browser's index")
+ASSERT(ADDR(.viewindex) + SIZEOF(.viewindex) <= 0xB800,
     "high memory: the buffers run into the screen at $B800")
 
 __stack = 0xd000;

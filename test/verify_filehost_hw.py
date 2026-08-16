@@ -93,7 +93,7 @@ def run(machine: h.Machine) -> int:
 
     # The address the tool will use, read off its own prompt rather than
     # assumed: a card file or a lease may have said something else.
-    machine.press("s")
+    machine.press("t")
     asking = machine.wait_until(lambda s: "NEW TFTP SERVER" in s, timeout=10.0)
     print("server:", asking.text(23).strip())
     machine.press("stop")

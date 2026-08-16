@@ -153,14 +153,21 @@ less.
   and attach a disk image from it to the frozen machine's drive. The catalogue is
   the fixed-width `catalog` file of
   [ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md),
-  read off the card as `CATALOG.M65` at start-up and fetched over TFTP on top of
-  it — a lease, the server's hardware address and the transfer, into the same
-  buffer the card copy occupies, so a fetch that fails costs the list on screen
-  and not the copy on the card. `F` fetches it again. Attaching an image the
+  fetched over TFTP at start-up — a lease, the server's hardware address and the
+  transfer — with the card's `CATALOG.M65` as the fallback when the wire has
+  nothing to say, into the same buffer, so a fetch that fails costs the list on
+  screen and not the copy on the card. `F` fetches it again, and `RUN/STOP`
+  gives up on a fetch that is getting nowhere. Each row carries the title,
+  author, category and year; `S` cycles the order through those last two and
+  back, and `/` narrows the list to titles containing what you type, the count
+  saying how many of how many. Attaching an image the
   card has not got fetches that too, onto the card under the 8.3 name derived
   from its catalogue path, with a counter on the status line: the file has to be
   contiguous, because a mounted image is read by counting sectors from a base.
-  `S` names the server, since a household router hands out addresses and has
+  An image the card already holds offers `A` to attach it or `R` to fetch it
+  again over the top — the repair for a transfer that stopped part way, which
+  leaves a file of the right length holding a stale tail that hyppo will mount.
+  `T` names the server, since a household router hands out addresses and has
   never heard of RFC 5859's option 150; `TFTP-IP.TXT` on the card says it
   without typing.
   The layers under it are: the 45E100 driver, ARP with a responder, IPv4, UDP

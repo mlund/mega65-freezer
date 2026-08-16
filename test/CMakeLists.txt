@@ -32,7 +32,7 @@ endif()
 # t_format.cpp.
 set(HOST_TESTS lineedit.c layout.c monitor/blockmove.c format.c
     screencode.c filehost/catalog.c filehost/shortname.c filehost/arp.c filehost/ip.c filehost/dhcp.c
-    filehost/tftp.c)
+    filehost/tftp.c filehost/view.c)
 
 # doctest is fetched at configure time, so a checkout with no network loses
 # these rather than failing.  Said out loud: a silently absent test reads

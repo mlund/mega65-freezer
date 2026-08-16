@@ -1,10 +1,11 @@
 /* The FileHost browser: a catalogue of downloadable titles, and the disk image
  * one of them attaches to the frozen machine's drive.
  *
- * The card's catalogue is shown at start-up and the network's fetched over it,
- * and an image the catalogue names is fetched onto the card when attaching it
- * finds it is not there.  Only the fetching needs a wire, so everything else
- * here is testable without one. */
+ * The catalogue is fetched at start-up and the card's copy is the fallback when
+ * the wire has nothing to say.  An image the catalogue names is fetched onto
+ * the card when attaching it finds it is not there, and one already there can
+ * be replaced when what arrived was rubbish.  Only the fetching needs a wire,
+ * so everything else here is testable without one. */
 
 #include "arp.h"
 #include "browser.h"
@@ -24,6 +25,7 @@
 #include "shortname.h"
 #include "slot.h"
 #include "tftp.h" /* TFTP_PORT */
+#include "view.h"
 
 #include <mega65.h>
 #include <string.h>
@@ -97,6 +99,11 @@ static bool slot_located;
  * the network and nothing else, so where the bytes land is decided here. */
 static uint32_t store_sector;
 
+/* What was typed at the `/` prompt, folded to upper case once so the comparison
+ * against each title does not fold it again per record.  Empty is no search,
+ * which is why an empty prompt is how a search is cleared. */
+static char search[CATALOG_TITLE_BYTES + 1];
+
 /* One keypress, with the queue left empty behind it so the next wait is not
  * answered by this one. */
 static uint8_t wait_key(void) {
@@ -149,33 +156,92 @@ static char* append_kb(char* at, uint32_t bytes) {
     return append_str(at, "KB");
 }
 
-static void draw_size(uint16_t cell, uint8_t colour, uint32_t bytes) {
-    char text[WIDTH_SIZE + 1];
-    *append_kb(text, bytes) = 0;
-    draw_field(cell, colour, text, WIDTH_SIZE);
+/* The year as four figures, or nothing where the catalogue did not say. */
+static void draw_year(uint16_t cell, uint8_t colour, uint16_t year) {
+    char text[CATALOG_YEAR_BYTES + 1];
+    text[0] = 0;
+    if (year) {
+        *append_dec(text, year) = 0;
+    }
+    draw_field(cell, colour, text, WIDTH_YEAR);
 }
 
-static void draw_row(uint16_t index) {
-    const uint8_t y = LIST_TOP_Y + (uint8_t)(index - first_shown);
-    if (index >= header.record_count) {
+static void draw_row(uint16_t row) {
+    const uint8_t y = LIST_TOP_Y + (uint8_t)(row - first_shown);
+    if (row >= view_count()) {
         draw_line(y, SchemeText, "");
         return;
     }
 
-    fetch_record(index);
-    const uint8_t colour = (index == selected) ? (SchemeSelected | AttribReverse) : SchemeText;
+    fetch_record(view_row(row));
+    const uint8_t colour = (row == selected) ? (SchemeSelected | AttribReverse) : SchemeText;
 
     draw_field(SCREEN_CELL(COLUMN_TITLE, y), colour, record.title, WIDTH_TITLE);
     draw_field(SCREEN_CELL(COLUMN_AUTHOR, y), colour, record.author, WIDTH_AUTHOR);
+    draw_field(SCREEN_CELL(COLUMN_CATEGORY, y), colour, catalog_category_name(record.category),
+        WIDTH_CATEGORY);
+    draw_year(SCREEN_CELL(COLUMN_YEAR, y), colour, record.year);
     draw_field(
         SCREEN_CELL(COLUMN_KIND, y), colour, record.kind == CatalogD81 ? "D81" : "PRG", WIDTH_KIND);
-    draw_size(SCREEN_CELL(COLUMN_SIZE, y), colour, record.size);
 }
 
 static void draw_list(void) {
     for (uint8_t row = 0; row < LIST_ROWS; row++) {
         draw_row(first_shown + row);
     }
+}
+
+/* ASCII, which is what the catalogue carries; the screen's own conversion is
+ * screencode.h's business and happens after this. */
+static uint8_t to_upper(uint8_t c) {
+    return (c >= 'a' && c <= 'z') ? (uint8_t)(c - ('a' - 'A')) : c;
+}
+
+/* Case-insensitively, and anywhere in the title rather than at the start: a
+ * user looking for "MONKEY" should not have to know the title begins with a
+ * quotation mark. */
+static bool title_contains(const char* text, const char* upper_needle) {
+    for (uint8_t start = 0; text[start]; start++) {
+        uint8_t i = 0;
+        while (upper_needle[i] && to_upper((uint8_t)text[start + i]) == (uint8_t)upper_needle[i]) {
+            i++;
+        }
+        if (!upper_needle[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* The two questions view.c cannot answer, since it holds no records: what this
+ * one contains, and what the user is looking for. */
+bool view_matches(uint16_t index) {
+    if (!search[0]) {
+        return true;
+    }
+    fetch_record(index);
+    return title_contains(record.title, search);
+}
+
+/* Years are ranked from this rather than stored: a byte cannot hold a year, and
+ * the catalogue's own run from 2020.  One before it and everything earlier
+ * share a rank, which puts them together at the far end where they belong. */
+static constexpr uint16_t VIEW_YEAR_BASE = 1900;
+
+uint8_t view_key(uint16_t index, enum ViewOrder order) {
+    fetch_record(index);
+    if (order == ViewByYear) {
+        /* Newest first, counted down so the sort itself stays ascending. */
+        if (record.year <= VIEW_YEAR_BASE) {
+            return VIEW_KEY_UNKNOWN;
+        }
+        const uint16_t rank = record.year - VIEW_YEAR_BASE;
+        return rank >= VIEW_KEY_UNKNOWN ? 0 : (uint8_t)(VIEW_KEY_UNKNOWN - rank);
+    }
+    /* Alphabetically by the name drawn in the column, which catalog.c derives
+     * from that table; a record naming no category sorts after all of them. */
+    const uint8_t rank = catalog_category_rank(record.category);
+    return rank ? rank : VIEW_KEY_UNKNOWN;
 }
 
 /* Scrolls only when the selection has left the window, and repaints only the
@@ -203,15 +269,15 @@ static void move_to(uint16_t index) {
 /* One clamp for every key that moves the selection, so the ends of the list
  * cannot be guarded four different ways. */
 static void move_by(int16_t delta) {
-    if (!header.record_count) {
+    if (!view_count()) {
         return;
     }
     int16_t at = (int16_t)selected + delta;
     if (at < 0) {
         at = 0;
     }
-    if (at >= (int16_t)header.record_count) {
-        at = (int16_t)header.record_count - 1;
+    if (at >= (int16_t)view_count()) {
+        at = (int16_t)view_count() - 1;
     }
     move_to((uint16_t)at);
 }
@@ -358,7 +424,7 @@ static bool attach_or_replace(char* name) {
 static void attach_selected(void) {
     char name[SHORT_NAME_BYTES];
 
-    fetch_record(selected);
+    fetch_record(view_row(selected));
     if (record.kind != CatalogD81) {
         show_status(SchemeWarning, "ONLY DISK IMAGES CAN BE ATTACHED");
         return;
@@ -669,41 +735,52 @@ static uint8_t write_server_text(char* text) {
  * line_edit() owns the buffer while this owns the screen and the keyboard,
  * which is what lets a full field and a backspace on an empty one be tested on
  * the host rather than typed at an emulator. */
+/* A prompt on the status line and an answer typed after it, or false where the
+ * user backed out.  Both things this asks for are the same transaction: a
+ * question, a field, and RUN/STOP meaning leave it alone.
+ *
+ * line_edit() owns the buffer while this owns the screen and the keyboard,
+ * which is what lets a full field and a backspace on an empty one be tested on
+ * the host rather than typed at an emulator. */
+[[nodiscard]] static bool edit_line(
+    const char* prompt, char* text, uint8_t capacity, uint8_t* length) {
+    const uint8_t field = (uint8_t)strlen(prompt);
+    *length = 0;
+    text[0] = 0;
+    for (;;) {
+        /* The whole line each key, prompt included.  Drawing the prompt once
+         * and repainting only the answer is the obvious economy and measured
+         * 161 bytes worse: one draw of a whole row beats two of parts of it. */
+        char shown[SCREEN_COLS + 1];
+        char* end = append_str(shown, prompt);
+        end = append_str(end, text);
+        *end = 0;
+        draw_line(STATUS_Y, SchemeHighlight, shown);
+        static const uint8_t caret = LINE_EDIT_CARET;
+        draw_fragment(SCREEN_CELL(field + *length, STATUS_Y), SchemeHighlight, &caret, 1);
+
+        const uint8_t key = wait_key();
+        if (key == KEY_RUN_STOP || key == KEY_ESC) {
+            show_status(SchemeText, "");
+            return false;
+        }
+        if (line_edit(text, capacity, length, key)) {
+            return true;
+        }
+    }
+}
+
 static void edit_server_address(void) {
     char prompt[32 + SERVER_TEXT_BYTES];
     char* at = append_str(prompt, "NEW TFTP SERVER (NOW ");
     at += write_server_text(at);
     at = append_str(at, "): ");
     *at = 0;
-    const uint8_t field = (uint8_t)(at - prompt);
 
     char text[SERVER_TEXT_BYTES];
-    uint8_t length = 0;
-    text[0] = 0;
-    for (;;) {
-        /* The whole line each key, prompt included.  Drawing the prompt once
-         * and repainting only the answer is the obvious economy and measured
-         * 161 bytes worse: one draw of a whole row beats two of parts of it. */
-        char shown[sizeof prompt + SERVER_TEXT_BYTES];
-        char* end = append_str(shown, prompt);
-        end = append_str(end, text);
-        *end = 0;
-        draw_line(STATUS_Y, SchemeHighlight, shown);
-        static const uint8_t caret = LINE_EDIT_CARET;
-        draw_fragment(SCREEN_CELL(field + length, STATUS_Y), SchemeHighlight, &caret, 1);
-
-        uint8_t key;
-        while (!(key = ASCIIKEY)) {
-            ;
-        }
-        ASCIIKEY = 0;
-        if (key == KEY_RUN_STOP || key == KEY_ESC) {
-            show_status(SchemeText, "");
-            return;
-        }
-        if (line_edit(text, sizeof text, &length, key)) {
-            break;
-        }
+    uint8_t length;
+    if (!edit_line(prompt, text, sizeof text, &length)) {
+        return;
     }
 
     if (!length) {
@@ -797,11 +874,19 @@ static bool load_catalog(void) {
     return accept_catalog(CATALOG_BUFFER_BYTES) != CatalogUnusable;
 }
 
+/* How many rows are shown, and of how many there are whenever those differ --
+ * a search hiding some, or a catalogue with more records than the index can
+ * address.  Either way a list that is not the whole list says so rather than
+ * reading as a complete one. */
 static void draw_count(void) {
-    char text[8];
-    char* at = append_dec(text, header.record_count);
+    char text[16];
+    char* at = append_dec(text, view_count());
+    if (view_count() != header.record_count) {
+        at = append_str(at, " OF ");
+        at = append_dec(at, header.record_count);
+    }
     *at = 0;
-    draw_field(SCREEN_CELL(COUNT_X, COUNT_Y), SchemeTextDim, text, 5);
+    draw_field(SCREEN_CELL(COUNT_X, COUNT_Y), SchemeTextDim, text, SCREEN_COLS - COUNT_X);
 }
 
 /* Back to the top of a list that has just been replaced.  Not move_to(), which
@@ -811,6 +896,48 @@ static void show_from_top(void) {
     first_shown = 0;
     draw_count();
     draw_list();
+}
+
+/* A new order or a new search makes a different list, so the selection goes
+ * back to the top: the row a user was on means nothing in it. */
+static void rebuild(enum ViewOrder order) {
+    view_build(order);
+    show_from_top();
+}
+
+/* A catalogue that has just arrived: no search, and the order it came in.
+ * Reset rather than rebuilt, since a search from the last catalogue would
+ * silently hide records of this one. */
+static void show_catalog(void) {
+    search[0] = 0;
+    view_reset(header.record_count);
+    rebuild(ViewByTitle);
+}
+
+/* What to look for, and an empty answer to stop looking.  The list is rebuilt
+ * under the order in force, so a search narrows what is shown without
+ * disturbing how it is arranged. */
+static void edit_search(void) {
+    char text[CATALOG_TITLE_BYTES + 1];
+    uint8_t length;
+    if (!edit_line("FIND: ", text, sizeof text, &length)) {
+        return;
+    }
+
+    /* Folded once here rather than per record: every title in the list is
+     * compared against this, and there may be VIEW_MAX of them. */
+    for (uint8_t i = 0; i <= length; i++) {
+        search[i] = (char)to_upper((uint8_t)text[i]);
+    }
+    rebuild(view_order());
+    show_status(SchemeText, view_count() ? "" : "NOTHING MATCHES THAT");
+}
+
+/* Title, then year, then category, and round again.  One key rather than
+ * three, and nothing said about it: the list itself is the answer. */
+static void cycle_order(void) {
+    const uint8_t next = view_order() + 1;
+    rebuild(next > ViewByCategory ? ViewByTitle : (enum ViewOrder)next);
 }
 
 /* The catalogue over the wire, into the buffer the card copy would occupy.
@@ -833,13 +960,13 @@ static void fetch_catalog(void) {
          * first -- and its own complaints are said before the one the user
          * pressed a key to hear. */
         (void)load_catalog();
-        show_from_top();
+        show_catalog();
         say_fetch_failed(result, nullptr);
         return;
     }
 
     const enum CatalogVerdict verdict = accept_catalog(got);
-    show_from_top();
+    show_catalog();
     /* Only when there is nothing to say against it: accept_catalog() has
      * already warned about a catalogue cut short, and "FETCHED" written over
      * that warning reads as a clean transfer of half a list. */
@@ -875,13 +1002,20 @@ static void browse(void) {
                 move_to(0);
                 break;
             case KEY_RETURN:
-                if (header.record_count) {
+                if (view_count()) {
                     attach_selected();
                 }
                 break;
             case 'S':
             case 's':
+                cycle_order();
+                break;
+            case 'T':
+            case 't':
                 edit_server_address();
+                break;
+            case '/':
+                edit_search();
                 break;
             case 'F':
             case 'f':

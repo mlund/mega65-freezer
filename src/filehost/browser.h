@@ -13,18 +13,27 @@
  * whole -- at 40 the title would be the only thing on the row.
  *
  * Each column is placed one cell past the end of the one before, and each field
- * runs to the start of the next, so the four tile the row: a highlighted
- * selection is then an unbroken bar rather than four lit runs with gaps
+ * runs to the start of the next, so the five tile the row: a highlighted
+ * selection is then an unbroken bar rather than five lit runs with gaps
  * between them. */
+/* The longest category name, which is what the column has to hold: a heading
+ * narrower than its values would be one that lies. */
+constexpr uint8_t CATALOG_CATEGORY_BYTES = 11;
+/* Four figures.  A year outside them is not one this browser will meet. */
+constexpr uint8_t CATALOG_YEAR_BYTES = 4;
+
 constexpr uint8_t COLUMN_TITLE = 0;
 constexpr uint8_t COLUMN_AUTHOR = COLUMN_TITLE + CATALOG_TITLE_BYTES + 1;
-constexpr uint8_t COLUMN_KIND = COLUMN_AUTHOR + CATALOG_AUTHOR_BYTES + 1;
-constexpr uint8_t COLUMN_SIZE = COLUMN_KIND + 4;
+constexpr uint8_t COLUMN_CATEGORY = COLUMN_AUTHOR + CATALOG_AUTHOR_BYTES + 1;
+constexpr uint8_t COLUMN_YEAR = COLUMN_CATEGORY + CATALOG_CATEGORY_BYTES + 1;
+constexpr uint8_t COLUMN_KIND = COLUMN_YEAR + CATALOG_YEAR_BYTES + 1;
 
 constexpr uint8_t WIDTH_TITLE = COLUMN_AUTHOR - COLUMN_TITLE;
-constexpr uint8_t WIDTH_AUTHOR = COLUMN_KIND - COLUMN_AUTHOR;
-constexpr uint8_t WIDTH_KIND = COLUMN_SIZE - COLUMN_KIND;
-constexpr uint8_t WIDTH_SIZE = SCREEN_COLS - COLUMN_SIZE;
+constexpr uint8_t WIDTH_AUTHOR = COLUMN_CATEGORY - COLUMN_AUTHOR;
+constexpr uint8_t WIDTH_CATEGORY = COLUMN_YEAR - COLUMN_CATEGORY;
+constexpr uint8_t WIDTH_YEAR = COLUMN_KIND - COLUMN_YEAR;
+constexpr uint8_t WIDTH_KIND = SCREEN_COLS - COLUMN_KIND;
+static_assert(WIDTH_KIND >= 3, "the type column has no room for D81");
 
 constexpr uint8_t COUNT_X = 60;
 constexpr uint8_t COUNT_Y = 0;

@@ -116,3 +116,21 @@ const char* catalog_category_name(uint8_t category) {
         "a category the format defines with no name would index past this table");
     return category < sizeof NAMES / sizeof *NAMES ? NAMES[category] : "";
 }
+
+uint8_t catalog_category_rank(uint8_t category) {
+    /* The alphabetical position of each name above, in the enumeration's own
+     * order: application, demo, firmware, game, manual, other, tool.  A test
+     * walks the names to check this still says so. */
+    static const uint8_t RANK[] = {
+        0, /* not stated, and named by nothing */
+        4, /* game */
+        2, /* demo */
+        1, /* application */
+        7, /* tool */
+        5, /* manual */
+        6, /* other */
+        3, /* firmware */
+    };
+    static_assert(sizeof RANK == CatalogFirmware + 1, "a category with no place in the order");
+    return category < sizeof RANK ? RANK[category] : 0;
+}
