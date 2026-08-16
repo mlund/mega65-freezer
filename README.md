@@ -150,9 +150,11 @@ less.
   <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
   
 - `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue with `D`
-  and attach a disk image from it to the frozen machine's drive. The catalogue is
-  the fixed-width `catalog` file of
-  [ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md),
+  and attach a disk image from it to the frozen machine's drive. The catalogue
+  is the fixed-width `catalog` file that `docs/FILEHOST.md` §2 of the ether65
+  repository defines; that repository is not public yet, so
+  [`docs/TFTP-SERVER.md`](docs/TFTP-SERVER.md) here states the parts of the
+  format a server has to honour. It is
   fetched over TFTP at start-up — a lease, the server's hardware address and the
   transfer — with the card's `CATALOG.M65` as the fallback when the wire has
   nothing to say, into the same buffer, so a fetch that fails costs the list on

@@ -1,8 +1,17 @@
 # Serving the FileHost over TFTP
 
-For whoever runs `files.mega65.org`. The format the machine reads is
-[ether65's `docs/FILEHOST.md`](https://github.com/mlund/ether65/blob/main/docs/FILEHOST.md)
-§2; this is the other half — the server that answers.
+For whoever runs `files.mega65.org`. This is the server half; the format the
+machine reads is fixed by `docs/FILEHOST.md` §2 in the ether65 repository, which
+is not public at the time of writing — the parts of it a server has to honour
+are stated here rather than pointed at.
+
+What the catalogue is, in one paragraph: a 128-byte header — `M65FHCAT`, a
+version byte, the record size and count as 16-bit little-endian, a 32-bit
+generation time — followed by fixed-width records of that size. Each record is
+a 40-byte space-padded title, a 16-byte author, a 48-byte NUL-padded path, a
+kind byte (0 = prg, 1 = d81), a 32-bit size, and from version 2 a category byte
+and a 16-bit year. Text is printable ASCII, records are sorted by title, and
+anything that is not a `.prg` or `.d81` is left out.
 
 Written for what that host actually runs, which its own headers give as
 `Apache/2.4.67 (Debian)` with `PHP/8.1.33`. Nothing here needs the web server
