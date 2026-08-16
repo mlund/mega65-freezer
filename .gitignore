@@ -9,6 +9,7 @@ build-*/
 TODO.md
 # Porting notes kept beside the code, not shipped with it.
 cc65-to-llvm-porting.md
+filehost-duplicate-block-report.md
 *.swp
 *.swo
 __pycache__/
