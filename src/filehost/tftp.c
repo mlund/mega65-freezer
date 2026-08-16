@@ -130,17 +130,18 @@ static __attribute__((noinline)) bool take(
 
     /* Whether the transfer still has anything to hear.  Once it is over, one
      * stray frame from the transfer's own port would otherwise carry the file
-     * past its end or undo a refusal, so everything that moves the transfer on
-     * is refused from here -- everything, that is, but the repeat below. */
+     * past its end or undo a refusal, so the data and error cases below refuse
+     * everything that would move it on -- all but the one repeat that dallies. */
     const bool expecting = client->stage < TftpDone;
 
     const uint8_t* payload = &in[UDP_PAYLOAD_AT];
     switch (net_get16(payload)) {
         case TFTP_OPTION_ACK:
             /* Acknowledged as block zero, which is what starts the transfer.
-             * One arriving after a block has been taken is a stray: the
-             * options were settled before the first block. */
-            if (!expecting || client->block) {
+             * Only while the request is still outstanding: one arriving later
+             * is a stray, and answering a repeat starts the doubling the data
+             * case below refuses to. */
+            if (client->stage != TftpRequesting) {
                 return false;
             }
             take_options(client, payload, datagram.payload_length);
@@ -154,23 +155,34 @@ static __attribute__((noinline)) bool take(
             if (bytes > TFTP_BLOCK_BYTES) {
                 return false;
             }
-            /* Where a block has been taken that the server may not know
-             * arrived -- the one repeat worth answering, since what was lost
-             * was the acknowledgement.  After the last block that is RFC 1350
-             * §6's dallying; a refused transfer answers nothing at all. */
-            const bool taken = client->stage == TftpTransferring || client->stage == TftpDone;
             if (expecting && block == (uint16_t)(client->block + 1)) {
                 client->block = block;
                 client->data_length = bytes;
                 /* Short of a whole block is the last of them, RFC 1350 §1; a
                  * file that is an exact multiple ends with an empty one. */
                 client->stage = bytes < TFTP_BLOCK_BYTES ? TftpDone : TftpTransferring;
-            } else if (!taken || block != client->block) {
-                /* Anything else is dropped: acknowledging an older block asks
-                 * for the file from there again. */
-                return false;
+                break;
             }
-            break;
+            /* The last block sent again, after the transfer ended: answer it.
+             * That is RFC 1350 §6's dallying -- our final acknowledgement was
+             * lost and a server left waiting records a failure for a file that
+             * arrived whole.  There is no next block for it to send twice, so
+             * answering costs nothing. */
+            if (tftp_done(client) && block == client->block) {
+                break;
+            }
+            /* Everything else is dropped without a word, the repeat of the
+             * block just taken being the case that matters.  Answering it is the
+             * Sorcerer's Apprentice Syndrome of RFC 1123 §4.2.3.1: the server
+             * then holds two acknowledgements of the same block, sends the next
+             * one twice, and each of those is answered twice in turn -- a
+             * doubling that feeds itself for the rest of the transfer.
+             *
+             * Nothing is lost by silence.  A server that missed our
+             * acknowledgement resends on its own timer, and this client resends
+             * on its own besides; a server that did not miss it needed
+             * nothing. */
+            return false;
         }
         case TFTP_ERROR:
             if (!expecting) {

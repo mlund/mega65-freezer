@@ -120,7 +120,10 @@ void tftp_start(struct TftpClient* client,
  * taken, the frames of every other machine on the LAN.
  *
  * The whole loop: start, step with nothing, send what comes back; then step
- * with every frame and on every timeout, sending anything non-zero and writing
+ * with every frame and on every timeout -- the timeout is not optional, being
+ * the only thing that answers again when an acknowledgement was lost, since a
+ * block sent twice is deliberately met with silence.  Send anything non-zero
+ * and write
  * `data_length` bytes from TFTP_DATA_AT wherever they belong, until
  * tftp_done() or tftp_failed().  The step that takes the last block returns the
  * acknowledgement that ends the transfer, so it is sent like any other.

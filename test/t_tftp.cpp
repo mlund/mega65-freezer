@@ -233,6 +233,14 @@ TEST_CASE("an option acknowledgement is answered and read for the file size") {
     CHECK(client.c.data_length == 0);
     CHECK(client.c.stage == TftpTransferring);
 
+    /* Sent again because our answer was lost, it earns no second answer: two
+     * would have the server send the first block twice.  The request is no
+     * longer outstanding, so there is nothing left for an option
+     * acknowledgement to answer. */
+    CHECK(client.step(client.from_server(oack)).empty());
+    CHECK(client.c.stage == TftpTransferring);
+    CHECK(client.c.size == 33024);
+
     /* And the block that follows is the first one, delivered and acknowledged. */
     const auto first = client.block(1, TFTP_BLOCK_BYTES);
     CHECK(client.step(first) == ack(1));
@@ -278,19 +286,38 @@ TEST_CASE("another machine's server is not ours") {
     CHECK(client.c.stage == TftpRequesting);
 }
 
-/* A lost acknowledgement has the server send the block again.  Acknowledging it
- * again is the whole recovery; delivering it again would write the same bytes
- * into the file twice. */
-TEST_CASE("a block the server sent again is acknowledged but not delivered again") {
+/* A block sent again mid-transfer is answered with nothing at all: answering it
+ * is the Sorcerer's Apprentice Syndrome tftp.c describes.  Delivering it again
+ * would write the same bytes into the file twice. */
+TEST_CASE("a block the server sent again is neither answered nor delivered again") {
     Client client;
     REQUIRE_FALSE(client.transferring().empty());
 
-    CHECK(client.step(client.block(1, TFTP_BLOCK_BYTES)) == ack(1));
+    CHECK(client.step(client.block(1, TFTP_BLOCK_BYTES)).empty());
     CHECK(client.c.data_length == 0);
     CHECK(client.c.block == 1);
 
-    /* And a timeout says the same acknowledgement rather than the request. */
+    /* Silence is not surrender: the timeout still says the acknowledgement the
+     * transfer owes, so a genuinely lost one is sent again on this client's
+     * own clock rather than once per duplicate. */
     CHECK(client.timeout() == ack(1));
+}
+
+/* However many repeats arrive, they earn one acknowledgement between them --
+ * the one the clock asks for -- and the transfer stays live. */
+TEST_CASE("a flood of repeats does not multiply what is sent back") {
+    Client client;
+    REQUIRE_FALSE(client.transferring().empty());
+    const auto again = client.block(1, TFTP_BLOCK_BYTES);
+
+    for (int i = 0; i < 20; i++) {
+        CHECK(client.step(again).empty());
+    }
+    CHECK(client.c.block == 1);
+    CHECK(client.c.data_length == 0);
+    /* And the transfer is still live: the next block is taken as normal. */
+    CHECK(client.step(client.block(2, TFTP_BLOCK_BYTES)) == ack(2));
+    CHECK(client.c.data_length == TFTP_BLOCK_BYTES);
 }
 
 /* Neither the next block nor the last: a stray from further back, which must
