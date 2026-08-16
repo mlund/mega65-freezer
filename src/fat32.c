@@ -110,9 +110,13 @@ enum FreezerError fat32_open_file_system(void) {
 }
 
 static uint32_t fat32_follow_cluster(uint32_t cluster) {
-    // Read out the cluster number from the FAT
-    sdcard_readsector(fat1_sector + (cluster / 128));
-    return *(uint32_t*)&sector_buffer[(cluster & 127) << 2];
+    // Read out the cluster number from the FAT, dropping the reserved top four
+    // bits: a formatter may leave them set, and a link read with them compares
+    // as neither a cluster number nor an end-of-chain marker -- which would
+    // stop a directory walk early and report a file that exists as absent.
+    sdcard_readsector(fat1_sector + (cluster / SECTORS_PER_FAT_SECTOR));
+    return *(uint32_t*)&sector_buffer[(cluster & (SECTORS_PER_FAT_SECTOR - 1)) << 2] &
+        FAT_CLUSTER_MASK;
 }
 
 static uint32_t fat32_allocate_cluster(uint32_t cluster) {
