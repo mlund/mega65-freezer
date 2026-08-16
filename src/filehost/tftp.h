@@ -92,6 +92,7 @@ struct TftpClient {
     uint16_t error;
     enum TftpStage stage;
     bool has_size;
+    bool heard;
 };
 
 /* Begins a read of `name` from `server`.
@@ -134,6 +135,19 @@ void tftp_start(struct TftpClient* client,
  * whole.  A caller that stops instead loses nothing but that. */
 [[nodiscard]] uint16_t tftp_step(
     struct TftpClient* client, const uint8_t* in, uint16_t in_length, uint8_t* out);
+
+/* Whether the last frame moved this transfer on or was its current block sent
+ * again -- the two that prove the server is still there.  A caller times
+ * silence against this rather than against blocks taken, so a repeat the client
+ * is right not to answer still says the transfer is alive.
+ *
+ * Not everything the server might send.  A stray option acknowledgement is one
+ * the transfer has moved past, and a refusal is not reported here at all --
+ * tftp_failed() ends the transfer, so keeping a clock running for it would be
+ * timing something already over. */
+[[nodiscard]] static inline bool tftp_heard(const struct TftpClient* client) {
+    return client->heard;
+}
 
 /* Whether the whole file arrived. */
 [[nodiscard]] static inline bool tftp_done(const struct TftpClient* client) {

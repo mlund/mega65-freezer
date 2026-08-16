@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Copyright 2026 Mikael Lund aka Wombat
 /* The three exchanges a fetch is made of -- a lease, an address resolved, a
- * transfer -- and the clock all three are measured against. */
+ * transfer -- and the two clocks all three are measured against. */
 
 #include "fetch.h"
 
@@ -38,17 +38,40 @@ static_assert(sizeof net_in >= TFTP_RECEIVE_BYTES, "a full block would be droppe
  * times phases this file has no notion of. */
 static constexpr uint8_t RASTER_HIGH = 0x07;
 static uint8_t last_high;
+/* Two clocks, because the two questions are different: how long this exchange
+ * has been silent, which gives it up, and how long since we last spoke, which
+ * says it again.  One counter reset for both would tie the answer to the last
+ * frame heard -- and a server repeating the block whose acknowledgement went
+ * missing would then push back the very answer it is asking for. */
 static uint16_t frames_elapsed;
+/* A byte is enough: this one is zeroed by every send, and the longest any
+ * exchange leaves it running is WAIT_FRAMES past its seed.  Sixteen bits cost a
+ * measured 16 bytes across the increment and the six sites that touch it. */
+static uint8_t frames_since_said;
 
 /* Whether this fetch was stopped by hand.  Remembered rather than asked again
  * at the end: the seam reports a keypress and taking it off the queue is what
  * consuming it means, so a second question would answer no. */
 static bool stopped;
 
+#ifdef ETH_COUNTERS
+/* How far received frames reach once the controller gave them to net_poll().
+ * `eth_rx_rotates` in eth.c is every frame the CPU took; these two tell whether
+ * it belonged to the TFTP transfer and whether it advanced the file.  Named for
+ * this file rather than for the protocol: they count what fetch_file() saw, and
+ * test/ethtest.c drives tftp_step() without touching them. */
+uint32_t fetch_heard_count;
+uint32_t fetch_block_count;
+#define COUNT_TFTP(counter) ((counter)++)
+#else
+#define COUNT_TFTP(counter) ((void)0)
+#endif
+
 static void tick(void) {
     const uint8_t now = VICIV.fn_raster_msb & RASTER_HIGH;
     if (now < last_high) {
         frames_elapsed++;
+        frames_since_said++;
         /* The keyboard is read here rather than in the loops that call this:
          * once a frame is often enough to catch a key a hand can press, and
          * the poll around it runs thousands of times a second with only three
@@ -60,17 +83,34 @@ static void tick(void) {
     last_high = now;
 }
 
-static void restart_clock(void) {
-    last_high = VICIV.fn_raster_msb & RASTER_HIGH;
-    frames_elapsed = 0;
-}
-
 /* How long to wait for an exchange, and how often to say the current step again
  * while it has not moved.  A broadcast from an unconfigured machine is lost in
  * the ordinary course of things, and one attempt means one loss costs the whole
  * fetch. */
 static constexpr uint16_t WAIT_FRAMES = 150; /* three seconds */
-static constexpr uint16_t RESEND_FRAMES = 25;
+static constexpr uint8_t RESEND_FRAMES = 25;
+
+/* Beginning an exchange sets the speaking clock to its limit, so the first
+ * thing it does is speak rather than wait a turn for permission.
+ *
+ * Hearing moves only the silence clock, and is a function rather than the bare
+ * store it compiles to so that the reason sits with the name: a word from the
+ * far end proves the exchange is alive without being an invitation to answer,
+ * and answering every repeat is the doubling RFC 1123 §4.2.3.1 warns of.
+ *
+ * Sending is left inline at its three sites.  Wrapping it with the clock it
+ * resets reads better and measured 40 bytes worse, which is the seam cost this
+ * target charges for a call. */
+static void begin_exchange(void) {
+    last_high = VICIV.fn_raster_msb & RASTER_HIGH;
+    frames_elapsed = 0;
+    frames_since_said = RESEND_FRAMES;
+}
+
+static void heard_from_far_end(void) {
+    frames_elapsed = 0;
+}
+
 /* How long a transfer may hear nothing new before it is given up on.  Silence
  * and not total time: an 800KB image is 1600 blocks and takes fifteen seconds
  * of a healthy wire, so a clock on the whole of it races a large file that is
@@ -130,18 +170,17 @@ static bool leased(void) {
     /* Where the beam happens to be is the only thing that differs between two
      * runs of the same tool loaded at the same address. */
     dhcp_start(&lease, mac, VICIV.fn_raster_lsb);
-    restart_clock();
-    uint16_t said_at = (uint16_t)(0 - RESEND_FRAMES);
+    begin_exchange();
     uint16_t said = 0;
     while (frames_elapsed < WAIT_FRAMES && !dhcp_leased(&lease) && !stopped) {
         tick();
         if (said) {
             eth_send(net_out, said);
-            said_at = frames_elapsed;
+            frames_since_said = 0;
         }
         const uint16_t got = net_poll(net_in, sizeof net_in, &us);
         said = got ? dhcp_step(&lease, net_in, got, net_out) : 0;
-        if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
+        if (!said && frames_since_said >= RESEND_FRAMES) {
             said = dhcp_step(&lease, nullptr, 0, net_out);
         }
     }
@@ -163,13 +202,12 @@ static bool resolved(void) {
     }
     const uint8_t* hop =
         ip_next_hop(server_address(), us.ip, lease.lease.netmask, lease.lease.router);
-    restart_clock();
-    uint16_t asked_at = (uint16_t)(0 - RESEND_FRAMES);
+    begin_exchange();
     while (frames_elapsed < WAIT_FRAMES && net_zero(server_mac, MAC_BYTES) && !stopped) {
         tick();
-        if (frames_elapsed - asked_at >= RESEND_FRAMES) {
+        if (frames_since_said >= RESEND_FRAMES) {
             eth_send(net_out, arp_request(net_out, us.mac, us.ip, hop));
-            asked_at = frames_elapsed;
+            frames_since_said = 0;
         }
         /* An ARP exchange is 42 bytes on the wire and comes back as 64 with its
          * check sequence, so nothing longer need reach the DMA. */
@@ -201,16 +239,15 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
     struct TftpClient transfer;
     tftp_start(&transfer, &us, &server, name, VICIV.fn_raster_lsb);
 
-    restart_clock();
+    begin_exchange();
     uint16_t said = tftp_step(&transfer, nullptr, 0, net_out);
-    uint16_t said_at = 0;
     uint32_t written = 0;
     while (frames_elapsed < STALL_FRAMES && !tftp_done(&transfer) && !tftp_failed(&transfer)
         && !stopped) {
         tick();
         if (said) {
             eth_send(net_out, said);
-            said_at = frames_elapsed;
+            frames_since_said = 0;
         }
         /* net_poll() and not eth_receive(): a transfer is exactly when the
          * server asks who holds this address, and a question left unanswered
@@ -224,7 +261,17 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
         if (got && transfer.has_size && transfer.size > limit) {
             return FetchTooBig;
         }
+        /* Silence is measured against this transfer, not against new bytes: its
+         * server may repeat the last block while an acknowledgement is lost,
+         * and answering that repeat directly is the RFC 1123 doubling trap.  A
+         * TFTP word that belongs here is proof the transfer is alive; other LAN
+         * traffic says nothing about it. */
+        if (got && tftp_heard(&transfer)) {
+            COUNT_TFTP(fetch_heard_count);
+            heard_from_far_end();
+        }
         if (got && transfer.data_length) {
+            COUNT_TFTP(fetch_block_count);
             if (written + transfer.data_length > limit) {
                 return FetchTooBig;
             }
@@ -235,13 +282,8 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
              * for an answer that cannot differ.  Read per block rather than
              * held, which measured 53 bytes more. */
             fetch_progress(written, transfer.size, false);
-            /* The clock measures silence, so a block arriving is where it
-             * starts again -- and the resend timer with it, both meaning
-             * "now". */
-            restart_clock();
-            said_at = 0;
         }
-        if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
+        if (!said && frames_since_said >= RESEND_FRAMES) {
             said = tftp_step(&transfer, nullptr, 0, net_out);
             /* Nothing new has arrived and the request has been said again, so
              * the screen must show that something is still being tried.  Not

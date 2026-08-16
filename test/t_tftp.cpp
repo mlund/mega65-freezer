@@ -294,6 +294,7 @@ TEST_CASE("a block the server sent again is neither answered nor delivered again
     REQUIRE_FALSE(client.transferring().empty());
 
     CHECK(client.step(client.block(1, TFTP_BLOCK_BYTES)).empty());
+    CHECK(tftp_heard(&client.c));  // it is ours, though it earns no second ACK
     CHECK(client.c.data_length == 0);
     CHECK(client.c.block == 1);
 
@@ -301,6 +302,14 @@ TEST_CASE("a block the server sent again is neither answered nor delivered again
      * transfer owes, so a genuinely lost one is sent again on this client's
      * own clock rather than once per duplicate. */
     CHECK(client.timeout() == ack(1));
+}
+
+TEST_CASE("a frame from another transfer does not keep this one alive") {
+    Client client;
+    REQUIRE_FALSE(client.transferring().empty());
+
+    CHECK(client.step(client.block(2, TFTP_BLOCK_BYTES, 0xA5, TID + 1)).empty());
+    CHECK_FALSE(tftp_heard(&client.c));
 }
 
 /* However many repeats arrive, they earn one acknowledgement between them --
@@ -318,6 +327,47 @@ TEST_CASE("a flood of repeats does not multiply what is sent back") {
     /* And the transfer is still live: the next block is taken as normal. */
     CHECK(client.step(client.block(2, TFTP_BLOCK_BYTES)) == ack(2));
     CHECK(client.c.data_length == TFTP_BLOCK_BYTES);
+}
+
+/* An acknowledgement that never reached the server, and a server saying the
+ * block again on its own clock until it gives up.  Silence at each repeat is
+ * correct, but only because the clock still answers between them: a client that
+ * each repeat left silent for good would have the server spend its five tries
+ * hearing nothing and abandon a transfer that was healthy all along.
+ *
+ * Five rounds, because five tries is what a server spends. */
+TEST_CASE("a lost acknowledgement is recovered between the server's repeats") {
+    Client client;
+    REQUIRE_FALSE(client.transferring().empty());
+    const auto again = client.block(1, TFTP_BLOCK_BYTES);
+
+    for (int try_ = 0; try_ < 5; try_++) {
+        CHECK(client.step(again).empty());     // the repeat itself earns nothing
+        CHECK(client.timeout() == ack(1));     // and the clock says it again
+        CHECK(client.c.block == 1);
+    }
+
+    /* Still live, and moving: the server hears one of those and sends the next. */
+    CHECK(client.step(client.block(2, TFTP_BLOCK_BYTES)) == ack(2));
+    CHECK(client.c.data_length == TFTP_BLOCK_BYTES);
+    CHECK_FALSE(tftp_done(&client.c));
+}
+
+/* And the same where the loss is the other way about -- the block itself lost
+ * rather than its acknowledgement -- since a client that answers a gap with the
+ * block it wanted next would ask the server to start again from there. */
+TEST_CASE("a block that never arrived leaves the acknowledgement where it was") {
+    Client client;
+    REQUIRE_FALSE(client.transferring().empty());
+
+    /* Block 2 lost on the way here, so 3 is the first thing seen after 1. */
+    CHECK(client.step(client.block(3, TFTP_BLOCK_BYTES)).empty());
+    CHECK(client.c.block == 1);
+    CHECK(client.timeout() == ack(1));
+
+    /* The server resends from 2, which is taken. */
+    CHECK(client.step(client.block(2, TFTP_BLOCK_BYTES)) == ack(2));
+    CHECK(client.step(client.block(3, TFTP_BLOCK_BYTES)) == ack(3));
 }
 
 /* Neither the next block nor the last: a stray from further back, which must

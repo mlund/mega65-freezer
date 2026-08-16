@@ -182,6 +182,9 @@ static __attribute__((noinline)) bool take(
              * acknowledgement resends on its own timer, and this client resends
              * on its own besides; a server that did not miss it needed
              * nothing. */
+            if (client->stage == TftpTransferring && block == client->block) {
+                client->heard = true;
+            }
             return false;
         }
         case TFTP_ERROR:
@@ -198,6 +201,7 @@ static __attribute__((noinline)) bool take(
     /* The transfer's port: this assignment for the first message accepted, and
      * a copy of itself for the rest, which the test above has already matched. */
     client->server.port = datagram.from.port;
+    client->heard = true;
     return true;
 }
 
@@ -255,6 +259,7 @@ void tftp_start(struct TftpClient* client,
 
 uint16_t tftp_step(struct TftpClient* client, const uint8_t* in, uint16_t in_length, uint8_t* out) {
     client->data_length = 0;
+    client->heard = false;
     /* A timeout says the current step again; anything that arrives is answered
      * only when it moved the transfer on. */
     const bool owed =
