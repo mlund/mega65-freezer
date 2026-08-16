@@ -119,12 +119,18 @@ def serve_one(sock, peer, path, root, faults):
             sent += 1
 
         # Wait for the acknowledgement, resending on a timeout as a server must.
+        # Only a timeout spends a try: a stale acknowledgement -- of the block
+        # before, say, which a client repeats on its own clock -- is not the
+        # client falling silent, and counting it as one would abandon a
+        # transfer that is merely noisy.
         acked = False
-        for _ in range(5):
+        tries = 0
+        sock.settimeout(1.0)
+        while tries < 5:
             try:
-                sock.settimeout(1.0)
                 reply, who = sock.recvfrom(1024)
             except socket.timeout:
+                tries += 1
                 sock.sendto(packet, peer)
                 continue
             if who != peer or len(reply) < 4:
