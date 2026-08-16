@@ -230,8 +230,9 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
         "", /* refused: the code is named below instead */
         "THE TRANSFER STOPPED PART WAY",
         "MORE THAN THERE IS ROOM FOR",
+        "THE FETCH WAS STOPPED",
     };
-    static_assert(sizeof why / sizeof *why == FetchTooBig + 1,
+    static_assert(sizeof why / sizeof *why == FetchStopped + 1,
         "a fetch result with no message would index past this table");
 
     /* Wider than the row on purpose: the two halves together run past 80
@@ -308,9 +309,8 @@ static bool fetch_image(const char* name, bool replace) {
 }
 
 /* Mounts it, saying why if it will not.  Not the first attach of all, which is
- * a question rather than an instruction and reads its own answer.
- *
- * `name` is not const because hyppo's attach takes it as it is given. */
+ * a question rather than an instruction and reads its own answer. */
+/* `name` is not const because hyppo's attach takes it as it is given. */
 static bool attached(char* name) {
     if (mega65_dos_attach(name, ATTACH_DRIVE)) {
         show_status(SchemeError, hyppoerror_to_screen(mega65_geterrorcode()));
@@ -342,12 +342,13 @@ static bool attach_or_replace(char* name) {
     show_status(SchemeWarning, text);
 
     const uint8_t key = wait_key();
-    if (key == 'R' || key == 'r') {
-        return fetch_image(name, true) && attached(name);
+    if (key != 'R' && key != 'r') {
+        /* Anything else leaves the mount as it is; only A and RETURN go on to
+         * write the descriptor, so a mistyped key does nothing rather than
+         * something. */
+        return key == 'A' || key == 'a' || key == KEY_RETURN;
     }
-    /* Anything else leaves the mount as it is; only A and RETURN go on to write
-     * the descriptor, so a mistyped key does nothing rather than something. */
-    return key == 'A' || key == 'a' || key == KEY_RETURN;
+    return fetch_image(name, true) && attached(name);
 }
 
 /* Attaching writes the frozen process descriptor as well as the live one: the
@@ -593,23 +594,50 @@ void fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
 
 /* Kilobytes as they arrive.  Not every block: an image is sixteen hundred of
  * them, and a redraw each would cost more than the transfer.  Every 8KB moves
- * often enough to say the machine is alive. */
-void fetch_progress(uint32_t so_far, uint32_t total) {
+ * often enough to say the machine is alive.
+ *
+ * A repeat is drawn however far along it is: a stalled transfer and a hung
+ * machine look exactly alike when the screen stops moving, and the number of
+ * repeats is the only thing that tells them apart from the outside. */
+void fetch_progress(uint32_t so_far, uint32_t total, bool waiting) {
     static constexpr uint32_t EVERY = 0x2000;
-    /* Every 8KB, and always the last.  A short block is the last one, which is
-     * how the end is known when the server declined to say how big the file is
-     * and `total` is 0 -- without that the line would stop at the last
-     * multiple rather than at what arrived. */
-    if ((so_far & (EVERY - 1)) && so_far != total && so_far % TFTP_BLOCK_BYTES == 0) {
-        return;
+    static uint8_t waits;
+
+    if (waiting) {
+        waits++;
+    } else {
+        waits = 0;
+        /* Every 8KB, and always the last.  A short block is the last one, which
+         * is how the end is known when the server declined to say how big the
+         * file is and `total` is 0 -- without that the line would stop at the
+         * last multiple rather than at what arrived. */
+        if ((so_far & (EVERY - 1)) && so_far != total && so_far % TFTP_BLOCK_BYTES == 0) {
+            return;
+        }
     }
+
     char text[40];
     char* at = append_kb(append_str(text, "FETCHED "), so_far);
     if (total) {
         at = append_kb(append_str(at, " OF "), total);
     }
+    if (waiting) {
+        at = append_str(at, ", WAITING ");
+        at = append_dec(at, waits);
+    }
     *at = 0;
     show_status(SchemeText, text);
+}
+
+/* RUN/STOP, and only that: anything else pressed during a fetch stays on the
+ * queue for the browser to answer afterwards.  Taken off the queue here, which
+ * is what stops it reaching browse() and leaving the tool as well. */
+bool fetch_cancelled(void) {
+    if (ASCIIKEY != KEY_RUN_STOP) {
+        return false;
+    }
+    ASCIIKEY = 0;
+    return true;
 }
 
 /* The server a fetch would go to, as text.  Asked of fetch.c rather than

@@ -27,6 +27,7 @@ enum FetchResult : uint8_t {
     FetchRefused,  /* the server said no; fetch_error() is its code */
     FetchLost,     /* it stopped part way, and what was written is incomplete */
     FetchTooBig,   /* more than the caller offered room for, refused before writing */
+    FetchStopped,  /* the user asked for it to stop; nothing is wrong */
 };
 
 /* The TFTP server to use when a lease names none, which is the ordinary case:
@@ -56,16 +57,34 @@ void fetch_set_server(const uint8_t* ip, uint16_t port);
  *
  * `total` is what the server said the file is, or 0 where it declined to say.
  * An image is a thousand blocks and more, and a screen with nothing moving on
- * it reads as a machine that has hung. */
+ * it reads as a machine that has hung.
+ *
+ * `waiting` says the count has not moved and a request was said again, which
+ * is the difference between a transfer that is slow and one that is over.  It
+ * is told rather than worked out from `so_far` repeating: only this side knows
+ * which of its two calls is which, and a guess would carry across fetches. */
 void fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length);
-void fetch_progress(uint32_t so_far, uint32_t total);
+void fetch_progress(uint32_t so_far, uint32_t total, bool waiting);
+
+/* Whether the user has asked for this to stop, which is asked once per poll of
+ * every wait here -- the lease and the address as well as the transfer, since a
+ * network that answers nothing is exactly when someone wants out.
+ *
+ * A seam for the same reason the two above are: fetching owns the wire and the
+ * caller owns the keyboard, and a fetch has no business deciding which key
+ * means stop. */
+[[nodiscard]] bool fetch_cancelled(void);
 
 /* Reads `name`, storing at most `limit` bytes, and says how many arrived.
  *
  * `length` is set on FetchOk and on FetchLost, where it says how far the
  * transfer got -- those bytes were stored, and nothing should be read from
  * them.  A file whose size the server states up front is refused before the
- * first block when it would not fit, which is what tsize is asked for. */
+ * first block when it would not fit, which is what tsize is asked for.
+ *
+ * A transfer is given up when nothing new has arrived for a while, rather than
+ * when it has run long: an 800KB image takes fifteen seconds of a healthy wire,
+ * and a clock on the whole of it would end a transfer that was working. */
 [[nodiscard]] enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length);
 
 /* The code behind FetchRefused, RFC 1350 §5: 1 is no such file, 2 is a file the

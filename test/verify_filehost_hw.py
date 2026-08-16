@@ -34,9 +34,11 @@ import m65harness as h
 # Where the freezer's tools draw, and where BASIC does; the run crosses between
 # them, since it starts and ends outside the freezer.
 TOOL_SCREEN = h.Screen(at=0xB800)
-# Longer than the tool's own budget for a transfer, or a run that is about to
-# say why it failed is cut off saying nothing: fetch.c gives up after 1800
-# video frames, half a minute.
+# Longer than the tool's own patience, or a run that is about to say why it
+# failed is cut off saying nothing.  fetch.c waits three seconds for a lease and
+# three more for an address, then gives up on a transfer once nothing new has
+# arrived for eight -- a bound on silence, so a healthy catalogue may take
+# longer than any one of them.
 FETCH_TIMEOUT = 45.0
 # What fetch_catalog() can leave on the status line, from main.c's table.
 DONE = ("FETCHED", "NO ADDRESS", "NO TFTP SERVER", "DID NOT ANSWER", "REFUSED",

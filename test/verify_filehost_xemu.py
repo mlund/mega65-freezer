@@ -91,6 +91,17 @@ STEPS = [
     ("key", "f"),
     ("expect", "FETCHING THE CATALOGUE"),
     ("expect", "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK", 30),
+    # The same fetch, given up on by hand.  A key reaches the machine whenever
+    # it is sent, so this one lands while the lease is still being waited for --
+    # which is the only part of a fetch an emulator with no ethernet ever gets
+    # to, and the part that proves the tool reads the keyboard at all while it
+    # is on the wire.  Without it, a transfer that will never finish can only be
+    # escaped by resetting the machine.
+    # Said in full, because "STOPPED" alone is also inside the message for a
+    # transfer that died on its own -- and this must not pass for that.
+    ("key", "f"),
+    ("key", "stop"),
+    ("expect", "THE FETCH WAS STOPPED", 30),
     # And an address typed in, since a household router names no TFTP server.
     # The field opens empty with the one in force named in the prompt, so what
     # the prompt says the second time is the only proof from outside that what

@@ -40,10 +40,22 @@ static constexpr uint8_t RASTER_HIGH = 0x07;
 static uint8_t last_high;
 static uint16_t frames_elapsed;
 
+/* Whether this fetch was stopped by hand.  Remembered rather than asked again
+ * at the end: the seam reports a keypress and taking it off the queue is what
+ * consuming it means, so a second question would answer no. */
+static bool stopped;
+
 static void tick(void) {
     const uint8_t now = VICIV.fn_raster_msb & RASTER_HIGH;
     if (now < last_high) {
         frames_elapsed++;
+        /* The keyboard is read here rather than in the loops that call this:
+         * once a frame is often enough to catch a key a hand can press, and
+         * the poll around it runs thousands of times a second with only three
+         * frames of room in the controller. */
+        if (!stopped) {
+            stopped = fetch_cancelled();
+        }
     }
     last_high = now;
 }
@@ -59,10 +71,13 @@ static void restart_clock(void) {
  * fetch. */
 static constexpr uint16_t WAIT_FRAMES = 150; /* three seconds */
 static constexpr uint16_t RESEND_FRAMES = 25;
-/* A disk image is 1600 blocks, one outstanding at a time.  Long enough that a
- * slow server is waited for; short enough that a machine with the wire pulled
- * out gives an answer rather than hanging. */
-static constexpr uint16_t TRANSFER_FRAMES = 1800; /* half a minute */
+/* How long a transfer may hear nothing new before it is given up on.  Silence
+ * and not total time: an 800KB image is 1600 blocks and takes fifteen seconds
+ * of a healthy wire, so a clock on the whole of it races a large file that is
+ * working while never troubling a small one that is not.  Long enough to
+ * outlast the gateway's own five one-second retries, after which it has
+ * abandoned the transfer and nothing more is coming. */
+static constexpr uint16_t STALL_FRAMES = 400; /* eight seconds */
 
 /* Kept between fetches: taking a lease costs seconds, and the address this
  * machine answers for is the same one all through a session. */
@@ -72,6 +87,7 @@ static uint8_t server_mac[MAC_BYTES];
 static uint8_t told_server[IPV4_BYTES];
 static uint16_t told_port;
 static uint8_t error_code;
+
 
 /* Out of line although it is short: three callers each inlined the copy setup,
  * which measured 6 bytes more than one body and three calls. */
@@ -117,7 +133,7 @@ static bool leased(void) {
     restart_clock();
     uint16_t said_at = (uint16_t)(0 - RESEND_FRAMES);
     uint16_t said = 0;
-    while (frames_elapsed < WAIT_FRAMES && !dhcp_leased(&lease)) {
+    while (frames_elapsed < WAIT_FRAMES && !dhcp_leased(&lease) && !stopped) {
         tick();
         if (said) {
             eth_send(net_out, said);
@@ -149,7 +165,7 @@ static bool resolved(void) {
         ip_next_hop(server_address(), us.ip, lease.lease.netmask, lease.lease.router);
     restart_clock();
     uint16_t asked_at = (uint16_t)(0 - RESEND_FRAMES);
-    while (frames_elapsed < WAIT_FRAMES && net_zero(server_mac, MAC_BYTES)) {
+    while (frames_elapsed < WAIT_FRAMES && net_zero(server_mac, MAC_BYTES) && !stopped) {
         tick();
         if (frames_elapsed - asked_at >= RESEND_FRAMES) {
             eth_send(net_out, arp_request(net_out, us.mac, us.ip, hop));
@@ -168,14 +184,15 @@ static bool resolved(void) {
 enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) {
     *length = 0;
     error_code = 0;
+    stopped = false;
     if (!leased()) {
-        return FetchNoLease;
+        return stopped ? FetchStopped : FetchNoLease;
     }
     if (net_zero(server_address(), IPV4_BYTES)) {
         return FetchNoServer;
     }
     if (!resolved()) {
-        return FetchNoAnswer;
+        return stopped ? FetchStopped : FetchNoAnswer;
     }
 
     struct NetEndpoint server = {0};
@@ -188,7 +205,8 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
     uint16_t said = tftp_step(&transfer, nullptr, 0, net_out);
     uint16_t said_at = 0;
     uint32_t written = 0;
-    while (frames_elapsed < TRANSFER_FRAMES && !tftp_done(&transfer) && !tftp_failed(&transfer)) {
+    while (frames_elapsed < STALL_FRAMES && !tftp_done(&transfer) && !tftp_failed(&transfer)
+        && !stopped) {
         tick();
         if (said) {
             eth_send(net_out, said);
@@ -216,10 +234,22 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
              * stated" by itself; testing has_size as well measured 23 bytes
              * for an answer that cannot differ.  Read per block rather than
              * held, which measured 53 bytes more. */
-            fetch_progress(written, transfer.size);
+            fetch_progress(written, transfer.size, false);
+            /* The clock measures silence, so a block arriving is where it
+             * starts again -- and the resend timer with it, both meaning
+             * "now". */
+            restart_clock();
+            said_at = 0;
         }
         if (!said && frames_elapsed - said_at >= RESEND_FRAMES) {
             said = tftp_step(&transfer, nullptr, 0, net_out);
+            /* Nothing new has arrived and the request has been said again, so
+             * the screen must show that something is still being tried.  Not
+             * while the first request is unanswered, where there is no count
+             * to repeat. */
+            if (written) {
+                fetch_progress(written, transfer.size, true);
+            }
         }
     }
     /* The acknowledgement the last block earned: the loop ends on it rather
@@ -234,5 +264,10 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
         error_code = (uint8_t)transfer.error;
         return FetchRefused;
     }
-    return tftp_done(&transfer) ? FetchOk : FetchLost;
+    if (tftp_done(&transfer)) {
+        return FetchOk;
+    }
+    /* Asked for before it was lost: a transfer someone stopped is not a fault
+     * to report, and what it left behind is cleared up the same way either. */
+    return stopped ? FetchStopped : FetchLost;
 }
