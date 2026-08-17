@@ -58,6 +58,16 @@ if(ETH_COUNTERS)
     add_compile_definitions(ETH_COUNTERS)
 endif()
 
+# FILEHOST's E and R keys, which ARP a fixed address and report what came back.
+# Off by default: it settled the question it was written for -- the controller
+# does work from a frozen machine -- and a kilobyte of code and buffers is a
+# great deal to carry for asking again.  The addresses it probes are compiled
+# in, so a different LAN needs a rebuild whatever this is set to.
+option(ETH_PROBE "FILEHOST's E and R ethernet probe keys" OFF)
+if(ETH_PROBE)
+    add_compile_definitions(ETH_PROBE)
+endif()
+
 option(SDCARD_COUNTERS "Count SD card reads and writes" OFF)
 if(SDCARD_COUNTERS)
     add_compile_definitions(SDCARD_COUNTERS)

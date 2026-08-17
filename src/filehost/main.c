@@ -561,6 +561,18 @@ static void attach_selected(void) {
     show_status(SchemeHighlight, text);
 }
 
+/* Dotted quad, which the server prompt spells as well as the probe. */
+static char* append_ip(char* at, const uint8_t* ip) {
+    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
+        if (i) {
+            *at++ = '.';
+        }
+        at = append_dec(at, ip[i]);
+    }
+    return at;
+}
+
+#ifdef ETH_PROBE
 /* Whether the ethernet controller works from the frozen state, which no source
  * answers and only hardware can.  An ARP request needs no address of our own
  * and no checksum, and its reply proves both directions at once: a machine that
@@ -568,7 +580,13 @@ static void attach_selected(void) {
  *
  * The frame count beside it is the weaker but unconditional half -- a LAN
  * broadcasts constantly, so frames arriving proves the receiver alone even if
- * nothing answers us. */
+ * nothing answers us.
+ *
+ * Built only when asked for.  It answered its question -- the controller does
+ * work from a frozen machine -- and what is left is a way to ask again on a
+ * machine where the wire is suspect, which is not worth a kilobyte of every
+ * shipped tool.  The addresses below are this LAN's, so it needs recompiling to
+ * point elsewhere in any case. */
 static constexpr uint8_t PROBE_TARGET[IPV4_BYTES] = {192, 168, 68, 57};
 /* A real address rather than zeros: an ARP probe with a zero sender is
  * answered by some stacks and ignored by others, and a request carrying a
@@ -603,16 +621,6 @@ static char* append_mac(char* at, const uint8_t* mac) {
             *at++ = ':';
         }
         at = append_byte_hex(at, mac[i]);
-    }
-    return at;
-}
-
-static char* append_ip(char* at, const uint8_t* ip) {
-    for (uint8_t i = 0; i < IPV4_BYTES; i++) {
-        if (i) {
-            *at++ = '.';
-        }
-        at = append_dec(at, ip[i]);
     }
     return at;
 }
@@ -730,6 +738,7 @@ static void ethernet_probe(bool transmit) {
     (void)wait_key();
     draw_list();
 }
+#endif /* ETH_PROBE */
 
 /* Where a fetch puts what arrives: the card when an image is being written,
  * and the buffer the browser indexes otherwise.
@@ -1114,6 +1123,7 @@ static void browse(void) {
             case 'f':
                 fetch_catalog();
                 break;
+#ifdef ETH_PROBE
             case 'E':
             case 'e':
                 ethernet_probe(true);
@@ -1122,6 +1132,7 @@ static void browse(void) {
             case 'r':
                 ethernet_probe(false);
                 break;
+#endif
             case KEY_RUN_STOP:
             case KEY_ESC:
                 return;
