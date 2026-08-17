@@ -66,6 +66,7 @@ class Faults:
         self.pause_after = args.pause_after
         self.pause = args.pause
         self.repeat_every = args.repeat_every
+        self.tries = args.tries
         self.drop_every = args.drop_every
         self.slow = args.slow / 1000.0
         self.paused_yet = False
@@ -100,6 +101,7 @@ def serve_one(sock, peer, path, root, faults):
 
     data = open(whole, "rb").read()
     print(f"  sending {path}, {len(data)} bytes", flush=True)
+    began = time.monotonic()
     block = 1
     at = 0
     sent = 0
@@ -126,11 +128,14 @@ def serve_one(sock, peer, path, root, faults):
         acked = False
         tries = 0
         sock.settimeout(1.0)
-        while tries < 5:
+        while tries < faults.tries:
             try:
                 reply, who = sock.recvfrom(1024)
             except socket.timeout:
                 tries += 1
+                # Each of these is a full second in which the client said
+                # nothing: what a stall looks like from the far end.
+                print(f"    silence {tries}s at block {block}", flush=True)
                 sock.sendto(packet, peer)
                 continue
             if who != peer or len(reply) < 4:
@@ -147,7 +152,10 @@ def serve_one(sock, peer, path, root, faults):
             return
 
         if len(chunk) < BLOCK:
-            print(f"    done, {sent} datagrams for {block} blocks", flush=True)
+            spent = time.monotonic() - began
+            rate = len(data) / spent / 1024 if spent else 0
+            print(f"    done, {sent} datagrams for {block} blocks"
+                  f" in {spent:.1f}s ({rate:.0f} KB/s)", flush=True)
             return
         at += BLOCK
         block += 1
@@ -164,6 +172,9 @@ def main():
                         help="send this many blocks and then nothing, for ever")
     parser.add_argument("--pause-after", type=int, default=0, help="pause once, at this block")
     parser.add_argument("--pause", type=float, default=8.0, help="seconds to pause for")
+    parser.add_argument("--tries", type=int, default=5,
+                        help="one-second silences to spend before abandoning a block.  Raise it "
+                             "to tell a client that has stalled from one that has died")
     parser.add_argument("--repeat-every", type=int, default=0, help="send every Nth block twice")
     parser.add_argument("--drop-every", type=int, default=0, help="do not send every Nth block")
     parser.add_argument("--slow", type=float, default=0.0, help="milliseconds between blocks")

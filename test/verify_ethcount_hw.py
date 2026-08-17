@@ -44,6 +44,7 @@ import argparse
 import contextlib
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import m65harness as h
@@ -55,6 +56,10 @@ TOOL_SCREEN = verify_filehost_hw.TOOL_SCREEN
 
 COUNTERS = ("eth_rx_rotates", "eth_rx_late", "eth_rx_norotate",
             "eth_sends", "eth_tx_busy", "fetch_heard_count", "fetch_block_count")
+# Only in a -DSDCARD_COUNTERS=ON build.  Read when present, since what they
+# separate -- sectors written from sectors already holding the wanted bytes --
+# is the difference between a fetch that writes and one that mostly compares.
+SD_COUNTERS = ("sd_reads", "sd_writes", "sd_writes_skipped")
 
 # What an image run can leave on the status line once it has stopped moving.
 # `FETCHED` is not among them although it ends a catalogue: it is also the live
@@ -120,9 +125,15 @@ def fetch_catalog(machine: h.Machine, address: str) -> None:
     machine.press("return")
 
     machine.press("f")
+    began = time.monotonic()
     shot = machine.wait_until(lambda s: any(said in s.text(23) for said in verify_filehost_hw.DONE),
                               timeout=verify_filehost_hw.FETCH_TIMEOUT)
-    print("fetch:", shot.text(23).strip())
+    # A catalogue lands in far memory and never on the card, so what this times
+    # is the wire and the client with no SD in it.  Only roughly, though: the
+    # status line says FETCHED while bytes are still arriving, so the wait ends
+    # at the first progress line rather than at the last block.  The server
+    # prints the transfer's real duration; take the figure from there.
+    print(f"catalogue: {shot.text(23).strip()}  in {time.monotonic() - began:.1f}s")
 
 
 def fetch_image(machine: h.Machine, title: str) -> None:
@@ -147,24 +158,33 @@ def fetch_image(machine: h.Machine, title: str) -> None:
     if "ATTACH OR REPLACE" in shot.text(23):
         machine.press("r")
 
-    # Long: 800KB is eleven seconds clean, and a transfer that is failing spends
-    # five one-second timeouts per block before it says so.
+    # Long: 800KB is sixteen seconds where the sectors are already right, twice
+    # that where they are written, and a transfer that is failing spends the
+    # server's whole patience -- see its --tries -- before anything is said.
+    began = time.monotonic()
     shot = machine.wait_until(lambda s: any(said in s.text(23) for said in IMAGE_SETTLED), timeout=180.0)
-    print("image:", shot.text(23).strip())
+    print(f"image: {shot.text(23).strip()}  in {time.monotonic() - began:.1f}s")
 
 
 def report(machine: h.Machine) -> int:
     # The harness's own verb rather than a second way of spelling it: `count`
     # resolves the symbol and reads the four bytes, which is what
     # verify_sdcount_xemu.py asks for too.
-    result = machine.drive([("count", f"FILEHOST.{name}") for name in COUNTERS])
+    wanted = list(COUNTERS)
+    for name in SD_COUNTERS:
+        try:
+            machine.address(f"FILEHOST.{name}")
+        except (h.Failure, KeyError):
+            continue  # not an SD-counting build
+        wanted.append(name)
+    result = machine.drive([("count", f"FILEHOST.{name}") for name in wanted])
     if not result.ok:
         raise h.Failure(f"could not read the counters: {result.failure}")
     # Keyed by the name the step asked for, which carries the program prefix.
-    read = {name: result.counted[f"FILEHOST.{name}"] for name in COUNTERS}
+    read = {name: result.counted[f"FILEHOST.{name}"] for name in wanted}
 
-    width = max(len(name) for name in COUNTERS)
-    for name in COUNTERS:
+    width = max(len(name) for name in wanted)
+    for name in wanted:
         print(f"{name:<{width}}  {read[name]}")
 
     rotates = read["eth_rx_rotates"]
