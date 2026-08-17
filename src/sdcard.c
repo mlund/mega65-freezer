@@ -204,6 +204,24 @@ volatile uint8_t sd_refuse_ready = 0;
     return ready_or_refuse();
 }
 
+/* Waits for a read this function asked for, with one reset if it does not
+ * come.  The same bound and the same single attempt as the write above, for
+ * the same reason: unbounded here was measured too, five seconds of silence at
+ * one sector where ten half-second resets went by unanswered.  It is the read
+ * before the write, so a caller that cannot have it is a caller that must not
+ * go on to write over what it failed to compare against. */
+[[nodiscard]] static bool wait_after_read(void) {
+    if (ready_or_refuse()) {
+        return true;
+    }
+    DEBUG_COUNT(sd_recoveries);
+    SD_COMMAND = SD_CMD_RESET_BEGIN;
+    usleep(SD_RESET_SETTLE_MICROSECS);
+    SD_COMMAND = SD_CMD_RESET_END;
+    SD_COMMAND = SD_CMD_READ;
+    return ready_or_refuse();
+}
+
 bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     uint8_t tries = 0;
     const uint32_t sector_address = sdhc_card ? sector_number : sector_number * SD_SECTOR_SIZE;
@@ -231,20 +249,8 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
     DEBUG_COUNT(sd_reads);
     SD_COMMAND = SD_CMD_READ;
-
-    /* The count wrapping is the timeout: 65536 polls without the card coming
-     * ready, and it is reset and asked again. */
-    uint16_t counter = 0;
-    while (SD_STATUS & SD_STATUS_BUSY) {
-        if (border_flicker > 1) {
-            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
-        }
-        if (!++counter) {
-            SD_COMMAND = SD_CMD_RESET_BEGIN;
-            usleep(SD_RESET_SETTLE_MICROSECS);
-            SD_COMMAND = SD_CMD_RESET_END;
-            SD_COMMAND = SD_CMD_READ;
-        }
+    if (!wait_after_read()) {
+        return false;
     }
 
     // Copy the read data to a buffer for verification
@@ -289,8 +295,8 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
              * verifies the write took. */
             DEBUG_COUNT(sd_reads);
             SD_COMMAND = SD_CMD_READ;
-
-            while (SD_STATUS & SD_STATUS_BUSY) {
+            if (!wait_after_read()) {
+                return false;
             }
 
             // Copy the read data to a buffer for verification
@@ -328,6 +334,9 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 static constexpr uint8_t SD_READY_ROUNDS = 200;
 [[nodiscard]] static bool sdcard_ready(void) {
     for (uint8_t round = 0; round < SD_READY_ROUNDS; round++) {
+        if (border_flicker > 1) {
+            VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
+        }
         uint16_t spins = 0;
         do {
             if (!(SD_STATUS & SD_STATUS_BUSY)) {
