@@ -16,8 +16,6 @@ static constexpr Addr28 SD_SECTORBUFFER = 0xffd6e00;
 unsigned char sdhc_card = 0;
 uint8_t border_flicker = 0;
 
-/* Half a second for the card to come back after a reset. */
-static constexpr uint32_t SD_RESET_SETTLE_MICROSECS = 500000;
 /* Polls, not time: how long a read waits before the card counts as stalled.
  * The controller answers in microseconds when it is well. */
 static constexpr uint16_t SD_READY_POLLS = 50000;
@@ -69,7 +67,7 @@ void sdcard_open(void) {
 uint32_t sd_reads = 0;
 uint32_t sd_writes = 0;
 uint32_t sd_writes_skipped = 0; /* sector already held what we were about to write */
-uint32_t sd_recoveries = 0;     /* writes where the card had to be reset first */
+uint32_t sd_write_failures = 0; /* sectors the card would not take */
 #define DEBUG_COUNT(counter) ((counter)++)
 #else
 #define DEBUG_COUNT(counter) ((void)0)
@@ -183,44 +181,14 @@ volatile uint8_t sd_refuse_ready = 0;
     return sdcard_ready();
 }
 
-/* Waits for the card before a write, with one reset if it does not come.
+/* A write gives up rather than resetting the controller and asking again.
  *
- * Bounded, and one attempt rather than for ever: this loop resetting and
- * reissuing every half second without limit is what turned a long busy into a
- * permanent wedge, sixty seconds of silence at a single block with nothing but
- * RESTORE left.  Whether the reset is needed at all is an open question --
- * mega65-tools' remotesd_eth.c never resets, and waits alone -- so it is
- * counted, and a run that never fires it is grounds for dropping it. */
-[[nodiscard]] static bool wait_before_write(uint8_t is_multi) {
-    if (ready_or_refuse()) {
-        return true;
-    }
-    DEBUG_COUNT(sd_recoveries);
-    SD_COMMAND = SD_CMD_RESET_BEGIN;
-    usleep(SD_RESET_SETTLE_MICROSECS);
-    SD_COMMAND = SD_CMD_RESET_END;
-    SD_COMMAND = SD_CMD_WRITE_GATE;
-    SD_COMMAND = is_multi ? SD_CMD_WRITE_MULTI_FIRST : SD_CMD_WRITE;
-    return ready_or_refuse();
-}
-
-/* Waits for a read this function asked for, with one reset if it does not
- * come.  The same bound and the same single attempt as the write above, for
- * the same reason: unbounded here was measured too, five seconds of silence at
- * one sector where ten half-second resets went by unanswered.  It is the read
- * before the write, so a caller that cannot have it is a caller that must not
- * go on to write over what it failed to compare against. */
-[[nodiscard]] static bool wait_after_read(void) {
-    if (ready_or_refuse()) {
-        return true;
-    }
-    DEBUG_COUNT(sd_recoveries);
-    SD_COMMAND = SD_CMD_RESET_BEGIN;
-    usleep(SD_RESET_SETTLE_MICROSECS);
-    SD_COMMAND = SD_CMD_RESET_END;
-    SD_COMMAND = SD_CMD_READ;
-    return ready_or_refuse();
-}
+ * The reset went in against a card that would not answer, and two hardware
+ * runs of more than 1600 real writes never once reached it -- sd_recoveries
+ * stayed at 0 throughout.  mega65-tools' remotesd_eth.c waits and never resets
+ * either.  So the card is given the time and then the caller is told, which is
+ * what it can act on; resetting the controller under an operation it is still
+ * performing is what the unbounded version did for ever. */
 
 bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     uint8_t tries = 0;
@@ -249,7 +217,8 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
 
     DEBUG_COUNT(sd_reads);
     SD_COMMAND = SD_CMD_READ;
-    if (!wait_after_read()) {
+    if (!ready_or_refuse()) {
+        DEBUG_COUNT(sd_write_failures);
         return false;
     }
 
@@ -273,7 +242,8 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         // Copy data to hardware sector buffer via DMA
         lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
 
-        if (!wait_before_write(is_multi)) {
+        if (!ready_or_refuse()) {
+            DEBUG_COUNT(sd_write_failures);
             return false;
         }
 
@@ -285,7 +255,8 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         }
 
         // Wait for the write to complete
-        if (!wait_before_write(is_multi)) {
+        if (!ready_or_refuse()) {
+            DEBUG_COUNT(sd_write_failures);
             return false;
         }
 
@@ -295,7 +266,8 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
              * verifies the write took. */
             DEBUG_COUNT(sd_reads);
             SD_COMMAND = SD_CMD_READ;
-            if (!wait_after_read()) {
+            if (!ready_or_refuse()) {
+                DEBUG_COUNT(sd_write_failures);
                 return false;
             }
 
@@ -322,6 +294,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     }
     /* Ten writes that would not verify.  The caller is told, rather than left
      * to discover it from a file that is wrong. */
+    DEBUG_COUNT(sd_write_failures);
     return false;
 }
 

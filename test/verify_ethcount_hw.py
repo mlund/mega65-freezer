@@ -59,7 +59,7 @@ COUNTERS = ("eth_rx_rotates", "eth_rx_late", "eth_rx_norotate",
 # Only in a -DSDCARD_COUNTERS=ON build.  Read when present, since what they
 # separate -- sectors written from sectors already holding the wanted bytes --
 # is the difference between a fetch that writes and one that mostly compares.
-SD_COUNTERS = ("sd_reads", "sd_writes", "sd_writes_skipped", "sd_recoveries")
+SD_COUNTERS = ("sd_reads", "sd_writes", "sd_writes_skipped", "sd_write_failures")
 
 # What an image run can leave on the status line once it has stopped moving.
 # `FETCHED` is not among them although it ends a catalogue: it is also the live

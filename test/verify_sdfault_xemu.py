@@ -4,13 +4,13 @@
 The wait in sdcard_writesector() used to have no bound: it reset the controller
 and reissued the write every half second for as long as the card stayed busy,
 which on hardware meant sixty seconds of silence at a single sector and a
-machine with nothing left but RESTORE.  It is bounded now, with one recovery
-attempt, and it reports what happened.
+machine with nothing left but RESTORE.  It is bounded now, and it reports
+what happened rather than resetting the controller under an operation it is
+still performing.
 
 No emulator can stage that on its own -- Xemu's card answers at once and is
 never busy -- so the refusal is asked for by name instead.  `sd_refuse_ready`
-counts down the ready checks to answer "not ready" to: one is rescued by the
-recovery, two are not.
+counts down the ready checks to answer "not ready" to.
 
 What this proves is the part that has no other test: that a write which cannot
 succeed *returns*.  If the unbounded loop came back, the format below would
@@ -48,19 +48,19 @@ STEPS = [
     # Staged after the name and before the writing starts, so the refusal lands
     # on the format rather than on the directory entry the name goes into.
     #
-    # Two, not one: the first is what the recovery answers, the second is what
-    # it cannot, so this is the whole of the new path -- wait, reset, wait, give
-    # up -- rather than the half that succeeds.
-    ("poke", "MAKEDISK.sd_refuse_ready", 2),
+    # One is enough now that a refused write gives up rather than resetting and
+    # asking again.
+    ("poke", "MAKEDISK.sd_refuse_ready", 1),
     ("key", "return"),
     # The format finishes, which is the assertion.  A write that cannot succeed
     # is one sector of an image nothing has promised is good, and MAKEDISK does
     # not yet carry that up; what matters here is that it came back at all.
     ("expect", "CREATED DISK IMAGE", 180),
-    # And the recovery was spent, which says the refusal reached the code under
-    # test rather than being lost somewhere above it.  Without this the run
-    # would pass just as well with the poke doing nothing at all.
-    ("count", "MAKEDISK.sd_recoveries", 1),
+    # And a write reported that it could not take the sector, which says the
+    # refusal reached the code under test rather than being lost somewhere
+    # above it.  Without this the run would pass just as well with the poke
+    # doing nothing at all.
+    ("count", "MAKEDISK.sd_write_failures", 1),
 ]
 
 if __name__ == "__main__":
