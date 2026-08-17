@@ -295,6 +295,17 @@ if(XEMU AND Python3_FOUND AND MEGA65_SDIMG AND EXISTS ${MEGA65_SDIMG})
         set_tests_properties(sdcount PROPERTIES TIMEOUT 600)
     endif()
 
+    # A write that cannot succeed, and whether it returns.  Needs both options:
+    # the faults to stage a card that will not come ready, the counters to see
+    # that the refusal was spent where it was aimed.
+    if(SDCARD_FAULTS AND SDCARD_COUNTERS)
+        add_test(NAME sdfault
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_sdfault_xemu.py
+                    --emulator ${XEMU} --sdimg ${MEGA65_SDIMG}
+                    --build $<TARGET_FILE_DIR:MAKEDISK>)
+        set_tests_properties(sdfault PROPERTIES TIMEOUT 600)
+    endif()
+
     # The FileHost browser over a catalogue staged onto the clone, and the
     # attach it performs.  The network half has no emulator route -- xemu's
     # ethernet is Linux-only -- so this is the whole of the tool that can be

@@ -55,6 +55,7 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size);
  * shorter than one is padded with zeros -- which is what a file's last piece
  * is, unless its length divides exactly.  Contiguous is what makes the sector
  * plain arithmetic rather than a walk of the chain. */
-void fat32_write_file_sector(
+/* False where the sector did not reach the card. */
+[[nodiscard]] bool fat32_write_file_sector(
     uint32_t first_sector, uint32_t offset, const uint8_t* bytes, uint16_t length);
 enum FreezerError fat32_open_file_system(void);

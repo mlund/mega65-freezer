@@ -27,6 +27,7 @@ enum FetchResult : uint8_t {
     FetchRefused,  /* the server said no; fetch_error() is its code */
     FetchLost,     /* it stopped part way, and what was written is incomplete */
     FetchTooBig,   /* more than the caller offered room for, refused before writing */
+    FetchWriteFailed, /* the card would not take a sector; what is there is partial */
     FetchStopped,  /* the user asked for it to stop; nothing is wrong */
 };
 
@@ -63,7 +64,10 @@ void fetch_set_server(const uint8_t* ip, uint16_t port);
  * is the difference between a transfer that is slow and one that is over.  It
  * is told rather than worked out from `so_far` repeating: only this side knows
  * which of its two calls is which, and a guess would carry across fetches. */
-void fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length);
+/* False where the bytes did not reach the card.  A fetch stops there: carrying
+ * on writes a file that is wrong, and the caller has already been told the
+ * transfer is incomplete. */
+[[nodiscard]] bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length);
 void fetch_progress(uint32_t so_far, uint32_t total, bool waiting);
 
 /* Whether the user has asked for this to stop, which is asked once per poll of

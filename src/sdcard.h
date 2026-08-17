@@ -22,7 +22,17 @@ extern uint8_t border_flicker;
 
 void sdcard_visual_feedback(const uint8_t do_flicker);
 void sdcard_open(void);
-void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi);
+/* Writes `sector_buffer` to `sector_number`, verified by reading it back, and
+ * skipped where the card already holds those bytes.
+ *
+ * False means the write did not take: the card never went idle, or ten
+ * attempts failed to verify.  Worth acting on -- a caller that carries on
+ * writes a file that is wrong, and the wait behind this used to hang for ever
+ * rather than say so.
+ *
+ * `is_multi` opens a CMD25 stream, and has no correct caller: this verifies by
+ * reading, which a stream cannot survive.  Use sdcard_writefirstsector(). */
+[[nodiscard]] bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi);
 void sdcard_readsector(const uint32_t sector_number);
 void mega65_fast(void);
 /* A follow-on block of an open multi-block write, and the last one, which

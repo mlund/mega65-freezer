@@ -136,15 +136,15 @@ static uint32_t fat32_allocate_cluster(uint32_t cluster) {
             // Found new free cluster, so place end-of-chain marker on it
             new_cluster = fat_sector_num * 128 + (i >> 2);
             *(uint32_t*)&sector_buffer[i] = 0x0fffffff;
-            sdcard_writesector(fat1_sector + fat_sector_num, 0);
-            sdcard_writesector(fat2_sector + fat_sector_num, 0);
+            (void)sdcard_writesector(fat1_sector + fat_sector_num, 0);
+            (void)sdcard_writesector(fat2_sector + fat_sector_num, 0);
 
             // chain old cluster to new cluster
             fat_sector_num = cluster / 128;
             sdcard_readsector(fat1_sector + fat_sector_num);
             *(uint32_t*)&sector_buffer[(cluster & 127) << 2] = new_cluster;
-            sdcard_writesector(fat1_sector + fat_sector_num, 0);
-            sdcard_writesector(fat2_sector + fat_sector_num, 0);
+            (void)sdcard_writesector(fat1_sector + fat_sector_num, 0);
+            (void)sdcard_writesector(fat2_sector + fat_sector_num, 0);
             return new_cluster;
         }
     }
@@ -160,8 +160,8 @@ static bool fat_held;
 /* Both FATs, since either copy is the one a reader may believe. */
 static void flush_fat(void) {
     if (fat_held) {
-        sdcard_writesector(fat1_sector + fat_held_at, 0);
-        sdcard_writesector(fat2_sector + fat_held_at, 0);
+        (void)sdcard_writesector(fat1_sector + fat_held_at, 0);
+        (void)sdcard_writesector(fat2_sector + fat_held_at, 0);
     }
 }
 
@@ -285,7 +285,7 @@ bool fat32_delete_file(const char* name) {
     // chain begins, and the search left its sector in the buffer.
     const uint32_t first = fat_entry_first_cluster(&sector_buffer[found_offset]);
     sector_buffer[found_offset] = FAT_ENTRY_DELETED;
-    sdcard_writesector(found_sector, 0);
+    (void)sdcard_writesector(found_sector, 0);
 
     // The entry goes first: clusters freed under a name still in the directory
     // would be handed to the next file while this one can still be opened.
@@ -306,13 +306,13 @@ bool fat32_delete_file(const char* name) {
   XXX -- Should allow creation of files in sub-directories
 
 */
-void fat32_write_file_sector(
+bool fat32_write_file_sector(
     uint32_t first_sector, uint32_t offset, const uint8_t* bytes, uint16_t length) {
     lcopy((Addr28)(uint16_t)bytes, (Addr28)(uint16_t)sector_buffer, length);
     if (length < SD_SECTOR_SIZE) {
         lfill((Addr28)(uint16_t)&sector_buffer[length], 0, SD_SECTOR_SIZE - length);
     }
-    sdcard_writesector(first_sector + offset / SD_SECTOR_SIZE, 0);
+    return sdcard_writesector(first_sector + offset / SD_SECTOR_SIZE, 0);
 }
 
 uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
@@ -350,7 +350,7 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
         found_sector = root_dir_sector + hw_mul32(dir_cluster - 2, sectors_per_cluster);
         found_offset = 0;
         for (uint8_t sn = 0; sn < sectors_per_cluster; sn++) {
-            sdcard_writesector(found_sector + sn, 0);
+            (void)sdcard_writesector(found_sector + sn, 0);
         }
     }
 
@@ -410,8 +410,8 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
             }
         }
         // Write FAT sector to both FATs
-        sdcard_writesector(fat1_sector + fat_sector_num + k, 0);
-        sdcard_writesector(fat2_sector + fat_sector_num + k, 0);
+        (void)sdcard_writesector(fat1_sector + fat_sector_num + k, 0);
+        (void)sdcard_writesector(fat2_sector + fat_sector_num + k, 0);
     }
 
     // Build directory entry
@@ -432,7 +432,7 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
     sector_buffer[found_offset + 0x1E] = (size >> 16L) & 0xff;
     sector_buffer[found_offset + 0x1F] = (size >> 24l) & 0xff;
 
-    sdcard_writesector(found_sector, 0);
+    (void)sdcard_writesector(found_sector, 0);
 
     return fat_cluster_first_sector(root_dir_sector, start_cluster, sectors_per_cluster);
 }

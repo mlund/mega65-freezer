@@ -127,7 +127,7 @@ enum FreezerError freeze_store_sector(uint32_t addr, unsigned char* buffer) {
             SD_SECTOR_SIZE - offset); // don't write behind the buffer!
     }
 
-    sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
+    (void)sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 
     return FreezerOk;
 }
@@ -162,7 +162,7 @@ enum FreezerError freeze_store_sector_partial(uint32_t addr, uint32_t src, uint1
 
     lcopy(src, (long)&sector_buffer[offset], count);
 
-    sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
+    (void)sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 
     return FreezerOk;
 }
@@ -201,7 +201,7 @@ void freeze_poke(uint32_t addr, unsigned char v) {
 
     sector_buffer[offset & 0x1ff] = v;
 
-    sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
+    (void)sdcard_writesector(freeze_slot_start_sector + freeze_slot_offset, 0);
 }
 
 /* Every I/O register shares the top half of its 28-bit address, and a call site

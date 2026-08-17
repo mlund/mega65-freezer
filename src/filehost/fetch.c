@@ -275,7 +275,9 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
             if (written + transfer.data_length > limit) {
                 return FetchTooBig;
             }
-            fetch_store(written, &net_in[TFTP_DATA_AT], transfer.data_length);
+            if (!fetch_store(written, &net_in[TFTP_DATA_AT], transfer.data_length)) {
+                return FetchWriteFailed;
+            }
             written += transfer.data_length;
             /* `size` is zero until a server states one, so it says "not
              * stated" by itself; testing has_size as well measured 23 bytes

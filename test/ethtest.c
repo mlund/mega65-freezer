@@ -202,7 +202,7 @@ int main(void) {
     sector_buffer[1] = 'U';
     sector_buffer[2] = 'S';
     sector_buffer[3] = 'Y';
-    sdcard_writesector(LOG_SECTOR, 0);
+    (void)sdcard_writesector(LOG_SECTOR, 0);
 
     sector_buffer[0] = 'E';
     sector_buffer[1] = 'T';
@@ -457,7 +457,7 @@ int main(void) {
     sector_buffer[21] = ETHERNET.ctrl1;
     sector_buffer[22] = ETHERNET.ctrl2;
 
-    sdcard_writesector(LOG_SECTOR, 0);
+    (void)sdcard_writesector(LOG_SECTOR, 0);
 
     /* Green border: the run finished and the sector is written. */
     VICIV.bordercol = 5;

@@ -92,7 +92,7 @@ static uint16_t time_single(uint32_t first, uint8_t pass) {
     start_clock();
     for (uint16_t index = 0; index < BATCH_SECTORS; index++) {
         fill_sector(pass, index);
-        sdcard_writesector(first + index, 0);
+        (void)sdcard_writesector(first + index, 0);
         tick();
     }
     return frames;
@@ -200,7 +200,7 @@ int main(void) {
     at = say(at, " OF ");
     at = say_num(at, PASSES);
     *at = 0;
-    sdcard_writesector(first + BATCH_SECTORS, 0);
+    (void)sdcard_writesector(first + BATCH_SECTORS, 0);
 
     return 0;
 }

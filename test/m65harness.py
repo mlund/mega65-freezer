@@ -502,7 +502,8 @@ class Machine:
         """Run a list of steps, and say which one did not come true.
 
         Returns rather than printing, so a caller can be a test rather than a
-        program.  Verbs: key, type, expect, expect_row, expect_at, read, count.
+        program.  Verbs: key, type, expect, expect_row, expect_at, read, poke,
+        count.
         A check that needs two screens compared, or a whole screen measured,
         wants `until_ok` and the methods above rather than a step.
         """
@@ -542,10 +543,21 @@ class Machine:
             got = self.read(address, len(want))
             if got != want:
                 raise Failure(f"${address:07X} read {got.hex()}, wanted {want.hex()}")
+        elif verb == "poke":
+            self._poke(rest)
         elif verb == "count":
             self._count(rest, counted)
         else:
             raise Failure(f"no such step {verb!r}")
+
+    def _poke(self, rest: tuple) -> None:
+        """A byte written into the running program by symbol name.
+
+        For the state a scenario has to stage rather than provoke: a card that
+        will not come ready has no keypress and no file behind it, so the only
+        way to ask for one is to say so in the program's own memory."""
+        name, value = rest[0], rest[1]
+        self.write(self.address(name), bytes([value]))
 
     def _count(self, rest: tuple, counted: dict[str, int]) -> None:
         """A counter read out of the running program by symbol name.  What it

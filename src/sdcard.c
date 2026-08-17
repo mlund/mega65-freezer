@@ -69,6 +69,7 @@ void sdcard_open(void) {
 uint32_t sd_reads = 0;
 uint32_t sd_writes = 0;
 uint32_t sd_writes_skipped = 0; /* sector already held what we were about to write */
+uint32_t sd_recoveries = 0;     /* writes where the card had to be reset first */
 #define DEBUG_COUNT(counter) ((counter)++)
 #else
 #define DEBUG_COUNT(counter) ((void)0)
@@ -155,7 +156,55 @@ void sdcard_readsector(const uint32_t sector_number) {
  * this does not come out of the same budget as the code. */
 static __attribute__((section(".sdverify"))) uint8_t sd_verify_buffer[SD_SECTOR_SIZE];
 
-void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
+[[nodiscard]] static bool sdcard_ready(void);
+
+#ifdef SDCARD_FAULTS
+/* Ready checks to answer "not ready" to, counted down as they are spent.
+ *
+ * Poked by name from the test harness, because no emulator can stage the thing
+ * this guards against: Xemu's card answers at once and never stays busy, so a
+ * wait that never returns looks identical to one that returns immediately.
+ * One refusal exercises the recovery below; two exercise the failure it cannot
+ * rescue. */
+/* Volatile because nothing in the program writes it: the harness pokes the
+ * symbol from outside, and link-time optimisation would otherwise prove the
+ * value can only be its initialiser, fold the test away and drop the name. */
+volatile uint8_t sd_refuse_ready = 0;
+#endif
+
+/* The card's readiness, or a refusal the harness asked for. */
+[[nodiscard]] static bool ready_or_refuse(void) {
+#ifdef SDCARD_FAULTS
+    if (sd_refuse_ready) {
+        sd_refuse_ready--;
+        return false;
+    }
+#endif
+    return sdcard_ready();
+}
+
+/* Waits for the card before a write, with one reset if it does not come.
+ *
+ * Bounded, and one attempt rather than for ever: this loop resetting and
+ * reissuing every half second without limit is what turned a long busy into a
+ * permanent wedge, sixty seconds of silence at a single block with nothing but
+ * RESTORE left.  Whether the reset is needed at all is an open question --
+ * mega65-tools' remotesd_eth.c never resets, and waits alone -- so it is
+ * counted, and a run that never fires it is grounds for dropping it. */
+[[nodiscard]] static bool wait_before_write(uint8_t is_multi) {
+    if (ready_or_refuse()) {
+        return true;
+    }
+    DEBUG_COUNT(sd_recoveries);
+    SD_COMMAND = SD_CMD_RESET_BEGIN;
+    usleep(SD_RESET_SETTLE_MICROSECS);
+    SD_COMMAND = SD_CMD_RESET_END;
+    SD_COMMAND = SD_CMD_WRITE_GATE;
+    SD_COMMAND = is_multi ? SD_CMD_WRITE_MULTI_FIRST : SD_CMD_WRITE;
+    return ready_or_refuse();
+}
+
+bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     uint8_t tries = 0;
     const uint32_t sector_address = sdhc_card ? sector_number : sector_number * SD_SECTOR_SIZE;
 
@@ -209,7 +258,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     }
     if (i == SD_SECTOR_SIZE) {
         DEBUG_COUNT(sd_writes_skipped);
-        return;
+        return true;
     }
 
     while (tries < 10) {
@@ -218,21 +267,8 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         // Copy data to hardware sector buffer via DMA
         lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
 
-        // Wait for SD card to be ready
-        uint16_t counter = 0;
-        while (SD_STATUS & SD_STATUS_BUSY) {
-            if (!++counter) {
-                // SD card not becoming ready: try reset
-                SD_COMMAND = SD_CMD_RESET_BEGIN;
-                usleep(SD_RESET_SETTLE_MICROSECS);
-                SD_COMMAND = SD_CMD_RESET_END;
-                SD_COMMAND = SD_CMD_WRITE_GATE;
-                if (is_multi) {
-                    SD_COMMAND = SD_CMD_WRITE_MULTI_FIRST;
-                } else {
-                    SD_COMMAND = SD_CMD_WRITE;
-                }
-            }
+        if (!wait_before_write(is_multi)) {
+            return false;
         }
 
         SD_COMMAND = SD_CMD_WRITE_GATE;
@@ -242,22 +278,9 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             SD_COMMAND = SD_CMD_WRITE;
         }
 
-        // Wait for write to complete
-        counter = 0;
-        while (SD_STATUS & SD_STATUS_BUSY) {
-            if (!++counter) {
-                // SD card not becoming ready: try reset
-                SD_COMMAND = SD_CMD_RESET_BEGIN;
-                usleep(SD_RESET_SETTLE_MICROSECS);
-                SD_COMMAND = SD_CMD_RESET_END;
-                // Retry write
-                SD_COMMAND = SD_CMD_WRITE_GATE;
-                if (is_multi) {
-                    SD_COMMAND = SD_CMD_WRITE_MULTI_FIRST;
-                } else {
-                    SD_COMMAND = SD_CMD_WRITE;
-                }
-            }
+        // Wait for the write to complete
+        if (!wait_before_write(is_multi)) {
+            return false;
         }
 
         if (!(SD_STATUS & SD_STATUS_UNSETTLED)) {
@@ -279,7 +302,7 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
                 }
             }
             if (i == SD_SECTOR_SIZE) {
-                return;
+                return true;
             }
             screen_hex(screen_line_address - 80 + 24, sector_number);
         }
@@ -291,6 +314,9 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
          * verify is rewritten for ever. */
         tries++;
     }
+    /* Ten writes that would not verify.  The caller is told, rather than left
+     * to discover it from a file that is wrong. */
+    return false;
 }
 
 /* Both engines idle, or the budget spent.  Bounded because the alternative was

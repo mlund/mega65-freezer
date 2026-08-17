@@ -1111,7 +1111,7 @@ int main(void) {
                         VICIV.bordercol = SchemeBorderBusy;
                         for (uint32_t j = 0; j < 128; j++) {
                             lcopy(0x40000U + (j << 9), (uint32_t)sector_buffer, SD_SECTOR_SIZE);
-                            sdcard_writesector(dest_freeze_slot_start_sector + i + j, 0);
+                            (void)sdcard_writesector(dest_freeze_slot_start_sector + i + j, 0);
                         }
                     }
                     VICIV.bordercol = SchemeBorder;

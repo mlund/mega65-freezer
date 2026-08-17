@@ -199,7 +199,7 @@ static void format_disk_image(uint32_t file_sector, char* diskname, bool is_d65)
      * 1600.  See test/verify_sdcount_xemu.py. */
     clear_sector_buffer();
     for (s = 0; s < sect_count; s++) {
-        sdcard_writesector(file_sector + s, 0);
+        (void)sdcard_writesector(file_sector + s, 0);
     }
 
     sdcard_visual_feedback(0);
@@ -247,7 +247,7 @@ static void format_disk_image(uint32_t file_sector, char* diskname, bool is_d65)
     sector_buffer[0x105] = id_hi;
 
     const uint32_t bam_sector = file_sector + disk_bam_sector(geom);
-    sdcard_writesector(bam_sector, 0);
+    (void)sdcard_writesector(bam_sector, 0);
 
     clear_sector_buffer();
     lcopy((long)BAM_SECTOR1, (long)sector_buffer, 0x100);
@@ -262,7 +262,7 @@ static void format_disk_image(uint32_t file_sector, char* diskname, bool is_d65)
     sector_buffer[0x0FA] = 40;
     sector_buffer[0x0FB] = 0xff;
 
-    sdcard_writesector(bam_sector + 1, 0);
+    (void)sdcard_writesector(bam_sector + 1, 0);
 }
 
 static void do_make_disk_image(bool is_d65, uint8_t drive_id) {

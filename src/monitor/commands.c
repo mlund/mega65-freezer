@@ -84,7 +84,7 @@ static bool mon_sector_dirty = false;
 static void flush_sector(void) {
     if (mon_sector_dirty) {
         lcopy((long)mon_sector, (long)sector_buffer, SD_SECTOR_SIZE);
-        sdcard_writesector(freeze_slot_start_sector + mon_sector_num, 0);
+        (void)sdcard_writesector(freeze_slot_start_sector + mon_sector_num, 0);
         mon_sector_dirty = false;
     }
 }
@@ -363,7 +363,7 @@ void set_memory(void) {
 
         // Write changes back
         lcopy((long)mon_sector, (long)sector_buffer, SD_SECTOR_SIZE);
-        sdcard_writesector(freeze_slot_start_sector + mon_sector_num, 0);
+        (void)sdcard_writesector(freeze_slot_start_sector + mon_sector_num, 0);
 
         // After writing memory values, redisplay the modified region
         mon_sector_num = -1;

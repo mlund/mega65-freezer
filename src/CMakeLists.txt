@@ -68,6 +68,15 @@ if(ETH_PROBE)
     add_compile_definitions(ETH_PROBE)
 endif()
 
+# A card that will not come ready, on demand.  Off by default: this exists so a
+# scenario can prove the write path returns rather than spins, which no
+# emulator can stage on its own -- Xemu's card is never busy.  See
+# test/verify_sdfault_xemu.py.
+option(SDCARD_FAULTS "Let a test refuse the SD card's ready check" OFF)
+if(SDCARD_FAULTS)
+    add_compile_definitions(SDCARD_FAULTS)
+endif()
+
 option(SDCARD_COUNTERS "Count SD card reads and writes" OFF)
 if(SDCARD_COUNTERS)
     add_compile_definitions(SDCARD_COUNTERS)

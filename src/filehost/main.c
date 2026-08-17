@@ -313,6 +313,7 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
         "", /* refused: the code is named below instead */
         "THE TRANSFER STOPPED PART WAY",
         "MORE THAN THERE IS ROOM FOR",
+        "THE CARD WOULD NOT TAKE IT",
         "THE FETCH WAS STOPPED",
     };
     static_assert(sizeof why / sizeof *why == FetchStopped + 1,
@@ -749,14 +750,14 @@ static void ethernet_probe(bool transmit) {
  *
  * A block is a sector, which is why the block size was left at 512 rather than
  * negotiated up to a whole frame's worth. */
-void fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
+bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
     static_assert(TFTP_BLOCK_BYTES == SD_SECTOR_SIZE,
         "a block that is not a sector needs the offset carried between calls");
     if (store_sector) {
-        fat32_write_file_sector(store_sector, offset, bytes, length);
-    } else {
-        lcopy((Addr28)(uint16_t)bytes, store_buffer + (Addr28)offset, length);
+        return fat32_write_file_sector(store_sector, offset, bytes, length);
     }
+    lcopy((Addr28)(uint16_t)bytes, store_buffer + (Addr28)offset, length);
+    return true;
 }
 
 /* Kilobytes as they arrive.  Not every block: an image is sixteen hundred of
