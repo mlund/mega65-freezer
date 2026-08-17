@@ -121,7 +121,7 @@ STEPS = [
     ("key", "down"),
     ("key", "return"),
     ("expect", "FETCHING THE PROGRAM"),
-    ("expect", "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK", 30),
+    ("expect", "NO ADDRESS: NOTHING ANSWERED", 30),
     # An image the card has not got is fetched rather than refused, so what
     # comes back here is the network's answer -- and Xemu has no network.
     ("key", "down"),
@@ -139,7 +139,7 @@ STEPS = [
     # on the previous screen even if the key did nothing.
     ("key", "f"),
     ("expect", "FETCHING THE CATALOGUE"),
-    ("expect", "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK", 30),
+    ("expect", "NO ADDRESS: NOTHING ANSWERED", 30),
     # The same fetch, given up on by hand.  A key reaches the machine whenever
     # it is sent, so this one lands while the lease is still being waited for --
     # which is the only part of a fetch an emulator with no ethernet ever gets

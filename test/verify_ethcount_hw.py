@@ -61,7 +61,7 @@ COUNTERS = ("eth_rx_rotates", "eth_rx_late", "eth_rx_norotate",
 # progress line an image draws while it is still arriving, so waiting on it
 # would stop at the first block.  A successful image is attached instead.
 IMAGE_SETTLED = (*(said for said in verify_filehost_hw.DONE if said != "FETCHED"),
-                 "ATTACHED", "CANNOT", "ONLY DISK IMAGES")
+                 "ATTACHED", "CANNOT", "ONLY D81 AND PRG")
 
 
 def main() -> int:

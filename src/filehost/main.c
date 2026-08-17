@@ -307,8 +307,8 @@ static void move_by(int16_t delta) {
 static void say_fetch_failed(enum FetchResult result, const char* also) {
     static const char* const why[] = {
         "",
-        "NO ADDRESS: NOTHING ANSWERED ON THE NETWORK",
-        "NO TFTP SERVER: PUT ONE IN TFTP-IP.TXT ON THE CARD",
+        "NO ADDRESS: NOTHING ANSWERED",
+        "NO TFTP SERVER: SET TFTP-IP.TXT",
         "THE TFTP SERVER DID NOT ANSWER",
         "", /* refused: the code is named below instead */
         "THE TRANSFER STOPPED PART WAY",
@@ -360,11 +360,11 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
  * returns is usually not space it can take again. */
 static bool fetch_image(const char* name, bool replace) {
     if (!record.size) {
-        show_status(SchemeError, "THE CATALOGUE DOES NOT SAY HOW BIG IT IS");
+        show_status(SchemeError, "UNKNOWN CATALOGUE SIZE");
         return false;
     }
     if (fat32_open_file_system() != FreezerOk) {
-        show_status(SchemeError, "CANNOT READ THE CARD'S FILESYSTEM");
+        show_status(SchemeError, "CANNOT READ THE CARD");
         return false;
     }
 
@@ -372,8 +372,8 @@ static bool fetch_image(const char* name, bool replace) {
                            : fat32_create_contiguous_file(name, record.size);
     if (!store_sector) {
         show_status(SchemeError,
-            replace ? "THE FILE ON THE CARD IS NOT THE RIGHT SIZE"
-                    : "COULD NOT MAKE THE FILE ON THE CARD");
+            replace ? "WRONG CARD SIZE"
+                    : "COULDNT MAKE FILE");
         return false;
     }
 
@@ -389,7 +389,7 @@ static bool fetch_image(const char* name, bool replace) {
          *
          * Said as it happened rather than as it was meant to: a delete that
          * fails leaves exactly the file this was written to prevent. */
-        const char* also = replace                  ? "IT IS STILL WRONG -- R TRIES AGAIN"
+        const char* also = replace                  ? "IT IS STILL WRONG -- R RETRIES"
             : fat32_delete_file(name)               ? "THE FILE WAS REMOVED"
                                                     : "A BAD FILE IS LEFT ON THE CARD";
         say_fetch_failed(result, also);
@@ -497,7 +497,7 @@ static void load_program(void) {
         /* Said as strongly as it deserves: the slot has no transaction, so what
          * is in the frozen machine now is part of this program over part of
          * whatever was there, and resuming runs that. */
-        show_status(SchemeError, "WRITE FAILED -- THE MACHINE IS PART WRITTEN, DO NOT RESUME");
+        show_status(SchemeError, "PARTIAL WRITE ERROR-DO NOT RESUME");
         return;
     }
 
@@ -524,7 +524,7 @@ static void attach_selected(void) {
         return;
     }
     if (record.kind != CatalogD81) {
-        show_status(SchemeWarning, "ONLY DISK IMAGES AND PROGRAMS CAN BE USED");
+        show_status(SchemeWarning, "ONLY D81 AND PRG");
         return;
     }
 
@@ -887,7 +887,7 @@ static void edit_server_address(void) {
     if (!length) {
         show_status(SchemeText, "");
     } else if (set_server(text)) {
-        show_status(SchemeHighlight, "SERVER SET -- F FETCHES THE CATALOGUE");
+        show_status(SchemeHighlight, "SERVER SET -- F FETCHES");
     } else {
         show_status(SchemeError, "THAT IS NOT AN ADDRESS");
     }
@@ -951,7 +951,7 @@ static enum CatalogVerdict accept_catalog(uint32_t bytes) {
     const bool cut = header.record_count > fits;
     if (cut) {
         header.record_count = fits;
-        show_status(SchemeWarning, "CATALOGUE CUT SHORT, SHOWING WHAT ARRIVED");
+        show_status(SchemeWarning, "CATALOGUE CUT SHORT, SHOWING IT");
     }
     if (!header.record_count) {
         show_status(SchemeWarning, "THE CATALOGUE IS EMPTY");
