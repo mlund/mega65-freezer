@@ -261,6 +261,20 @@ if(LINK_LIBC)
         ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
     set_target_properties(ethtest PROPERTIES OUTPUT_NAME ethtest.prg)
 
+    # What a multi-sector write costs against one at a time.  Also run by hand
+    # against hardware -- the card routines' CMD25 calls have never executed.
+    # See test/sdbatch.c.
+    add_executable(sdbatch ${CMAKE_SOURCE_DIR}/test/sdbatch.c fat32.c layout.c ${COMMON})
+    add_dependencies(sdbatch version_stamp)
+    target_compile_options(sdbatch PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
+    target_compile_definitions(sdbatch PRIVATE SCREEN_CELL_BYTES=2)
+    target_include_directories(sdbatch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/filehost)
+    target_link_libraries(sdbatch mega65libc)
+    target_link_options(sdbatch PRIVATE -mlto-zp=16
+        ${CMAKE_CURRENT_SOURCE_DIR}/lowmem.ld
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
+    set_target_properties(sdbatch PROPERTIES OUTPUT_NAME sdbatch.prg)
+
     # Decimal conversion has no caller in the seven tools -- they format hex and
     # hand-roll their decimals -- so this path reaches the machine only here.
     add_executable(test_printf ${CMAKE_SOURCE_DIR}/test/test_printf.c)

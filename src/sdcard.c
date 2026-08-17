@@ -293,28 +293,84 @@ void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     }
 }
 
-void sdcard_writenextsector(void) {
-    // Copy data to hardware sector buffer via DMA
-    lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
-
-    // Command write of follow-on block in multi-block write job
-    while (SD_STATUS & SD_STATUS_BUSY) {
+/* Both engines idle, or the budget spent.  Bounded because the alternative was
+ * measured: a wait for a bit that never changes has no way out and no way to
+ * say so, and it hung the machine mid-transfer with nothing but RESTORE left.
+ * Generous, though -- a card part way through an internal erase can be busy for
+ * a long time, and giving up early costs a sector where waiting costs seconds
+ * at worst. */
+static constexpr uint8_t SD_READY_ROUNDS = 200;
+[[nodiscard]] static bool sdcard_ready(void) {
+    for (uint8_t round = 0; round < SD_READY_ROUNDS; round++) {
+        uint16_t spins = 0;
+        do {
+            if (!(SD_STATUS & SD_STATUS_BUSY)) {
+                return true;
+            }
+        } while (++spins);
     }
-    SD_COMMAND = SD_CMD_WRITE_GATE;
-    SD_COMMAND = SD_CMD_WRITE_MULTI_NEXT;
-    while (!(SD_STATUS & SD_STATUS_BUSY)) {
-    }
-    while (SD_STATUS & SD_STATUS_BUSY) {
-    }
+    return false;
 }
 
-void sdcard_writemultidone(void) {
-    while (SD_STATUS & SD_STATUS_BUSY) {
+/* Opens a multi-block write and sends its first block.
+ *
+ * Separate from sdcard_writesector() because that one cannot serve: it reads
+ * the sector back to verify, and sdcardio.vhdl shows what any other traffic
+ * does to an open stream -- command $03 clears sd_write_multi outright, and a
+ * read leaves the card part way through a CMD25 it will never be told to
+ * finish.  Measured on hardware: the first block landed and every one after it
+ * was lost.  It also short-circuits when the sector already holds the wanted
+ * bytes, which would leave the stream unopened and the blocks after it
+ * addressed at nothing.
+ *
+ * So this verifies nothing.  The batch is read back once the stream is closed,
+ * which is what mega65-tools' remotesd_eth.c does. */
+bool sdcard_writefirstsector(const uint32_t sector_number) {
+    const uint32_t sector_address = sdhc_card ? sector_number : sector_number * SD_SECTOR_SIZE;
+    SD_COMMAND = SD_CMD_RESET_END;
+    SD_SECTOR_ADDR(0) = (sector_address >> 0) & 0xff;
+    SD_SECTOR_ADDR(1) = (sector_address >> 8) & 0xff;
+    SD_SECTOR_ADDR(2) = (sector_address >> 16) & 0xff;
+    SD_SECTOR_ADDR(3) = (sector_address >> 24) & 0xff;
+
+    if (!sdcard_ready()) {
+        return false;
     }
+    lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    SD_COMMAND = SD_CMD_WRITE_GATE;
+    SD_COMMAND = SD_CMD_WRITE_MULTI_FIRST;
+    return true;
+}
+
+/* A follow-on block of an open CMD25 stream: the card holds the address, so
+ * only the data and the command are needed.
+ *
+ * The command is issued and left, rather than waited on.  Waiting for BUSY to
+ * *rise* is what the first version did, and a command the controller does not
+ * take never raises it -- measured on hardware, where the stream's first sector
+ * landed and every one after it was lost to that spin.  mega65-tools'
+ * remotesd_eth.c does not wait either: it settles the card before the next
+ * block instead, which is what the call above does. */
+bool sdcard_writenextsector(void) {
+    if (!sdcard_ready()) {
+        return false;
+    }
+    lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    SD_COMMAND = SD_CMD_WRITE_GATE;
+    SD_COMMAND = SD_CMD_WRITE_MULTI_NEXT;
+    return true;
+}
+
+/* The stream's last block, which carries data like any other and closes the
+ * stream behind it.  Closing is not optional: remotesd_eth.c's
+ * abort_write_batch() records that a CMD25 left open makes the next write
+ * fail, whatever that write is. */
+bool sdcard_writelastsector(void) {
+    if (!sdcard_ready()) {
+        return false;
+    }
+    lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
     SD_COMMAND = SD_CMD_WRITE_GATE;
     SD_COMMAND = SD_CMD_WRITE_MULTI_LAST;
-    while (!(SD_STATUS & SD_STATUS_BUSY)) {
-    }
-    while (SD_STATUS & SD_STATUS_BUSY) {
-    }
+    return sdcard_ready();
 }

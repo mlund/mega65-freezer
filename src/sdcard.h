@@ -7,6 +7,7 @@
 
 #include <ctype.h>
 #include <mega65/hal.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 extern unsigned char sdhc_card;
@@ -24,5 +25,12 @@ void sdcard_open(void);
 void sdcard_writesector(const uint32_t sector_number, uint8_t is_multi);
 void sdcard_readsector(const uint32_t sector_number);
 void mega65_fast(void);
-void sdcard_writenextsector(void);
-void sdcard_writemultidone(void);
+/* A follow-on block of an open multi-block write, and the last one, which
+ * closes the stream.  The buffer to write is `sector_buffer`, and the card
+ * carries the address from the sdcard_writesector() that opened the stream.
+ *
+ * False means the card never went idle within the wait, and the stream's state
+ * is then unknown: no further block may be sent into it. */
+[[nodiscard]] bool sdcard_writefirstsector(const uint32_t sector_number);
+[[nodiscard]] bool sdcard_writenextsector(void);
+[[nodiscard]] bool sdcard_writelastsector(void);
