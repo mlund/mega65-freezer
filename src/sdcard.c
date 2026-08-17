@@ -68,9 +68,71 @@ uint32_t sd_reads = 0;
 uint32_t sd_writes = 0;
 uint32_t sd_writes_skipped = 0; /* sector already held what we were about to write */
 uint32_t sd_write_failures = 0; /* sectors the card would not take */
+
+/* Where a slow sector's time goes, in polls rather than in any clock: the
+ * waits below already count them and a poll costs the same every time, so the
+ * figure is proportional to the pause and needs no timer this machine does not
+ * have.  Only the three waits are watched -- the DMA is 512 bytes and the
+ * compare stops at the first difference, so neither can vary by seconds.
+ *
+ * Maxima, with the sector that set the worst of them, because the question is
+ * which single sector took five seconds rather than what the average is.  The
+ * sector number is the test for a slow card region: the same one across two
+ * runs of different files means the card, not the driver. */
+uint32_t sd_polls_before_read = 0;
+uint32_t sd_polls_before_write = 0;
+uint32_t sd_polls_after_write = 0;
+/* Volatile: nothing in the program reads it back, so link-time optimisation
+ * proves the stores dead and drops the name the harness asks for. */
+volatile uint32_t sd_slowest_sector = 0;
+uint32_t sd_slowest_polls = 0;
+
+/* And in frames, which is the only figure that answers "seconds".  Polls are
+ * proportional to time but not convertible to it -- 562052 of them is a few
+ * hundred milliseconds, not the five seconds a server waits -- so a pause worth
+ * explaining has to be counted against the raster.
+ *
+ * Sampled from inside the wait, because a caller cannot sample a call it is
+ * blocked in: the raster's high bits step 1 -> 0 once a frame, and a wait that
+ * spans several frames looks like one to anybody watching from outside.  Every
+ * 4096 polls, which is finer than a frame and costs one test in four thousand.
+ *
+ * `worst` is the longest single wait, `total` every frame spent waiting.  If
+ * the first is small and the second large, no one sector stalls and the cost is
+ * spread; if neither is large, the seconds are not being spent here at all. */
+uint32_t sd_frames_worst = 0;
+uint32_t sd_frames_total = 0;
+
 #define DEBUG_COUNT(counter) ((counter)++)
 #else
 #define DEBUG_COUNT(counter) ((void)0)
+#endif
+
+#ifdef SDCARD_COUNTERS
+/* What the last wait cost, for the caller to file under its own phase. */
+static uint32_t sd_last_polls;
+#define POLLS_SPENT(round, spins) (sd_last_polls = ((uint32_t)(round) << 16) | (spins))
+#define FRAMES_SPENT(frames)                                                                       \
+    do {                                                                                           \
+        sd_frames_total += (frames);                                                               \
+        if ((frames) > sd_frames_worst) {                                                          \
+            sd_frames_worst = (frames);                                                            \
+        }                                                                                          \
+    } while (0)
+#define PHASE_MAX(phase, sector)                                                                   \
+    do {                                                                                           \
+        if (sd_last_polls > (phase)) {                                                             \
+            (phase) = sd_last_polls;                                                               \
+        }                                                                                          \
+        if (sd_last_polls > sd_slowest_polls) {                                                    \
+            sd_slowest_polls = sd_last_polls;                                                      \
+            sd_slowest_sector = (sector);                                                          \
+        }                                                                                          \
+    } while (0)
+#else
+#define POLLS_SPENT(round, spins) ((void)0)
+#define PHASE_MAX(phase, sector) ((void)0)
+#define FRAMES_SPENT(frames) ((void)0)
 #endif
 
 void sdcard_readsector(const uint32_t sector_number) {
@@ -162,8 +224,7 @@ static __attribute__((section(".sdverify"))) uint8_t sd_verify_buffer[SD_SECTOR_
  * Poked by name from the test harness, because no emulator can stage the thing
  * this guards against: Xemu's card answers at once and never stays busy, so a
  * wait that never returns looks identical to one that returns immediately.
- * One refusal exercises the recovery below; two exercise the failure it cannot
- * rescue. */
+ * One refusal is enough: a write that cannot have the card gives up. */
 /* Volatile because nothing in the program writes it: the harness pokes the
  * symbol from outside, and link-time optimisation would otherwise prove the
  * value can only be its initialiser, fold the test away and drop the name. */
@@ -221,6 +282,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         DEBUG_COUNT(sd_write_failures);
         return false;
     }
+    PHASE_MAX(sd_polls_before_read, sector_number);
 
     // Copy the read data to a buffer for verification
     lcopy(SD_SECTORBUFFER, (Addr28)sd_verify_buffer, SD_SECTOR_SIZE);
@@ -246,6 +308,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             DEBUG_COUNT(sd_write_failures);
             return false;
         }
+        PHASE_MAX(sd_polls_before_write, sector_number);
 
         SD_COMMAND = SD_CMD_WRITE_GATE;
         if (is_multi) {
@@ -259,6 +322,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             DEBUG_COUNT(sd_write_failures);
             return false;
         }
+        PHASE_MAX(sd_polls_after_write, sector_number);
 
         if (!(SD_STATUS & SD_STATUS_UNSETTLED)) {
             /* The controller misbehaves unless a read follows a write, and
@@ -306,6 +370,10 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
  * at worst. */
 static constexpr uint8_t SD_READY_ROUNDS = 200;
 [[nodiscard]] static bool sdcard_ready(void) {
+#ifdef SDCARD_COUNTERS
+    uint8_t high = VICIV.fn_raster_msb & 0b00000111;
+    uint16_t frames = 0;
+#endif
     for (uint8_t round = 0; round < SD_READY_ROUNDS; round++) {
         if (border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
@@ -313,10 +381,23 @@ static constexpr uint8_t SD_READY_ROUNDS = 200;
         uint16_t spins = 0;
         do {
             if (!(SD_STATUS & SD_STATUS_BUSY)) {
+                POLLS_SPENT(round, spins);
+                FRAMES_SPENT(frames);
                 return true;
             }
+#ifdef SDCARD_COUNTERS
+            if (!(spins & 0x0FFF)) {
+                const uint8_t now = VICIV.fn_raster_msb & 0b00000111;
+                if (now < high) {
+                    frames++;
+                }
+                high = now;
+            }
+#endif
         } while (++spins);
     }
+    POLLS_SPENT(SD_READY_ROUNDS, 0);
+    FRAMES_SPENT(frames);
     return false;
 }
 
@@ -345,6 +426,7 @@ bool sdcard_writefirstsector(const uint32_t sector_number) {
         return false;
     }
     lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    DEBUG_COUNT(sd_writes);
     SD_COMMAND = SD_CMD_WRITE_GATE;
     SD_COMMAND = SD_CMD_WRITE_MULTI_FIRST;
     return true;
@@ -364,6 +446,7 @@ bool sdcard_writenextsector(void) {
         return false;
     }
     lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    DEBUG_COUNT(sd_writes);
     SD_COMMAND = SD_CMD_WRITE_GATE;
     SD_COMMAND = SD_CMD_WRITE_MULTI_NEXT;
     return true;
@@ -378,7 +461,16 @@ bool sdcard_writelastsector(void) {
         return false;
     }
     lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    DEBUG_COUNT(sd_writes);
     SD_COMMAND = SD_CMD_WRITE_GATE;
     SD_COMMAND = SD_CMD_WRITE_MULTI_LAST;
     return sdcard_ready();
+}
+
+/* A failed CMD25 follow-on leaves its state unknown.  The controller's reset
+ * pair is its documented stream escape; it releases the card without sending
+ * invented data as a final block would. */
+void sdcard_writeabort(void) {
+    SD_COMMAND = SD_CMD_RESET_BEGIN;
+    SD_COMMAND = SD_CMD_RESET_END;
 }

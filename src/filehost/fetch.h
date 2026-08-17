@@ -68,6 +68,10 @@ void fetch_set_server(const uint8_t* ip, uint16_t port);
  * on writes a file that is wrong, and the caller has already been told the
  * transfer is incomplete. */
 [[nodiscard]] bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length);
+/* Whether this fetch writes its received blocks to a contiguous disk image. */
+[[nodiscard]] bool fetch_stores_image(void);
+/* Stores adjacent whole blocks with one CMD25 stream. */
+[[nodiscard]] bool fetch_store_blocks(uint32_t offset, const uint8_t* bytes, uint8_t count);
 void fetch_progress(uint32_t so_far, uint32_t total, bool waiting);
 
 /* Whether the user has asked for this to stop, which is asked once per poll of

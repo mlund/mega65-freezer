@@ -315,6 +315,40 @@ bool fat32_write_file_sector(
     return sdcard_writesector(first_sector + offset / SD_SECTOR_SIZE, 0);
 }
 
+/* A CMD25 cannot be checked between sectors: any read abandons its stream.
+ * Keep the source in high RAM, close the stream, then verify every sector. */
+bool fat32_write_file_sectors(
+    const uint32_t first_sector, const uint32_t offset, const uint8_t* bytes, const uint8_t count) {
+    const uint32_t first = first_sector + offset / SD_SECTOR_SIZE;
+    bool stream_open = false;
+
+    for (uint8_t block = 0; block < count; block++) {
+        const uint16_t byte_offset = (uint16_t)block * SD_SECTOR_SIZE;
+        lcopy((Addr28)(uint16_t)&bytes[byte_offset], (Addr28)(uint16_t)sector_buffer, SD_SECTOR_SIZE);
+        const bool wrote = block == 0 ? sdcard_writefirstsector(first)
+            : block + 1 == count ? sdcard_writelastsector()
+                                 : sdcard_writenextsector();
+        if (!wrote) {
+            if (stream_open) {
+                sdcard_writeabort();
+            }
+            return false;
+        }
+        stream_open = true;
+    }
+
+    for (uint8_t block = 0; block < count; block++) {
+        const uint16_t byte_offset = (uint16_t)block * SD_SECTOR_SIZE;
+        sdcard_readsector(first + block);
+        for (uint16_t byte = 0; byte < SD_SECTOR_SIZE; byte++) {
+            if (sector_buffer[byte] != bytes[byte_offset + byte]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
     uint16_t offset;
     uint16_t j;

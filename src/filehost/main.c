@@ -760,6 +760,14 @@ bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
     return true;
 }
 
+bool fetch_stores_image(void) {
+    return store_sector != 0;
+}
+
+bool fetch_store_blocks(uint32_t offset, const uint8_t* bytes, uint8_t count) {
+    return fat32_write_file_sectors(store_sector, offset, bytes, count);
+}
+
 /* Kilobytes as they arrive.  Not every block: an image is sixteen hundred of
  * them, and a redraw each would cost more than the transfer.  Every 8KB moves
  * often enough to say the machine is alive.

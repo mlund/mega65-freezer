@@ -58,4 +58,8 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size);
 /* False where the sector did not reach the card. */
 [[nodiscard]] bool fat32_write_file_sector(
     uint32_t first_sector, uint32_t offset, const uint8_t* bytes, uint16_t length);
+/* Writes adjacent complete sectors through one CMD25 stream, then reads them
+ * back.  `count` is at least two; false leaves the file incomplete. */
+[[nodiscard]] bool fat32_write_file_sectors(
+    uint32_t first_sector, uint32_t offset, const uint8_t* bytes, uint8_t count);
 enum FreezerError fat32_open_file_system(void);

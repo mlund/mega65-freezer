@@ -126,6 +126,11 @@ uint32_t eth_tx_busy = 0;
 uint32_t eth_rx_rotates = 0;
 uint32_t eth_rx_late = 0;
 uint32_t eth_rx_norotate = 0;
+/* $D6E1.1-2 says how many receive buffers the ethernet side can still take.
+ * Zero means a frame in flight is vetoed before eth_receive() can observe it.
+ * Shorter card work narrows that window but cannot close it, so this stays as
+ * test instrumentation rather than making a passing fetch look conclusive. */
+uint32_t eth_rx_no_free_buffers = 0;
 
 #define COUNT_ETH(counter) ((counter)++)
 #else
@@ -161,7 +166,13 @@ void eth_send(const uint8_t* frame, uint16_t length) {
 }
 
 uint16_t eth_receive(uint8_t* into, uint16_t limit) {
-    if (!(ETHERNET.ctrl2 & ETH_RXQ_MASK)) {
+    const uint8_t ctrl2 = ETHERNET.ctrl2;
+#ifdef ETH_COUNTERS
+    if (!(ctrl2 & ETH_RXBF_MASK)) {
+        COUNT_ETH(eth_rx_no_free_buffers);
+    }
+#endif
+    if (!(ctrl2 & ETH_RXQ_MASK)) {
         return 0;
     }
 

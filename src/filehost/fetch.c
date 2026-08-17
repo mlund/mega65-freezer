@@ -7,9 +7,11 @@
 
 #include "arp.h"
 #include "dhcp.h"
+#include "dma.h"
 #include "eth.h"
 #include "ip.h"
 #include "netpoll.h"
+#include "sdcard.h"
 #include "tftp.h"
 
 #include <mega65.h>
@@ -21,6 +23,11 @@
  * full block plus its headers and check sequence is larger still. */
 static __attribute__((section(".netbuf"))) uint8_t net_in[ETH_MAX_RECEIVED];
 static __attribute__((section(".netbuf"))) uint8_t net_out[DHCP_FRAME_BYTES];
+/* Three sectors leave the controller's fourth receive buffer free while a
+ * CMD25 closes and is verified.  This turns ACK + write from a serial wait
+ * into a short receive run followed by one card transaction. */
+static constexpr uint8_t FETCH_BATCH_SECTORS = 3;
+static __attribute__((section(".netbuf"))) uint8_t fetch_batch[FETCH_BATCH_SECTORS * SD_SECTOR_SIZE];
 static_assert(sizeof net_out >= TFTP_SEND_BYTES, "no room to build a request");
 static_assert(sizeof net_in >= TFTP_RECEIVE_BYTES, "a full block would be dropped");
 
@@ -242,6 +249,9 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
     begin_exchange();
     uint16_t said = tftp_step(&transfer, nullptr, 0, net_out);
     uint32_t written = 0;
+    uint32_t batch_offset = 0;
+    uint8_t batch_count = 0;
+    const bool batch_writes = fetch_stores_image();
     while (frames_elapsed < STALL_FRAMES && !tftp_done(&transfer) && !tftp_failed(&transfer)
         && !stopped) {
         tick();
@@ -275,7 +285,15 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
             if (written + transfer.data_length > limit) {
                 return FetchTooBig;
             }
-            if (!fetch_store(written, &net_in[TFTP_DATA_AT], transfer.data_length)) {
+            if (batch_writes) {
+                lcopy((Addr28)(uint16_t)&net_in[TFTP_DATA_AT],
+                    (Addr28)(uint16_t)&fetch_batch[batch_count * SD_SECTOR_SIZE],
+                    transfer.data_length);
+                if (!batch_count) {
+                    batch_offset = written;
+                }
+                batch_count++;
+            } else if (!fetch_store(written, &net_in[TFTP_DATA_AT], transfer.data_length)) {
                 return FetchWriteFailed;
             }
             written += transfer.data_length;
@@ -284,6 +302,37 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
              * for an answer that cannot differ.  Read per block rather than
              * held, which measured 53 bytes more. */
             fetch_progress(written, transfer.size, false);
+        }
+        /* The server may send the next DATA while these sectors wait for the
+         * card.  Sending the ACK here, rather than at the next poll, makes the
+         * three slots a pipeline instead of merely deferred work.  An SD
+         * failure can therefore follow an ACK; FetchWriteFailed preserves the
+         * incomplete file rather than claiming the transfer succeeded. */
+        if (said && batch_count) {
+            eth_send(net_out, said);
+            frames_since_said = 0;
+            said = 0;
+        }
+        /* The tail is padded by the single-sector writer.  It cannot enter a
+         * CMD25 stream, whose every block is exactly one sector. */
+        if (batch_count && transfer.data_length < SD_SECTOR_SIZE) {
+            const uint8_t full_blocks = batch_count - 1;
+            if (full_blocks == 1 && !fetch_store(batch_offset, fetch_batch, SD_SECTOR_SIZE)) {
+                return FetchWriteFailed;
+            }
+            if (full_blocks > 1 && !fetch_store_blocks(batch_offset, fetch_batch, full_blocks)) {
+                return FetchWriteFailed;
+            }
+            if (!fetch_store(batch_offset + (uint32_t)full_blocks * SD_SECTOR_SIZE,
+                    &fetch_batch[(uint16_t)full_blocks * SD_SECTOR_SIZE], transfer.data_length)) {
+                return FetchWriteFailed;
+            }
+            batch_count = 0;
+        } else if (batch_count == FETCH_BATCH_SECTORS) {
+            if (!fetch_store_blocks(batch_offset, fetch_batch, batch_count)) {
+                return FetchWriteFailed;
+            }
+            batch_count = 0;
         }
         if (!said && frames_since_said >= RESEND_FRAMES) {
             said = tftp_step(&transfer, nullptr, 0, net_out);
@@ -301,6 +350,18 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
      * a file that arrived whole. */
     if (said) {
         eth_send(net_out, said);
+    }
+
+    /* TFTP ends an exact multiple with an empty DATA.  The full tail then has
+     * no block to force it out, so close it only after the transfer succeeded. */
+    if (tftp_done(&transfer) && batch_count) {
+        if (batch_count == 1) {
+            if (!fetch_store(batch_offset, fetch_batch, SD_SECTOR_SIZE)) {
+                return FetchWriteFailed;
+            }
+        } else if (!fetch_store_blocks(batch_offset, fetch_batch, batch_count)) {
+            return FetchWriteFailed;
+        }
     }
 
     *length = written;

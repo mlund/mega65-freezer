@@ -44,3 +44,6 @@ void mega65_fast(void);
 [[nodiscard]] bool sdcard_writefirstsector(const uint32_t sector_number);
 [[nodiscard]] bool sdcard_writenextsector(void);
 [[nodiscard]] bool sdcard_writelastsector(void);
+/* Ends a CMD25 stream after a failed follow-on block.  The stream owns the
+ * controller until this is called; no ordinary read or write may intervene. */
+void sdcard_writeabort(void);

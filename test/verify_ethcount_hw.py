@@ -55,11 +55,16 @@ import verify_filehost_hw
 TOOL_SCREEN = verify_filehost_hw.TOOL_SCREEN
 
 COUNTERS = ("eth_rx_rotates", "eth_rx_late", "eth_rx_norotate",
-            "eth_sends", "eth_tx_busy", "fetch_heard_count", "fetch_block_count")
+            "eth_rx_no_free_buffers", "eth_sends", "eth_tx_busy", "fetch_heard_count",
+            "fetch_block_count",
+            )
 # Only in a -DSDCARD_COUNTERS=ON build.  Read when present, since what they
 # separate -- sectors written from sectors already holding the wanted bytes --
 # is the difference between a fetch that writes and one that mostly compares.
-SD_COUNTERS = ("sd_reads", "sd_writes", "sd_writes_skipped", "sd_write_failures")
+SD_COUNTERS = ("sd_reads", "sd_writes", "sd_writes_skipped", "sd_write_failures",
+               "sd_polls_before_read", "sd_polls_before_write", "sd_polls_after_write",
+               "sd_slowest_polls", "sd_slowest_sector",
+               "sd_frames_worst", "sd_frames_total")
 
 # What an image run can leave on the status line once it has stopped moving.
 # `FETCHED` is not among them although it ends a catalogue: it is also the live
@@ -158,11 +163,22 @@ def fetch_image(machine: h.Machine, title: str) -> None:
     if "ATTACH OR REPLACE" in shot.text(23):
         machine.press("r")
 
+    # `ATTACHED` is still on screen while R starts the replacement fetch.  It
+    # becomes a terminal result only after a progress line proves this run
+    # moved; otherwise the first wait returns before the first data block.
+    progressed = False
+
+    def settled(snapshot: h.Snapshot) -> bool:
+        nonlocal progressed
+        line = snapshot.text(23)
+        progressed = progressed or "FETCHED " in line
+        return progressed and any(said in line for said in IMAGE_SETTLED)
+
     # Long: 800KB is sixteen seconds where the sectors are already right, twice
     # that where they are written, and a transfer that is failing spends the
     # server's whole patience -- see its --tries -- before anything is said.
     began = time.monotonic()
-    shot = machine.wait_until(lambda s: any(said in s.text(23) for said in IMAGE_SETTLED), timeout=180.0)
+    shot = machine.wait_until(settled, timeout=180.0)
     print(f"image: {shot.text(23).strip()}  in {time.monotonic() - began:.1f}s")
 
 

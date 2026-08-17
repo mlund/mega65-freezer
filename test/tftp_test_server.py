@@ -121,22 +121,33 @@ def serve_one(sock, peer, path, root, faults):
             sent += 1
 
         # Wait for the acknowledgement, resending on a timeout as a server must.
-        # Only a timeout spends a try: a stale acknowledgement -- of the block
-        # before, say, which a client repeats on its own clock -- is not the
-        # client falling silent, and counting it as one would abandon a
-        # transfer that is merely noisy.
+        #
+        # The deadline is a wall clock, not a socket timeout, and only the
+        # acknowledgement this block is waiting for renews it.  A stale one --
+        # of the block before, say, which a client repeats on its own clock --
+        # still does not spend a try, because it is not the client falling
+        # silent; but it must not buy the client another second either.  With
+        # settimeout() alone it did: every datagram restarted the second, so a
+        # client repeating itself faster than that was never timed out, and the
+        # server would neither resend nor give up.  A stall could hide behind
+        # its own chatter, which is the failure this exists to observe.
         acked = False
         tries = 0
-        sock.settimeout(1.0)
+        deadline = time.monotonic() + 1.0
         while tries < faults.tries:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                tries += 1
+                # A whole second in which nothing this block wanted arrived:
+                # what a stall looks like from the far end.
+                print(f"    silence {tries}s at block {block}", flush=True)
+                sock.sendto(packet, peer)
+                deadline = time.monotonic() + 1.0
+                continue
+            sock.settimeout(left)
             try:
                 reply, who = sock.recvfrom(1024)
             except socket.timeout:
-                tries += 1
-                # Each of these is a full second in which the client said
-                # nothing: what a stall looks like from the far end.
-                print(f"    silence {tries}s at block {block}", flush=True)
-                sock.sendto(packet, peer)
                 continue
             if who != peer or len(reply) < 4:
                 continue
