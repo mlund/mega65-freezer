@@ -627,6 +627,9 @@ class SerialChannel:
             # Raw: a terminal helpfully translating a monitor's bytes is a
             # terminal corrupting them.
             attributes[:4] = [0, 0, termios.CS8 | termios.CREAD | termios.CLOCAL, 0]
+            # tcgetattr() may return IOSSIOSPEED's numeric custom rate, which
+            # tcsetattr() refuses.  Give it a named rate before the ioctl below.
+            attributes[4] = attributes[5] = termios.B9600
             attributes[6][termios.VMIN] = attributes[6][termios.VTIME] = 0
             termios.tcsetattr(self._fd, termios.TCSANOW, attributes)
             fcntl.ioctl(self._fd, self._IOSSIOSPEED, struct.pack("I", baud))

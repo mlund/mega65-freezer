@@ -292,6 +292,40 @@ def main() -> int:
     except Failure as failed:
         check("unknown key raises", "no such key" in str(failed), True)
 
+    # macOS reports the custom 2 Mbaud rate as a number tcsetattr() cannot take
+    # back.  Opening the channel must first select a named termios rate, then
+    # replace it through IOSSIOSPEED.
+    serial_calls = []
+    originals = (m65harness.os.open, m65harness.os.close, m65harness.termios.tcgetattr,
+                 m65harness.termios.tcsetattr, m65harness.termios.tcflush,
+                 m65harness.fcntl.ioctl)
+    try:
+        m65harness.os.open = lambda *_: 73
+        m65harness.os.close = lambda fd: serial_calls.append(("close", fd))
+        m65harness.termios.tcgetattr = lambda _fd: [1, 2, 3, 4, 2000000, 2000000, [0] * 32]
+
+        def set_attributes(_fd, _when, attributes):
+            if attributes[4] == 2000000 or attributes[5] == 2000000:
+                raise m65harness.termios.error(22, "Invalid argument")
+            serial_calls.append(("termios", attributes[4], attributes[5]))
+
+        m65harness.termios.tcsetattr = set_attributes
+        m65harness.termios.tcflush = lambda *_: None
+        m65harness.fcntl.ioctl = lambda _fd, _request, value: serial_calls.append(
+            ("speed", m65harness.struct.unpack("I", value)[0]))
+        try:
+            channel = m65harness.SerialChannel("serial", 2000000)
+        except m65harness.termios.error:
+            channel = None
+        check("a custom serial speed opens again", channel is not None, True)
+        check("the ioctl sets 2 Mbaud", ("speed", 2000000) in serial_calls, True)
+        if channel is not None:
+            channel.close()
+    finally:
+        (m65harness.os.open, m65harness.os.close, m65harness.termios.tcgetattr,
+         m65harness.termios.tcsetattr, m65harness.termios.tcflush,
+         m65harness.fcntl.ioctl) = originals
+
     for failure in failures:
         print(failure)
     if failures:
