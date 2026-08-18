@@ -196,6 +196,13 @@ constexpr uint8_t CPU_PORT_KERNAL_AND_IO = 0x36;
 // direction register for every value but two: the CPU intercepts $40 and $41
 // and they set the speed instead, never reaching the DDR (mega65-core,
 // src/vhdl/gs4510.vhdl:3301).
+//
+// Any write to $00 also flushes the zero-page cache, the speed values included,
+// and the cache is bypassed until the flush walks all 1024 entries (4709).  It
+// costs the CPU nothing directly -- the walk runs alongside -- but zero page is
+// where llvm-mos keeps its imaginary registers, so this is the hottest memory
+// in the program going uncached for a spell.  Worth knowing before putting a
+// write to $00 anywhere repetitive: m65_io_enable() does one per DMA.
 constexpr uint8_t CPU_PORT_FORCE_FAST = 0x41;
 constexpr uint8_t CPU_PORT_FORCE_FAST_OFF = 0x40;
 
