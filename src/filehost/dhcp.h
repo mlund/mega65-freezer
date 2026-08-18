@@ -78,6 +78,7 @@ void dhcp_start(struct DhcpClient* client, const uint8_t* mac, uint16_t seed);
 [[nodiscard]] uint16_t dhcp_step(
     struct DhcpClient* client, const uint8_t* in, uint16_t in_length, uint8_t* out);
 
+/* Whether an address has been granted and the exchange is over. */
 [[nodiscard]] static inline bool dhcp_leased(const struct DhcpClient* client) {
     return client->stage == DhcpLeased;
 }

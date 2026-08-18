@@ -49,7 +49,11 @@ void view_reset(uint16_t records);
  * left. */
 void view_build(enum ViewOrder order);
 
+/* How many records the index holds, which is how many rows there are to show. */
 [[nodiscard]] uint16_t view_count(void);
+
+/* The order the index was last built in, so a search can rebuild without the
+ * caller having to remember which one is in force. */
 [[nodiscard]] enum ViewOrder view_order(void);
 
 /* The record behind row `n`, which is what the browser draws and attaches.

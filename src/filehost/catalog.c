@@ -1,3 +1,5 @@
+/* Reading the catalogue: its header, and one record at a time out of the
+ * fixed-width run behind it. */
 #include "catalog.h"
 
 /* Assembled byte by byte rather than read through a struct: the file is
@@ -29,10 +31,12 @@ static constexpr uint8_t RECORD_YEAR = 110;
  * of them would have this reading the next record instead. */
 static constexpr uint8_t RECORD_MINIMUM = RECORD_YEAR + 2;
 
+/* Two bytes of the file, which is little-endian throughout. */
 static uint16_t le16(const uint8_t* at) {
     return (uint16_t)(at[0] | ((uint16_t)at[1] << 8));
 }
 
+/* Four of them, likewise. */
 static uint32_t le32(const uint8_t* at) {
     return (uint32_t)at[0] | ((uint32_t)at[1] << 8) | ((uint32_t)at[2] << 16) |
         ((uint32_t)at[3] << 24);

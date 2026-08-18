@@ -83,6 +83,8 @@ uint32_t fetch_block_count;
 #define COUNT_TFTP(counter) ((void)0)
 #endif
 
+/* Advances the clocks, once per video frame, and reads the keyboard while it
+ * is there. */
 static void tick(void) {
     const uint8_t now = VICIV.fn_raster_msb & RASTER_HIGH;
     if (now < last_high) {
@@ -109,11 +111,6 @@ static constexpr uint8_t RESEND_FRAMES = 25;
 /* Beginning an exchange sets the speaking clock to its limit, so the first
  * thing it does is speak rather than wait a turn for permission.
  *
- * Hearing moves only the silence clock, and is a function rather than the bare
- * store it compiles to so that the reason sits with the name: a word from the
- * far end proves the exchange is alive without being an invitation to answer,
- * and answering every repeat is the doubling RFC 1123 §4.2.3.1 warns of.
- *
  * Sending is left inline at its three sites.  Wrapping it with the clock it
  * resets reads better and costs more: a call is not free on this target, and
  * three sites pay for it three times. */
@@ -123,6 +120,12 @@ static void begin_exchange(void) {
     frames_since_said = RESEND_FRAMES;
 }
 
+/* Starts the silence clock again, and only that.
+ *
+ * A function rather than the bare store it compiles to, so the reason sits
+ * with the name: a word from the far end proves the exchange is alive without
+ * being an invitation to answer, and answering every repeat is the doubling
+ * RFC 1123 §4.2.3.1 warns of. */
 static void heard_from_far_end(void) {
     frames_elapsed = 0;
 }

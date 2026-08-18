@@ -1,3 +1,5 @@
+/* Where the browser puts things on screen: the columns, the rows the list
+ * occupies, and the lines above and below it. */
 #pragma once
 
 #include "catalog.h"

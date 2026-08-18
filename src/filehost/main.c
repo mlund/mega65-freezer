@@ -154,6 +154,7 @@ static void draw_line(uint8_t y, uint8_t colour, const char* text) {
     draw_field(SCREEN_CELL(0, y), colour, text, SCREEN_COLS);
 }
 
+/* The status line, which is the one row that says what just happened. */
 static void show_status(uint8_t colour, const char* text) {
     draw_line(STATUS_Y, colour, text);
 }
@@ -183,6 +184,7 @@ static void draw_year(uint16_t cell, uint8_t colour, uint16_t year) {
     draw_field(cell, colour, text, WIDTH_YEAR);
 }
 
+/* One row of the list, or blank where the index has run out. */
 static void draw_row(uint16_t row) {
     const uint8_t y = LIST_TOP_Y + (uint8_t)(row - first_shown);
     if (row >= view_count()) {
@@ -202,6 +204,7 @@ static void draw_row(uint16_t row) {
         SCREEN_CELL(COLUMN_KIND, y), colour, record.kind == CatalogD81 ? "D81" : "PRG", WIDTH_KIND);
 }
 
+/* Every visible row, from whichever record is at the top. */
 static void draw_list(void) {
     for (uint8_t row = 0; row < LIST_ROWS; row++) {
         draw_row(first_shown + row);
@@ -609,6 +612,7 @@ static uint8_t probe_frame[ETH_MIN_RECEIVED];
  * copied nothing came back looking like our own transmission. */
 static uint8_t probe_received[ETH_MIN_RECEIVED];
 
+/* A byte as two hex digits, and where the next one goes. */
 static char* append_byte_hex(char* at, uint8_t value) {
     static const char digits[] = "0123456789ABCDEF";
     *at++ = digits[value >> 4];
@@ -616,6 +620,7 @@ static char* append_byte_hex(char* at, uint8_t value) {
     return at;
 }
 
+/* A hardware address, colon-separated, as the wire spells it. */
 static char* append_mac(char* at, const uint8_t* mac) {
     for (uint8_t i = 0; i < MAC_BYTES; i++) {
         if (i) {
@@ -626,10 +631,13 @@ static char* append_mac(char* at, const uint8_t* mac) {
     return at;
 }
 
+/* A line of the probe report, counted from the top of the list area. */
 static void probe_line(uint8_t row, uint8_t colour, const char* text) {
     draw_line(LIST_TOP_Y + row, colour, text);
 }
 
+/* Asks who holds a fixed address and reports what came back, or listens
+ * without asking so the two can be told apart. */
 static void ethernet_probe(bool transmit) {
     char text[64];
     uint8_t mac[MAC_BYTES];
@@ -883,6 +891,7 @@ static uint8_t write_server_text(char* text) {
     }
 }
 
+/* Reads a new server address from the user and tells the fetch about it. */
 static void edit_server_address(void) {
     char prompt[32 + SERVER_TEXT_BYTES];
     char* at = append_str(prompt, "NEW TFTP SERVER (NOW ");
@@ -925,6 +934,8 @@ static bool read_server_address(void) {
     return set_server(text);
 }
 
+/* Zeroes the catalogue buffer, a fill at a time: lfill counts in 16 bits and
+ * the buffer is wider. */
 static void clear_buffer(void) {
     for (uint32_t at = 0; at < CATALOG_BUFFER_BYTES; at += CLEAR_STEP) {
         lfill(CATALOG_BUFFER + (Addr28)at, 0, CLEAR_STEP);
@@ -950,7 +961,6 @@ enum CatalogVerdict : uint8_t {
  * `bytes` is what is in the buffer, so it is never more than the buffer holds:
  * the card path passes the buffer's own size and the fetch is refused above
  * that before a block is written. */
-
 static enum CatalogVerdict accept_catalog(uint32_t bytes) {
     lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)raw_record, CATALOG_HEADER_BYTES);
     if (bytes < CATALOG_HEADER_BYTES || !catalog_header(raw_record, &header)) {
@@ -972,6 +982,7 @@ static enum CatalogVerdict accept_catalog(uint32_t bytes) {
     return cut ? CatalogPartial : CatalogWhole;
 }
 
+/* The catalogue from the card, if there is one worth having. */
 static bool load_catalog(void) {
     clear_buffer();
     if (read_file_from_sdcard(CATALOG_FILE, CATALOG_BUFFER)) {
@@ -1089,6 +1100,7 @@ static void fetch_catalog(void) {
     }
 }
 
+/* The browser itself: draws the list and answers keys until RUN/STOP. */
 static void browse(void) {
     draw_list();
 

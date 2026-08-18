@@ -1,3 +1,5 @@
+/* The name a catalogue path takes on the card, which an 8.3 directory entry
+ * has to hold and hyppo has to match. */
 #include "shortname.h"
 
 #include "catalog.h"
@@ -30,6 +32,7 @@ static uint16_t path_hash(const char* path) {
     return hash;
 }
 
+/* A letter in the case a directory entry keeps. */
 static char upper(char c) {
     return (c >= 'a' && c <= 'z') ? (char)(c - 'a' + 'A') : c;
 }
