@@ -49,6 +49,11 @@ uses `octet` mode and asks for `tsize` and 1024-byte blocks; a server may grant
 the options or send 512-byte block 1 directly. `--retransmit 1000000` means one
 second before the first resend.
 
+A server may answer `blksize` with any size up to the one asked for, but
+FILEHOST stages two sectors at a time and refuses a size that would not divide
+that: 1024, 512 and smaller powers of two are taken, anything else ends the
+transfer. Leave the block size alone unless there is a reason to set it.
+
 ```sh
 systemctl enable --now tftpd-hpa
 ```
@@ -101,4 +106,7 @@ cmp bordercolorbars_Zu8DOI.prg web.prg
 | `DID NOT ANSWER` | ARP, UDP/69 and the firewall helper. |
 | `REFUSED, CODE 1` | Missing path or stale catalogue. |
 | `REFUSED, CODE 2` | File permissions or a path outside `/srv/tftp`. |
+| `REFUSED, CODE 8` | A granted `blksize` FILEHOST cannot use; see above. |
+| `MORE THAN THERE IS ROOM FOR` | The card, or a `tsize` larger than the space found. |
+| `THE CARD WOULD NOT TAKE IT` | The SD card, not the network: a sector would not write. |
 | `TRANSFER STOPPED PART WAY` | Packet loss and server logs: `journalctl -u tftpd-hpa --since -10min`. |
