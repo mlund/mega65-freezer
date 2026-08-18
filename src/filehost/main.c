@@ -788,8 +788,8 @@ void fetch_progress(uint32_t so_far, uint32_t total, bool last, bool waiting) {
          * last multiple rather than at what arrived.
          *
          * Told rather than worked out here: the size a block is short of is no
-         * longer fixed at 512, and dividing by a variable one measured 240
-         * bytes against the mask a constant allowed. */
+         * longer fixed at 512, and dividing by a variable one costs far more
+         * than the mask a constant allowed. */
         if ((so_far & (EVERY - 1)) && so_far != total && !last) {
             return;
         }

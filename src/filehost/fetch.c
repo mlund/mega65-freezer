@@ -28,6 +28,14 @@ static __attribute__((section(".netbuf"))) uint8_t net_out[DHCP_FRAME_BYTES];
  * whole number of blocks in either mode, and 2048 does not fit .netbuf beside
  * net_in and net_out.  A wider one would amortise the CMD25 stream further. */
 static constexpr uint16_t FETCH_STAGE_BYTES = 2 * SD_SECTOR_SIZE;
+/* take_options() refuses a granted block that would not tile this, and names
+ * the sizes itself rather than being told the stage, which costs less than
+ * threading it through the protocol for a rule with one caller.  These keep the
+ * two in step: change the stage and the build stops here, rather than a server
+ * granting 1024 overrunning the buffer. */
+static_assert(FETCH_STAGE_BYTES % TFTP_BLOCK_BYTES == 0, "the default block must tile the stage");
+static_assert(
+    FETCH_STAGE_BYTES % TFTP_MAX_BLOCK_BYTES == 0, "the negotiated block must tile the stage");
 static __attribute__((section(".netbuf"))) uint8_t fetch_stage[FETCH_STAGE_BYTES];
 static_assert(sizeof net_out >= TFTP_SEND_BYTES, "no room to build a request");
 static_assert(sizeof net_in >= TFTP_RECEIVE_BYTES, "a full block would be dropped");
@@ -53,8 +61,8 @@ static uint8_t last_high;
  * missing would then push back the very answer it is asking for. */
 static uint16_t frames_elapsed;
 /* A byte is enough: this one is zeroed by every send, and the longest any
- * exchange leaves it running is WAIT_FRAMES past its seed.  Sixteen bits cost a
- * measured 16 bytes across the increment and the six sites that touch it. */
+ * exchange leaves it running is WAIT_FRAMES past its seed.  Sixteen bits cost
+ * more across the increment and the six sites that touch it. */
 static uint8_t frames_since_said;
 
 /* Whether this fetch was stopped by hand.  Remembered rather than asked again
@@ -107,8 +115,8 @@ static constexpr uint8_t RESEND_FRAMES = 25;
  * and answering every repeat is the doubling RFC 1123 §4.2.3.1 warns of.
  *
  * Sending is left inline at its three sites.  Wrapping it with the clock it
- * resets reads better and measured 40 bytes worse, which is the seam cost this
- * target charges for a call. */
+ * resets reads better and costs more: a call is not free on this target, and
+ * three sites pay for it three times. */
 static void begin_exchange(void) {
     last_high = VICIV.fn_raster_msb & RASTER_HIGH;
     frames_elapsed = 0;
@@ -232,7 +240,12 @@ static bool resolved(void) {
  * The two-sector case cannot be folded into the one-sector case:
  * fat32_write_file_sectors() with a count of 1 takes the first-block branch and
  * never closes the CMD25 stream (fat32.c), which breaks the next write whatever
- * it is.  The split is load-bearing, not clutter. */
+ * it is.  The split is load-bearing, not clutter.
+ *
+ * One entry point down in fat32.c taking a length, so this file need not know
+ * that a run of sectors and a padded tail are written differently, reads better
+ * and costs more than the split does -- and more still unless it quietly caps
+ * at two sectors. */
 static bool store_stage(uint32_t offset, uint16_t bytes) {
     if (bytes == FETCH_STAGE_BYTES) {
         return fetch_store_blocks(offset, fetch_stage, 2);
