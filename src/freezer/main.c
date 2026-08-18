@@ -1050,7 +1050,8 @@ int main(void) {
                     change_mounted_disk_image(1);
                     break;
 
-                case KEY_F1: // F1 = next colour scheme
+                case 'P':
+                case 'p': // next colour scheme
                     apply_scheme((uint8_t)(current_scheme + 1));
                     break;
 
