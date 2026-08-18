@@ -87,6 +87,11 @@ def main() -> int:
                              "the transfer large enough to reach where the failures are. "
                              "This one does write to the card, replacing the image with "
                              "a fresh copy of itself")
+    parser.add_argument("--no-counters", action="store_true",
+                        help="drive the transfer and read nothing.  For timing a shipping "
+                             "build, whose counters do not exist -- without this a build "
+                             "missing them fails, which is what a renamed or optimised-away "
+                             "counter should do rather than quietly reporting nothing")
     parser.add_argument("--baud", type=int, default=h.MONITOR_BAUD)
     args = parser.parse_args()
 
@@ -97,7 +102,7 @@ def main() -> int:
                 fetch_catalog(machine, args.fetch)
             if args.image:
                 fetch_image(machine, args.image)
-            return report(machine)
+            return 0 if args.no_counters else report(machine)
         except h.Failure as failed:
             return h.report_failure(failed)
         finally:
@@ -186,13 +191,18 @@ def report(machine: h.Machine) -> int:
     # The harness's own verb rather than a second way of spelling it: `count`
     # resolves the symbol and reads the four bytes, which is what
     # verify_sdcount_xemu.py asks for too.
-    wanted = list(COUNTERS)
-    for name in SD_COUNTERS:
+    wanted = []
+    for name in (*COUNTERS, *SD_COUNTERS):
         try:
             machine.address(f"FILEHOST.{name}")
         except (h.Failure, KeyError):
-            continue  # not an SD-counting build
+            continue  # not a counting build
         wanted.append(name)
+    if not wanted:
+        # Asked for by name and absent: a counter that was renamed or optimised
+        # away must fail here.  A build with none on purpose says so with
+        # --no-counters and never reaches this.
+        raise h.Failure("no counters in this build; --no-counters to drive it anyway")
     result = machine.drive([("count", f"FILEHOST.{name}") for name in wanted])
     if not result.ok:
         raise h.Failure(f"could not read the counters: {result.failure}")
@@ -203,19 +213,21 @@ def report(machine: h.Machine) -> int:
     for name in wanted:
         print(f"{name:<{width}}  {read[name]}")
 
-    rotates = read["eth_rx_rotates"]
-    if rotates == 0:
-        # Nothing was received, so the counters say nothing about what happens
-        # when something is.  A run reporting zeroes as a clean result is worse
-        # than one refusing to report.
-        print("\nno frames were received: the tool was loaded after the transfer, "
-              "or the transfer never started")
-        return 1
+    if "eth_rx_rotates" in read:
+        rotates = read["eth_rx_rotates"]
+        if rotates == 0:
+            # Nothing was received, so the counters say nothing about what
+            # happens when something is.  A run reporting zeroes as a clean
+            # result is worse than one refusing to report.
+            print("\nno frames were received: the tool was loaded after the transfer, "
+                  "or the transfer never started")
+            return 1
+        print(f"\nof {rotates} rotations, {read['eth_rx_late']} were read before the "
+              f"window settled and {read['eth_rx_norotate']} never happened")
 
-    print(f"\nof {rotates} rotations, {read['eth_rx_late']} were read before the "
-          f"window settled and {read['eth_rx_norotate']} never happened")
-    print(f"{read['fetch_heard_count']} were TFTP words and "
-          f"{read['fetch_block_count']} advanced a file")
+    if "fetch_heard_count" in read:
+        print(f"{read['fetch_heard_count']} were TFTP words and "
+              f"{read['fetch_block_count']} advanced a file")
     return 0
 
 
