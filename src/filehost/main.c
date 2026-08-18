@@ -748,11 +748,10 @@ static void ethernet_probe(bool transmit) {
  * being 0 -- fat32_create_contiguous_file() answers 0 for failure, so there is
  * no second flag to keep in step with it.
  *
- * A block is a sector, which is why the block size was left at 512 rather than
- * negotiated up to a whole frame's worth. */
+ * One sector at a time, or less: a stage of whole sectors goes through
+ * fetch_store_blocks() instead, so the only lengths that reach the card here
+ * are a single sector and the short tail store_stage() pads. */
 bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
-    static_assert(TFTP_BLOCK_BYTES == SD_SECTOR_SIZE,
-        "a block that is not a sector needs the offset carried between calls");
     if (store_sector) {
         return fat32_write_file_sector(store_sector, offset, bytes, length);
     }
@@ -775,7 +774,7 @@ bool fetch_store_blocks(uint32_t offset, const uint8_t* bytes, uint8_t count) {
  * A repeat is drawn however far along it is: a stalled transfer and a hung
  * machine look exactly alike when the screen stops moving, and the number of
  * repeats is the only thing that tells them apart from the outside. */
-void fetch_progress(uint32_t so_far, uint32_t total, bool waiting) {
+void fetch_progress(uint32_t so_far, uint32_t total, bool last, bool waiting) {
     static constexpr uint32_t EVERY = 0x2000;
     static uint8_t waits;
 
@@ -786,8 +785,12 @@ void fetch_progress(uint32_t so_far, uint32_t total, bool waiting) {
         /* Every 8KB, and always the last.  A short block is the last one, which
          * is how the end is known when the server declined to say how big the
          * file is and `total` is 0 -- without that the line would stop at the
-         * last multiple rather than at what arrived. */
-        if ((so_far & (EVERY - 1)) && so_far != total && so_far % TFTP_BLOCK_BYTES == 0) {
+         * last multiple rather than at what arrived.
+         *
+         * Told rather than worked out here: the size a block is short of is no
+         * longer fixed at 512, and dividing by a variable one measured 240
+         * bytes against the mask a constant allowed. */
+        if ((so_far & (EVERY - 1)) && so_far != total && !last) {
             return;
         }
     }

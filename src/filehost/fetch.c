@@ -23,11 +23,12 @@
  * full block plus its headers and check sequence is larger still. */
 static __attribute__((section(".netbuf"))) uint8_t net_in[ETH_MAX_RECEIVED];
 static __attribute__((section(".netbuf"))) uint8_t net_out[DHCP_FRAME_BYTES];
-/* Three sectors leave the controller's fourth receive buffer free while a
- * CMD25 closes and is verified.  This turns ACK + write from a serial wait
- * into a short receive run followed by one card transaction. */
-static constexpr uint8_t FETCH_BATCH_SECTORS = 3;
-static __attribute__((section(".netbuf"))) uint8_t fetch_batch[FETCH_BATCH_SECTORS * SD_SECTOR_SIZE];
+/* One storage transaction in either TFTP mode: two 512-byte blocks or one
+ * negotiated 1024-byte block.  Two sectors and not four: a stage must be a
+ * whole number of blocks in either mode, and 2048 does not fit .netbuf beside
+ * net_in and net_out.  A wider one would amortise the CMD25 stream further. */
+static constexpr uint16_t FETCH_STAGE_BYTES = 2 * SD_SECTOR_SIZE;
+static __attribute__((section(".netbuf"))) uint8_t fetch_stage[FETCH_STAGE_BYTES];
 static_assert(sizeof net_out >= TFTP_SEND_BYTES, "no room to build a request");
 static_assert(sizeof net_in >= TFTP_RECEIVE_BYTES, "a full block would be dropped");
 
@@ -226,6 +227,24 @@ static bool resolved(void) {
     return !net_zero(server_mac, MAC_BYTES);
 }
 
+/* Writes the whole sectors first and pads only the short tail.
+ *
+ * The two-sector case cannot be folded into the one-sector case:
+ * fat32_write_file_sectors() with a count of 1 takes the first-block branch and
+ * never closes the CMD25 stream (fat32.c), which breaks the next write whatever
+ * it is.  The split is load-bearing, not clutter. */
+static bool store_stage(uint32_t offset, uint16_t bytes) {
+    if (bytes == FETCH_STAGE_BYTES) {
+        return fetch_store_blocks(offset, fetch_stage, 2);
+    }
+    if (bytes > SD_SECTOR_SIZE) {
+        return fetch_store(offset, fetch_stage, SD_SECTOR_SIZE)
+            && fetch_store(offset + SD_SECTOR_SIZE, &fetch_stage[SD_SECTOR_SIZE],
+                bytes - SD_SECTOR_SIZE);
+    }
+    return fetch_store(offset, fetch_stage, bytes);
+}
+
 enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) {
     *length = 0;
     error_code = 0;
@@ -249,9 +268,9 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
     begin_exchange();
     uint16_t said = tftp_step(&transfer, nullptr, 0, net_out);
     uint32_t written = 0;
-    uint32_t batch_offset = 0;
-    uint8_t batch_count = 0;
-    const bool batch_writes = fetch_stores_image();
+    uint32_t stage_offset = 0;
+    uint16_t stage_bytes = 0;
+    const bool stage_writes = fetch_stores_image();
     while (frames_elapsed < STALL_FRAMES && !tftp_done(&transfer) && !tftp_failed(&transfer)
         && !stopped) {
         tick();
@@ -285,14 +304,13 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
             if (written + transfer.data_length > limit) {
                 return FetchTooBig;
             }
-            if (batch_writes) {
-                lcopy((Addr28)(uint16_t)&net_in[TFTP_DATA_AT],
-                    (Addr28)(uint16_t)&fetch_batch[batch_count * SD_SECTOR_SIZE],
-                    transfer.data_length);
-                if (!batch_count) {
-                    batch_offset = written;
+            if (stage_writes) {
+                if (!stage_bytes) {
+                    stage_offset = written;
                 }
-                batch_count++;
+                lcopy((Addr28)(uint16_t)&net_in[TFTP_DATA_AT],
+                    (Addr28)(uint16_t)&fetch_stage[stage_bytes], transfer.data_length);
+                stage_bytes += transfer.data_length;
             } else if (!fetch_store(written, &net_in[TFTP_DATA_AT], transfer.data_length)) {
                 return FetchWriteFailed;
             }
@@ -301,38 +319,30 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
              * stated" by itself; testing has_size as well measured 23 bytes
              * for an answer that cannot differ.  Read per block rather than
              * held, which measured 53 bytes more. */
-            fetch_progress(written, transfer.size, false);
+            /* Read once: `transfer` escapes to tftp_step(), so the compiler
+             * must reload it across the store above and re-emit the compare.
+             * tftp_done() is the same conclusion take() drew from the same
+             * comparison, and a byte test rather than two 16-bit ones. */
+            fetch_progress(written, transfer.size, tftp_done(&transfer), false);
         }
         /* The server may send the next DATA while these sectors wait for the
          * card.  Sending the ACK here, rather than at the next poll, makes the
          * three slots a pipeline instead of merely deferred work.  An SD
          * failure can therefore follow an ACK; FetchWriteFailed preserves the
          * incomplete file rather than claiming the transfer succeeded. */
-        if (said && batch_count) {
+        if (said && stage_bytes) {
             eth_send(net_out, said);
             frames_since_said = 0;
             said = 0;
         }
-        /* The tail is padded by the single-sector writer.  It cannot enter a
-         * CMD25 stream, whose every block is exactly one sector. */
-        if (batch_count && transfer.data_length < SD_SECTOR_SIZE) {
-            const uint8_t full_blocks = batch_count - 1;
-            if (full_blocks == 1 && !fetch_store(batch_offset, fetch_batch, SD_SECTOR_SIZE)) {
+        /* Only a full stage: a short block ends the transfer, and the flush
+         * after the loop stores what it left behind, at the same offset and
+         * length this would have used. */
+        if (stage_bytes == FETCH_STAGE_BYTES) {
+            if (!store_stage(stage_offset, stage_bytes)) {
                 return FetchWriteFailed;
             }
-            if (full_blocks > 1 && !fetch_store_blocks(batch_offset, fetch_batch, full_blocks)) {
-                return FetchWriteFailed;
-            }
-            if (!fetch_store(batch_offset + (uint32_t)full_blocks * SD_SECTOR_SIZE,
-                    &fetch_batch[(uint16_t)full_blocks * SD_SECTOR_SIZE], transfer.data_length)) {
-                return FetchWriteFailed;
-            }
-            batch_count = 0;
-        } else if (batch_count == FETCH_BATCH_SECTORS) {
-            if (!fetch_store_blocks(batch_offset, fetch_batch, batch_count)) {
-                return FetchWriteFailed;
-            }
-            batch_count = 0;
+            stage_bytes = 0;
         }
         if (!said && frames_since_said >= RESEND_FRAMES) {
             said = tftp_step(&transfer, nullptr, 0, net_out);
@@ -341,7 +351,7 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
              * while the first request is unanswered, where there is no count
              * to repeat. */
             if (written) {
-                fetch_progress(written, transfer.size, true);
+                fetch_progress(written, transfer.size, false, true);
             }
         }
     }
@@ -354,12 +364,8 @@ enum FetchResult fetch_file(const char* name, uint32_t limit, uint32_t* length) 
 
     /* TFTP ends an exact multiple with an empty DATA.  The full tail then has
      * no block to force it out, so close it only after the transfer succeeded. */
-    if (tftp_done(&transfer) && batch_count) {
-        if (batch_count == 1) {
-            if (!fetch_store(batch_offset, fetch_batch, SD_SECTOR_SIZE)) {
-                return FetchWriteFailed;
-            }
-        } else if (!fetch_store_blocks(batch_offset, fetch_batch, batch_count)) {
+    if (tftp_done(&transfer) && stage_bytes) {
+        if (!store_stage(stage_offset, stage_bytes)) {
             return FetchWriteFailed;
         }
     }

@@ -45,8 +45,8 @@ TFTP_OPTIONS="--secure --retransmit 1000000"
 ```
 
 `--secure` confines requests to `/srv/tftp`; do not add `--create`. FILEHOST
-uses `octet` mode and 512-byte blocks, and asks for `tsize`; a server may reply
-with that option or send block 1 directly. `--retransmit 1000000` means one
+uses `octet` mode and asks for `tsize` and 1024-byte blocks; a server may grant
+the options or send 512-byte block 1 directly. `--retransmit 1000000` means one
 second before the first resend.
 
 ```sh

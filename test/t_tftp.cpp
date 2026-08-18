@@ -146,8 +146,7 @@ std::vector<uint8_t> ack(uint16_t number) {
 
 TEST_SUITE("tftp") {
 
-/* Every field RFC 1350 fixes, in the order it fixes them, plus the one option
- * FILEHOST.md §4 has the client ask for. */
+/* Every field RFC 1350 fixes, in order, plus the requested options. */
 TEST_CASE("the transfer opens with a read request naming the file") {
     Client client;
     const auto p = client.timeout();
@@ -161,7 +160,9 @@ TEST_CASE("the transfer opens with a read request naming the file") {
      * find before the first block is written down. */
     CHECK(string_at(p, 16) == "tsize");
     CHECK(string_at(p, 22) == "0");
-    CHECK(p.size() == 24);
+    CHECK(string_at(p, 24) == "blksize");
+    CHECK(string_at(p, 32) == "1024");
+    CHECK(p.size() == 37);
     CHECK_FALSE(tftp_done(&client.c));
 }
 
@@ -245,6 +246,21 @@ TEST_CASE("an option acknowledgement is answered and read for the file size") {
     const auto first = client.block(1, TFTP_BLOCK_BYTES);
     CHECK(client.step(first) == ack(1));
     CHECK(client.c.data_length == TFTP_BLOCK_BYTES);
+}
+
+TEST_CASE("a granted block size admits its larger data block") {
+    Client client;
+    REQUIRE_FALSE(client.timeout().empty());
+    std::vector<uint8_t> oack = {0, 6};
+    put_string(oack, "blksize");
+    put_string(oack, "1024");
+    CHECK(client.step(client.from_server(oack)) == ack(0));
+    CHECK(client.step(client.block(1, 1024)) == ack(1));
+    CHECK(client.c.data_length == 1024);
+    CHECK(client.c.stage == TftpTransferring);
+    CHECK(client.step(client.block(2, 7)) == ack(2));
+    CHECK(client.c.data_length == 7);
+    CHECK(tftp_done(&client.c));
 }
 
 /* RFC 2347 lets the server decline every option, in which case the first thing
@@ -587,15 +603,17 @@ TEST_CASE("a malformed message is turned away") {
         CHECK(client.c.size == 819200);  // a .d81, and past sixteen bits
     }
 
-    /* An option this client did not ask for is ignored rather than believed. */
+    /* A block size larger than the one requested ends the transfer with the
+     * option-negotiation error RFC 2347 assigns it. */
     {
         Client client;
         REQUIRE_FALSE(client.timeout().empty());
         std::vector<uint8_t> oack = {0, 6};
         put_string(oack, "blksize");
         put_string(oack, "1468");
-        REQUIRE_FALSE(client.step(client.from_server(oack)).empty());
-        CHECK_FALSE(client.c.has_size);
+        CHECK(client.step(client.from_server(oack)) == std::vector<uint8_t>({0, 5, 0, 8, 0}));
+        CHECK(tftp_failed(&client.c));
+        CHECK(client.c.error == 8);
     }
 
     /* A datagram too short to carry an opcode and a block number, and one

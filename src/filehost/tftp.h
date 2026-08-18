@@ -24,9 +24,11 @@
  * Frames are built and read, never sent, so this is tested on the host,
  * sequencing included. */
 
-/* One block, which is one SD sector: the reason 512 is left alone rather than
- * negotiated up to a whole frame's worth. */
+/* RFC 1350's block, and the larger one asked for from a server that grants RFC
+ * 2348.  A caller may accept only sizes its own storage can take -- see
+ * take_options() -- so these are the two this client knows how to be given. */
 constexpr uint16_t TFTP_BLOCK_BYTES = 512;
+constexpr uint16_t TFTP_MAX_BLOCK_BYTES = 1024;
 /* Where a block's bytes sit in the frame they arrived in, past the opcode and
  * block number.  A transfer never copies them anywhere else. */
 constexpr uint8_t TFTP_DATA_AT = UDP_PAYLOAD_AT + 4;
@@ -35,7 +37,7 @@ constexpr uint8_t TFTP_DATA_AT = UDP_PAYLOAD_AT + 4;
  * transfer can be refuses the rest before the DMA rather than after.  The check
  * sequence is in the count because a received length includes it (eth.h) and a
  * buffer one sector wide would therefore drop every full block. */
-constexpr uint16_t TFTP_RECEIVE_BYTES = TFTP_DATA_AT + TFTP_BLOCK_BYTES + ETH_FCS_BYTES;
+constexpr uint16_t TFTP_RECEIVE_BYTES = TFTP_DATA_AT + TFTP_MAX_BLOCK_BYTES + ETH_FCS_BYTES;
 
 /* The longest name that can be asked for, which is the catalogue's path field
  * (ether65 docs/FILEHOST.md §2): a client asks for `catalog` and for the paths
@@ -43,10 +45,11 @@ constexpr uint16_t TFTP_RECEIVE_BYTES = TFTP_DATA_AT + TFTP_BLOCK_BYTES + ETH_FC
  * refused rather than truncated -- a truncated path names a different file. */
 constexpr uint8_t TFTP_NAME_MAX = 48;
 /* What the send buffer must hold: the request, being the name plus the mode
- * and the one option asked for.  Everything else sent is a four-byte
+ * and the two options asked for.  Everything else sent is a four-byte
  * acknowledgement. */
 constexpr uint16_t TFTP_SEND_BYTES =
-    UDP_PAYLOAD_AT + 2 + (TFTP_NAME_MAX + 1) + sizeof "octet" + sizeof "tsize" + sizeof "0";
+    UDP_PAYLOAD_AT + 2 + (TFTP_NAME_MAX + 1) + sizeof "octet" + sizeof "tsize" + sizeof "0"
+    + sizeof "blksize" + sizeof "1024";
 
 /* Where a request goes when a caller names no port of its own. */
 constexpr uint16_t TFTP_PORT = 69;
@@ -81,13 +84,16 @@ enum TftpStage : uint8_t {
  * nothing else: read between steps it still holds the previous answer, so a
  * caller counts where it steps.
  *
- * `error` is the code the server refused with, or TFTP_REFUSED. */
+ * `block_bytes` is the negotiated block size, or the RFC 1350 default when the
+ * server declines the option.  `error` is the code the server refused with, or
+ * TFTP_REFUSED. */
 struct TftpClient {
     struct NetEndpoint us;
     struct NetEndpoint server;
     const char* name;
     uint32_t size;
     uint16_t block;
+    uint16_t block_bytes;
     uint16_t data_length;
     uint16_t error;
     enum TftpStage stage;

@@ -2,9 +2,9 @@
 """Fetch the FileHost catalogue over the wire, on the machine itself.
 
 The one thing no emulator run can check.  Xemu has no ethernet on macOS, so
-everything the network stack does -- a lease, an address resolved, 512 bytes at
-a time off a TFTP server -- is exercised here or nowhere.  The rest of FILEHOST
-is covered by verify_filehost_xemu.py, which is faster and needs no hardware.
+everything the network stack does -- a lease, an address resolved, and blocks
+off a TFTP server -- is exercised here or nowhere.  The rest of FILEHOST is
+covered by verify_filehost_xemu.py, which is faster and needs no hardware.
 
 Read-only, deliberately: nothing is written to the card and nothing is attached
 to the frozen machine's drive.  A catalogue fetched over TFTP lands in memory,

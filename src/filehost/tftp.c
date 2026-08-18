@@ -12,6 +12,7 @@ static constexpr uint8_t TFTP_DATA = 3;
 static constexpr uint8_t TFTP_ACKNOWLEDGE = 4;
 static constexpr uint8_t TFTP_ERROR = 5;
 static constexpr uint8_t TFTP_OPTION_ACK = 6;
+static constexpr uint8_t TFTP_BAD_OPTION = 8;
 
 /* An opcode, and the block number or error code behind it. */
 static constexpr uint8_t TFTP_OPCODE_BYTES = 2;
@@ -76,25 +77,38 @@ static uint32_t decimal(const uint8_t* at) {
     return value;
 }
 
-/* Reads what the server granted.  Only tsize was asked for, so only tsize is
- * looked for -- an option nobody asked about is a server's business, not
- * something to act on. */
-static void take_options(struct TftpClient* client, const uint8_t* payload, uint16_t length) {
+/* Reads the file size and block size the server granted.  False means the
+ * server chose a block size this sector writer cannot use. */
+static bool take_options(struct TftpClient* client, const uint8_t* payload, uint16_t length) {
     uint16_t at = TFTP_OPCODE_BYTES;
     for (;;) {
         const uint16_t name = at;
         at = after_string(payload, at, length);
         if (!at) {
-            return;
+            return true;
         }
         const uint16_t value = at;
         at = after_string(payload, at, length);
         if (!at) {
-            return;
+            return true;
         }
         if (option_is(&payload[name], "tsize")) {
             client->size = decimal(&payload[value]);
             client->has_size = true;
+        } else if (option_is(&payload[name], "blksize")) {
+            /* RFC 2348 lets a server answer with any size up to the one asked
+             * for, and a caller stages whole sectors, so anything that does not
+             * tile the stage would overrun it.  Refusing is RFC 2347's remedy --
+             * the client sends error 8 and the transfer ends -- and the price is
+             * real: a server configured to grant, say, 768 now fails where it
+             * would have worked before this option was ever asked for.  There is
+             * no way back: the server sends the size it granted, so a client
+             * that quietly used another would mis-stage every block. */
+            const uint16_t block_bytes = (uint16_t)decimal(&payload[value]);
+            if (block_bytes != TFTP_BLOCK_BYTES && block_bytes != TFTP_MAX_BLOCK_BYTES) {
+                return false;
+            }
+            client->block_bytes = block_bytes;
         }
     }
 }
@@ -144,15 +158,19 @@ static __attribute__((noinline)) bool take(
             if (client->stage != TftpRequesting) {
                 return false;
             }
-            take_options(client, payload, datagram.payload_length);
-            client->stage = TftpTransferring;
+            if (take_options(client, payload, datagram.payload_length)) {
+                client->stage = TftpTransferring;
+            } else {
+                client->stage = TftpFailed;
+                client->error = TFTP_BAD_OPTION;
+            }
             break;
         case TFTP_DATA: {
             const uint16_t block = net_get16(&payload[TFTP_OPCODE_BYTES]);
             const uint16_t bytes = datagram.payload_length - TFTP_HEADER_BYTES;
             /* No larger block was negotiated, so a server sending one is not
              * one whose blocks fit where the caller is putting them. */
-            if (bytes > TFTP_BLOCK_BYTES) {
+            if (bytes > client->block_bytes) {
                 return false;
             }
             if (expecting && block == (uint16_t)(client->block + 1)) {
@@ -160,7 +178,7 @@ static __attribute__((noinline)) bool take(
                 client->data_length = bytes;
                 /* Short of a whole block is the last of them, RFC 1350 §1; a
                  * file that is an exact multiple ends with an empty one. */
-                client->stage = bytes < TFTP_BLOCK_BYTES ? TftpDone : TftpTransferring;
+                client->stage = bytes < client->block_bytes ? TftpDone : TftpTransferring;
                 break;
             }
             /* The last block sent again, after the transfer ended: answer it.
@@ -222,6 +240,13 @@ static uint16_t say(const struct TftpClient* client, uint8_t* out) {
          * the first block is written down.  A server may decline to say. */
         at = put_string(at, "tsize");
         at = put_string(at, "0");
+        at = put_string(at, "blksize");
+        at = put_string(at, "1024");
+    } else if (client->stage == TftpFailed) {
+        net_put16(at, TFTP_ERROR);
+        net_put16(at + TFTP_OPCODE_BYTES, client->error);
+        at[TFTP_HEADER_BYTES] = 0;
+        at += TFTP_HEADER_BYTES + 1;
     } else {
         net_put16(at, TFTP_ACKNOWLEDGE);
         net_put16(at + TFTP_OPCODE_BYTES, client->block);
@@ -239,6 +264,7 @@ void tftp_start(struct TftpClient* client,
      * two struct members in it is assembled in a temporary and copied over,
      * which measured 34 bytes for the same result. */
     *client = (struct TftpClient){0};
+    client->block_bytes = TFTP_BLOCK_BYTES;
     client->us = *us;
     client->server = *server;
     client->name = name;
