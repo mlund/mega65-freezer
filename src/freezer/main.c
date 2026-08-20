@@ -1075,7 +1075,7 @@ int main(void) {
                     // workaround for old freeze slots that have an empty chargen area
                     fix_chargen_area(ChargenFixMem | ChargenFixSlot);
 
-                    unfreeze_slot(slot_number);
+                    mega65_h_unfreeze_from_slot(slot_number);
 
                     // should never get here
                     screen_of_death("unfreeze failed");

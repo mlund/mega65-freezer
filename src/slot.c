@@ -34,8 +34,7 @@ void request_freeze_region_list(void) {
 }
 
 uint32_t read_freeze_slot_start_sector(uint16_t slot) {
-    find_freeze_slot_start_sector(slot);
-    return *(volatile uint32_t*)0xD681U;
+    return mega65_h_locate_freezeslot(slot);
 }
 
 /* Each of these reads or writes a whole sector per byte: there is no cache

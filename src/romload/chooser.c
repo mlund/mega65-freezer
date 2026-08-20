@@ -432,7 +432,7 @@ void user_reset_prompt(void) {
 
     if (x == 'y' || x == 'Y') {
         freeze_reset_cpu_state();
-        unfreeze_slot(0);
+        mega65_h_unfreeze_from_slot(0);
 
         while (1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;

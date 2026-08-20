@@ -7,11 +7,11 @@
 // __ASSEMBLER__.  Do not parenthesise the constants: in 6502 assembly
 // "(expr)" is indirect addressing, so "sta (0x0140)" means something else.
 
-// Trap registers.  The address chooses the handler, not the value: the CPU
+// Trap register.  The address chooses the handler, not the value: the CPU
 // copies it into the program counter, so each of $D640-$D67F enters a
 // different trap (mega65-core, src/vhdl/gs4510.vhdl, "set PC based on address
-// written to").  A then chooses the function inside that handler, and the two
-// handlers number their functions independently.
+// written to").  A then chooses the function within that handler, and each
+// handler numbers its own.
 #define HTRAP_DOS 0xD640
 
 // The one HTRAP_DOS function helper.S still takes for itself; everything else
@@ -76,54 +76,6 @@ extern volatile uint8_t hyppo_exec_page[256];
  * It holds here: helper.s only ever transfers to the loader stub and
  * PROGRAM_ENTRY, neither of which is C. */
 #define HELPER_ASM __attribute__((leaf))
-
-/* C-only: helper.S never names these, so they need not be preprocessor
- * constants and the compiler can check their type. */
-constexpr uint16_t HTRAP_SYSPART = 0xD642;
-/* HTRAP_SYSPART functions.  The prefix says which register, because a function
- * taken to the wrong handler reaches invalid_subfunction rather than failing
- * to assemble. */
-constexpr uint8_t SYSPART_SLOT_SECTOR = 0x10;
-constexpr uint8_t SYSPART_UNFREEZE = 0x12;
-
-/* Traps short enough to state their own clobbers live here as inline asm, so
- * the compiler places operands in the registers the trap wants instead of the
- * assembly shuffling them out of the C ABI by hand.  Optimising for size, one
- * out-of-line copy beats duplicating the body per call site; otherwise inline. */
-#if defined(__OPTIMIZE_SIZE__)
-#define HELPER_INLINE static inline __attribute__((noinline))
-#else
-#define HELPER_INLINE static inline __attribute__((always_inline))
-#endif
-
-/* Slot number: low byte in Y, high in X -- the opposite of what hyppo's own
- * comment and bounds check say, and of what the SDK's wrappers pass.  The
- * trap's arithmetic pops the two bytes off the stack in the order they were
- * pushed (mega65-core, src/hyppo/syspart.asm: phx/phy, then plx/ply), which
- * inverts them.  Measured on the machine: a slot passed the SDK's way lands
- * 256 slots further on. */
-HELPER_INLINE void find_freeze_slot_start_sector(uint16_t slot) {
-    __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
-        :
-        : "y"((unsigned char)slot),
-        "x"((unsigned char)(slot >> 8)),
-        [fn] "i"(SYSPART_SLOT_SECTOR),
-        [trap] "i"(HTRAP_SYSPART)
-        : "a", "p", "memory");
-}
-
-/* As above.  Worse here: the trap never loads the saved Y at all, so the low
- * byte is whatever hyppo last held (syspart.asm, syspart_unfreeze_from_slot_trap
- * against syspart_locate_freezeslot_trap).  Only slot 0 is dependable. */
-HELPER_INLINE void unfreeze_slot(uint16_t slot) {
-    __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
-        :
-        : "y"((unsigned char)slot),
-        "x"((unsigned char)(slot >> 8)),
-        [fn] "i"(SYSPART_UNFREEZE),
-        [trap] "i"(HTRAP_SYSPART)
-        : "a", "p", "memory");
-}
 
 extern bool hdos_new_attach;
 
