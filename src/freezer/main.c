@@ -903,8 +903,8 @@ int main(void) {
                     slot_number -= 9;
                 case KEY_CURSOR_LEFT: // Cursor left
                     slot_number--;
-                    if (slot_number >= get_freeze_slot_count()) { // unsigned!
-                        slot_number = get_freeze_slot_count() - 1;
+                    if (slot_number >= mega65_h_get_freeze_slot_count()) { // unsigned!
+                        slot_number = mega65_h_get_freeze_slot_count() - 1;
                     }
 
                     draw_freeze_menu(
@@ -916,7 +916,7 @@ int main(void) {
                     slot_number += 9;
                 case KEY_CURSOR_RIGHT: // Cursor right
                     slot_number++;
-                    if (slot_number >= get_freeze_slot_count()) {
+                    if (slot_number >= mega65_h_get_freeze_slot_count()) {
                         slot_number = 0;
                     }
 

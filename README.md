@@ -145,7 +145,7 @@ less.
     `M 8000E000` reads through the frozen map where `M E000` is literal --
     the convention the MEGA65 monitor documents.
   - Fill, compare, copy commands
-- Dynamic colour schemes - press F1 to cycle (Mega65, Amiga Workbench, Gruvbox)
+- Dynamic colour schemes - press P to cycle (Mega65, Amiga Workbench, Gruvbox)
 
   <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
   

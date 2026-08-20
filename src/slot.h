@@ -11,7 +11,6 @@
 #include "slotmap.h"
 
 #include <ctype.h>
-#include <mega65/dirent.h>
 #include <mega65/fileio.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -128,7 +127,7 @@ static_assert(offsetof(struct ProcessDescriptor, d81_namelen) == 0x13);
 static_assert(offsetof(struct ProcessDescriptor, d81_name) == 0x15);
 static_assert(offsetof(struct ProcessDescriptor, d81_name[1]) == 0x35);
 
-/* Where mega65_dos_getprocdesc leaves the running program's descriptor.  Named
+/* Where mega65_h_get_proc_desc leaves the running program's descriptor.  Named
  * as the struct because the offset arithmetic it replaces is where a stray
  * conditional cost the disk chooser its saved mount state: `0x0400 + drive_id
  * ? 0x35 : 0x15` is the constant 0x35, and nothing says so. */

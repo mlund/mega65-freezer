@@ -115,13 +115,41 @@ add_compile_options(
     # against a signed-char platform this one is not.
     -Wno-char-subscripts
 )
-# The SDK's MEGA65 register structs (VICIV, CIA, SID, PALETTE).  Headers only:
-# the platform stays c64, because the mega65 platform emits a BASIC 65 stub
-# this loader cannot enter.  LLVM_MOS_ROOT comes from the parent scope.
+# The SDK's MEGA65 register structs (VICIV, CIA, SID, PALETTE) and its KERNAL
+# and hypervisor wrappers.  The platform stays c64, because the mega65 platform
+# emits a BASIC 65 stub this loader cannot enter, so the archive holding those
+# wrappers has to be named here: the c64 driver does not put it on the link
+# line.  Archive, not object, so a tool pays only for what it calls.
+# LLVM_MOS_ROOT comes from the parent scope.
 set(MEGA65_INCLUDE ${LLVM_MOS_ROOT}/mos-platform/mega65/include)
+set(MEGA65_LIBC ${LLVM_MOS_ROOT}/mos-platform/mega65/lib/libc.a)
 if(NOT EXISTS ${MEGA65_INCLUDE}/mega65.h)
     message(FATAL_ERROR "MEGA65 register headers not found at ${MEGA65_INCLUDE}")
 endif()
+if(NOT EXISTS ${MEGA65_LIBC})
+    message(FATAL_ERROR "MEGA65 platform libc not found at ${MEGA65_LIBC}")
+endif()
+# An SDK too old to carry the wrappers has the archive all the same, so its
+# presence says nothing: the failure would be an undefined symbol at the first
+# call site, naming the wrapper rather than the reason.  The header is what is
+# always readable -- a check needing a tool is a check that can be skipped --
+# and it ships with the archive.  setname_page is the newest of the wrappers
+# this tree calls, so it is the one that dates the SDK.
+file(READ ${MEGA65_INCLUDE}/mega65.h MEGA65_HEADER)
+if(NOT MEGA65_HEADER MATCHES "mega65_h_setname_page")
+    message(FATAL_ERROR
+        "The MEGA65 SDK at ${LLVM_MOS_ROOT} predates the hyppo and kernal "
+        "wrappers.  Point CMAKE_PREFIX_PATH at one that has them.")
+endif()
+unset(MEGA65_HEADER)
+
+# The wrappers, and the platform libc that must be searched before them: the
+# link line puts these ahead of the driver's own, so naming c64's first is what
+# keeps the platform choice at the top of this tree meaningful.  Without it the
+# whole C library silently comes from the mega65 archive instead.
+add_library(mega65sdk INTERFACE)
+target_link_libraries(mega65sdk INTERFACE
+    ${LLVM_MOS_ROOT}/mos-platform/c64/lib/libc.a ${MEGA65_LIBC})
 # Also feeds the ASM rule, so helper.S finds helper.h here too -- no separate
 # CMAKE_ASM_FLAGS entry needed.
 include_directories(${SRC} ${CMAKE_CURRENT_BINARY_DIR})
@@ -141,7 +169,7 @@ add_link_options(-mlto-zp=${LTO_ZP} -Wl,--gc-sections)
 
 set(COMMON
     slot.c slotmap.c dma.c screen.c format.c screencode.c
-    sdcard.c common.c
+    sdcard.c common.c hyppo.c
     helper.S version.c
 )
 
@@ -154,6 +182,7 @@ function(add_m65 name)
     if(LINK_LIBC)
         target_link_libraries(${name} mega65libc)
     endif()
+    target_link_libraries(${name} mega65sdk)
     # -L so that link.ld's INCLUDE of lowmem.ld resolves from the build
     # directory.
     target_link_options(${name} PRIVATE -T ${CMAKE_CURRENT_SOURCE_DIR}/link.ld
@@ -233,7 +262,7 @@ endforeach()
 if(LINK_LIBC)
     add_executable(test_dma ${CMAKE_SOURCE_DIR}/test/test_dma.c dma.c)
     target_compile_options(test_dma PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
-    target_link_libraries(test_dma mega65libc)
+    target_link_libraries(test_dma mega65libc mega65sdk)
     set_target_properties(test_dma PROPERTIES OUTPUT_NAME test_dma.prg)
 
     # The freeze slot's round trip: a byte at a time, and the whole-sector pair
@@ -244,7 +273,7 @@ if(LINK_LIBC)
     target_compile_options(test_freezeslot PRIVATE
         $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_compile_definitions(test_freezeslot PRIVATE SCREEN_CELL_BYTES=2)
-    target_link_libraries(test_freezeslot mega65libc)
+    target_link_libraries(test_freezeslot mega65libc mega65sdk)
     # The c64 platform script reserves less zero page than link.ld does, so the
     # project-wide -mlto-zp does not fit here.  lowmem.ld comes along because
     # slot.c names hyppo's page; as an input file rather than -T, which would
@@ -264,7 +293,7 @@ if(LINK_LIBC)
     target_compile_options(ethtest PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_compile_definitions(ethtest PRIVATE SCREEN_CELL_BYTES=2)
     target_include_directories(ethtest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/filehost)
-    target_link_libraries(ethtest mega65libc)
+    target_link_libraries(ethtest mega65libc mega65sdk)
     target_link_options(ethtest PRIVATE -mlto-zp=16
         ${CMAKE_CURRENT_SOURCE_DIR}/lowmem.ld
         ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
@@ -278,7 +307,7 @@ if(LINK_LIBC)
     target_compile_options(sdbatch PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_compile_definitions(sdbatch PRIVATE SCREEN_CELL_BYTES=2)
     target_include_directories(sdbatch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/filehost)
-    target_link_libraries(sdbatch mega65libc)
+    target_link_libraries(sdbatch mega65libc mega65sdk)
     target_link_options(sdbatch PRIVATE -mlto-zp=16
         ${CMAKE_CURRENT_SOURCE_DIR}/lowmem.ld
         ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
@@ -288,6 +317,6 @@ if(LINK_LIBC)
     # hand-roll their decimals -- so this path reaches the machine only here.
     add_executable(test_printf ${CMAKE_SOURCE_DIR}/test/test_printf.c)
     target_compile_options(test_printf PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
-    target_link_libraries(test_printf mega65libc)
+    target_link_libraries(test_printf mega65libc mega65sdk)
     set_target_properties(test_printf PROPERTIES OUTPUT_NAME test_printf.prg)
 endif()

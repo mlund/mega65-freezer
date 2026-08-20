@@ -34,6 +34,9 @@ static constexpr uint16_t FETCH_STAGE_BYTES = 2 * SD_SECTOR_SIZE;
  * two in step: change the stage and the build stops here, rather than a server
  * granting 1024 overrunning the buffer. */
 static_assert(FETCH_STAGE_BYTES % TFTP_BLOCK_BYTES == 0, "the default block must tile the stage");
+/* store_stage()'s short-tail branch writes one sector and a remainder, so a
+ * wider stage needs that branch rewritten, not just the constant changed. */
+static_assert(FETCH_STAGE_BYTES <= 2 * SD_SECTOR_SIZE, "a wider stage needs a longer tail path");
 static_assert(
     FETCH_STAGE_BYTES % TFTP_MAX_BLOCK_BYTES == 0, "the negotiated block must tile the stage");
 static __attribute__((section(".netbuf"))) uint8_t fetch_stage[FETCH_STAGE_BYTES];
@@ -251,7 +254,7 @@ static bool resolved(void) {
  * at two sectors. */
 static bool store_stage(uint32_t offset, uint16_t bytes) {
     if (bytes == FETCH_STAGE_BYTES) {
-        return fetch_store_blocks(offset, fetch_stage, 2);
+        return fetch_store_blocks(offset, fetch_stage, FETCH_STAGE_BYTES / SD_SECTOR_SIZE);
     }
     if (bytes > SD_SECTOR_SIZE) {
         return fetch_store(offset, fetch_stage, SD_SECTOR_SIZE)

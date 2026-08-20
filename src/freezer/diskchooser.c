@@ -83,9 +83,9 @@ void display_error(void) {
     char* errstr;
 
     VICIV.bordercol = SchemeError;
-    const uint8_t code = mega65_geterrorcode();
-    /* The commonest failure here, and the one hyppo reports as the end of the
-     * directory on hardware, so the code alone would be shown for it. */
+    const uint8_t code = mega65_h_geterrorcode();
+    /* The commonest failure here, and the one worth a phrase rather than a
+     * bare number on screen. */
     errstr = hyppo_file_absent(code) ? "FILE NOT FOUND" : hyppoerror_to_screen(code);
     /* No message hyppoerror_to_screen returns exceeds the 19-cell field: the
      * longest are 18, and the fallback is "ERROR CODE XX". */
@@ -414,11 +414,11 @@ void scan_directory(uint8_t drive_id) {
     uint8_t x;
     uint8_t dir;
     char* ptr;
-    struct m65_dirent* dirent;
+    mega65_h_dirent* const dirent = HYPPO_DIRENT;
 
     file_count = 0;
 
-    closeall();
+    mega65_h_closeall();
 
     lfill(DIR_NAME_BUF, ' ', 0xffffU);
     // Add the pseudo disks
@@ -437,43 +437,44 @@ void scan_directory(uint8_t drive_id) {
     min_dir_entry = file_count;
 
     in_subdirectory = false;
-    dir = opendir();
-    dirent = readdir(dir);
-    while (dirent && ((uint16_t)dirent != 0xffffU)) {
+    if (mega65_h_opendir(&dir) != MEGA65_H_OK) {
+        return;
+    }
+    while (mega65_h_readdir(dir, dirent) == MEGA65_H_OK) {
 
-        x = (uint8_t)strlen(dirent->d_name);
+        x = dirent->name_len;
 
         // check DIR attribute of dirent
         if (x < 32) {
-            if (dirent->d_type & 0x10) {
+            if (dirent->attributes & MEGA65_H_ATTR_SUBDIR) {
                 // if there is a .. path, then we are in a subdir
-                if (!strcmp("..", dirent->d_name)) {
+                if (dirent_is_dotdot(dirent->long_name, x)) {
                     in_subdirectory = true;
                     // overwrite makedisk
                     file_count--;
                     lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), ' ', 64);
                 }
-                lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + 1 + DIR_ENTRY_INDEX(file_count), x);
+                lcopy(
+                    (long)&dirent->long_name[0], DIR_NAME_BUF + 1 + DIR_ENTRY_INDEX(file_count), x);
                 // Put / at the start of directory names to make them obviously different
                 lpoke(DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), '/');
                 // Don't list "." directory pointer
-                if (strcmp(".", dirent->d_name) != 0) {
+                if (!dirent_is_dot(dirent->long_name, x)) {
                     file_count++;
                 }
             } else if (x > 4) {
-                ptr = &dirent->d_name[x - 4];
+                ptr = &dirent->long_name[x - 4];
                 if ((!strcmp(ptr, ".D81")) || (!strcmp(ptr, ".d81")) || (!strcmp(ptr, ".D64")) ||
                     (!strcmp(ptr, ".d64")) || (!strcmp(ptr, ".D65")) || (!strcmp(ptr, ".d65"))) {
                     // File is a disk image
-                    lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), x);
+                    lcopy(
+                        (long)&dirent->long_name[0], DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), x);
                     file_count++;
                 }
             }
         }
-
-        dirent = readdir(dir);
     }
-    closedir(dir);
+    mega65_h_closedir(dir);
 }
 
 char* freeze_select_disk_image(uint8_t drive_id) {
@@ -491,7 +492,7 @@ char* freeze_select_disk_image(uint8_t drive_id) {
     blank_screen();
 
     // save old mounted state
-    mega65_dos_getprocdesc(HYPPO_PAGE_MSB);
+    (void)mega65_h_get_proc_desc(HYPPO_PAGE_MSB);
     old_disk_flags = HYPPO_PROCDESC->d81_flags[drive_id];
     old_disk_len = HYPPO_PROCDESC->d81_namelen[drive_id];
     for (x = 0; x < 32; x++) {
@@ -535,7 +536,7 @@ char* freeze_select_disk_image(uint8_t drive_id) {
         switch (x) {
             case KEY_LEFT_ARROW: // <- key at top left of key board
                 // Go back up one directory
-                mega65_dos_chdir((unsigned char*)"..");
+                mega65_dos_chdir("..");
                 selection_number = 0;
                 display_offset = 0;
                 scan_directory(drive_id);
@@ -561,7 +562,7 @@ char* freeze_select_disk_image(uint8_t drive_id) {
                 VICIV.bordercol = SchemeBorderBusy;
                 if (disk_name_return[0] == '/') {
                     // Its a directory
-                    mega65_dos_chdir((unsigned char*)&disk_name_return[1]);
+                    mega65_dos_chdir(&disk_name_return[1]);
                     selection_number = 0;
                     display_offset = 0;
                     scan_directory(drive_id);

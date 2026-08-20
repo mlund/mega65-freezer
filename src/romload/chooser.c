@@ -131,30 +131,31 @@ void scan_directory(void) {
     short last_dir = -1;
     short dir_pos;
     short i;
-    struct m65_dirent* dirent;
+    mega65_h_dirent* const dirent = HYPPO_DIRENT;
 
     file_count = 0;
 
-    closeall();
+    mega65_h_closeall();
 
-    dir = opendir();
-    dirent = readdir(dir);
-    while (dirent && ((uint16_t)dirent != 0xffffU)) {
+    if (mega65_h_opendir(&dir) != MEGA65_H_OK) {
+        return;
+    }
+    while (mega65_h_readdir(dir, dirent) == MEGA65_H_OK) {
 
-        x = (unsigned char)strlen(dirent->d_name);
+        x = dirent->name_len;
         // only accept 32 characters max!
         if (x > 32) {
-            goto next_entry;
+            continue;
         }
 
         // check DIR attribute of dirent
-        if (dirent->d_type & 0x10) {
+        if (dirent->attributes & MEGA65_H_ATTR_SUBDIR) {
             // File is a directory
             // limit filename length and skip '.' directory
-            if (strcmp(dirent->d_name, ".") != 0) {
+            if (!dirent_is_dot(dirent->long_name, x)) {
                 // keep directories at the top, and
                 // always put ROMS dir at the very top
-                if (!strcmp(dirent->d_name, "ROMS")) {
+                if (!strcmp(dirent->long_name, "ROMS")) {
                     dir_pos = 0;
                 } else {
                     dir_pos = last_dir + 1;
@@ -167,34 +168,31 @@ void scan_directory(void) {
                     }
                 }
                 lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(dir_pos), ' ', 64);
-                lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + 1 + DIR_ENTRY_INDEX(dir_pos), x);
+                lcopy((long)&dirent->long_name[0], DIR_NAME_BUF + 1 + DIR_ENTRY_INDEX(dir_pos), x);
                 // Put / at the start of directory names to make them obviously different
                 lpoke(DIR_NAME_BUF + DIR_ENTRY_INDEX(dir_pos), '/');
                 last_dir++;
                 file_count++;
             }
         } else if (x > 4 &&
-            ((!strncmp(&dirent->d_name[x - 4], ".ROM", 4)) ||    // ROM Files
-                (!strncmp(&dirent->d_name[x - 4], ".BIN", 4)) || // ROM Files
-                (!strncmp(&dirent->d_name[x - 4], ".CHR", 4)) || // 8x8 CHaRacter Set FONT files
+            ((!strncmp(&dirent->long_name[x - 4], ".ROM", 4)) ||    // ROM Files
+                (!strncmp(&dirent->long_name[x - 4], ".BIN", 4)) || // ROM Files
+                (!strncmp(&dirent->long_name[x - 4], ".CHR", 4)) || // 8x8 CHaRacter Set FONT files
                 (!strncmp(
-                    &dirent->d_name[x - 4], ".TCR", 4)) || // 8x16 Tall ChaRacter Set FONT files
-                (!strncmp(&dirent->d_name[x - 4], ".rom", 4)) || // ROM Files
-                (!strncmp(&dirent->d_name[x - 4], ".bin", 4)) || // ROM Files
-                (!strncmp(&dirent->d_name[x - 4], ".chr", 4)) || // 8x8 CHaRacter Set FONT files
+                    &dirent->long_name[x - 4], ".TCR", 4)) || // 8x16 Tall ChaRacter Set FONT files
+                (!strncmp(&dirent->long_name[x - 4], ".rom", 4)) || // ROM Files
+                (!strncmp(&dirent->long_name[x - 4], ".bin", 4)) || // ROM Files
+                (!strncmp(&dirent->long_name[x - 4], ".chr", 4)) || // 8x8 CHaRacter Set FONT files
                 (!strncmp(
-                    &dirent->d_name[x - 4], ".tcr", 4)))) { // 8x16 Tall ChaRacter Set FONT files
+                    &dirent->long_name[x - 4], ".tcr", 4)))) { // 8x16 Tall ChaRacter Set FONT files
             // File is a ROM or a CHaRset
             lfill(DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), ' ', 64);
-            lcopy((long)&dirent->d_name[0], DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), x);
+            lcopy((long)&dirent->long_name[0], DIR_NAME_BUF + DIR_ENTRY_INDEX(file_count), x);
             file_count++;
         }
-
-    next_entry:
-        dirent = readdir(dir);
     }
 
-    closedir(dir);
+    mega65_h_closedir(dir);
 }
 
 /*
@@ -246,7 +244,7 @@ unsigned char freeze_load_romarea(void) {
             case KEY_LEFT_ARROW: // <- key at top left of key board
                 // Go back up one directory
 
-                mega65_dos_chdir((unsigned char*)"..");
+                mega65_dos_chdir("..");
                 file_count = 0;
                 selection_number = 0;
                 display_offset = 0;
@@ -272,7 +270,7 @@ unsigned char freeze_load_romarea(void) {
                 // Is it a directory?
                 if (rom_name_return[0] == '/') {
                     // Its a directory
-                    mega65_dos_chdir((unsigned char*)&rom_name_return[1]);
+                    mega65_dos_chdir(&rom_name_return[1]);
                     file_count = 0;
                     selection_number = 0;
                     display_offset = 0;

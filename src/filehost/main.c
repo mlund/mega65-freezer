@@ -197,7 +197,9 @@ static void draw_row(uint16_t row) {
 
     draw_field(SCREEN_CELL(COLUMN_TITLE, y), colour, record.title, WIDTH_TITLE);
     draw_field(SCREEN_CELL(COLUMN_AUTHOR, y), colour, record.author, WIDTH_AUTHOR);
-    draw_field(SCREEN_CELL(COLUMN_CATEGORY, y), colour, catalog_category_name(record.category),
+    draw_field(SCREEN_CELL(COLUMN_CATEGORY, y),
+        colour,
+        catalog_category_name(record.category),
         WIDTH_CATEGORY);
     draw_year(SCREEN_CELL(COLUMN_YEAR, y), colour, record.year);
     draw_field(
@@ -375,9 +377,7 @@ static bool fetch_image(const char* name, bool replace) {
     store_sector = replace ? fat32_file_first_sector(name, record.size)
                            : fat32_create_contiguous_file(name, record.size);
     if (!store_sector) {
-        show_status(SchemeError,
-            replace ? "WRONG CARD SIZE"
-                    : "COULDNT MAKE FILE");
+        show_status(SchemeError, replace ? "WRONG CARD SIZE" : "COULDNT MAKE FILE");
         return false;
     }
 
@@ -393,9 +393,9 @@ static bool fetch_image(const char* name, bool replace) {
          *
          * Said as it happened rather than as it was meant to: a delete that
          * fails leaves exactly the file this was written to prevent. */
-        const char* also = replace                  ? "IT IS STILL WRONG -- R RETRIES"
-            : fat32_delete_file(name)               ? "THE FILE WAS REMOVED"
-                                                    : "A BAD FILE IS LEFT ON THE CARD";
+        const char* also = replace    ? "IT IS STILL WRONG -- R RETRIES"
+            : fat32_delete_file(name) ? "THE FILE WAS REMOVED"
+                                      : "A BAD FILE IS LEFT ON THE CARD";
         say_fetch_failed(result, also);
         return false;
     }
@@ -407,7 +407,7 @@ static bool fetch_image(const char* name, bool replace) {
 /* `name` is not const because hyppo's attach takes it as it is given. */
 static bool attached(char* name) {
     if (mega65_dos_attach(name, ATTACH_DRIVE)) {
-        show_status(SchemeError, hyppoerror_to_screen(mega65_geterrorcode()));
+        show_status(SchemeError, hyppoerror_to_screen(mega65_h_geterrorcode()));
         return false;
     }
     return true;
@@ -540,7 +540,7 @@ static void attach_selected(void) {
          * catalogue names what FileHost has and the card holds what has been
          * fetched, so the first attach is also how the question is asked.
          * Anything else is a failure and is reported as one. */
-        const uint8_t code = mega65_geterrorcode();
+        const uint8_t code = mega65_h_geterrorcode();
         if (!hyppo_file_absent(code)) {
             show_status(SchemeError, hyppoerror_to_screen(code));
             return;

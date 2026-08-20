@@ -1,27 +1,22 @@
 #pragma once
 
-// Hypervisor interface: the trap and loader constants helper.S writes, the
-// routines it exports, and the short traps that are inline asm instead.
+// Hypervisor interface: the trap and loader constants, the pages hyppo reads
+// and writes, and the routines hyppo.c and helper.S export between them.
 //
 // Included by helper.S as well as by C, so everything C-specific sits behind
 // __ASSEMBLER__.  Do not parenthesise the constants: in 6502 assembly
 // "(expr)" is indirect addressing, so "sta (0x0140)" means something else.
 
-// Trap registers.  The value written selects the function; the two registers
-// reach different trap handlers.
+// Trap registers.  The address chooses the handler, not the value: the CPU
+// copies it into the program counter, so each of $D640-$D67F enters a
+// different trap (mega65-core, src/vhdl/gs4510.vhdl, "set PC based on address
+// written to").  A then chooses the function inside that handler, and the two
+// handlers number their functions independently.
 #define HTRAP_DOS 0xD640
 
-// HTRAP_DOS functions.
-#define HYPPO_GETVERSION 0x00
-#define HYPPO_GETCURRENTDRIVE 0x04
-#define HYPPO_CHDIR 0x0C
-#define HYPPO_CLOSEALL 0x22
-#define HYPPO_SETNAME 0x2E
-#define HYPPO_FINDFILE 0x34
+// The one HTRAP_DOS function helper.S still takes for itself; everything else
+// reaches hyppo through the SDK's wrappers, which name their own.
 #define HYPPO_LOADFILE 0x36
-#define HYPPO_CDROOTDIR 0x3C
-#define HYPPO_GETPROCDESC 0x48
-#define HYPPO_ATTACH 0x4A
 
 // Hyppo's two page-aligned buffers are reserved in lowmem.ld, which is where
 // the reasoning for their addresses lives: hyppo_page for the filename the
@@ -37,48 +32,41 @@
 #define BORDER_COLOUR 0xD020
 
 // Drive selection bits for attach/detach.
-#define DRIVE_MASK 0x01
-#define DETACH_DRIVE_MASK 0x41 // drive bits plus bit 6 (nodrive)
-#define DETACH_FLAG 0x80
-#define ATTACH_LEGACY_BASE 0x40 // pre-1.2 hyppo: $40 or $46
-#define ATTACH_LEGACY_DRIVE1 0x06
-
-// Offsets into hyppo's dirent, written to hyppo_page.
-#define HDIRENT_NAME_LEN 64 // name is 64 bytes
-#define HDIRENT_CLUSTER 77  // 64 + 1 + 12
-#define HDIRENT_SIZE 81     // HDIRENT_CLUSTER + 4
-#define HDIRENT_ATTR 86     // HDIRENT_SIZE + 1 + 4
-
-// Offsets into the C struct m65_dirent.
-#define DIRENT_INO 0    // d_ino,    4 bytes
-#define DIRENT_OFF 4    // d_off,    2 bytes
-#define DIRENT_RECLEN 6 // d_reclen, 4 bytes
-#define DIRENT_TYPE 10  // d_type,   2 bytes
-#define DIRENT_NAME 12  // d_name
-
-// The filename pointer is stashed alongside each buffer for post-mortem
-// inspection from the monitor.  Unparenthesised for the reason at the top of
-// this file, hence the NOLINT.
+// The exec filename pointer, kept beside its buffer for post-mortem inspection
+// from the monitor.  Unparenthesised for the reason at the top of this file,
+// hence the NOLINT.
 #define NAME_PTR_STASH_EXEC hyppo_exec_page + 0x40 // NOLINT(bugprone-macro-parentheses)
-#define NAME_PTR_STASH_DOS hyppo_page + 0x40       // NOLINT(bugprone-macro-parentheses)
-
-// dos_attach gained its current calling convention in hyppo DOS 1.3.
-#define HDOS_MAJOR_MIN 1
-#define HDOS_MINOR_MIN 3
 
 // Border flashes while retrying a failed load, before falling back.
 #define RETRY_FLASH_COUNT 60
 
-#define ATTACH_ERROR 0xEF
-
 #ifndef __ASSEMBLER__
 
+#include <mega65.h>
+#include <stdbool.h>
 #include <stdint.h>
 
-/* Reserved in lowmem.ld.  Whatever hyppo last put here decides which of
- * the three shapes is meaningful, so the page is declared as bytes and each
- * reader casts. */
+/* Reserved in lowmem.ld.  Whatever hyppo last put here decides which shape is
+ * meaningful, so the page is declared as bytes and each reader casts. */
 extern volatile uint8_t hyppo_page[256];
+
+/* The exec name's page, which must outlive hyppo_page's next use. */
+extern volatile uint8_t hyppo_exec_page[256];
+
+/* hyppo_page seen as what readdir leaves there, one of the shapes the page
+ * takes in turn. */
+#define HYPPO_DIRENT ((mega65_h_dirent*)(void*)hyppo_page)
+
+/* The two directory entries every listing has to skip or notice.  Tested by
+ * length rather than with strcmp, which lowers to memcmp and links 59 bytes
+ * of it in for a one- and a two-character comparison. */
+[[nodiscard]] static inline bool dirent_is_dot(const char* name, uint8_t len) {
+    return len == 1 && name[0] == '.';
+}
+
+[[nodiscard]] static inline bool dirent_is_dotdot(const char* name, uint8_t len) {
+    return len == 2 && name[0] == '.' && name[1] == '.';
+}
 
 /* The trap takes the page, not the address: the high byte is all it reads. */
 #define HYPPO_PAGE_MSB ((uint8_t)((uintptr_t)hyppo_page >> 8))
@@ -92,16 +80,11 @@ extern volatile uint8_t hyppo_page[256];
 /* C-only: helper.S never names these, so they need not be preprocessor
  * constants and the compiler can check their type. */
 constexpr uint16_t HTRAP_SYSPART = 0xD642;
-constexpr uint8_t HYPPO_OPENDIR = 0x12;
-constexpr uint8_t HYPPO_READDIR = 0x14;
-constexpr uint8_t HYPPO_CLOSEDIR = 0x16;
+/* HTRAP_SYSPART functions.  The prefix says which register, because a function
+ * taken to the wrong handler reaches invalid_subfunction rather than failing
+ * to assemble. */
 constexpr uint8_t SYSPART_SLOT_SECTOR = 0x10;
 constexpr uint8_t SYSPART_UNFREEZE = 0x12;
-constexpr uint8_t SYSPART_REGION_LIST = 0x14;
-constexpr uint8_t SYSPART_SLOT_COUNT = 0x16;
-constexpr uint8_t SYSPART_GETERRORCODE = 0x38;
-constexpr uint8_t HDIRENT_NAME = 0;
-constexpr uint16_t DIRENT_NAME_MAX = 256;
 
 /* Traps short enough to state their own clobbers live here as inline asm, so
  * the compiler places operands in the registers the trap wants instead of the
@@ -113,7 +96,12 @@ constexpr uint16_t DIRENT_NAME_MAX = 256;
 #define HELPER_INLINE static inline __attribute__((always_inline))
 #endif
 
-/* Slot number: low byte in Y, high in X. */
+/* Slot number: low byte in Y, high in X -- the opposite of what hyppo's own
+ * comment and bounds check say, and of what the SDK's wrappers pass.  The
+ * trap's arithmetic pops the two bytes off the stack in the order they were
+ * pushed (mega65-core, src/hyppo/syspart.asm: phx/phy, then plx/ply), which
+ * inverts them.  Measured on the machine: a slot passed the SDK's way lands
+ * 256 slots further on. */
 HELPER_INLINE void find_freeze_slot_start_sector(uint16_t slot) {
     __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
         :
@@ -124,7 +112,9 @@ HELPER_INLINE void find_freeze_slot_start_sector(uint16_t slot) {
         : "a", "p", "memory");
 }
 
-/* Slot number: low byte in Y, high in X. */
+/* As above.  Worse here: the trap never loads the saved Y at all, so the low
+ * byte is whatever hyppo last held (syspart.asm, syspart_unfreeze_from_slot_trap
+ * against syspart_locate_freezeslot_trap).  Only slot 0 is dependable. */
 HELPER_INLINE void unfreeze_slot(uint16_t slot) {
     __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
         :
@@ -135,56 +125,33 @@ HELPER_INLINE void unfreeze_slot(uint16_t slot) {
         : "a", "p", "memory");
 }
 
-/* Buffer address: low byte in X, high in Y -- the opposite of the two above.
- * Taken as the page rather than the address because the low byte is only ever
- * zero, and because the caller then hands the assembler a symbol to relocate
- * instead of a shift to perform. */
-HELPER_INLINE void fetch_freeze_region_list_from_hypervisor(uint8_t page) {
-    __asm__ volatile("ldx #0\n\tlda #%c[fn]\n\tsta %c[trap]\n\tclv"
-        :
-        : "y"(page), [fn] "i"(SYSPART_REGION_LIST), [trap] "i"(HTRAP_SYSPART)
-        : "a", "x", "p", "memory");
-}
-
-/* Count returns in X(low)/Y(high). */
-HELPER_INLINE uint16_t get_freeze_slot_count(void) {
-    unsigned char lo;
-    unsigned char hi;
-    __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
-        : "=x"(lo), "=y"(hi)
-        : [fn] "i"(SYSPART_SLOT_COUNT), [trap] "i"(HTRAP_SYSPART)
-        : "a", "p", "memory");
-    return lo | ((uint16_t)hi << 8);
-}
-
-HELPER_INLINE unsigned char mega65_geterrorcode(void) {
-    unsigned char err;
-    __asm__ volatile("lda #%c[fn]\n\tsta %c[trap]\n\tclv"
-        : "=a"(err)
-        : [fn] "i"(SYSPART_GETERRORCODE), [trap] "i"(HTRAP_SYSPART)
-        : "p", "memory");
-    return err;
-}
-
-extern uint8_t hdos_new_attach;
+extern bool hdos_new_attach;
 
 HELPER_ASM void init_nmi(void);
 
-// initializes variables for attach call
-// returns 0 if new dos_attach is not available, 1 otherwise
-HELPER_ASM uint8_t mega65_dos_init(void);
+/* Record whether hyppo's DOS is new enough for the current dos_attach
+ * convention, for mega65_dos_attach() to read. */
+void mega65_dos_init(void);
 
-HELPER_ASM char mega65_dos_attach(char* image_name, uint8_t driveid);
+/* Mount a D81 image on a drive.  0 on success, else hyppo's error code. */
+uint8_t mega65_dos_attach(const char* image_name, uint8_t driveid);
 #define M65_DOS_ATTACH_NODRIVE 0b01000000
-HELPER_ASM char mega65_dos_detach(uint8_t driveid_and_flags);
 
-HELPER_ASM char mega65_dos_chdir(unsigned char* dirname);
-HELPER_ASM char mega65_dos_cdroot(void);
+/* Unmount whatever is on a drive.  Nothing to report: the drive ends up empty
+ * whether or not anything was there. */
+void mega65_dos_detach(uint8_t driveid_and_flags);
 
+/* Change to a named directory, and to the current drive's root.  0 on
+ * success, else hyppo's error code. */
+uint8_t mega65_dos_chdir(const char* dirname);
+uint8_t mega65_dos_cdroot(void);
+
+/* Load another tool over this one and enter it.  Only returns on failure,
+ * having fallen back to the freeze menu. */
 HELPER_ASM char mega65_dos_exechelper(char* filename);
 
-HELPER_ASM uint8_t mega65_dos_getprocdesc(uint8_t pagemsb);
-
-HELPER_ASM char read_file_from_sdcard(char* filename, uint32_t load_address);
+/* Load a file off the card at a 28-bit address.  0 on success, else hyppo's
+ * error code. */
+uint8_t read_file_from_sdcard(const char* filename, uint32_t load_address);
 
 #endif // __ASSEMBLER__

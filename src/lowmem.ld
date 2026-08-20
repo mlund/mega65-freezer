@@ -37,11 +37,17 @@ loader_stub_size = 0x0040;
  * below 32KB, and this one is free because it is the C64's screen -- ours is
  * at $B800.
  *
- * Three structures share it, one at a time: the process descriptor and the
- * freeze region list, 256 bytes each, and the filename hyppo's file traps
- * read.  Each is consumed or copied out before the next is asked for. */
+ * Four structures share it, one at a time: the process descriptor, the freeze
+ * region list, the filename hyppo's file traps read, and the directory entry
+ * readdir writes back.  Each is consumed or copied out before the next is
+ * asked for. */
 hyppo_page      = 0x0400;
 hyppo_page_size = 0x0100;
+/* The SDK's mega65_h_setname() stages the name in the page this names, so it
+ * writes where our own copies went rather than into a page of its own.  Its
+ * platform script defaults this to the stack page, which here is the exec
+ * name's (below) and must not be shared. */
+__mega65_h_name_buf = hyppo_page;
 /* exec loads the next tool over this image, so its filename cannot share a
  * page with an attach name that has still to be used.  The stack page serves:
  * it grows down from $01FF and no tool pushes deep enough to reach a name at

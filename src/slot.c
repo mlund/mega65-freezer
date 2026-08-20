@@ -18,7 +18,7 @@ uint32_t freeze_slot_start_sector = 0;
 
 void request_freeze_region_list(void) {
     uint16_t i;
-    fetch_freeze_region_list_from_hypervisor(HYPPO_PAGE_MSB);
+    (void)mega65_h_read_freeze_region_list((void*)hyppo_page);
     lcopy((Addr28)hyppo_page, (Addr28)&freeze_region_list, 256);
 
     freeze_region_flags = 0;
