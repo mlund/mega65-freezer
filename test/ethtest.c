@@ -185,11 +185,11 @@ int main(void) {
     POKE(0x01, CPU_PORT_KERNAL_AND_IO);
     /* Without this sdcard.c addresses the card in bytes rather than sectors
      * and the controller never reports the transfer complete. */
-    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) != 0;
+    sdhc_card = (SDCARD.status & SD_SDHC_MASK) != 0;
     /* And this selects the card's sector buffer rather than the floppy's, as
      * src/freezer/main.c does: writes go through $FFD6E00 either way, so with
      * the wrong one selected a write ships whatever the SD buffer last held. */
-    SD_MISC = SD_MISC | SD_MISC_BUFSEL_SDCARD;
+    SDCARD.control |= SD_BUFFSEL_MASK;
 
     for (uint16_t i = 0; i < SD_SECTOR_SIZE; i++) {
         sector_buffer[i] = 0;

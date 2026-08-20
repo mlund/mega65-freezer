@@ -31,26 +31,26 @@ void sdcard_visual_feedback(const uint8_t do_flicker) {
 }
 
 void sdcard_reset(void) {
-    SD_COMMAND = SD_CMD_RESET_BEGIN;
-    SD_COMMAND = SD_CMD_RESET_END;
+    SDCARD.command = SDCARD_RESET_BEGIN;
+    SDCARD.command = SDCARD_RESET_END;
 
     // Now wait for SD card reset to complete
-    while (SD_STATUS & SD_STATUS_BUSY) {
+    while (SDCARD.status & SD_STATUS_BUSY) {
         if (border_flicker > 1) {
             VICIV.bordercol = (VICIV.bordercol + 1) & 0b1111;
         }
     }
 
     if (sdhc_card) {
-        SD_COMMAND = SD_CMD_SDHC_MODE;
+        SDCARD.command = SDCARD_SDHC_MODE_ON;
     }
 }
 
 void mega65_fast(void) {
     CPU_PORTDDR = CPU_PORT_FORCE_FAST;
     // MEGA65 IO registers
-    VICIV.key = VIC4_KNOCK_1;
-    VICIV.key = VIC4_KNOCK_2;
+    VICIV.key = VIC4_KEY_VICIV_A;
+    VICIV.key = VIC4_KEY_VICIV_B;
 }
 
 void sdcard_open(void) {
@@ -147,54 +147,51 @@ void sdcard_readsector(const uint32_t sector_number) {
     }
     const uint32_t sector_address = sdhc_card ? sector_number : sector_number * SD_SECTOR_SIZE;
 
-    SD_SECTOR_ADDR(0) = (sector_address >> 0) & 0xff;
-    SD_SECTOR_ADDR(1) = (sector_address >> 8) & 0xff;
-    SD_SECTOR_ADDR(2) = (sector_address >> 16) & 0xff;
-    SD_SECTOR_ADDR(3) = (sector_address >> 24) & 0xff;
+    SDCARD.sector_number = sector_address;
 
     while (tries < 10) {
         DEBUG_COUNT(sd_reads);
 
         // Wait for SD card to be ready
         timeout = SD_READY_POLLS;
-        while (SD_STATUS & SD_STATUS_BUSY) {
+        while (SDCARD.status & SD_STATUS_BUSY) {
             timeout--;
             if (!timeout) {
                 // Time out -- so reset SD card
-                SD_COMMAND = SD_CMD_RESET_BEGIN;
-                SD_COMMAND = SD_CMD_RESET_END;
+                SDCARD.command = SDCARD_RESET_BEGIN;
+                SDCARD.command = SDCARD_RESET_END;
                 timeout = SD_READY_POLLS;
             }
-            if (SD_STATUS & SD_STATUS_ERROR) {
+            if (SDCARD.status & SD_ERROR_MASK) {
                 return;
             }
             // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
             // but sdcardio.vhdl thinks not. This means a read error
-            if (SD_STATUS == SD_STATUS_SDIO_BUSY) {
+            if (SDCARD.status == SD_SDIO_BUSY_MASK) {
                 return;
             }
         }
 
-        SD_COMMAND = SD_CMD_READ;
+        SDCARD.command = SDCARD_READ_SECTOR;
 
         // Wait for read to complete
         timeout = SD_READY_POLLS;
-        while (SD_STATUS & SD_STATUS_BUSY) {
+        while (SDCARD.status & SD_STATUS_BUSY) {
             timeout--;
             if (!timeout) {
                 return;
             }
-            if (SD_STATUS & SD_STATUS_ERROR) {
+            if (SDCARD.status & SD_ERROR_MASK) {
                 return;
             }
             // Sometimes we see this result, i.e., sdcard.vhdl thinks it is done,
             // but sdcardio.vhdl thinks not. This means a read error
-            if (SD_STATUS == SD_STATUS_SDIO_BUSY) {
+            if (SDCARD.status == SD_SDIO_BUSY_MASK) {
                 return;
             }
         }
 
-        if (!(SD_STATUS & SD_STATUS_UNSETTLED)) {
+        if (!(SDCARD.status & SD_STATUS_UNSETTLED)) {
             // Copy data from hardware sector buffer via DMA
             lcopy(SD_SECTORBUFFER, (Addr28)sector_buffer, SD_SECTOR_SIZE);
 
@@ -256,11 +253,8 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     const uint32_t sector_address = sdhc_card ? sector_number : sector_number * SD_SECTOR_SIZE;
 
     // Set address to read/write
-    SD_COMMAND = SD_CMD_RESET_END;
-    SD_SECTOR_ADDR(0) = (sector_address >> 0) & 0xff;
-    SD_SECTOR_ADDR(1) = (sector_address >> 8) & 0xff;
-    SD_SECTOR_ADDR(2) = (sector_address >> 16) & 0xff;
-    SD_SECTOR_ADDR(3) = (sector_address >> 24) & 0xff;
+    SDCARD.command = SDCARD_RESET_END;
+    SDCARD.sector_number = sector_address;
 
     /* Read the sector first and write only if it differs.
      *
@@ -277,7 +271,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
      */
 
     DEBUG_COUNT(sd_reads);
-    SD_COMMAND = SD_CMD_READ;
+    SDCARD.command = SDCARD_READ_SECTOR;
     if (!ready_or_refuse()) {
         DEBUG_COUNT(sd_write_failures);
         return false;
@@ -310,11 +304,11 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         }
         PHASE_MAX(sd_polls_before_write, sector_number);
 
-        SD_COMMAND = SD_CMD_WRITE_GATE;
+        SDCARD.command = SDCARD_WRITE_GATE;
         if (is_multi) {
-            SD_COMMAND = SD_CMD_WRITE_MULTI_FIRST;
+            SDCARD.command = SDCARD_WRITE_MULTI_FIRST;
         } else {
-            SD_COMMAND = SD_CMD_WRITE;
+            SDCARD.command = SDCARD_WRITE_SECTOR;
         }
 
         // Wait for the write to complete
@@ -324,12 +318,12 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         }
         PHASE_MAX(sd_polls_after_write, sector_number);
 
-        if (!(SD_STATUS & SD_STATUS_UNSETTLED)) {
+        if (!(SDCARD.status & SD_STATUS_UNSETTLED)) {
             /* The controller misbehaves unless a read follows a write, and
              * sometimes wants a reset even then; the read below is also what
              * verifies the write took. */
             DEBUG_COUNT(sd_reads);
-            SD_COMMAND = SD_CMD_READ;
+            SDCARD.command = SDCARD_READ_SECTOR;
             if (!ready_or_refuse()) {
                 DEBUG_COUNT(sd_write_failures);
                 return false;
@@ -380,7 +374,7 @@ static constexpr uint8_t SD_READY_ROUNDS = 200;
         }
         uint16_t spins = 0;
         do {
-            if (!(SD_STATUS & SD_STATUS_BUSY)) {
+            if (!(SDCARD.status & SD_STATUS_BUSY)) {
                 POLLS_SPENT(round, spins);
                 FRAMES_SPENT(frames);
                 return true;
@@ -416,19 +410,16 @@ static constexpr uint8_t SD_READY_ROUNDS = 200;
  * which is what mega65-tools' remotesd_eth.c does. */
 bool sdcard_writefirstsector(const uint32_t sector_number) {
     const uint32_t sector_address = sdhc_card ? sector_number : sector_number * SD_SECTOR_SIZE;
-    SD_COMMAND = SD_CMD_RESET_END;
-    SD_SECTOR_ADDR(0) = (sector_address >> 0) & 0xff;
-    SD_SECTOR_ADDR(1) = (sector_address >> 8) & 0xff;
-    SD_SECTOR_ADDR(2) = (sector_address >> 16) & 0xff;
-    SD_SECTOR_ADDR(3) = (sector_address >> 24) & 0xff;
+    SDCARD.command = SDCARD_RESET_END;
+    SDCARD.sector_number = sector_address;
 
     if (!sdcard_ready()) {
         return false;
     }
     lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
     DEBUG_COUNT(sd_writes);
-    SD_COMMAND = SD_CMD_WRITE_GATE;
-    SD_COMMAND = SD_CMD_WRITE_MULTI_FIRST;
+    SDCARD.command = SDCARD_WRITE_GATE;
+    SDCARD.command = SDCARD_WRITE_MULTI_FIRST;
     return true;
 }
 
@@ -447,8 +438,8 @@ bool sdcard_writenextsector(void) {
     }
     lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
     DEBUG_COUNT(sd_writes);
-    SD_COMMAND = SD_CMD_WRITE_GATE;
-    SD_COMMAND = SD_CMD_WRITE_MULTI_NEXT;
+    SDCARD.command = SDCARD_WRITE_GATE;
+    SDCARD.command = SDCARD_WRITE_MULTI_NEXT;
     return true;
 }
 
@@ -462,8 +453,8 @@ bool sdcard_writelastsector(void) {
     }
     lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
     DEBUG_COUNT(sd_writes);
-    SD_COMMAND = SD_CMD_WRITE_GATE;
-    SD_COMMAND = SD_CMD_WRITE_MULTI_LAST;
+    SDCARD.command = SDCARD_WRITE_GATE;
+    SDCARD.command = SDCARD_WRITE_MULTI_LAST;
     return sdcard_ready();
 }
 
@@ -471,6 +462,6 @@ bool sdcard_writelastsector(void) {
  * pair is its documented stream escape; it releases the card without sending
  * invented data as a final block would. */
 void sdcard_writeabort(void) {
-    SD_COMMAND = SD_CMD_RESET_BEGIN;
-    SD_COMMAND = SD_CMD_RESET_END;
+    SDCARD.command = SDCARD_RESET_BEGIN;
+    SDCARD.command = SDCARD_RESET_END;
 }

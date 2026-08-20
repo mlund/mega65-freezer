@@ -46,10 +46,10 @@ __attribute__((noinline)) void do_dma(void) {
     __asm__ volatile("" ::: "memory");
 
     // Now run DMA job (to and from anywhere, and list is in low 1MB)
-    DMA_ADDR_BANK = 0;
-    DMA_ADDR_MB = 0x00; // list is in the first megabyte
-    DMA_ADDR_MSB = ((uint16_t)&dmalist) >> 8;
-    DMA_ENABLE = ((uint16_t)&dmalist) & 0xff; // writing the low byte triggers it
+    DMA.addr_bank = 0;
+    DMA.addr_mb = 0x00; // list is in the first megabyte
+    DMA.addr_msb = ((uint16_t)&dmalist) >> 8;
+    DMA.trigger_enhanced = ((uint16_t)&dmalist) & 0xff; // writing the low byte triggers it
 }
 
 /* Everything both jobs share; the caller sets command, source and count. */
@@ -115,7 +115,7 @@ void lfill(Addr28 destination_address, unsigned char value, uint16_t count) {
 
 void m65_io_enable(void) {
     // Gate C65 IO enable
-    VICIV.key = VIC4_KNOCK_1;
-    VICIV.key = VIC4_KNOCK_2;
+    VICIV.key = VIC4_KEY_VICIV_A;
+    VICIV.key = VIC4_KEY_VICIV_B;
     CPU_PORTDDR = CPU_PORT_FORCE_FAST;
 }

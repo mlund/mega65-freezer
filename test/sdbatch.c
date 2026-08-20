@@ -158,8 +158,8 @@ int main(void) {
      * card in bytes rather than sectors and the controller never reports the
      * transfer complete; without the second, a write ships whatever the
      * floppy's buffer last held, both planes living at $FFD6E00. */
-    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) != 0;
-    SD_MISC = SD_MISC | SD_MISC_BUFSEL_SDCARD;
+    sdhc_card = (SDCARD.status & SD_SDHC_MASK) != 0;
+    SDCARD.control |= SD_BUFFSEL_MASK;
     if (fat32_open_file_system() != FreezerOk) {
         return 1;
     }

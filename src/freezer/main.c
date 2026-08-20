@@ -822,15 +822,15 @@ int main(void) {
     make_colour_lookup();
 
     // assure we're viewing the sdcard's sector buffer (and not the floppy disk buffer)
-    uint8_t orig_sd_misc = SD_MISC;
-    SD_MISC = SD_MISC | SD_MISC_BUFSEL_SDCARD;
+    uint8_t orig_sd_control = SDCARD.control;
+    SDCARD.control |= SD_BUFFSEL_MASK;
 
     // Now find the start sector of the slot, and make a copy for safe keeping
     slot_number = 0;
     freeze_slot_start_sector = read_freeze_slot_start_sector(slot_number);
 
     // SD or SDHC card?
-    if (SD_STATUS & SD_STATUS_SDHC) {
+    if (SDCARD.status & SD_SDHC_MASK) {
         sdhc_card = 1;
     } else {
         sdhc_card = 0;
@@ -1070,7 +1070,7 @@ int main(void) {
                     }
                     // Doesn't seem to really help (probably needs to be done by the hypervisor
                     // unfreezing routine?)
-                    SD_MISC = orig_sd_misc;
+                    SDCARD.control = orig_sd_control;
 
                     // workaround for old freeze slots that have an empty chargen area
                     fix_chargen_area(ChargenFixMem | ChargenFixSlot);

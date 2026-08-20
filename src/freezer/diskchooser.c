@@ -244,7 +244,7 @@ uint8_t draw_directory_contents(uint8_t drive_id) {
     // d68a.6/7 -> d64 flag
     // d68b.6/7 -> d65 flag
     disk_type =
-        ((SDFDC_CONTROL >> (5 + drive_id)) & 0x2) | ((SDFDC_IMAGE_TYPE >> (6 + drive_id)) & 0x1);
+        ((SDFDC.flags >> (5 + drive_id)) & 0x2) | ((SDFDC.image_type >> (6 + drive_id)) & 0x1);
     switch (disk_type) {
         case DiskTypeD81:
             dir_track = 39;

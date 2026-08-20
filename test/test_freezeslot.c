@@ -68,7 +68,7 @@ int main(void) {
      * controller never reports the transfer complete. */
     POKE(0x00, CPU_PORT_DDR_ALL_OUTPUTS);
     POKE(0x01, CPU_PORT_KERNAL_AND_IO);
-    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) != 0;
+    sdhc_card = (SDCARD.status & SD_SDHC_MASK) != 0;
 
     request_freeze_region_list();
     freeze_slot_start_sector = read_freeze_slot_start_sector(0);

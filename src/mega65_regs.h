@@ -70,11 +70,6 @@ static inline uint16_t hw_div16_ceil(uint32_t a, uint32_t b) {
 // plain values above are constexpr so the compiler checks their type.
 #define REG8(addr) (*(volatile uint8_t*)(addr))
 
-// The VIC-III/IV conceals its registers until this knock is written to
-// VICIV.key ($D02F), in this order.
-constexpr uint8_t VIC4_KNOCK_1 = 0x47;
-constexpr uint8_t VIC4_KNOCK_2 = 0x53;
-
 // F011 floppy controller (45IO27).  See the MEGA65 user guide, "45IO27
 // Multi-Function I/O Controller".
 #define F011_CONTROL REG8(0xD080) // motor and drive select
@@ -101,52 +96,13 @@ constexpr uint32_t M65_MODEL_ID = 0xffd3629; // UARTMISC:M65MODEL, the board rev
 constexpr uint32_t RTC_SECONDS = 0xffd7110;  // RTC:RTCSEC; minutes, hours, day,
                                              // month and year follow in order
 
-// DMAgic.  Writing DMA_ENABLE is what starts the job, so it goes last; the
-// other three only say where the list is.
-#define DMA_ADDR_MSB REG8(0xD701)
-#define DMA_ADDR_BANK REG8(0xD702)
-#define DMA_ADDR_MB REG8(0xD704)
-#define DMA_ENABLE REG8(0xD705)
-
-// SD controller.  SD:CMDANDSTAT takes a command when written and reports
-// status when read; bit and command names from mega65-core's iomap.txt and the
-// $D680 write decode in sdcardio.vhdl.
-#define SD_COMMAND REG8(0xD680)
-#define SD_STATUS REG8(0xD680) // same register; reads status
-
-constexpr uint8_t SD_STATUS_SDIO_BUSY = 0b00000001;
-constexpr uint8_t SD_STATUS_CARD_BUSY = 0b00000010;
-constexpr uint8_t SD_STATUS_BUSY = 0b00000011; // either engine still working
-constexpr uint8_t SD_STATUS_SDHC = 0b00010000;
-constexpr uint8_t SD_STATUS_ERROR = 0b01000000; // bit 6, where a BIT lands it in V
+// SD controller.  <mega65.h> names the registers, their bits and the commands
+// as SDCARD and SDFDC; only these two combinations are ours.
+constexpr uint8_t SD_STATUS_BUSY = SD_SDIO_BUSY_MASK | SD_CARD_BUSY_MASK;
 /* Busy, still in reset, or in error -- all of which must be clear before a
  * command's result means anything. */
-constexpr uint8_t SD_STATUS_UNSETTLED = 0b01100111;
-
-constexpr uint8_t SD_CMD_RESET_BEGIN = 0x00;
-constexpr uint8_t SD_CMD_RESET_END = 0x01;
-constexpr uint8_t SD_CMD_READ = 0x02;
-constexpr uint8_t SD_CMD_WRITE = 0x03;
-constexpr uint8_t SD_CMD_WRITE_MULTI_FIRST = 0x04;
-constexpr uint8_t SD_CMD_WRITE_MULTI_NEXT = 0x05;
-constexpr uint8_t SD_CMD_WRITE_MULTI_LAST = 0x06;
-constexpr uint8_t SD_CMD_SDHC_MODE = 0x41;
-constexpr uint8_t SD_CMD_WRITE_GATE = 0x57; // opens a window of about 1ms
-
-// SD:SDSECTOR0-3, low byte first.  Four independent latches, sampled only when
-// a command is written (mega65-core, src/vhdl/sdcardio.vhdl), so the order
-// they are set in does not matter.
-#define SD_SECTOR_ADDR(byte) REG8(0xD681 + (byte))
-
-// $D689 carries several unrelated signals; only the buffer select is used
-// here.  SD:BUFSEL, 1 = the SD card's sector buffer, 0 = the F011/FDC's.
-#define SD_MISC REG8(0xD689)
-constexpr uint8_t SD_MISC_BUFSEL_SDCARD = 0x80;
-
-// F011 disk-image type and control.  Bit 6 is drive 0 and bit 7 drive 1 in
-// both, so the code shifts by the drive id.
-#define SDFDC_IMAGE_TYPE REG8(0xD68A) // SDFDC:D0D64 / D1D64, set for D64
-#define SDFDC_CONTROL REG8(0xD68B)    // SDFDC:D0MD / D1MD, set for D65
+constexpr uint8_t SD_STATUS_UNSETTLED =
+    SD_STATUS_BUSY | SD_RESET_MASK | SD_FSM_ERROR_MASK | SD_ERROR_MASK;
 
 // AUDIOMIX:REGSEL selects a mixer coefficient, which is then read or written
 // through AUDIOMIX:REGWDATA.

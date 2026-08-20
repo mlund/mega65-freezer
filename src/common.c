@@ -147,7 +147,7 @@ void freezer_tool_start(void) {
 
     set_palette();
 
-    sdhc_card = (SD_STATUS & SD_STATUS_SDHC) != 0;
+    sdhc_card = (SDCARD.status & SD_SDHC_MASK) != 0;
 }
 
 static char default_error[] = "ERROR CODE XX";
