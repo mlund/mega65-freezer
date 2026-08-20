@@ -118,7 +118,7 @@ constexpr uint8_t SD_STATUS_SDIO_BUSY = 0b00000001;
 constexpr uint8_t SD_STATUS_CARD_BUSY = 0b00000010;
 constexpr uint8_t SD_STATUS_BUSY = 0b00000011; // either engine still working
 constexpr uint8_t SD_STATUS_SDHC = 0b00010000;
-constexpr uint8_t SD_STATUS_ERROR = 0b01000000; // reported in bit 6 so V can test it
+constexpr uint8_t SD_STATUS_ERROR = 0b01000000; // bit 6, where a BIT lands it in V
 /* Busy, still in reset, or in error -- all of which must be clear before a
  * command's result means anything. */
 constexpr uint8_t SD_STATUS_UNSETTLED = 0b01100111;
@@ -133,8 +133,9 @@ constexpr uint8_t SD_CMD_WRITE_MULTI_LAST = 0x06;
 constexpr uint8_t SD_CMD_SDHC_MODE = 0x41;
 constexpr uint8_t SD_CMD_WRITE_GATE = 0x57; // opens a window of about 1ms
 
-// SD:SDSECTOR0-3, low byte first.  Written a byte at a time rather than as one
-// 32-bit store, so the order the controller sees is the order written here.
+// SD:SDSECTOR0-3, low byte first.  Four independent latches, sampled only when
+// a command is written (mega65-core, src/vhdl/sdcardio.vhdl), so the order
+// they are set in does not matter.
 #define SD_SECTOR_ADDR(byte) REG8(0xD681 + (byte))
 
 // $D689 carries several unrelated signals; only the buffer select is used

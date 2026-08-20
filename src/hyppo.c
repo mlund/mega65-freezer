@@ -7,8 +7,11 @@
 
 #include "helper.h"
 
-/* Only drive 0 and drive 1 exist; bit 6 asks for no drive at all, and bit 7
- * turns an attach into a detach. */
+/* The flag byte dos_attach takes: bit 0 picks the drive, bit 1 asks for both
+ * at once, bit 6 leaves the real floppy drive disconnected, and bit 7 makes a
+ * detach of it (mega65-core, src/hyppo/dos.asm, dos_attach).  Detaching keeps
+ * bits 0 and 6 only: the tools detach one named drive, so letting bit 1 pass
+ * would turn that into both. */
 constexpr uint8_t DRIVE_MASK = 0x01;
 constexpr uint8_t DETACH_DRIVE_MASK = 0x41;
 constexpr uint8_t DETACH_FLAG = 0x80;
