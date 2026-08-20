@@ -101,25 +101,7 @@ cmake -B build-trace -DFREEZER_TRACE=ON ...
 
 ### Size
 
-Against the binaries on the MEGA65 R3 SD card (release 0.97), both columns
-counted whole, as the files are shipped:
-
-| tool       |    R3 |  llvm |    % |
-|------------|------:|------:|-----:|
-| `AUDIOMIX` | 23163 |  8268 |  -64 |
-| `MAKEDISK` | 22309 |  9981 |  -55 |
-| `MEGAINFO` | 21968 | 10356 |  -53 |
-| `SPRITED`  | 31018 | 15292 |  -51 |
-| `ROMLOAD`  | 17380 |  8741 |  -50 |
-| `FREEZER`  | 24702 | 16911 |  -32 |
-| `MONITOR`  | 18228 | 23313 | +28* |
-
-`*MONITOR` is no longer the same program, so its figure measures something the
-others do not: 45GS02 disassembler and assembler; the bit editor that names
-registers and their bits, the memory map of the frozen machine, and the copy,
-fill, compare, hunt and pixel commands have no counterpart in the original to be
-measured against. Doing only what that original did, it was 9353 bytes -- 49%
-less.
+Against the cc65 generated 0.97 binaries we get a 30-65% reduction in byte count for the same functionality. This extra space can be used to add new features.
 
 ### New features
 
@@ -149,60 +131,7 @@ less.
 
   <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
   
-- `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue with `D`
-  and attach a disk image from it to the frozen machine's drive. The catalogue
-  is the fixed-width `catalog` file that `docs/FILEHOST.md` §2 of the ether65
-  repository defines; that repository is not public yet, so
-  [`docs/TFTP-SERVER.md`](docs/TFTP-SERVER.md) here states the parts of the
-  format a server has to honour. It is
-  fetched over TFTP at start-up — a lease, the server's hardware address and the
-  transfer — with the card's `CATALOG.M65` as the fallback when the wire has
-  nothing to say, into the same buffer, so a fetch that fails costs the list on
-  screen and not the copy on the card. `F` fetches it again, and `RUN/STOP`
-  gives up on a fetch that is getting nowhere. Each row carries the title,
-  author, category and year; `S` cycles the order through those last two and
-  back, and `/` narrows the list to titles containing what you type, the count
-  saying how many of how many. Attaching an image the
-  card has not got fetches that too, onto the card under the 8.3 name derived
-  from its catalogue path, with a counter on the status line: the file has to be
-  contiguous, because a mounted image is read by counting sectors from a base.
-  An image the card already holds offers `A` to attach it or `R` to fetch it
-  again over the top — the repair for a transfer that stopped part way, which
-  leaves a file of the right length holding a stale tail that hyppo will mount.
-  A program goes somewhere else entirely: a `.prg` needs no file on the card,
-  so it is fetched whole into a buffer and then written straight into the frozen
-  machine's memory, with BASIC's end-of-program pointer set behind it. Its load
-  address says which BASIC it came from — `$0801` is C64, `$2001` is MEGA65 —
-  and one saved from the other mode is refused rather than loaded somewhere it
-  cannot run. It is not started: the frozen program counter is wherever the
-  machine was, so the tool says `LOADED -- RESUME AND TYPE RUN` and leaves that
-  to the user.
-  `T` names the server, since a household router hands out addresses and has
-  never heard of RFC 5859's option 150; `TFTP-IP.TXT` on the card says it
-  without typing. [`docs/TFTP-SERVER.md`](docs/TFTP-SERVER.md) is the other end:
-  running the server the machine fetches from.
-  The layers under it are: the 45E100 driver, ARP with a responder, IPv4, UDP
-  and a DHCP client, each checked on the host against its RFC and on hardware,
-  where the controller turns out to send and receive perfectly well from inside
-  the freezer, the machine takes a real lease from the router, and it answers
-  when something on the LAN asks who holds that address. The DHCP client owns
-  the whole exchange — a frame goes in, a frame comes out, and the ports and
-  broadcast addresses RFC 2131 fixes never reach a caller — so the sequencing
-  is checked on the host too, not only the message formats. The TFTP client is
-  the same shape, and owns rather more: the port the server moves a transfer
-  to, which block is new and which the server saying it again, and asking how
-  big the file is before its first block is written down. `E` runs an
-  ethernet probe and `R` listens without transmitting. `test/ethtest.c` is how
-  the wire is seen at all — Xemu has no ethernet on macOS, so it runs on the
-  machine under `etherload` and writes what arrived to a sector the host reads
-  back. It now takes a lease, resolves the TFTP server the lease named — or the
-  router in front of it — and fetches `catalog`, logging the block count, the
-  byte count, a sum to compare against the file on the server, and the first
-  sixteen bytes, which are the catalogue's own magic if the right file came
-  back. An image is named on the card by five characters of its
-  catalogue path and three of a hash of the whole path: the writer here emits
-  8.3 short names only, and truncation alone would land two catalogue entries on
-  one file.
+- `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue using TFTP. Currently requires a TFTP gateway since the gateway is HTTPS only.
 - `MAKEDISK`: the border reports while the card is busy.
 - SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
   a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a

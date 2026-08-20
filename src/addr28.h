@@ -14,8 +14,8 @@
  * host `long` is 64 bits, and an address that overflows 28 or 32 bits there
  * quietly does not, so a test would pass on arithmetic the machine gets wrong.
  *
- * Alone in a header of its own so that a module with no hardware in it can name
- * the type and still compile for the host: dma.h reaches <peekpoke.h>. */
+ * Alone in a header so a module with no hardware can use it host side.
+ */
 typedef int32_t Addr28;
 
 /* The point of the spelling above, stated where it will be checked.  A host

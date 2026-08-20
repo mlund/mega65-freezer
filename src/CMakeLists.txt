@@ -209,7 +209,7 @@ target_include_directories(MONITOR PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/monitor)
 add_m65(MAKEDISK makedisk/main.c fat32.c layout.c)
 add_m65(ROMLOAD  romload/main.c romload/chooser.c)
 add_m65(SPRITED  sprited/main.c sprited/editor.c sprited/textout.c lineedit.c)
-add_m65(MEGAINFO megainfo/main.c megainfo/info.c)
+add_m65(MEGAINFO megainfo/main.c megainfo/info.c layout.c)
 add_m65(FILEHOST filehost/main.c filehost/catalog.c filehost/shortname.c
                  filehost/eth.c filehost/arp.c filehost/ip.c filehost/dhcp.c
                  filehost/netpoll.c filehost/tftp.c filehost/fetch.c filehost/view.c filehost/prgload.c
