@@ -87,6 +87,14 @@ char* append_dec(char* at, uint16_t value) {
      * whole for this one caller; four subtractions against a table of powers
      * are a handful of instructions and no call.  Slower per digit, which
      * costs nothing: numbers are formatted to be looked at. */
+    /* Pinned out of zero page.  A `static const` table is free to land in
+     * .zp.data, which costs twice: a start-up copy, and eight bytes the
+     * register allocator cannot have -- and it is short of them.  Guarded
+     * because this file is built for the host too, where a bare section name
+     * is not what Mach-O wants. */
+#if defined(__mos__)
+    __attribute__((section(".rodata")))
+#endif
     static const uint16_t POWER[] = {10000, 1000, 100, 10};
     bool any = false;
     for (uint8_t i = 0; i < sizeof POWER / sizeof *POWER; i++) {
