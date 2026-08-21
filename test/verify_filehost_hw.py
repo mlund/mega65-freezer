@@ -68,11 +68,14 @@ def say_counters(machine: h.Machine) -> None:
     """
     try:
         at = machine.address("fetch_counters")
-    except h.Failure:
-        # A shipping build has none: they cost 185 bytes for something only
-        # this reads.  Said out loud rather than skipped in silence, so a run
-        # that reported no transport numbers does not read like one that
-        # measured them and found nothing.
+    except (h.Failure, KeyError):
+        # KeyError as well as Failure: a name absent from the symbol table
+        # comes back from elf.symbol() as the one, not the other, and a
+        # shipping build has no counters by design -- so catching only the
+        # harness's own exception turned the ordinary case into a crash.
+        # Said out loud rather than skipped in silence, so a run that reported
+        # no transport numbers does not read like one that measured them and
+        # found nothing.
         print("transport counters: absent -- build with -DETH_COUNTERS=ON for them")
         return
     dropped, resent, stalls, heard, moved, frames, first = struct.unpack(
