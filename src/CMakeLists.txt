@@ -284,6 +284,29 @@ if(LINK_LIBC)
         ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
     set_target_properties(test_freezeslot PROPERTIES OUTPUT_NAME test_freezeslot.prg)
 
+    # What the HTTP transport does on a real wire, with no browser in the way.
+    # A plain PRG so etherload can push it and run it: measuring through
+    # FILEHOST measures its screen and its card writes too, and a serial
+    # monitor watching the status line halts the CPU at instruction boundaries
+    # and slows the very transfer being timed.
+    #
+    # Its own ETH_COUNTERS, since the numbers are the whole point of it and a
+    # shipping FILEHOST does not carry them.  Not a CTest entry: there is no
+    # ethernet under Xemu, so this is run by hand against hardware.
+    add_executable(httpbench ${CMAKE_SOURCE_DIR}/test/httpbench.c
+        filehost/eth.c filehost/arp.c filehost/ip.c filehost/dhcp.c filehost/netpoll.c
+        filehost/tcp.c filehost/http.c filehost/jsoncat.c filehost/fetch.c
+        filehost/catalog.c ${COMMON})
+    add_dependencies(httpbench version_stamp)
+    target_compile_options(httpbench PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
+    target_compile_definitions(httpbench PRIVATE SCREEN_CELL_BYTES=2 ETH_COUNTERS)
+    target_include_directories(httpbench PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/filehost)
+    target_link_libraries(httpbench mega65libc mega65sdk)
+    target_link_options(httpbench PRIVATE -mlto-zp=16
+        ${CMAKE_CURRENT_SOURCE_DIR}/lowmem.ld
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
+    set_target_properties(httpbench PROPERTIES OUTPUT_NAME httpbench.prg)
+
 
     # What a multi-sector write costs against one at a time.  Also run by hand
     # against hardware -- the card routines' CMD25 calls have never executed.
