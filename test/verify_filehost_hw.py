@@ -49,7 +49,7 @@ FETCH_TIMEOUT = 45.0
 # What fetch_catalog() can leave on the status line, from main.c's table.
 DONE = ("FETCHED", "NO ADDRESS", "NO PROXY", "DID NOT ANSWER", "REFUSED",
         "STOPPED PART WAY", "MORE THAN THERE IS ROOM FOR", "NOT A CATALOGUE",
-        "CATALOGUE CAME CUT SHORT", "THE CATALOGUE IS EMPTY", "CARD WOULD NOT TAKE IT")
+        "CATALOGUE CUT SHORT", "THE CATALOGUE IS EMPTY", "CARD WOULD NOT TAKE IT")
 
 # struct FetchCounters in src/filehost/fetch.h, field for field.  Add one there
 # and this must change with it: a format string that has drifted still unpacks,

@@ -5,6 +5,8 @@
 
 #include "format.h"
 
+#include <stdbool.h>
+
 /* The low nibble as one hex digit, in screen codes rather than ASCII: the
  * digits sit at $30 as usual, but A-F are $01-$06. */
 uint8_t nybl_to_screen(uint8_t v) {
@@ -80,15 +82,26 @@ char* append_hex(char* at, int32_t value, uint8_t columns) {
 }
 
 char* append_dec(char* at, uint16_t value) {
-    char digits[DECIMAL_COLUMNS];
-    uint8_t n = 0;
-    do {
-        digits[n++] = (char)('0' + value % 10);
-        value /= 10;
-    } while (value);
-    while (n) {
-        *at++ = digits[--n];
+    /* Taken from the top by subtraction rather than divided down from the
+     * bottom.  A general 16-bit divide is a library routine of its own, linked
+     * whole for this one caller; four subtractions against a table of powers
+     * are a handful of instructions and no call.  Slower per digit, which
+     * costs nothing: numbers are formatted to be looked at. */
+    static const uint16_t POWER[] = {10000, 1000, 100, 10};
+    bool any = false;
+    for (uint8_t i = 0; i < sizeof POWER / sizeof *POWER; i++) {
+        uint8_t digit = 0;
+        while (value >= POWER[i]) {
+            value = (uint16_t)(value - POWER[i]);
+            digit++;
+        }
+        /* Leading zeros are not digits, but a zero after the first one is. */
+        if (digit || any) {
+            *at++ = (char)('0' + digit);
+            any = true;
+        }
     }
+    *at++ = (char)('0' + value);
     return at;
 }
 

@@ -33,6 +33,12 @@
 #include <mega65.h>
 #include <string.h>
 
+/* Said by more than one thing that noticed the same trouble.  A message
+ * spelled twice is stored twice: the linker merges strings that match, and two
+ * wordings of one idea never do. */
+#define CUT_SHORT "CATALOGUE CUT SHORT, SHOWING IT"
+#define NO_ROOM "THE CARD WOULD NOT TAKE IT"
+
 /* The catalogue as it sits on the card.  A payload rather than a program, which
  * is the convention IOMAP.M65 and M65THUMB.M65 already follow. */
 #define CATALOG_FILE "CATALOG.M65"
@@ -364,7 +370,7 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
         "", /* refused: the code is named below instead */
         "THE TRANSFER STOPPED PART WAY",
         "MORE THAN THERE IS ROOM FOR",
-        "THE CARD WOULD NOT TAKE IT",
+        NO_ROOM,
         "THE FETCH WAS STOPPED",
     };
     static_assert(sizeof why / sizeof *why == FetchStopped + 1,
@@ -1042,7 +1048,7 @@ static void clear_buffer(void) {
      * the warning is the whole of what the caller needs to know about it. */
     if (header.record_count > fits) {
         header.record_count = fits;
-        show_status(SchemeWarning, "CATALOGUE CUT SHORT, SHOWING IT");
+        show_status(SchemeWarning, CUT_SHORT);
     }
     if (!header.record_count) {
         show_status(SchemeWarning, "THE CATALOGUE IS EMPTY");
@@ -1208,14 +1214,14 @@ static void fetch_catalog(void) {
      * its length -- the endpoint states none -- so only the shape of the JSON
      * says so, and half a list is not worth keeping over a whole one. */
     if (!whole) {
-        show_status(SchemeWarning, "THE CATALOGUE CAME CUT SHORT, SHOWING IT");
+        show_status(SchemeWarning, CUT_SHORT);
         return;
     }
     /* Once, into a variable: written twice in one expression this would write
      * the card twice. */
     const bool kept = save_catalog(catalog_at);
     show_status(kept ? SchemeHighlight : SchemeWarning,
-        kept ? "FETCHED AND KEPT ON THE CARD" : "FETCHED, BUT THE CARD WOULD NOT TAKE IT");
+        kept ? "FETCHED AND KEPT ON THE CARD" : NO_ROOM);
 }
 
 /* The browser itself: draws the list and answers keys until RUN/STOP. */
