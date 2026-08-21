@@ -168,7 +168,7 @@ add_link_options(-mlto-zp=${LTO_ZP} -Wl,--gc-sections)
 set(COMMON
     slot.c slotmap.c dma.c screen.c format.c screencode.c
     sdcard.c common.c hyppo.c
-    helper.S version.c
+    helper.S flatmem.S version.c
 )
 
 function(add_m65 name)
@@ -259,7 +259,7 @@ endforeach()
 # $080D trampoline.  mega65-libc supplies assert_eq/xemu_exit/debug_msg, so the
 # tests only build when it is linked.
 if(LINK_LIBC)
-    add_executable(test_dma ${CMAKE_SOURCE_DIR}/test/test_dma.c dma.c)
+    add_executable(test_dma ${CMAKE_SOURCE_DIR}/test/test_dma.c dma.c flatmem.S)
     target_compile_options(test_dma PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_link_libraries(test_dma mega65libc mega65sdk)
     set_target_properties(test_dma PROPERTIES OUTPUT_NAME test_dma.prg)

@@ -12,7 +12,7 @@
 
 #include "helper.h"
 
-	.zeropage __rc2, __rc3, __rc4, __rc5
+	.include "imag.inc"
 
 	.section .zp.bss.hptr,"az",@nobits
 ;; Indirect addressing needs a zero-page pointer, and the argument registers do
