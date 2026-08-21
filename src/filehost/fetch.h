@@ -106,6 +106,7 @@ void fetch_progress(uint32_t so_far, uint32_t total, bool last, bool waiting);
  * eight. */
 [[nodiscard]] uint16_t fetch_status(void);
 
+#ifdef ETH_COUNTERS
 /* What the transport had to cope with, for the benchmark that decides whether
  * receiving strictly in order is good enough.
  *
@@ -138,3 +139,4 @@ struct FetchCounters {
  * it, so LTO is right to delete it and the hardware test then finds no
  * symbol. */
 extern struct FetchCounters fetch_counters;
+#endif

@@ -143,6 +143,7 @@ void http_start(struct HttpClient* client,
     return tcp_heard(&client->tcp);
 }
 
+#ifdef ETH_COUNTERS
 /* How the transport fared underneath, for a caller reporting on the wire
  * rather than on the reply.  Forwarded rather than reached for: `struct
  * TcpClient` is this module's own, and a caller that read its fields could not
@@ -154,6 +155,8 @@ void http_start(struct HttpClient* client,
 [[nodiscard]] static inline uint16_t http_retransmits(const struct HttpClient* client) {
     return client->tcp.retransmits;
 }
+
+#endif
 
 /* Whether the whole body arrived: all of Content-Length where the server
  * stated one, and everything up to the close where it did not. */

@@ -59,9 +59,14 @@ if(HOST_C_COMPILER AND HOST_CXX_COMPILER AND DOCTEST_INCLUDE_DIR)
     # -Wno-char-subscripts because `char` is unsigned on llvm-mos and may be
     # signed here: a char subscript cannot go negative on the target, so the
     # warning is about the host rather than about this code.
-    set(HOST_CFLAGS -std=c2x -O1 -Wall -Wextra -Werror -Wno-char-subscripts
+    # The transport's counters are gated off in a shipping build, where they
+    # cost 185 bytes for something only a hardware benchmark reads.  Here they
+    # are always on: several tests assert on the drop count because it is the
+    # only outward sign of a segment having been dropped, and nothing on the
+    # host is short of room.
+    set(HOST_CFLAGS -std=c2x -O1 -Wall -Wextra -Werror -Wno-char-subscripts -DETH_COUNTERS
         ${HOST_INCLUDES})
-    set(HOST_CXXFLAGS -std=c++20 -O1 -Wall -Wextra -Werror
+    set(HOST_CXXFLAGS -std=c++20 -O1 -Wall -Wextra -Werror -DETH_COUNTERS
         -I${DOCTEST_INCLUDE_DIR} -I${CMAKE_CURRENT_SOURCE_DIR} ${HOST_INCLUDES})
 
     # Every header the tests reach through, so editing one rebuilds them.  A

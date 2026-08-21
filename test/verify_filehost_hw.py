@@ -69,7 +69,12 @@ def say_counters(machine: h.Machine) -> None:
     try:
         at = machine.address("fetch_counters")
     except h.Failure:
-        return  # no symbol table given, so no counters; the screen still said
+        # A shipping build has none: they cost 185 bytes for something only
+        # this reads.  Said out loud rather than skipped in silence, so a run
+        # that reported no transport numbers does not read like one that
+        # measured them and found nothing.
+        print("transport counters: absent -- build with -DETH_COUNTERS=ON for them")
+        return
     dropped, resent, stalls, heard, moved, frames, first = struct.unpack(
         COUNTERS, machine.read(at, struct.calcsize(COUNTERS)))
     seconds = frames / FRAMES_PER_SECOND

@@ -198,7 +198,9 @@ static bool take(struct TcpClient* client, const uint8_t* in, uint16_t in_length
              * stream is thrown away and the server asked again by the
              * acknowledgement below.  Counted because the count is what
              * decides whether reassembly has to be written at all. */
+#ifdef ETH_COUNTERS
             client->dropped++;
+#endif
         }
     }
     /* A FIN takes one sequence number of its own, after whatever it carried,
@@ -262,10 +264,12 @@ uint16_t tcp_step(struct TcpClient* client, const uint8_t* in, uint16_t in_lengt
     if (!in_length) {
         /* The first tick is what puts the SYN on the wire; every one after it
          * says something again, which is what the counter is for. */
+#ifdef ETH_COUNTERS
         if (client->spoke) {
             client->retransmits++;
         }
         client->spoke = true;
+#endif
         return say(client, out);
     }
     if (!take(client, in, in_length)) {
@@ -274,6 +278,8 @@ uint16_t tcp_step(struct TcpClient* client, const uint8_t* in, uint16_t in_lengt
     if (client->stage >= TcpDone) {
         return 0;
     }
+#ifdef ETH_COUNTERS
     client->spoke = true;
+#endif
     return say(client, out);
 }
