@@ -27,8 +27,7 @@ void sdcard_open(void);
  *
  * False means the write did not take: the card never went idle, or ten
  * attempts failed to verify.  Worth acting on -- a caller that carries on
- * writes a file that is wrong, and the wait behind this used to hang for ever
- * rather than say so.
+ * writes a file that is wrong.
  *
  * `is_multi` opens a CMD25 stream, and has no correct caller: this verifies by
  * reading, which a stream cannot survive.  Use sdcard_writefirstsector(). */

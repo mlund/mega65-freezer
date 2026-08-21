@@ -9,18 +9,14 @@
 #include <stdint.h>
 
 /* Fetching one file over HTTP: the request, the reply's headers, and where its
- * body begins.
+ * body begins.  TCP stays behind it -- a caller names a path and is handed
+ * bytes, never a sequence number or a window -- and a whole frame in, a whole
+ * frame out, so this compiles for the host and is tested there.
  *
- * This is the module.  TCP is how it is built and stays behind it -- a caller
- * names a path and is handed bytes, and never sees a sequence number, a
- * handshake or a window.  A whole frame goes in and a whole frame comes out,
- * so all of it compiles for the host and is tested there.
- *
- * Deliberately not a general HTTP client.  The proxy this speaks to accepts
- * HTTP/1.0, answers with `Connection: close`, and never uses chunked transfer
- * encoding -- measured, not assumed -- so there is no chunk decoder, no
- * keep-alive and no redirect following here.  A reply that needs any of them
- * fails rather than being half understood. */
+ * Deliberately not a general client.  The proxy accepts HTTP/1.0, answers
+ * `Connection: close` and never chunks -- measured, not assumed -- so there is
+ * no chunk decoder, keep-alive or redirect following.  A reply needing any of
+ * them fails rather than being half understood. */
 
 /* The longest path that can be asked for, which is the catalogue's own path
  * field (ether65 docs/FILEHOST.md section 2): a client asks for the catalogue
@@ -76,20 +72,15 @@ enum HttpStage : uint8_t {
 
 /* The fetch in progress.
  *
- * `data_at` and `data_length` describe the body bytes the last step delivered,
- * in the same buffer that step was given.  The body is never copied: it stays
- * where it arrived, and the caller takes it from there.  `data_at` is a field
- * and not a constant because an HTTP body does not begin at a fixed offset --
- * the headers before it are whatever length the server made them, and they may
- * end part way through a segment.
+ * `data_at` and `data_length` point into the buffer the last step was given;
+ * the body is never copied.  `data_at` is a field because a body has no fixed
+ * offset -- the headers are whatever length the server made them.
  *
- * `status` is sixteen bits because three digits do not fit in eight.  It is
- * set as soon as the status line is read, so it is worth showing even on a
- * failure -- particularly then, 404 and 503 being different things to do about.
+ * `status` is sixteen bits because three digits do not fit in eight, and is
+ * set as soon as the status line is read, so it is worth showing on failure.
  *
- * `length` is what the server said the body is, and `has_length` whether it
- * said at all: a file gives Content-Length and the catalogue endpoint does
- * not, so both happen.  `received` counts the body bytes handed over so far. */
+ * `has_length` because a file gives Content-Length and the catalogue endpoint
+ * does not.  `received` counts body bytes handed over. */
 struct HttpClient {
     struct TcpClient tcp;
     uint32_t length;
@@ -106,18 +97,13 @@ struct HttpClient {
 
 /* Begins a GET of `path` from `server`, naming `host` in the request.
  *
- * `path` and `host` are read here and not kept: the request they make is
- * assembled once, into the client itself, because TCP re-reads it on every
- * retransmission and so needs bytes that stay put.  A caller is therefore free
- * to reuse whatever it built them in.
+ * `path` and `host` are read here and not kept -- the request is assembled
+ * once into the client, TCP re-reading it on every retransmission -- so a
+ * caller may reuse whatever it built them in.
  *
- * `server->port` names the port -- 80 is HTTP's, but a proxy on a port above
- * 1024 needs no root to run, so the caller says.  `seed` moves this
- * connection's port and sequence numbers off the last one's; any value the
- * caller has that changes will do.
- *
- * A path or host too long, a port of zero, or a machine with no address of its
- * own leaves the client failed with nothing to send. */
+ * `server->port` names the port, 80 being HTTP's.  `seed` moves this
+ * connection's port and sequence numbers off the last one's.  Too long a path
+ * or host, a zero port, or no address of our own fails with nothing to send. */
 void http_start(struct HttpClient* client,
     const struct NetEndpoint* us,
     const struct NetEndpoint* server,

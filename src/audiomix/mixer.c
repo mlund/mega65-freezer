@@ -1,3 +1,6 @@
+/* The audio mixer's screen and its keys: the coefficient matrix as the frozen
+   machine left it, and the writes that change it. */
+
 #include "colours.h"
 #include "common.h"
 #include "dma.h"
@@ -230,21 +233,11 @@ static uint16_t read_coefficient_pair(uint8_t c) {
 }
 
 void set_amplifier(unsigned char left_right, uint16_t coefficient) {
-    /*
-      Map 16-bit unsigned volume level to amplifier level.
-      This is not super simple, as amplifier value $00 = +24dB,
-      which is not a good idea to go that high.
-      $20 is safe enough on the MEGA65 R3, but $28 is about the
-      limit on the MEGAphone without causing power rail sagging
-      on maximum volume.  $28 should thus not be in the "red"
-      zone of the mixer.
-
-      $FF is effectively mute on the amplifier.
-
-      So $0000 = $FF and $FFFF = $20
-      So a linear mapping between those should be fine.
-
-    */
+    /* Volume level to amplifier level, linearly: $0000 -> $FF, $FFFF -> $20.
+     *
+     * Not the obvious range, because $00 is +24dB.  $20 is safe on the R3 and
+     * $28 about the MEGAphone's limit before the power rail sags at full
+     * volume, so $28 should not be in the mixer's red zone.  $FF is mute. */
 
     // This does not work, disabled!
 

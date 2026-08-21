@@ -10,19 +10,16 @@
 #include <stdint.h>
 
 /* One outbound TCP connection: enough of RFC 793 to ask a web server a
- * question and read the answer, and no more.  No listen, no second
- * connection, no scheduler, no TIME_WAIT.
+ * question and read the answer.  No listen, no second connection, no
+ * scheduler, no TIME_WAIT.
  *
- * http.h is the module; this is how it is built, and it is a header rather
- * than a static block only so its own tests can drive it.  Nothing but http.c
- * includes it -- a public TCP interface with one user would be a seam invented
- * for a caller that does not exist.
+ * http.h is the module; this is how it is built, and is a header rather than a
+ * static block only so its own tests can drive it.  Nothing but http.c
+ * includes it.
  *
- * A whole frame goes in and a whole frame comes out, so this compiles for the
- * host and the sequencing is tested there.  That matters more
- * here than for TFTP: sequence arithmetic is wrong only in the cases nobody
- * arranges by hand -- a wrap, an option nobody expected, a segment arriving
- * twice. */
+ * A whole frame in, a whole frame out, so the sequencing is tested on the
+ * host -- sequence arithmetic goes wrong only in the cases nobody arranges by
+ * hand: a wrap, an unexpected option, a segment arriving twice. */
 
 constexpr uint8_t TCP_HEADER_BYTES = 20;
 /* Where a segment's payload sits when the header carries no options.  A header
@@ -73,21 +70,16 @@ enum TcpStage : uint8_t {
 
 /* The connection.
  *
- * `data_at` and `data_length` describe the payload the last step delivered,
- * in the same buffer that step was given -- never copied out of it.  Both
- * answer for the step just made and nothing else: read between steps they
- * still hold the previous answer.
+ * `data_at` and `data_length` point into the buffer the last step was given,
+ * never copied out of it, and answer for that step alone.
  *
- * `dropped` counts segments whose payload fell outside the window and was
- * thrown away.  It is the number that decides whether receiving strictly in
- * order is good enough or whether reassembly has to be written, so it is a
- * field rather than a debug counter.  `retransmits` counts the steps where a
- * clock tick made us say the same thing again.
+ * `dropped` counts segments whose payload fell outside the window.  It decides
+ * whether receiving strictly in order is enough or reassembly must be written,
+ * so it is a field rather than a debug counter.
  *
  * The sequence numbers are the connection: `send_unacked` is the oldest byte
- * of ours the server has not acknowledged and is where every segment we send
- * starts, `send_next` is one past everything we have to send, and
- * `receive_next` is the sequence number we expect from the server next. */
+ * unacknowledged and where every segment starts, `send_next` one past all we
+ * have to send, `receive_next` what we expect from the server. */
 struct TcpClient {
     struct NetEndpoint us;
     struct NetEndpoint server;
@@ -114,22 +106,16 @@ struct TcpClient {
 
 /* Opens a connection to `server` and asks it `request`.
  *
- * Two entry points and not three: the obvious shape has a tcp_write() beside
- * tcp_step(), but the only thing ever written is the request and it cannot go
- * until the handshake completes.  Handing the request over here and letting
- * this send it when the connection opens means the caller never sees the
- * handshake at all -- the three-way exchange, the retry, and the moment the
- * connection became writable all stay in here.
+ * Two entry points and not three: the only thing ever written is the request
+ * and it cannot go until the handshake completes, so taking it here keeps the
+ * three-way exchange and the retry out of the caller entirely.
  *
- * `request` is not copied.  It is re-read on every retransmission, so it must
+ * `request` is not copied -- it is re-read on every retransmission and must
  * outlive the connection.
  *
- * Our own port and the initial sequence number both come from `seed`, so that
- * a segment left over from a previous connection is not read as this one's;
- * any value the caller has that moves will do.  `server->port` must name a
- * port: TCP has no reserved one, and which port a request belongs at is the
- * protocol above's question.  Without it, or without an address of our own,
- * the connection is failed with nothing to send. */
+ * Our port and the initial sequence number both come from `seed`, so a segment
+ * left from a previous connection is not read as this one's; any moving value
+ * will do.  `server->port` must name a port, TCP reserving none. */
 void tcp_start(struct TcpClient* client,
     const struct NetEndpoint* us,
     const struct NetEndpoint* server,

@@ -35,20 +35,14 @@ enum FetchResult : uint8_t {
  * protocol is underneath. */
 constexpr uint8_t FETCH_SERVER_TEXT_BYTES = 56;
 
-/* The proxy to fetch from: the address to open a connection to, and the name
- * to ask it by.
+/* The proxy to fetch from: the address to connect to, and the name to ask it
+ * by.  Separate things, which cost a 404 to learn -- the public proxy is
+ * name-based virtual hosting, so a Host header carrying the address is
+ * answered by the wrong site, with a healthy connection and no file.  No
+ * resolver is needed; the address still comes from the card.
  *
- * The two are separate because they are separate things, which cost a 404 to
- * learn.  The public proxy is name-based virtual hosting, so a request whose
- * Host header carries the address rather than the name reaches the server and
- * is answered by the wrong site -- the connection, the handshake and the reply
- * are all perfectly healthy, and the file is simply not found.  Naming it here
- * needs no resolver: the address still comes from the card.
- *
- * `host` may be null, and then the address is used, which is right for a proxy
- * that answers for whatever it is asked.  `port` 0 means the protocol's own,
- * which is what a bare address means; a proxy put above 1024 needs no root to
- * run and is named with the port it was put on. */
+ * `host` null uses the address, right for a proxy answering whatever it is
+ * asked.  `port` 0 means the protocol's own. */
 void fetch_set_server(const uint8_t* ip, uint16_t port, const char* host);
 
 /* The proxy a fetch would go to, and through `port` the port it was named

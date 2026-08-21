@@ -1,18 +1,8 @@
 /*
-  Disk chooser for freeze menu.
+  Picking a disk image, drawn over the freeze menu and so in its screen mode.
 
-  It is displayed over the top of the normal freeze menu,
-  and so we use that screen mode.
-
-  We get our list of disknames and put them at $40000.
-  As we only care about their names, and file names are
-  limited to 64 characters, we can fit ~1000.
-  In fact, we can only safely mount images with names <32
-  characters.
-
-  We return the disk image name or a NULL pointer if the
-  selection has failed and $FFFF if the user cancels selection
-  of a disk.
+  Names are collected at $40000, room for about a thousand at 64 characters
+  each -- though only those under 32 characters can be mounted safely.
 */
 
 #include "colours.h"

@@ -87,19 +87,16 @@ uint32_t sd_polls_after_write = 0;
 volatile uint32_t sd_slowest_sector = 0;
 uint32_t sd_slowest_polls = 0;
 
-/* And in frames, which is the only figure that answers "seconds".  Polls are
- * proportional to time but not convertible to it -- 562052 of them is a few
- * hundred milliseconds, not the five seconds a server waits -- so a pause worth
- * explaining has to be counted against the raster.
+/* And in frames, the only figure that answers "seconds": polls are
+ * proportional to time but not convertible to it, 562052 of them being a few
+ * hundred milliseconds rather than the five seconds a server waits.
  *
- * Sampled from inside the wait, because a caller cannot sample a call it is
- * blocked in: the raster's high bits step 1 -> 0 once a frame, and a wait that
- * spans several frames looks like one to anybody watching from outside.  Every
- * 4096 polls, which is finer than a frame and costs one test in four thousand.
+ * Sampled from inside the wait -- a caller cannot sample a call it is blocked
+ * in, and a wait spanning several frames looks like one from outside.  Every
+ * 4096 polls, finer than a frame at one test in four thousand.
  *
- * `worst` is the longest single wait, `total` every frame spent waiting.  If
- * the first is small and the second large, no one sector stalls and the cost is
- * spread; if neither is large, the seconds are not being spent here at all. */
+ * `worst` is the longest single wait, `total` every frame spent waiting: a
+ * small first and large second means the cost is spread, not stalling. */
 uint32_t sd_frames_worst = 0;
 uint32_t sd_frames_total = 0;
 
@@ -256,19 +253,13 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     SDCARD.command = SDCARD_RESET_END;
     SDCARD.sector_number = sector_address;
 
-    /* Read the sector first and write only if it differs.
-     *
-     * This looks like waste on a bulk write of fresh data -- a read and a
-     * 512-byte compare per sector that cannot match -- and it is not.  Measured
-     * on hardware, fetching an 800KB disk image over TFTP: 14.5 seconds as it
-     * stands, against 57.6 with the compare skipped, and that run did not
-     * finish.  Two reasons.  The compare exits at the first differing byte, so
-     * it costs almost nothing when it fails; and where it succeeds it saves a
-     * whole write, which is most sectors when a file is written over its own
-     * previous contents.  The loop also separates the read from the write, and
-     * the controller is timing-sensitive enough that removing it makes the
-     * read-back below fail and the write be retried.
-     */
+    /* Read the sector first and write only if it differs.  This looks like
+     * waste on a bulk write and is not: measured on hardware over an 800KB
+     * image, 14.5 seconds as it stands against 57.6 with the compare skipped,
+     * and that run did not finish.  The compare exits at the first differing
+     * byte so it costs almost nothing when it fails, and where it succeeds it
+     * saves a whole write.  It also separates the read from the write, which
+     * the controller is timing-sensitive enough to need. */
 
     DEBUG_COUNT(sd_reads);
     SDCARD.command = SDCARD_READ_SECTOR;
@@ -397,17 +388,14 @@ static constexpr uint8_t SD_READY_ROUNDS = 200;
 
 /* Opens a multi-block write and sends its first block.
  *
- * Separate from sdcard_writesector() because that one cannot serve: it reads
- * the sector back to verify, and sdcardio.vhdl shows what any other traffic
- * does to an open stream -- command $03 clears sd_write_multi outright, and a
- * read leaves the card part way through a CMD25 it will never be told to
- * finish.  Measured on hardware: the first block landed and every one after it
- * was lost.  It also short-circuits when the sector already holds the wanted
- * bytes, which would leave the stream unopened and the blocks after it
- * addressed at nothing.
+ * Separate from sdcard_writesector(), which cannot serve: it reads the sector
+ * back, and sdcardio.vhdl shows what other traffic does to an open stream --
+ * command $03 clears sd_write_multi outright.  Measured on hardware, the first
+ * block landed and every one after was lost.  It also short-circuits on an
+ * unchanged sector, leaving the stream unopened.
  *
- * So this verifies nothing.  The batch is read back once the stream is closed,
- * which is what mega65-tools' remotesd_eth.c does. */
+ * So this verifies nothing; the batch is read back once closed, as
+ * mega65-tools' remotesd_eth.c does. */
 bool sdcard_writefirstsector(const uint32_t sector_number) {
     const uint32_t sector_address = sdhc_card ? sector_number : sector_number * SD_SECTOR_SIZE;
     SDCARD.command = SDCARD_RESET_END;

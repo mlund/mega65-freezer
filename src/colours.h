@@ -2,30 +2,21 @@
 
 /* The seven tools' colours, named for what they mark rather than for a hue.
  *
- * Colour RAM holds a four-bit index, not a colour, and so do VICIV.bordercol
- * and VICIV.screencol.  Rewriting the sixteen palette entries therefore
- * repaints everything already on screen on the next frame, with nothing
- * redrawn -- which is what lets a scheme be switched while the tools run.
+ * Colour RAM and VICIV.bordercol hold a four-bit index, not a colour, so
+ * rewriting the sixteen palette entries repaints everything on screen the next
+ * frame with nothing redrawn -- which is what lets a scheme be switched while
+ * the tools run.  That holds only while every scheme puts a role on the same
+ * entry, so the mapping below is fixed and a scheme chooses only the colours.
+ * Roles are enum constants, so a themed call site costs what a bare index does.
  *
- * That only holds while every scheme puts a role on the same palette entry, so
- * the role-to-entry mapping below is fixed and a scheme chooses only the
- * sixteen colours those entries hold.  Roles are enum constants, so a themed
- * call site costs exactly what the bare index it carries costs.
+ * Safe because hyppo's freeze.asm restores all four palette banks and $D070,
+ * so the frozen program gets its own colours back on resume.
  *
- * Redefining the palette is safe because hyppo's freeze.asm saves and restores
- * all four palette banks and $D070, so the frozen program gets its own colours
- * back on resume.
- *
- * Two parts of the display show the frozen machine rather than our own menus,
- * and only one can be kept clear of a scheme.  The freezer's thumbnail stores
- * each pixel as three bits of red, three of green and two of blue, and reaches
- * the palette entries above the sixteen, so it is unaffected.  The sprite
- * editor's canvas cannot be: it draws palette indices taken from the frozen
- * VIC's own registers, against whatever palette is loaded, so it misreports a
- * sprite's colour under every scheme.  Only reading the frozen palette out of
- * the freeze slot fixes that.
+ * The sprite editor's canvas is the one thing a scheme breaks: it draws
+ * indices taken from the frozen VIC against whatever palette is loaded, so it
+ * misreports a sprite's colour.  Only reading the frozen palette fixes that.
+ * The freezer's thumbnail is unaffected, storing 3-3-2 RGB above the sixteen.
  */
-
 #include <stdint.h>
 
 /* $D100-$D300 take each channel with its nybbles swapped, so a scheme is

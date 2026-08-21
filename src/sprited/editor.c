@@ -1902,20 +1902,6 @@ static void main_loop(void) {
 
                 /* --------------------------- DRAWING TOOLS GROUP ----------------------- */
 
-                /*
-                case 111: // o = circle  tool
-                  SetDrawTool(DrawingToolCircle);
-                  g_state.redrawFlags = RedrawSidebarTools | RedrawToolPreview;
-
-                  SetRedrawFullCanvas();
-                  break;
-
-                case 79: // "O" = filled circle  tool
-                  SetDrawTool(DrawingToolFilledCircle);
-                  g_state.redrawFlags = RedrawSidebarTools | RedrawToolPreview;
-                  SetRedrawFullCanvas();
-                  break;
-                */
 
             case 112: // pixel=pixel tool
                 set_draw_tool(DrawingToolPixel);

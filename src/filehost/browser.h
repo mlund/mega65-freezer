@@ -8,16 +8,12 @@
 #include <stdint.h>
 
 /* The browser's layout, in one place: menu.cpp writes the headings at compile
- * time and main.c writes the values under them at run time, and a heading over
- * the wrong column is exactly the drift a shared constant prevents.
+ * time and main.c the values at run time, and a heading over the wrong column
+ * is the drift a shared constant prevents.
  *
- * Eighty columns, so a 40-character title and a 16-character author both fit
- * whole -- at 40 the title would be the only thing on the row.
- *
- * Each column is placed one cell past the end of the one before, and each field
- * runs to the start of the next, so the five tile the row: a highlighted
- * selection is then an unbroken bar rather than five lit runs with gaps
- * between them. */
+ * Eighty columns, so a 40-character title and a 16-character author both fit.
+ * Each column sits one cell past the last and each field runs to the next, so
+ * the five tile the row and a selection is an unbroken bar. */
 /* The longest category name, which is what the column has to hold: a heading
  * narrower than its values would be one that lies. */
 constexpr uint8_t CATALOG_CATEGORY_BYTES = 11;

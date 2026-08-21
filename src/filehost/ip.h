@@ -8,19 +8,16 @@
 #include <stdint.h>
 
 /* IPv4 and UDP: enough of RFC 791 and RFC 768 to carry DHCP, with the IPv4
- * half serving TCP beside it, and no more --
- * building a datagram, reading one, and the one question about an address that
- * has to be answered before either.
+ * half serving TCP beside it.
  *
- * Building and reading datagrams is separate from putting them on the wire
- * (eth.h), so this compiles for the host and is tested there.  That matters
- * more here than elsewhere: a wrong checksum is not an error anybody reports,
- * it is a datagram the far end discards in silence.
+ * Separate from putting them on the wire (eth.h), so this compiles for the
+ * host and is tested there -- which matters more here than elsewhere, a wrong
+ * checksum being not an error anybody reports but a datagram the far end
+ * discards in silence.
  *
- * No fragmentation, in either direction.  Nothing this sends approaches the
- * 1500-byte limit, so what it sends is marked don't-fragment; a fragment that
- * arrives is dropped rather than reassembled, since half a datagram treated as
- * a whole one is worse than a lost one. */
+ * No fragmentation either way: nothing sent approaches 1500 bytes, so it is
+ * marked don't-fragment, and an arriving fragment is dropped rather than
+ * reassembled. */
 
 constexpr uint8_t IPV4_HEADER_BYTES = 20;
 constexpr uint8_t UDP_HEADER_BYTES = 8;

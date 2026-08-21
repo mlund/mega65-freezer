@@ -5,16 +5,13 @@
 
 /* Whether a program may be put into the frozen machine, and where it goes.
  *
- * A .prg needs no file on the card at all: it is memory, and the frozen
- * machine's memory is what the freeze slot holds.  What has to be decided
- * first is all arithmetic and rules -- which BASIC the program was saved from,
- * whether that is the one the frozen machine is running, and which pointer has
- * to be told where the program ends -- so it is decided here, away from the
- * hardware, and tested on the host.
+ * A .prg needs no file on the card: it is memory, and the freeze slot holds
+ * the frozen machine's.  Which BASIC it was saved from, whether that is the
+ * one running, and which pointer learns where it ends are all arithmetic, so
+ * they are settled here, away from the hardware, and tested on the host.
  *
- * Nothing here writes anything.  A caller that gets PrgOk has a plan; a caller
- * that gets anything else has a reason to show and nothing to undo, which is
- * the point of settling all of it before the first byte is stored. */
+ * Nothing here writes.  PrgOk is a plan; anything else is a reason to show and
+ * nothing to undo, which is why it is all settled before the first byte. */
 
 /* Where each BASIC starts a program, which is also how a file says which one it
  * was saved from.  Not ours to choose: etherload, m65, matrix65 and Xemu all

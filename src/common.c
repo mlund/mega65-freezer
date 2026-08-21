@@ -158,58 +158,23 @@ bool hyppo_file_absent(uint8_t error) {
 }
 
 char* hyppoerror_to_screen(uint8_t error) {
-    // Few messages: each costs its full width in the image.
+    /* Few messages: each costs its full width in the image.  The rest fall
+     * through to the hex default -- 07 read timeout, 11 illegal value, 21 write
+     * error, 80 no such drive, 81 name too long, 82 not implemented, 83 file
+     * too long, 84 too many open files, 86 is a directory, 87 not a directory,
+     * 89 invalid file descriptor, 8c no space left, 8d file exists, 8e
+     * directory full, ff no such trap or end of file. */
     switch (error) {
-            /*
-              case 0x07:
-                return "READ TIMEOUT";
-              case 0x11:
-                return "ILLEGAL VALUE";
-            */
         case 0x20:
             return "READ ERROR";
-            /*
-              case 0x21:
-                return "WRITE ERROR";
-              case 0x80:
-                return "NO SUCH DRIVE";
-              case 0x81:
-                return "NAME TO LONG";
-              case 0x82:
-                return "NOT IMPLEMENTED";
-              case 0x83:
-                return "FILE TO LONG";
-              case 0x84:
-                return "TO MANY OPEN FILES";
-            */
         case 0x85:
             return "INVALID CLUSTER";
-            /*
-              case 0x86:
-                return "IS A DIRECTORY";
-              case 0x87:
-                return "NOT A DIRECTORY";
-            */
         case 0x88:
             return "FILE NOT FOUND";
-            /*
-              case 0x89:
-                return "INVALID FILE DESCR";
-            */
         case 0x8a:
             return "WRONG IMAGE LENGTH";
         case 0x8b:
             return "IMAGE FRAGMENTED";
-            /*
-              case 0x8c:
-                return "NO SPACE LEFT";
-              case 0x8d:
-                return "FILE EXISTS";
-              case 0x8e:
-                return "DIRECTORY FULL";
-              case 0xff:
-                return "NO SUCH TRAP / EOF";
-            */
         default:
             break;
     }

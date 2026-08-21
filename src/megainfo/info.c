@@ -1,3 +1,6 @@
+/* What the machine is: the core and hyppo versions, the hardware it reports,
+   and the page that lays them out. */
+
 #include "colours.h"
 #include "common.h"
 #include "dma.h"

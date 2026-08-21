@@ -473,21 +473,9 @@ void draw_freeze_menu(uint8_t part) {
         detect_rom();
     }
 
-    /* Display info from the process descriptor
-       The useful bits are:
-       $00     - Task ID (0-255, $FF = operating system)
-       $01-$10 - Process name (16 characters)
-       $11     - D81 image 0 flags
-       $12     - D81 image 1 flags
-       $13     - D81 image 0 name len
-       $14     - D81 image 1 name len
-       $15-$34 - D81 image 0 file name (max 32 chars, not null terminated)
-       $35-$54 - D81 image 0 file name (max 32 chars, not null terminated)
-       $55-$7F - RESERVED
-       $80-$FF - File descriptors
-
-       We should just read the sector containing all this, and get it out all at once.
-    */
+    /* The process descriptor: $00 task id ($FF = operating system), $01-$10
+     * name, $11/$12 D81 flags, $13/$14 D81 name lengths, $15-$34 and $35-$54
+     * the two D81 names (32 chars, not terminated), $80-$FF file descriptors. */
     if ((part & UpdateProcess) || (part & UpdateDisk)) {
         freeze_fetch_sector(0xFFFBD00L, (unsigned char*)&process_descriptor);
     }

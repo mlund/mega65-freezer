@@ -395,27 +395,18 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
     show_status(SchemeError, text);
 }
 
-/* The image the selected record names, onto the card under `name`, whole or not
- * at all.
+/* The image the selected record names, onto the card under `name`, whole or
+ * not at all.
  *
- * Contiguous because the hardware reads a mounted image by counting sectors
- * from a base rather than by walking the FAT (mega65-core sdcardio.vhdl:380),
- * which is also why nothing can be mounted out of memory.
+ * Contiguous because the hardware counts sectors from a base rather than
+ * walking the FAT (mega65-core sdcardio.vhdl:380).  The file must exist at its
+ * full length before the first block arrives, so a transfer that stops part
+ * way would mount as a working disk -- hyppo checks length, never contents.
+ * Hence the cleanup lives here, where no caller can forget it.
  *
- * The length comes from the catalogue rather than from the server, the file
- * having to exist at its full size before the first block arrives.  So a
- * transfer that stops part way leaves a file of the right name and length
- * holding a correct head and a stale tail, and hyppo checks an image's length
- * and never its contents -- it would mount as a working disk.  Removing it is
- * the whole of the answer: this owns the cleanup so that no caller can be the
- * one that forgot it.
- *
- * `replace` is the file that is already there and wrong.  It is written over
- * where it lies rather than removed and remade: the file is the length the
- * catalogue names and hyppo has just mounted it, so it is contiguous and the
- * right size, and remaking it could fail after the delete had already destroyed
- * it -- the writer takes only wholly free FAT sectors, so the space a delete
- * returns is usually not space it can take again. */
+ * `replace` is written over where it lies rather than remade: remaking could
+ * fail after the delete destroyed it, the writer taking only wholly free FAT
+ * sectors. */
 static bool fetch_image(const char* name, bool replace) {
     if (!record.size) {
         show_status(SchemeError, "UNKNOWN CATALOGUE SIZE");
@@ -467,18 +458,13 @@ static bool attached(char* name) {
 
 /* The card already holds this image, so which of the two was meant.
  *
- * Asked rather than assumed because neither answer is safe to guess: attaching
- * a corrupt image mounts rubbish, and fetching over a good one costs an 800KB
- * transfer nobody asked for.  A file that arrived wrong cannot be told from one
- * that arrived whole -- hyppo checks length and never contents -- so the user
- * is the only judge of which this is.
+ * Asked rather than guessed: a corrupt image mounts rubbish, and refetching a
+ * good one costs 800KB nobody asked for, and the two cannot be told apart.
  *
- * The mount has already happened by the time this is asked -- the attach is
- * how the card was asked whether it holds the file at all.  Answering A only
- * has to write the descriptor that survives the resume.  Answering R writes
- * over a file the drive is still attached to, and if the fetch then fails the
- * file is removed under it; what the frozen machine resumes with is unaffected,
- * that descriptor being written only on the way out. */
+ * The mount has already happened -- attaching is how the card was asked
+ * whether it holds the file.  R therefore writes over a file the drive is
+ * still attached to; the resume is unaffected, its descriptor being written
+ * only on the way out. */
 static bool attach_or_replace(char* name) {
     char text[SHORT_NAME_BYTES + 32];
     char* at = append_str(text, "ATTACH OR REPLACE ");
@@ -508,19 +494,15 @@ static void locate_slot(void) {
     }
 }
 
-/* The selected program into the frozen machine's memory, which is where a .prg
- * belongs: no file on the card, and so nothing of the FAT involved.
+/* The selected program into the frozen machine's memory, where a .prg belongs:
+ * no file on the card, so no FAT involved.
  *
- * Fetched whole into a buffer first.  There is no transaction on the freeze
- * slot -- half a program stored into it resumes as a broken machine -- so the
- * transfer has to have finished before the first byte goes in, and every rule
- * that could refuse it is settled before that too.
+ * Fetched whole into a buffer first, the freeze slot having no transaction --
+ * half a program stored into it resumes as a broken machine.
  *
- * It is not started.  The frozen program counter is wherever the machine was,
- * which may be mid-interrupt or inside the KERNAL, and swapping a program in
- * under it is undefined; in MEGA65 mode the ROM's own source says the $02B0
- * keyboard buffer is no longer generally honoured.  So the machine is left
- * loaded and the user resumes and types RUN, which is a thing they can see. */
+ * Not started: the frozen PC may be mid-interrupt or inside the KERNAL, and
+ * MEGA65 mode no longer generally honours the $02B0 keyboard buffer.  The user
+ * resumes and types RUN, which is a thing they can see. */
 static void load_program(void) {
     show_status(SchemeText, "FETCHING THE PROGRAM...");
     store_sector = 0;
@@ -629,20 +611,14 @@ static char* append_ip(char* at, const uint8_t* ip) {
 }
 
 #ifdef ETH_PROBE
-/* Whether the ethernet controller works from the frozen state, which no source
- * answers and only hardware can.  An ARP request needs no address of our own
- * and no checksum, and its reply proves both directions at once: a machine that
- * hears one has transmitted and received while a freezer tool was running.
+/* Whether the ethernet controller works from the frozen state, which only
+ * hardware can answer.  An ARP request needs no address of our own and no
+ * checksum, and a reply proves both directions at once; the frame count beside
+ * it is the weaker half, a busy LAN proving only the receiver.
  *
- * The frame count beside it is the weaker but unconditional half -- a LAN
- * broadcasts constantly, so frames arriving proves the receiver alone even if
- * nothing answers us.
- *
- * Built only when asked for.  It answered its question -- the controller does
- * work from a frozen machine -- and what is left is a way to ask again on a
- * machine where the wire is suspect, which is not worth a kilobyte of every
- * shipped tool.  The addresses below are this LAN's, so it needs recompiling to
- * point elsewhere in any case. */
+ * Built only when asked for -- a kilobyte in every shipped tool is too much
+ * for a wire that is usually not suspect.  The addresses below are this LAN's,
+ * so pointing it elsewhere means recompiling. */
 static constexpr uint8_t PROBE_TARGET[IPV4_BYTES] = {192, 168, 68, 57};
 /* A real address rather than zeros: an ARP probe with a zero sender is
  * answered by some stacks and ignored by others, and a request carrying a
@@ -924,20 +900,6 @@ static uint8_t write_server_text(char* text) {
     return (uint8_t)(at - text);
 }
 
-/* Typing the server's address, on the status line.
- *
- * The field opens empty with the address in force named in the prompt, rather
- * than opening on that address: an editor prefilled with thirteen characters
- * is thirteen backspaces before the first useful keystroke, and RETURN on an
- * empty field is then the way to leave it alone.
- *
- * Kept for this session only.  Writing it back to the card wants a FAT writer
- * that can replace a file, where MAKEDISK's can only create one, so the file
- * on the card is how an address survives a reset until then.
- *
- * line_edit() owns the buffer while this owns the screen and the keyboard,
- * which is what lets a full field and a backspace on an empty one be tested on
- * the host rather than typed at an emulator. */
 /* A prompt on the status line and an answer typed after it, or false where the
  * user backed out.  Both things this asks for are the same transaction: a
  * question, a field, and RUN/STOP meaning leave it alone.
@@ -974,6 +936,14 @@ static uint8_t write_server_text(char* text) {
 }
 
 /* Reads a new server address from the user and tells the fetch about it. */
+/* Typing the server's address, on the status line.
+ *
+ * The field opens empty with the address in force named in the prompt: an
+ * editor prefilled with thirteen characters is thirteen backspaces before the
+ * first useful keystroke, and RETURN then leaves it alone.
+ *
+ * Kept for this session only.  Writing it back wants a FAT writer that can
+ * replace a file, where MAKEDISK's can only create one. */
 static void edit_server_address(void) {
     char prompt[32 + SERVER_TEXT_BYTES];
     char* at = append_str(prompt, "NEW PROXY (NOW ");

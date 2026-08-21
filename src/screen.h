@@ -41,17 +41,14 @@ constexpr uint16_t FOOTER_ADDRESS = SCREEN_ADDRESS + 24 * SCREEN_ROW_BYTES;
  *
  *     [len] [cell lo] [cell hi] [colour] [len screen codes ...]  ... [0]
  *
- * The run length is the text length, so the two cannot disagree, and a single
- * zero byte ends the stream.  The codes are already screen codes -- the
- * conversion happens at compile time -- so nothing here folds case.
- *
- * The position is stored as a byte offset from the top left rather than as a
- * column and a row, because it is known when the fragment is built: y * 80 + x
- * * 2 is a multiply the 6502 would otherwise open-code on every draw, and it
- * occupies the same two bytes either way.
+ * The run length is the text length, so the two cannot disagree, and a zero
+ * byte ends the stream.  The codes are already screen codes, converted at
+ * compile time, so nothing here folds case.  The position is a byte offset
+ * rather than a column and row for the same reason: the multiply happens at
+ * compile time and costs the same two bytes either way.
  *
  * In the 16-bit mode the character is the low byte of its cell and the colour
- * is the high byte of the colour cell, hence the SCREEN_CELL_BYTES - 1 offset
+ * the high byte of the colour cell, hence the SCREEN_CELL_BYTES - 1 offset
  * into colour RAM; in the 8-bit mode both are simply the cell. */
 #define SCREEN_CELL(x, y) ((uint16_t)((y) * SCREEN_ROW_BYTES + (x) * SCREEN_CELL_BYTES))
 

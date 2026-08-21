@@ -8,19 +8,14 @@
 /* The FileHost catalogue as JSON, turned into the fixed-width one the browser
  * already reads: bytes in, 128-byte records out.
  *
- * This is what makes fetching over plain HTTP possible at all: the proxy
- * mirrors upstream's JSON as it stands, so the machine is what turns it into
- * something indexable.  What comes out is ether65 docs/FILEHOST.md section 2,
- * which is what catalog.c, view.c, shortname.c and the browser read -- so none
- * of them needs to know a proxy exists.
+ * The proxy mirrors upstream's JSON as it stands, so the machine is what makes
+ * it indexable.  What comes out is ether65 docs/FILEHOST.md section 2, so
+ * catalog.c, view.c and the browser need not know a proxy exists.
  *
- * Streaming, because the catalogue is 292KB and this machine has nowhere to
- * put it: the reply is consumed a segment at a time as it arrives and never
- * exists whole.  Nothing here allocates, and nothing seeks.
- *
- * No hardware, so it compiles for the host and is tested there -- which is
- * where a format decoder belongs: a field taken from the wrong key is a
- * browser full of plausible wrong entries, not a crash. */
+ * Streaming: the catalogue is 292KB and there is nowhere to put it, so the
+ * reply is consumed a segment at a time and never exists whole.  Nothing here
+ * allocates or seeks, so it compiles for the host and is tested there -- a
+ * field taken from the wrong key is plausible wrong entries, not a crash. */
 
 /* The stride this writes.  A reader takes it from the header rather than
  * assuming it, so it is this writer's choice; 128 is what upstream's own

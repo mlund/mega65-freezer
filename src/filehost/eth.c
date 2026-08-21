@@ -17,19 +17,14 @@
 /* Everything on the wire, CRC checked, both clock phases at 1.  The phases are
  * two-bit fields rather than flags, hence the shifts.
  *
- * Promiscuous -- ETH_NOPROM_MASK deliberately clear.  With the hardware filter
- * on, measurement showed only broadcast frames arriving and the unicast reply
- * to our own ARP request never reaching us.  iomap.txt does not settle it
- * either: $D6E5.0 is annotated both "disable promiscuous mode" and "enable
- * filtering of unicast frames if MAC address does not match", and $D6E5.5 is
- * annotated as both the multicast and the unicast enable.
+ * Promiscuous -- ETH_NOPROM_MASK deliberately clear.  With the filter on,
+ * measurement showed only broadcasts arriving and the unicast reply to our own
+ * ARP never reaching us; iomap.txt does not settle it either, annotating
+ * $D6E5.0 as both "disable promiscuous mode" and a unicast filter.
  *
- * So every frame on the wire arrives here, and deciding which are ours is the
- * caller's: udp_parse() matches the destination address, and the exchanges
- * that run before there is an address to match -- DHCP -- match on their own
- * transaction id instead.  The controller offers its own verdict in the frame's
- * flag nibble below, but it arrives with the frame and so saves nothing; the
- * cheap refusal is eth_receive()'s `limit`. */
+ * So every frame arrives here and deciding which are ours is the caller's:
+ * udp_parse() matches the address, and DHCP, which runs before there is one,
+ * matches its own transaction id. */
 static constexpr uint8_t ETH_PHASE_ONE = 1;
 static constexpr uint8_t ETH_FILTER =
     ETH_BCST_MASK | ETH_MCST_MASK | (uint8_t)(ETH_PHASE_ONE << 2) | (uint8_t)(ETH_PHASE_ONE << 6);

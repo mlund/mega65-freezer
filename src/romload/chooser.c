@@ -1,3 +1,5 @@
+/* Picking a ROM off the card, listed and scrolled like the disk chooser. */
+
 #include "colours.h"
 #include "common.h"
 #include "dma.h"
