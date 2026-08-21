@@ -43,15 +43,22 @@ TEST_CASE("the glyphs around the letters") {
     CHECK(ascii_to_screen(']') == 0x1D);
 }
 
-/* $1C, $1E and $1F are a pound sign, an up arrow and a left arrow -- not the
- * ASCII characters whose codes would land there.  The charset has no glyph for
- * these three, so they take the fallback: an underscore rendering as an arrow
- * would be exactly the wrong-glyph-for-the-byte this converter exists to
- * prevent. */
-TEST_CASE("the three the charset cannot show are not faked") {
+/* $1C and $1E are a pound sign and an up arrow -- not the ASCII characters
+ * whose codes would land there.  The charset has no glyph for either, so they
+ * take the fallback: a backslash rendering as a pound sign would be exactly
+ * the wrong-glyph-for-the-byte this converter exists to prevent. */
+TEST_CASE("the two the charset cannot show are not faked") {
     CHECK(ascii_to_screen('\\') == QUESTION_MARK);
     CHECK(ascii_to_screen('^') == QUESTION_MARK);
-    CHECK(ascii_to_screen('_') == QUESTION_MARK);
+}
+
+/* The underscore is not among them.  $1F is a left arrow, but $64 is a rule
+ * along the bottom row of the cell and nothing else, which is what an
+ * underscore is -- read out of the charset the machine had in RAM rather than
+ * taken from a table.  Upstream is full of them: `jim_64`, `grim_fandango`,
+ * and the random suffix on every path the catalogue names. */
+TEST_CASE("the underscore is drawn from where its glyph actually is") {
+    CHECK(ascii_to_screen('_') == 0x64);
 }
 
 /* The catalogue promises 0x20-0x7E, so anything outside it is a file the

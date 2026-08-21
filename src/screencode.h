@@ -12,8 +12,9 @@
  *
  * The screen is uppercase-only, so both cases of a letter give the same glyph.
  * Anything the charset cannot show becomes a question mark rather than whatever
- * the byte happens to index -- including the backslash, caret and underscore,
- * whose codes here are a pound sign, an up arrow and a left arrow.
+ * the byte happens to index -- including the backslash and caret, whose codes
+ * here are a pound sign and an up arrow.  The underscore is the exception: it
+ * is drawn from elsewhere in the charset, where a glyph for it does exist.
  *
  * No hardware, so src/screencode.c compiles for the host and is tested there. */
 uint8_t ascii_to_screen(uint8_t c);

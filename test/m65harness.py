@@ -272,6 +272,12 @@ def _glyph(code: int) -> str:
         return chr(code)
     if code == 0x00:
         return "@"
+    # $64 is a rule along the bottom row of the cell, which is what the charset
+    # has instead of an underscore at $1F -- see src/screencode.c.  Spelled out
+    # here so a screen dump of a FileHost author reads `grim_fandango` rather
+    # than `GRIM{64}FANDANGO`.
+    if code == 0x64:
+        return "_"
     return f"{{{code:02X}}}"
 
 
