@@ -1,7 +1,7 @@
 /* The FileHost browser: a catalogue of downloadable titles, and what one of
  * them does to the frozen machine.
  *
- * The catalogue is fetched at start-up and the card's copy is the fallback when
+ * The catalogue is read from the card at start-up and F fetches a fresh one;
  * the wire has nothing to say.  A disk image goes onto the card and is attached
  * to the frozen machine's drive -- fetched first if the card has not got it,
  * and written over again if what arrived was rubbish.  A program goes nowhere
@@ -27,7 +27,7 @@
 #include "sdcard.h"
 #include "shortname.h"
 #include "slot.h"
-#include "tftp.h" /* TFTP_PORT */
+#include "jsoncat.h"
 #include "view.h"
 
 #include <mega65.h>
@@ -36,29 +36,26 @@
 /* The catalogue as it sits on the card.  A payload rather than a program, which
  * is the convention IOMAP.M65 and M65THUMB.M65 already follow. */
 #define CATALOG_FILE "CATALOG.M65"
-/* What the same catalogue is called on the server, which ether65's
- * docs/FILEHOST.md §1 fixes: the card needs an 8.3 name and the server does
- * not, so the two differ and neither is derived from the other. */
-#define CATALOG_NAME "catalog"
+/* The endpoint that lists everything.  The proxy serves it as JSON with no
+ * stated length, so the body ends at the connection close; jsoncat.h turns it
+ * into the fixed-width records the rest of this file reads, which is the same
+ * format the card's copy is in. */
+#define CATALOG_PATH "/php/readfilespublic.php"
+/* How much JSON a catalogue may be, which is not how much room the records
+ * need: the limit bounds the reply as it arrives, and 292KB of JSON becomes
+ * 33KB of records.  Passing the buffer's size instead refuses the real
+ * catalogue four times over -- measured on hardware, which stopped after 63KB
+ * with a quarter of the list.  What bounds the records is fetch_store(). */
+static constexpr uint32_t CATALOGUE_MAX_BYTES = 1024UL * 1024;
 /* Where to fetch from, when whoever runs the network does not say.  A file
  * rather than a screen to type on: the address is settled once per network and
  * a card is easier to edit than a machine with no keyboard driver of its own.
  * One line, an address in figures -- there is no resolver here to turn a name
  * into one. */
-#define SERVER_FILE "TFTP-IP.TXT"
-/* "255.255.255.255:65535", its line ending, and a terminator. */
-static constexpr uint8_t SERVER_TEXT_BYTES = 24;
-/* Where a fetch goes before anything else says otherwise -- the machine this
- * was developed against, at the port megatalk-tftpd runs on without root.
- *
- * Installed rather than merely offered as the editor's opening text, so a fetch
- * works with nothing typed.  Temporary, and not to be released: while it stands
- * the tool never has no server, so the advice that comes with FetchNoServer is
- * reachable only by typing an address of zeros -- and on any other 192.168.68
- * network the machine would talk to whoever holds .57.  Before a release this
- * becomes a build option, or goes. */
-static constexpr uint8_t DEFAULT_SERVER[IPV4_BYTES] = {192, 168, 68, 57};
-static constexpr uint16_t DEFAULT_SERVER_PORT = 6969;
+#define SERVER_FILE "HTTP-IP.TXT"
+/* How long a proxy line can be, which fetch.h owns: this file does not know
+ * what protocol is underneath and has no business sizing its host field. */
+static constexpr uint8_t SERVER_TEXT_BYTES = FETCH_SERVER_TEXT_BYTES;
 
 /* Read whole and indexed in place.  Chip RAM the tool has to itself: hyppo's
  * 384KB freeze region covers it, so the resume puts the frozen program's own
@@ -100,7 +97,26 @@ static uint16_t selected;
 static uint16_t first_shown;
 
 /* One record at a time in the 16-bit window; the rest stays in far memory. */
-static uint8_t raw_record[CATALOG_HEADER_BYTES];
+/* Up in .netbuf for the same reason as the sector above: the 16-bit window is
+ * the scarce thing here, and a record being unpacked is not on the path any
+ * frame takes. */
+static __attribute__((section(".netbuf"))) uint8_t raw_record[CATALOG_HEADER_BYTES];
+/* The JSON turned into records as it arrives, because 292KB of it will not fit
+ * anywhere on this machine and never exists whole. */
+static struct JsonCatalog transcoder;
+/* Where the next record goes, and so how long the catalogue is when the reply
+ * ends.  Counts from past the header, which cannot be written until the record
+ * count is known. */
+static uint32_t catalog_at;
+/* Whether what is arriving is JSON to transcode or bytes to keep as they are:
+ * a program is fetched into the same window and must not go through the
+ * transcoder. */
+static bool transcoding;
+/* One sector, for copying the finished catalogue out of far memory and onto
+ * the card -- fat32's writer takes a pointer in the 16-bit window.  Up in
+ * .netbuf with the frame buffers: half a kilobyte is far more than the window
+ * has to spare, and this is only touched once a fetch is over. */
+static __attribute__((section(".netbuf"))) uint8_t catalog_sector[SD_SECTOR_SIZE];
 static struct CatalogRecord record;
 
 /* Whether the freeze slot has been located.  Deferred until an attach actually
@@ -119,7 +135,16 @@ static Addr28 store_buffer;
 /* What was typed at the `/` prompt, folded to upper case once so the comparison
  * against each title does not fold it again per record.  Empty is no search,
  * which is why an empty prompt is how a search is cleared. */
-static char search[CATALOG_TITLE_BYTES + 1];
+/* Kept out of zero page deliberately.  The LTO allocator put it there, which
+ * is what it is for -- but forty-one bytes of it, for a buffer touched only
+ * while somebody is typing, are forty-one the imaginary registers cannot have.
+ * Measured at -364 bytes, almost none of it here: the saving is in the code
+ * the allocator then generates everywhere else.
+ *
+ * Safe as a bare section name because this file is compiled for the machine
+ * alone; a file that also builds for the host would need the __mos__ guard,
+ * Mach-O wanting "segment,section". */
+__attribute__((section(".bss"))) static char search[CATALOG_TITLE_BYTES + 1];
 
 /* One keypress, with the queue left empty behind it so the next wait is not
  * answered by this one. */
@@ -136,16 +161,37 @@ static uint8_t wait_key(void) {
  * fetch.c.  Every way of naming a server goes through here, so none of them can
  * set one without the fetch hearing about it.
  *
- * The port starts at TFTP's own rather than at whatever is in force: a bare
+ * The port starts at HTTP's own rather than at whatever is in force: a bare
  * address means the reserved port, and a text that says nothing about a port
- * cannot be meant to keep one somebody typed an hour ago. */
-static bool set_server(const char* text) {
+ * cannot be meant to keep one somebody typed an hour ago.
+ *
+ * The text is written over where it names a host, so it must be the caller's
+ * own copy. */
+static bool set_server(char* text) {
     uint8_t ip[IPV4_BYTES];
-    uint16_t port = TFTP_PORT;
+    /* Zero unless the text names one, which fetch.c reads as "the protocol's
+     * own": which port that is belongs down there, not here. */
+    uint16_t port = 0;
     if (!ip_parse(text, ip, &port)) {
         return false;
     }
-    fetch_set_server(ip, port);
+    /* Whatever follows the first space, up to whatever ends the line.  Nothing
+     * where the line named no host, which fetch.c reads as "ask by the
+     * address" -- right for a proxy that answers for whatever it is asked. */
+    char* host = text;
+    while (*host && *host != ' ') {
+        host++;
+    }
+    while (*host == ' ') {
+        host++;
+    }
+    for (char* at = host; *at; at++) {
+        if (*at == ' ' || *at == '\r' || *at == '\n') {
+            *at = 0;
+            break;
+        }
+    }
+    fetch_set_server(ip, port, *host ? host : nullptr);
     return true;
 }
 
@@ -306,15 +352,15 @@ static void move_by(int16_t delta) {
 
 /* Why a fetch did not happen, in the same words wherever it was asked for.
  *
- * A refusal is the one that carries a number: RFC 1350's code is the difference
- * between a file the server has not got and one it will not part with, and only
- * the second is worth arguing with. */
+ * A refusal is the one that carries a number: the HTTP status is the
+ * difference between a file the server has not got and one it will not part
+ * with, and only the second is worth arguing with. */
 static void say_fetch_failed(enum FetchResult result, const char* also) {
     static const char* const why[] = {
         "",
         "NO ADDRESS: NOTHING ANSWERED",
-        "NO TFTP SERVER: SET TFTP-IP.TXT",
-        "THE TFTP SERVER DID NOT ANSWER",
+        ("NO PROXY: SET " SERVER_FILE),
+        "THE PROXY DID NOT ANSWER",
         "", /* refused: the code is named below instead */
         "THE TRANSFER STOPPED PART WAY",
         "MORE THAN THERE IS ROOM FOR",
@@ -331,7 +377,7 @@ static void say_fetch_failed(enum FetchResult result, const char* also) {
     char text[SCREEN_COLS + 16];
     char* at = append_str(text, why[result]);
     if (result == FetchRefused) {
-        at = append_dec(append_str(text, "THE SERVER REFUSED IT, CODE "), fetch_error());
+        at = append_dec(append_str(text, "THE SERVER REFUSED IT, CODE "), fetch_status());
     }
     /* Both on one line: the reason is what to do something about, and what is
      * now on the card is what to know before trying again. */
@@ -763,7 +809,28 @@ bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
     if (store_sector) {
         return fat32_write_file_sector(store_sector, offset, bytes, length);
     }
-    lcopy((Addr28)(uint16_t)bytes, store_buffer + (Addr28)offset, length);
+    if (!transcoding) {
+        lcopy((Addr28)(uint16_t)bytes, store_buffer + (Addr28)offset, length);
+        return true;
+    }
+    /* JSON in, 128-byte records out, a record at a time -- the offset means
+     * nothing here, since what arrives and what is kept are different lengths.
+     * raw_record is borrowed: nothing reads it between one fetch and the
+     * catalogue being accepted at the end of one. */
+    uint16_t left = length;
+    while (left) {
+        uint16_t taken = 0;
+        if (jsoncat_take(&transcoder, bytes, left, &taken, raw_record)) {
+            if (catalog_at + JSONCAT_RECORD_BYTES > CATALOG_BUFFER_BYTES) {
+                return false; /* more records than there is room for */
+            }
+            lcopy((Addr28)(uint16_t)raw_record, CATALOG_BUFFER + (Addr28)catalog_at,
+                JSONCAT_RECORD_BYTES);
+            catalog_at += JSONCAT_RECORD_BYTES;
+        }
+        bytes += taken;
+        left = (uint16_t)(left - taken);
+    }
     return true;
 }
 
@@ -785,6 +852,10 @@ bool fetch_store_blocks(uint32_t offset, const uint8_t* bytes, uint8_t count) {
 void fetch_progress(uint32_t so_far, uint32_t total, bool last, bool waiting) {
     static constexpr uint32_t EVERY = 0x2000;
     static uint8_t waits;
+    /* Which 8KB step was last drawn.  A fetch that starts again from zero
+     * differs from wherever the last one stopped, so there is nothing to
+     * reset. */
+    static uint8_t drawn;
 
     if (waiting) {
         waits++;
@@ -795,12 +866,17 @@ void fetch_progress(uint32_t so_far, uint32_t total, bool last, bool waiting) {
          * file is and `total` is 0 -- without that the line would stop at the
          * last multiple rather than at what arrived.
          *
-         * Told rather than worked out here: the size a block is short of is no
-         * longer fixed at 512, and dividing by a variable one costs far more
-         * than the mask a constant allowed. */
-        if ((so_far & (EVERY - 1)) && so_far != total && !last) {
+         * Which 8KB step the count is in, and not whether it is a multiple of
+         * one: a body arrives in segments the server chose the length of, so
+         * the running total steps over the multiples rather than onto them and
+         * a mask would match almost never.  That draws nothing at all until
+         * the file finishes -- seconds of a still screen, which reads as a
+         * hung machine and is the one thing this line exists to prevent. */
+        const uint8_t step = (uint8_t)(so_far / EVERY);
+        if (step == drawn && so_far != total && !last) {
             return;
         }
+        drawn = step;
     }
 
     char text[40];
@@ -834,7 +910,7 @@ static uint8_t write_server_text(char* text) {
     uint16_t port = 0;
     char* at = append_ip(text, fetch_server(&port));
     /* The reserved port is left unsaid, being what a bare address means. */
-    if (port != TFTP_PORT) {
+    if (port) {
         *at++ = ':';
         at = append_dec(at, port);
     }
@@ -850,8 +926,8 @@ static uint8_t write_server_text(char* text) {
  * empty field is then the way to leave it alone.
  *
  * Kept for this session only.  Writing it back to the card wants a FAT writer
- * that can replace a file, where MAKEDISK's can only create one, so TFTP-IP.TXT
- * is how an address survives a reset until then.
+ * that can replace a file, where MAKEDISK's can only create one, so the file
+ * on the card is how an address survives a reset until then.
  *
  * line_edit() owns the buffer while this owns the screen and the keyboard,
  * which is what lets a full field and a backspace on an empty one be tested on
@@ -894,7 +970,7 @@ static uint8_t write_server_text(char* text) {
 /* Reads a new server address from the user and tells the fetch about it. */
 static void edit_server_address(void) {
     char prompt[32 + SERVER_TEXT_BYTES];
-    char* at = append_str(prompt, "NEW TFTP SERVER (NOW ");
+    char* at = append_str(prompt, "NEW PROXY (NOW ");
     at += write_server_text(at);
     at = append_str(at, "): ");
     *at = 0;
@@ -942,14 +1018,6 @@ static void clear_buffer(void) {
     }
 }
 
-enum CatalogVerdict : uint8_t {
-    CatalogUnusable,
-    /* Indexable, and less than it says it is: the rows that arrived are worth
-     * showing, and calling that a clean fetch is not. */
-    CatalogPartial,
-    CatalogWhole,
-};
-
 /* What is in the buffer, read as a catalogue, given that `bytes` of it are
  * real.
  *
@@ -961,25 +1029,26 @@ enum CatalogVerdict : uint8_t {
  * `bytes` is what is in the buffer, so it is never more than the buffer holds:
  * the card path passes the buffer's own size and the fetch is refused above
  * that before a block is written. */
-static enum CatalogVerdict accept_catalog(uint32_t bytes) {
+[[nodiscard]] static bool accept_catalog(uint32_t bytes) {
     lcopy(CATALOG_BUFFER, (Addr28)(uint16_t)raw_record, CATALOG_HEADER_BYTES);
     if (bytes < CATALOG_HEADER_BYTES || !catalog_header(raw_record, &header)) {
         header = (struct CatalogHeader){0};
         show_status(SchemeError, "THAT IS NOT A CATALOGUE");
-        return CatalogUnusable;
+        return false;
     }
 
     const uint16_t fits = hw_div16(bytes - CATALOG_HEADER_BYTES, header.record_bytes);
-    const bool cut = header.record_count > fits;
-    if (cut) {
+    /* Less than it says it is: the rows that arrived are worth showing, and
+     * the warning is the whole of what the caller needs to know about it. */
+    if (header.record_count > fits) {
         header.record_count = fits;
         show_status(SchemeWarning, "CATALOGUE CUT SHORT, SHOWING IT");
     }
     if (!header.record_count) {
         show_status(SchemeWarning, "THE CATALOGUE IS EMPTY");
-        return CatalogUnusable;
+        return false;
     }
-    return cut ? CatalogPartial : CatalogWhole;
+    return true;
 }
 
 /* The catalogue from the card, if there is one worth having. */
@@ -995,7 +1064,7 @@ static bool load_catalog(void) {
     /* The loader says nothing about the length, so the whole buffer is what
      * may have been filled. */
     /* Cut short is still worth browsing, and the warning already said so. */
-    return accept_catalog(CATALOG_BUFFER_BYTES) != CatalogUnusable;
+    return accept_catalog(CATALOG_BUFFER_BYTES);
 }
 
 /* How many rows are shown, and of how many there are whenever those differ --
@@ -1064,12 +1133,45 @@ static void cycle_order(void) {
     rebuild(next > ViewByCategory ? ViewByTitle : (enum ViewOrder)next);
 }
 
-/* The catalogue over the wire, into the buffer the card copy would occupy.
+/* Keeps the catalogue that just arrived, so the next run needs no network.
  *
- * Nothing is written to the card: the browser reads the catalogue from this
- * buffer either way, so a fetch that fails costs the list on screen and not the
- * copy on the card.  What the buffer holds afterwards is whatever the fetch
- * left, so the card copy is read back rather than trusted. */
+ * After the transcode and not before: what is worth keeping is 33KB of records
+ * the browser can index, not 292KB of JSON it would have to parse again.
+ *
+ * Replaced in place where the card's copy is already the right length, and
+ * only otherwise deleted and remade.  The order matters: fat32's writer takes
+ * only wholly free sectors, so a delete usually gives back space it cannot
+ * take again -- and a failure here would leave no catalogue at all where there
+ * had been a usable one. */
+static bool save_catalog(uint32_t bytes) {
+    if (fat32_open_file_system() != FreezerOk) {
+        return false;
+    }
+    uint32_t sector = fat32_file_first_sector(CATALOG_FILE, bytes);
+    if (!sector) {
+        (void)fat32_delete_file(CATALOG_FILE);
+        sector = fat32_create_contiguous_file(CATALOG_FILE, bytes);
+    }
+    if (!sector) {
+        return false;
+    }
+    for (uint32_t at = 0; at < bytes; at += SD_SECTOR_SIZE) {
+        const uint32_t rest = bytes - at;
+        const uint16_t n = rest < SD_SECTOR_SIZE ? (uint16_t)rest : SD_SECTOR_SIZE;
+        lcopy(CATALOG_BUFFER + (Addr28)at, (Addr28)(uint16_t)catalog_sector, n);
+        if (!fat32_write_file_sector(sector, at, catalog_sector, n)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/* The catalogue over the wire, transcoded into the buffer the browser indexes
+ * and then kept on the card.
+ *
+ * A fetch that fails costs the list on screen and not the copy on the card:
+ * what the buffer holds afterwards is whatever the fetch left, so the card's
+ * copy is read back rather than trusted. */
 static void fetch_catalog(void) {
     show_status(SchemeText, "FETCHING THE CATALOGUE...");
 
@@ -1077,9 +1179,12 @@ static void fetch_catalog(void) {
      * the tail of the old one readable behind it. */
     clear_buffer();
     store_sector = 0;
-    store_buffer = CATALOG_BUFFER;
+    transcoding = true;
+    jsoncat_begin(&transcoder);
+    catalog_at = CATALOG_HEADER_BYTES;
     uint32_t got = 0;
-    const enum FetchResult result = fetch_file(CATALOG_NAME, CATALOG_BUFFER_BYTES, &got);
+    const enum FetchResult result = fetch_file(CATALOG_PATH, CATALOGUE_MAX_BYTES, &got);
+    transcoding = false;
     if (result != FetchOk) {
         /* Whatever landed is half a catalogue, so the card's copy goes back
          * first -- and its own complaints are said before the one the user
@@ -1090,14 +1195,27 @@ static void fetch_catalog(void) {
         return;
     }
 
-    const enum CatalogVerdict verdict = accept_catalog(got);
+    /* The header last, the record count not being known until here. */
+    const bool whole = jsoncat_end(&transcoder, raw_record);
+    lcopy((Addr28)(uint16_t)raw_record, CATALOG_BUFFER, CATALOG_HEADER_BYTES);
+
+    const bool usable = accept_catalog(catalog_at);
     show_catalog();
-    /* Only when there is nothing to say against it: accept_catalog() has
-     * already warned about a catalogue cut short, and "FETCHED" written over
-     * that warning reads as a clean transfer of half a list. */
-    if (verdict == CatalogWhole) {
-        show_status(SchemeHighlight, "FETCHED");
+    if (!usable) {
+        return; /* accept_catalog() has already said what is wrong with it */
     }
+    /* A reply that stopped part way is indistinguishable from a whole one by
+     * its length -- the endpoint states none -- so only the shape of the JSON
+     * says so, and half a list is not worth keeping over a whole one. */
+    if (!whole) {
+        show_status(SchemeWarning, "THE CATALOGUE CAME CUT SHORT, SHOWING IT");
+        return;
+    }
+    /* Once, into a variable: written twice in one expression this would write
+     * the card twice. */
+    const bool kept = save_catalog(catalog_at);
+    show_status(kept ? SchemeHighlight : SchemeWarning,
+        kept ? "FETCHED AND KEPT ON THE CARD" : "FETCHED, BUT THE CARD WOULD NOT TAKE IT");
 }
 
 /* The browser itself: draws the list and answers keys until RUN/STOP. */
@@ -1183,19 +1301,19 @@ int main(void) {
     /* Browsing runs whether or not a catalogue was found: with none, the list
      * is empty and the message says why, but the ethernet probe -- the one
      * thing that does not need a catalogue -- is still reachable. */
-    /* In this order: the card overrides the default, and reading the address
-     * wants the buffer a catalogue would occupy.  A complaint about the address
-     * file waits until after, so the catalogue's own does not bury it. */
-    fetch_set_server(DEFAULT_SERVER, DEFAULT_SERVER_PORT);
+    /* Reading the address wants the buffer a catalogue would occupy, so it
+     * goes first; a complaint about the address file then waits until after
+     * the catalogue's own, so neither buries the other. */
     if (!read_server_address()) {
         show_status(SchemeWarning, SERVER_FILE " IS NOT AN ADDRESS");
     }
-    /* One list, not two.  The card's copy is the fallback rather than the
-     * opening screen: drawing it first and replacing it seconds later shows a
-     * list that was never what the tool went on to use, and the flash reads as
-     * the browser changing its mind.  fetch_catalog() puts the card's copy up
-     * itself when the wire has nothing to say. */
-    fetch_catalog();
+    /* The card's copy, and nothing else.  Nothing reaches the network until
+     * somebody presses F: a catalogue changes rarely, the card's copy loads in
+     * no time where a fetch is seconds, and a machine with no cable in it
+     * opens the browser rather than waiting out a lease that will not come.
+     * With no copy the list is simply empty. */
+    (void)load_catalog();
+    show_catalog();
     browse();
 
     mega65_dos_exechelper("FREEZER.M65");

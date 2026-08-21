@@ -5,7 +5,8 @@
 
 /* The FileHost catalogue: one fixed-width file, so a client indexes with
  * arithmetic and parses nothing.  The format is ether65's docs/FILEHOST.md
- * section 2, and this file is the only thing here that knows it.  No hardware,
+ * section 2; this file reads it and jsoncat.c writes it, with t_jsoncat.cpp
+ * pinning the two together by reading a written catalogue back through here.  No hardware,
  * so it compiles for the host and is tested there.
  *
  * Text in the file is printable ASCII rather than PETSCII, deliberately: it

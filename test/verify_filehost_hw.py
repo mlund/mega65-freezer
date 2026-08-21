@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
-"""Fetch the FileHost catalogue over the wire, on the machine itself.
+"""Fetch the FileHost catalogue over HTTP, on the machine itself.
 
 The one thing no emulator run can check.  Xemu has no ethernet on macOS, so
 everything the network stack does -- a lease, an address resolved, and blocks
-off a TFTP server -- is exercised here or nowhere.  The rest of FILEHOST is
+off a web server -- is exercised here or nowhere.  The rest of FILEHOST is
 covered by verify_filehost_xemu.py, which is faster and needs no hardware.
 
 Read-only, deliberately: nothing is written to the card and nothing is attached
-to the frozen machine's drive.  A catalogue fetched over TFTP lands in memory,
-so a run leaves the card exactly as it found it, and the frozen program is
+to the frozen machine's drive -- except the catalogue itself, which the tool
+keeps on the card so the next run needs no network.  The frozen program is
 resumed at the end whatever happened.
 
 What it needs, none of which this can arrange for itself:
 
   * the MEGA65 on, running something to freeze, and reachable at --device
   * FILEHOST.M65 on its card, recent enough to have the F key
-  * a TFTP server the machine can reach, serving `catalog`, at whatever
-    address FILEHOST is set to.  megatalk-tftpd from ether65 serves the real
-    FileHost on demand:
-        megatalk-tftpd --bind 0.0.0.0:6969 --prefetch
+  * an ethernet cable and a route out.  No server has to be stood up first:
+    the catalogue comes from the public proxy, named in HTTP-IP.TXT on the
+    card as an address, a space, and the name to ask it by --
+
+        46.30.215.17 m65filehost.twistedpair.se
+
+    The name is not resolved; it is what the Host header carries, and the
+    proxy is name-based virtual hosting, so a bare address earns a 404 on a
+    connection that worked perfectly.
 
     python3 test/verify_filehost_hw.py --device /dev/cu.usbserial-AQ027F6E
 """
@@ -26,6 +31,7 @@ What it needs, none of which this can arrange for itself:
 import argparse
 import contextlib
 import os
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -41,9 +47,41 @@ TOOL_SCREEN = h.Screen(at=0xB800)
 # longer than any one of them.
 FETCH_TIMEOUT = 45.0
 # What fetch_catalog() can leave on the status line, from main.c's table.
-DONE = ("FETCHED", "NO ADDRESS", "NO TFTP SERVER", "DID NOT ANSWER", "REFUSED",
+DONE = ("FETCHED", "NO ADDRESS", "NO PROXY", "DID NOT ANSWER", "REFUSED",
         "STOPPED PART WAY", "MORE THAN THERE IS ROOM FOR", "NOT A CATALOGUE",
-        "CATALOGUE CUT SHORT", "THE CATALOGUE IS EMPTY")
+        "CATALOGUE CAME CUT SHORT", "THE CATALOGUE IS EMPTY", "CARD WOULD NOT TAKE IT")
+
+# struct FetchCounters in src/filehost/fetch.h, field for field.  Add one there
+# and this must change with it: a format string that has drifted still unpacks,
+# and reports a transfer of two gigabytes in eight hundredths of a second.
+COUNTERS = "<4HI2H"
+# Video frames per second, for turning frames into seconds.
+FRAMES_PER_SECOND = 50.0
+
+
+def say_counters(machine: h.Machine) -> None:
+    """What the transport had to cope with, read once the fetch is over.
+
+    Once, and afterwards.  A monitor read halts the CPU at an instruction
+    boundary and is not subject to the guarantees an interrupt is, so polling
+    these while the transfer ran would drop the very frames being counted.
+    """
+    try:
+        at = machine.address("fetch_counters")
+    except h.Failure:
+        return  # no symbol table given, so no counters; the screen still said
+    dropped, resent, stalls, heard, moved, frames, first = struct.unpack(
+        COUNTERS, machine.read(at, struct.calcsize(COUNTERS)))
+    seconds = frames / FRAMES_PER_SECOND
+    rate = (moved / 1024.0 / seconds) if seconds else 0.0
+    print(f"transport: {moved} bytes in {seconds:.2f}s = {rate:.1f} KB/s, "
+          f"first byte after {first / FRAMES_PER_SECOND:.2f}s")
+    print(f"           {heard} frames were ours; dropped {dropped}, "
+          f"resent {resent}, stalls {stalls}")
+    # The number that decides whether receiving strictly in order is enough.
+    if dropped:
+        print(f"           {dropped} segments fell outside the window -- "
+              "reassembly may be worth its lines")
 
 
 def to_freeze_menu(machine: h.Machine) -> None:
@@ -69,9 +107,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", required=True, help="the serial monitor, /dev/cu.usbserial-*")
     parser.add_argument("--baud", type=int, default=h.MONITOR_BAUD)
+    parser.add_argument("--elf", default=None,
+                        help="FILEHOST.M65.elf, for reading the transport's counters "
+                             "by name rather than by a hand-copied address")
     args = parser.parse_args()
 
-    with h.attach(args.device, args.baud, screen=TOOL_SCREEN) as machine:
+    symbol = None
+    if args.elf:
+        import elf
+        symbol = lambda name: elf.symbol(args.elf, name)  # noqa: E731
+
+    with h.attach(args.device, args.baud, screen=TOOL_SCREEN, symbol=symbol) as machine:
         try:
             return run(machine)
         except h.Failure as failed:
@@ -94,7 +140,7 @@ def run(machine: h.Machine) -> int:
     # The address the tool will use, read off its own prompt rather than
     # assumed: a card file or a lease may have said something else.
     machine.press("t")
-    asking = machine.wait_until(lambda s: "NEW TFTP SERVER" in s, timeout=10.0)
+    asking = machine.wait_until(lambda s: "NEW PROXY" in s, timeout=10.0)
     print("server:", asking.text(23).strip())
     machine.press("stop")
 
@@ -116,6 +162,7 @@ def run(machine: h.Machine) -> int:
         return 1
     print(f"fetched: {shot.text(0).strip()}")
     print(f"first row: {first[:60]}")
+    say_counters(machine)
 
     return 0
 

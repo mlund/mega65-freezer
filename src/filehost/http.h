@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// Copyright 2026 Mikael Lund aka Wombat
+#pragma once
+
+#include "net.h"
+#include "tcp.h"
+
+#include <stdbool.h>
+#include <stdint.h>
+
+/* Fetching one file over HTTP: the request, the reply's headers, and where its
+ * body begins.
+ *
+ * This is the module.  TCP is how it is built and stays behind it -- a caller
+ * names a path and is handed bytes, and never sees a sequence number, a
+ * handshake or a window.  A whole frame goes in and a whole frame comes out,
+ * so all of it compiles for the host and is tested there.
+ *
+ * Deliberately not a general HTTP client.  The proxy this speaks to accepts
+ * HTTP/1.0, answers with `Connection: close`, and never uses chunked transfer
+ * encoding -- measured, not assumed -- so there is no chunk decoder, no
+ * keep-alive and no redirect following here.  A reply that needs any of them
+ * fails rather than being half understood. */
+
+/* The longest path that can be asked for, which is the catalogue's own path
+ * field (ether65 docs/FILEHOST.md section 2): a client asks for the catalogue
+ * endpoint and for the paths the catalogue named, and nothing else exists to
+ * ask for.  A longer one is refused rather than truncated -- a truncated path
+ * names a different file.  Stated here rather than taken from catalog.h, which
+ * this has no business including: a test pins the two together. */
+constexpr uint8_t HTTP_PATH_MAX = 48;
+/* What goes in the Host header.  An address in text, with room for a port
+ * after it, since the proxy is reached by address -- naming it would need a
+ * resolver, which is a separate piece of work. */
+constexpr uint8_t HTTP_HOST_MAX = 32;
+/* Where a request goes when a caller names no port of its own. */
+constexpr uint16_t HTTP_DEFAULT_PORT = 80;
+
+/* The request, which is the same shape every time:
+ *
+ *   GET <path> HTTP/1.0\r\nHost: <host>\r\nConnection: close\r\n\r\n
+ *
+ * `Connection: close` is sent although HTTP/1.0 already means it: the body of
+ * the catalogue endpoint has no stated length and so ends at the close, and a
+ * proxy someone else is running that kept the connection open would leave that
+ * fetch waiting for a close that never comes.  Nineteen bytes to remove a
+ * hang. */
+constexpr uint16_t HTTP_REQUEST_BYTES =
+    (sizeof "GET " - 1) + HTTP_PATH_MAX + (sizeof " HTTP/1.0\r\nHost: " - 1) + HTTP_HOST_MAX
+    + (sizeof "\r\nConnection: close\r\n\r\n" - 1);
+
+/* What the send buffer must hold.  The request is the largest thing sent; the
+ * SYN's option is smaller and every other segment is a bare acknowledgement. */
+constexpr uint16_t HTTP_SEND_BYTES = TCP_PAYLOAD_AT + HTTP_REQUEST_BYTES;
+/* And the receive buffer: a whole frame, since the server chooses how much of
+ * the body each one carries. */
+constexpr uint16_t HTTP_RECEIVE_BYTES = ETH_MAX_RECEIVED;
+
+/* How much of one header line is kept.  Only two are read -- the status line
+ * and Content-Length -- and both state what they mean in their first thirty
+ * characters, so a longer line keeps its beginning and discards the rest.
+ * That is safe because what is matched is a prefix: a truncated line cannot
+ * become a different header than the one it started as. */
+constexpr uint8_t HTTP_LINE_BYTES = 40;
+
+/* Where the reply has got to.  Status and Headers are apart because a reply
+ * that is not a reply at all -- a proxy answering in some other protocol --
+ * has to fail on its first line rather than be read as a header block. */
+enum HttpStage : uint8_t {
+    HttpStatus,
+    HttpHeaders,
+    HttpBody,
+    HttpDone,
+    HttpFailed,
+};
+
+/* The fetch in progress.
+ *
+ * `data_at` and `data_length` describe the body bytes the last step delivered,
+ * in the same buffer that step was given.  The body is never copied: it stays
+ * where it arrived, and the caller takes it from there.  `data_at` is a field
+ * and not a constant because an HTTP body does not begin at a fixed offset --
+ * the headers before it are whatever length the server made them, and they may
+ * end part way through a segment.
+ *
+ * `status` is sixteen bits because three digits do not fit in eight.  It is
+ * set as soon as the status line is read, so it is worth showing even on a
+ * failure -- particularly then, 404 and 503 being different things to do about.
+ *
+ * `length` is what the server said the body is, and `has_length` whether it
+ * said at all: a file gives Content-Length and the catalogue endpoint does
+ * not, so both happen.  `received` counts the body bytes handed over so far. */
+struct HttpClient {
+    struct TcpClient tcp;
+    uint32_t length;
+    uint32_t received;
+    uint16_t status;
+    uint16_t data_at;
+    uint16_t data_length;
+    uint8_t request[HTTP_REQUEST_BYTES];
+    char line[HTTP_LINE_BYTES];
+    uint8_t line_length;
+    enum HttpStage stage;
+    bool has_length;
+};
+
+/* Begins a GET of `path` from `server`, naming `host` in the request.
+ *
+ * `path` and `host` are read here and not kept: the request they make is
+ * assembled once, into the client itself, because TCP re-reads it on every
+ * retransmission and so needs bytes that stay put.  A caller is therefore free
+ * to reuse whatever it built them in.
+ *
+ * `server->port` names the port -- 80 is HTTP's, but a proxy on a port above
+ * 1024 needs no root to run, so the caller says.  `seed` moves this
+ * connection's port and sequence numbers off the last one's; any value the
+ * caller has that changes will do.
+ *
+ * A path or host too long, a port of zero, or a machine with no address of its
+ * own leaves the client failed with nothing to send. */
+void http_start(struct HttpClient* client,
+    const struct NetEndpoint* us,
+    const struct NetEndpoint* server,
+    const char* path,
+    const char* host,
+    uint16_t seed);
+
+/* Cranks the fetch: returns the length of the frame left in `out`, or 0 when
+ * there is nothing to send.  `in` is a received frame; `in_length` 0 means the
+ * clock ticked, so say the current step again.
+ *
+ * The whole loop: start, step with nothing, send what comes back; then step
+ * with every frame and on every timeout, sending anything non-zero and taking
+ * `data_length` bytes from `data_at` wherever they belong, until http_done()
+ * or http_failed(). */
+[[nodiscard]] uint16_t http_step(
+    struct HttpClient* client, const uint8_t* in, uint16_t in_length, uint8_t* out);
+
+/* Whether the last frame belonged to this fetch -- what a caller times silence
+ * against, since a segment we are right to drop still proves the server is
+ * there. */
+[[nodiscard]] static inline bool http_heard(const struct HttpClient* client) {
+    return tcp_heard(&client->tcp);
+}
+
+/* How the transport fared underneath, for a caller reporting on the wire
+ * rather than on the reply.  Forwarded rather than reached for: `struct
+ * TcpClient` is this module's own, and a caller that read its fields could not
+ * be told that it never sees a handshake or a window. */
+[[nodiscard]] static inline uint16_t http_dropped(const struct HttpClient* client) {
+    return client->tcp.dropped;
+}
+
+[[nodiscard]] static inline uint16_t http_retransmits(const struct HttpClient* client) {
+    return client->tcp.retransmits;
+}
+
+/* Whether the whole body arrived: all of Content-Length where the server
+ * stated one, and everything up to the close where it did not. */
+[[nodiscard]] static inline bool http_done(const struct HttpClient* client) {
+    return client->stage == HttpDone;
+}
+
+/* Whether the server refused it, answered something this cannot read, or
+ * closed part way through a body whose length it had already stated.  On the
+ * first of those `status` says what it refused with. */
+[[nodiscard]] static inline bool http_failed(const struct HttpClient* client) {
+    return client->stage == HttpFailed;
+}

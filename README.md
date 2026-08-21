@@ -131,7 +131,14 @@ Against the cc65 generated 0.97 binaries we get a 30-65% reduction in byte count
 
   <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
   
-- `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue using TFTP. Currently requires a TFTP gateway since the gateway is HTTPS only.
+- `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue over
+  plain HTTP, through a proxy that mirrors the HTTPS original. No gateway on
+  your own LAN: one connection, port 80. Put the proxy's address and the name
+  to ask it by in `HTTP-IP.TXT` on the card --
+  `46.30.215.17 m65filehost.twistedpair.se` -- the name being what the `Host`
+  header carries, since the proxy is name-based virtual hosting. The catalogue
+  is transcoded from JSON on the machine and kept on the card, so it loads
+  instantly next time; `F` fetches a fresh one.
 - `MAKEDISK`: the border reports while the card is busy.
 - SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
   a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
@@ -242,8 +249,8 @@ Defects found in original:
   nobody at the keyboard. They register only with
   `-DMEGA65_SERIAL=/dev/cu.usbserial-XXXXXXX`, since a run takes the machine
   over. What earns the trip is the network: Xemu has no ethernet on macOS, so
-  `verify_filehost_hw.py` fetching a catalogue over TFTP is the only check the
-  wire ever gets. It writes nothing to the card and resumes the frozen program
+  `verify_filehost_hw.py` fetching a catalogue over HTTP is the only check the
+  wire ever gets -- and it needs no server stood up first, only a route out. It writes nothing to the card and resumes the frozen program
   whatever happens.
 
 ### Static analysis

@@ -15,4 +15,9 @@ void format_decimal(char* out, uint16_t v);
 char* append_str(char* at, const char* text);
 char* append_hex(char* at, int32_t value, uint8_t columns);
 char* append_dec(char* at, uint16_t value);
+
+/* The unsigned decimal `text` begins with, stopping at the first character
+ * that is not a digit.  The other direction from append_dec, and shared
+ * because two protocol decoders wanted the same six lines. */
+[[nodiscard]] uint32_t parse_dec(const char* text);
 char* append_dec2(char* at, uint8_t value);

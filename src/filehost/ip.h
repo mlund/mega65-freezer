@@ -7,7 +7,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* IPv4 and UDP: enough of RFC 791 and RFC 768 to carry TFTP, and no more --
+/* IPv4 and UDP: enough of RFC 791 and RFC 768 to carry DHCP, with the IPv4
+ * half serving TCP beside it, and no more --
  * building a datagram, reading one, and the one question about an address that
  * has to be answered before either.
  *
@@ -23,6 +24,12 @@
 
 constexpr uint8_t IPV4_HEADER_BYTES = 20;
 constexpr uint8_t UDP_HEADER_BYTES = 8;
+/* Where whatever IPv4 carries begins, options being refused rather than
+ * followed. */
+constexpr uint8_t IPV4_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES;
+/* The two protocol numbers this stack has adapters for, IANA's own. */
+constexpr uint8_t IPV4_PROTOCOL_TCP = 6;
+constexpr uint8_t IPV4_PROTOCOL_UDP = 17;
 /* Ethernet, IPv4 and UDP headers together: where a payload begins, and where
  * it always begins -- a header carrying options is refused rather than
  * followed, so this is a constant rather than a property of what arrived. */
@@ -64,6 +71,53 @@ constexpr uint8_t UDP_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES + UDP_HE
 [[nodiscard]] const uint8_t* ip_next_hop(
     const uint8_t* target, const uint8_t* us, const uint8_t* netmask, const uint8_t* router);
 
+/* The ethernet and IPv4 headers of a datagram carrying `payload_length` bytes
+ * of `protocol`, checksum included -- everything below the transport, and
+ * nothing of it.  The caller fills IPV4_PAYLOAD_AT onwards.
+ *
+ * Public because there are two adapters above it, UDP and TCP, and one copy of
+ * the checksum, the don't-fragment reasoning and the TTL is the point.  While
+ * there was one adapter this was rightly inlined in udp_build(). */
+void ipv4_build_header(uint8_t* frame,
+    const struct NetEndpoint* from,
+    const struct NetEndpoint* to,
+    uint8_t protocol,
+    uint16_t payload_length);
+
+/* What arrived, and who from.
+ *
+ * One struct for both layers rather than one per layer: IPv4 answers every
+ * field of it except the port, and the transport above fills that in where it
+ * has one.  Two identical structs and a copy between them measured 61 bytes
+ * for an answer that cannot differ. */
+struct Datagram {
+    /* Who sent it, in the shape a reply to them needs.  `port` is left alone
+     * by ipv4_parse(): IPv4 has no notion of one. */
+    struct NetEndpoint from;
+    /* What the header says follows it, checked against what the frame holds --
+     * so a caller may walk this many bytes from IPV4_PAYLOAD_AT. */
+    uint16_t payload_length;
+};
+
+/* True when `frame` is an IPv4 datagram of `protocol` for `us`, and then `out`
+ * describes it.  An all-zero `us->ip` accepts any destination, which is what a
+ * machine that has not been given an address yet must do to hear a DHCP offer.
+ *
+ * Refuses a header carrying options and a datagram in fragments: options would
+ * move every offset above, and half a datagram treated as a whole one is worse
+ * than a lost one. */
+[[nodiscard]] bool ipv4_parse(const uint8_t* frame,
+    uint16_t length,
+    const struct NetEndpoint* us,
+    uint8_t protocol,
+    struct Datagram* out);
+
+/* The twelve bytes RFC 768 and RFC 793 both have a transport checksum cover
+ * but neither transmits: the addresses, the protocol and the transport length
+ * again.  `payload_length` counts the transport header and its data. */
+[[nodiscard]] uint32_t ipv4_pseudo_sum(
+    const uint8_t* source, const uint8_t* destination, uint8_t protocol, uint16_t payload_length);
+
 /* Fills `frame` with an ethernet/IPv4/UDP datagram carrying `payload`, and
  * returns the whole frame's length.  The caller owns at least
  * UDP_PAYLOAD_AT + payload_length bytes. */
@@ -73,12 +127,6 @@ constexpr uint8_t UDP_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES + UDP_HE
     const uint8_t* payload,
     uint16_t payload_length);
 
-struct UdpDatagram {
-    /* Who sent it, in the shape a reply to them needs. */
-    struct NetEndpoint from;
-    uint16_t payload_length;
-};
-
 /* True when `frame` is a UDP datagram for `us`, and then `out` describes it;
  * its payload is at UDP_PAYLOAD_AT.  An all-zero `us->ip` accepts any
  * destination, which is what a machine that has not been given an address yet
@@ -87,4 +135,4 @@ struct UdpDatagram {
  * A wrong UDP checksum is a rejection; a zero one is not, since RFC 768 makes
  * it optional over IPv4 and says zero means it was not computed. */
 [[nodiscard]] bool udp_parse(
-    const uint8_t* frame, uint16_t length, const struct NetEndpoint* us, struct UdpDatagram* out);
+    const uint8_t* frame, uint16_t length, const struct NetEndpoint* us, struct Datagram* out);

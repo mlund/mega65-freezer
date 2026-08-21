@@ -24,19 +24,17 @@
  * and the frame this -- far memory, not the 16-bit window. */
 constexpr uint16_t DHCP_FRAME_BYTES = UDP_PAYLOAD_AT + 300;
 
-/* What a server told us.  `tftp` is the point of asking: options 150 and 66
- * are how a DHCP server names a TFTP server, which is the standard answer to
- * "where do I fetch from" and costs nothing once a lease is being taken
- * anyway.  A server that says nothing leaves `has_tftp` false, and finding the
- * gateway is then somebody else's problem. */
+/* What a server told us.
+ *
+ * `dns` is stored although nothing reads it yet: it is the one thing here that
+ * would let the proxy be named rather than addressed, which is what the Host
+ * header already needs and the address file carries by hand today. */
 struct DhcpLease {
     uint8_t ip[IPV4_BYTES];
     uint8_t server[IPV4_BYTES];
     uint8_t router[IPV4_BYTES];
     uint8_t dns[IPV4_BYTES];
     uint8_t netmask[IPV4_BYTES];
-    uint8_t tftp[IPV4_BYTES];
-    bool has_tftp;
 };
 
 /* How far the exchange got.  More than dhcp_leased() gives: still discovering

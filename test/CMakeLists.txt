@@ -8,12 +8,13 @@
 #
 #   cmake -DMEGA65_SERIAL=/dev/cu.usbserial-XXXXXXX -B build
 #
-# It also needs a TFTP server the machine can reach; see the script's header.
+# It also needs an ethernet cable and a route out; see the script's header.
 if(MEGA65_SERIAL AND Python3_FOUND)
     add_test(NAME filehost_fetch_hw
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_filehost_hw.py
-                --device ${MEGA65_SERIAL})
+                --device ${MEGA65_SERIAL} --elf $<TARGET_FILE:FILEHOST>.elf)
     set_tests_properties(filehost_fetch_hw PROPERTIES TIMEOUT 300)
+
 else()
     message(STATUS "hardware tests: skipped, set MEGA65_SERIAL to a serial monitor device")
 endif()
@@ -32,7 +33,8 @@ endif()
 # t_format.cpp.
 set(HOST_TESTS lineedit.c layout.c monitor/blockmove.c format.c
     screencode.c filehost/catalog.c filehost/shortname.c filehost/arp.c filehost/ip.c filehost/dhcp.c
-    filehost/tftp.c filehost/view.c filehost/prgload.c)
+    filehost/view.c filehost/prgload.c
+    filehost/tcp.c filehost/http.c filehost/jsoncat.c)
 
 # doctest is fetched at configure time, so a checkout with no network loses
 # these rather than failing.  Said out loud: a silently absent test reads
@@ -65,7 +67,7 @@ if(HOST_C_COMPILER AND HOST_CXX_COMPILER AND DOCTEST_INCLUDE_DIR)
     # Every header the tests reach through, so editing one rebuilds them.  A
     # declaration can change without its .c changing, and an object built
     # against the old one still links and still passes.
-    file(GLOB HOST_HEADERS ${HOST_HEADER_GLOBS})
+    file(GLOB HOST_HEADERS ${HOST_HEADER_GLOBS} ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
 
     # doctest's own implementation, compiled once and shared.
     set(HOST_OBJECTS doctest_main.o)

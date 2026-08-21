@@ -20,9 +20,11 @@ transfer stopped" is placed at one layer by which count falls short.
                      whether repeats are being answered, which is the doubling
                      a client must not do.
   eth_tx_busy        frames written over a transmitter still sending.
-  fetch_heard_count  frames that belonged to this transfer, repeats included.
-  fetch_block_count  frames that carried a new block.  Steady across
-                     duplication rates is the sign repeats are being refused.
+  counters           what the transport itself saw, from src/filehost/fetch.h:
+                     frames that belonged to this connection against the
+                     rotations above says how much of a promiscuous receiver's
+                     traffic was ours, and the dropped count is what decides
+                     whether receiving strictly in order is enough.
 
 Counting starts when the tool is loaded, so a run enters FILEHOST itself rather
 than finding it already there.  Needs a build with -DETH_COUNTERS=ON both on
@@ -34,7 +36,6 @@ reach where the failures are, and does write to the card.  Given neither, the
 counters of a transfer already run are read and the tool is left on screen.
 
     cmake -B build-eth -DETH_COUNTERS=ON && cmake --build build-eth
-    python3 test/tftp_test_server.py --root /tmp/tftproot --repeat-every 10
     python3 test/verify_ethcount_hw.py --device /dev/cu.usbserial-AQ027F6E \\
             --build build-eth/src --fetch 192.168.68.56:6970 \\
             --image "BLADE RUNNER"
@@ -55,8 +56,7 @@ import verify_filehost_hw
 TOOL_SCREEN = verify_filehost_hw.TOOL_SCREEN
 
 COUNTERS = ("eth_rx_rotates", "eth_rx_late", "eth_rx_norotate",
-            "eth_rx_no_free_buffers", "eth_sends", "eth_tx_busy", "fetch_heard_count",
-            "fetch_block_count",
+            "eth_rx_no_free_buffers", "eth_sends", "eth_tx_busy",
             )
 # Only in a -DSDCARD_COUNTERS=ON build.  Read when present, since what they
 # separate -- sectors written from sectors already holding the wanted bytes --
@@ -130,7 +130,7 @@ def fetch_catalog(machine: h.Machine, address: str) -> None:
     machine.wait_until(lambda s: "MEGA65 FILEHOST" in s, timeout=15.0)
 
     machine.press("t")
-    machine.wait_until(lambda s: "NEW TFTP SERVER" in s, timeout=10.0)
+    machine.wait_until(lambda s: "NEW PROXY" in s, timeout=10.0)
     machine.type_text(address)
     machine.press("return")
 
@@ -225,9 +225,7 @@ def report(machine: h.Machine) -> int:
         print(f"\nof {rotates} rotations, {read['eth_rx_late']} were read before the "
               f"window settled and {read['eth_rx_norotate']} never happened")
 
-    if "fetch_heard_count" in read:
-        print(f"{read['fetch_heard_count']} were TFTP words and "
-              f"{read['fetch_block_count']} advanced a file")
+    verify_filehost_hw.say_counters(machine)
     return 0
 
 

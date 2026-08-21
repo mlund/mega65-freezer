@@ -137,7 +137,7 @@ TEST_CASE("a datagram is accepted back whatever the payload length") {
             payload[i] = static_cast<uint8_t>(i * 7 + 1);
         }
         const auto f = build(payload);
-        UdpDatagram got{};
+        Datagram got{};
         REQUIRE(udp_parse(f.data(), static_cast<uint16_t>(f.size()), &at(THEIR_IP, 69), &got));
         CHECK(got.payload_length == n);
         CHECK(got.from.port == 4096);
@@ -160,7 +160,7 @@ TEST_CASE("a computed checksum is never sent as zero") {
 
     /* And it is still a checksum a receiver accepts, which 0x0000 would not
      * have been: 0xFFFF and 0x0000 are the same value in one's complement. */
-    UdpDatagram got{};
+    Datagram got{};
     CHECK(udp_parse(zero_case.data(), static_cast<uint16_t>(zero_case.size()),
                     &at(THEIR_IP, 69), &got));
 
@@ -170,7 +170,7 @@ TEST_CASE("a computed checksum is never sent as zero") {
 
 TEST_CASE("a LAN's other traffic is turned away") {
     const auto f = build({1, 2, 3, 4});
-    UdpDatagram got{};
+    Datagram got{};
     const uint16_t n = static_cast<uint16_t>(f.size());
 
     CHECK_FALSE(udp_parse(f.data(), n, &at(THEIR_IP, 70), &got));       // another port
@@ -219,7 +219,7 @@ TEST_CASE("a datagram claiming more than it carries is turned away") {
         return f;
     };
 
-    UdpDatagram got{};
+    Datagram got{};
     for (uint16_t claimed : {uint16_t(0xFFFF), uint16_t(0x8000), uint16_t(1400), uint16_t(13)}) {
         CAPTURE(claimed);
         const auto f = hostile(claimed);
@@ -239,14 +239,14 @@ TEST_CASE("a datagram claiming more than it carries is turned away") {
 TEST_CASE("ethernet padding is not payload") {
     auto f = build({1, 2, 3});
     f.resize(60, 0xAA);  // as the wire delivers it
-    UdpDatagram got{};
+    Datagram got{};
     REQUIRE(udp_parse(f.data(), 60, &at(THEIR_IP, 69), &got));
     CHECK(got.payload_length == 3);
 }
 
 TEST_CASE("a corrupted datagram is rejected") {
     const auto f = build({1, 2, 3, 4});
-    UdpDatagram got{};
+    Datagram got{};
 
     auto broken = f;
     broken[25] ^= 0x01;  // a bit of the header
@@ -265,7 +265,7 @@ TEST_CASE("a datagram with no UDP checksum is accepted") {
     auto f = build({1, 2, 3, 4});
     f[40] = 0;
     f[41] = 0;
-    UdpDatagram got{};
+    Datagram got{};
     CHECK(udp_parse(f.data(), static_cast<uint16_t>(f.size()), &at(THEIR_IP, 69), &got));
 }
 
@@ -274,7 +274,7 @@ TEST_CASE("a datagram with no UDP checksum is accepted") {
 TEST_CASE("with no address of our own, any destination is ours") {
     const auto f = build({1, 2, 3, 4});
     const std::array<uint8_t, 4> none = {0, 0, 0, 0};
-    UdpDatagram got{};
+    Datagram got{};
     CHECK(udp_parse(f.data(), static_cast<uint16_t>(f.size()), &at(none, 69), &got));
 }
 
@@ -294,7 +294,7 @@ TEST_CASE("a datagram from elsewhere parses and verifies") {
     /* The header sums to zero, which is the receiver's own test of it. */
     CHECK(sums_to_zero(elsewhere + 14, 20));
 
-    UdpDatagram got{};
+    Datagram got{};
     REQUIRE(udp_parse(elsewhere, sizeof elsewhere, &at(to, 53), &got));
     CHECK(got.from.port == 0xc350);
     CHECK(got.payload_length == 0x28 - 8);
@@ -372,6 +372,128 @@ TEST_CASE("the next hop is the target on this network and the router off it") {
      * than routing every datagram to an address that may also be zero. */
     const std::array<uint8_t, 4> none = {0, 0, 0, 0};
     CHECK(ip_next_hop(away.data(), us.data(), none.data(), router.data()) == away.data());
+}
+
+/* --- The IPv4 layer on its own, which UDP is now one adapter of and TCP the
+ * other.  Checked against the same bytes udp_build() produces, because the
+ * point of the seam is that it changed nothing on the wire. --------------- */
+
+TEST_CASE("a 32-bit field goes out big-endian and comes back") {
+    uint8_t at[4] = {0xEE, 0xEE, 0xEE, 0xEE};
+    net_put32(at, 0x01020304);
+    CHECK(at[0] == 0x01);
+    CHECK(at[1] == 0x02);
+    CHECK(at[2] == 0x03);
+    CHECK(at[3] == 0x04);
+    CHECK(net_get32(at) == 0x01020304u);
+    /* The top bit set, where a signed accumulator would wrap. */
+    net_put32(at, 0xFFFFFFFFu);
+    CHECK(net_get32(at) == 0xFFFFFFFFu);
+    net_put32(at, 0x80000000u);
+    CHECK(net_get32(at) == 0x80000000u);
+}
+
+/* The header udp_build() writes, byte for byte, from the seam underneath it.
+ * If these ever differ the extraction changed the wire. */
+TEST_CASE("the extracted header is the one UDP was already writing") {
+    const std::vector<uint8_t> payload(9, 0x5A);
+    const auto whole = build(payload);
+
+    std::vector<uint8_t> f(whole.size(), 0xEE);
+    const NetEndpoint us = endpoint(OUR_MAC, OUR_IP, 4096);
+    const NetEndpoint them = endpoint(THEIR_MAC, THEIR_IP, 69);
+    ipv4_build_header(f.data(), &us, &them, IPV4_PROTOCOL_UDP,
+                      static_cast<uint16_t>(UDP_HEADER_BYTES + payload.size()));
+    for (size_t i = 0; i < IPV4_PAYLOAD_AT; i++) {
+        CAPTURE(i);
+        CHECK(f[i] == whole[i]);
+    }
+    /* And nothing past the header it was asked for. */
+    for (size_t i = IPV4_PAYLOAD_AT; i < f.size(); i++) {
+        CHECK(f[i] == 0xEE);
+    }
+    CHECK(IPV4_PAYLOAD_AT == 34);
+}
+
+TEST_CASE("the protocol byte is the one it was given") {
+    std::vector<uint8_t> f(IPV4_PAYLOAD_AT + 4, 0xEE);
+    const NetEndpoint us = endpoint(OUR_MAC, OUR_IP, 0);
+    const NetEndpoint them = endpoint(THEIR_MAC, THEIR_IP, 0);
+    ipv4_build_header(f.data(), &us, &them, IPV4_PROTOCOL_TCP, 4);
+    CHECK(f[23] == 6);
+    CHECK(at16(f, 16) == 20 + 4);
+    CHECK(sums_to_zero(f.data() + 14, 20));
+    CHECK(IPV4_PROTOCOL_TCP == 6);
+    CHECK(IPV4_PROTOCOL_UDP == 17);
+}
+
+TEST_CASE("a datagram is read back through the layer that built it") {
+    const std::vector<uint8_t> payload(31, 0xC3);
+    const auto f = build(payload);
+    Datagram got{};
+    CHECK(ipv4_parse(f.data(), static_cast<uint16_t>(f.size()), &at(THEIR_IP, 69),
+                     IPV4_PROTOCOL_UDP, &got));
+    CHECK(got.payload_length == UDP_HEADER_BYTES + payload.size());
+    for (int i = 0; i < 4; i++) {
+        CHECK(got.from.ip[i] == OUR_IP[i]);
+    }
+    for (int i = 0; i < 6; i++) {
+        CHECK(got.from.mac[i] == OUR_MAC[i]);
+    }
+}
+
+/* The protocol is the caller's question, so a TCP segment is not a UDP one
+ * however well formed it is -- this is the whole of what keeps two adapters
+ * on one wire apart. */
+TEST_CASE("another protocol's datagram belongs to the other adapter") {
+    auto f = build(std::vector<uint8_t>(4, 0));
+    Datagram got{};
+    CHECK_FALSE(ipv4_parse(f.data(), static_cast<uint16_t>(f.size()), &at(THEIR_IP, 69),
+                           IPV4_PROTOCOL_TCP, &got));
+    CHECK(ipv4_parse(f.data(), static_cast<uint16_t>(f.size()), &at(THEIR_IP, 69),
+                     IPV4_PROTOCOL_UDP, &got));
+}
+
+/* A short frame must be refused before any offset in it is read, or the
+ * length the header states is read from beyond the buffer. */
+TEST_CASE("a frame shorter than the headers is refused") {
+    const auto f = build(std::vector<uint8_t>(4, 0));
+    Datagram got{};
+    for (uint16_t n = 0; n < IPV4_PAYLOAD_AT; n++) {
+        CAPTURE(n);
+        CHECK_FALSE(ipv4_parse(f.data(), n, &at(THEIR_IP, 69), IPV4_PROTOCOL_UDP, &got));
+    }
+}
+
+/* The total length is what says where the payload ends, so one claiming more
+ * than the frame holds must not become a length the caller walks. */
+TEST_CASE("a header claiming more than the frame carries is refused") {
+    auto f = build(std::vector<uint8_t>(4, 0));
+    f[16] = 0;
+    f[17] = 200;  // 200 bytes of IPv4, in a frame that has 42
+    // the header checksum has to still be right, or that is what refuses it
+    f[24] = 0;
+    f[25] = 0;
+    const uint16_t sum = ip_sum_final(ip_sum(0, f.data() + 14, 20));
+    f[24] = static_cast<uint8_t>(sum >> 8);
+    f[25] = static_cast<uint8_t>(sum);
+    Datagram got{};
+    CHECK_FALSE(ipv4_parse(f.data(), static_cast<uint16_t>(f.size()), &at(THEIR_IP, 69),
+                           IPV4_PROTOCOL_UDP, &got));
+}
+
+/* Two adapters, one accumulator: the pseudo header differs from UDP's only in
+ * the protocol byte, so the sum a TCP segment is checked with must differ from
+ * a UDP one of the same shape by exactly that. */
+TEST_CASE("the pseudo header carries the protocol it was given") {
+    const std::array<uint8_t, 4> a = {10, 0, 0, 1};
+    const std::array<uint8_t, 4> b = {10, 0, 0, 2};
+    const uint32_t udp = ipv4_pseudo_sum(a.data(), b.data(), IPV4_PROTOCOL_UDP, 40);
+    const uint32_t tcp = ipv4_pseudo_sum(a.data(), b.data(), IPV4_PROTOCOL_TCP, 40);
+    CHECK(udp - tcp == IPV4_PROTOCOL_UDP - IPV4_PROTOCOL_TCP);
+    /* And the length is in it: RFC 768 and RFC 793 both count the transport
+     * header and its data, which is not a field the datagram repeats. */
+    CHECK(ipv4_pseudo_sum(a.data(), b.data(), IPV4_PROTOCOL_TCP, 41) - tcp == 1);
 }
 
 }  // TEST_SUITE

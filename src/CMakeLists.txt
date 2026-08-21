@@ -52,8 +52,8 @@ endif()
 
 # Ethernet diagnostics.  Off by default so a shipping build carries neither
 # the counters nor the increments; on, the hardware scenario reads them by
-# name to separate controller, TFTP and transmit failures.
-option(ETH_COUNTERS "Count Ethernet and TFTP diagnostic events" OFF)
+# name to separate controller, transport and transmit failures.
+option(ETH_COUNTERS "Count Ethernet and transport diagnostic events" OFF)
 if(ETH_COUNTERS)
     add_compile_definitions(ETH_COUNTERS)
 endif()
@@ -212,7 +212,8 @@ add_m65(SPRITED  sprited/main.c sprited/editor.c sprited/textout.c lineedit.c)
 add_m65(MEGAINFO megainfo/main.c megainfo/info.c layout.c)
 add_m65(FILEHOST filehost/main.c filehost/catalog.c filehost/shortname.c
                  filehost/eth.c filehost/arp.c filehost/ip.c filehost/dhcp.c
-                 filehost/netpoll.c filehost/tftp.c filehost/fetch.c filehost/view.c filehost/prgload.c
+                 filehost/netpoll.c filehost/tcp.c filehost/http.c filehost/jsoncat.c
+                 filehost/fetch.c filehost/view.c filehost/prgload.c
                  lineedit.c fat32.c layout.c filehost/menu.cpp)
 
 # Card payloads: not linked into any tool, but built here because they are
@@ -283,21 +284,6 @@ if(LINK_LIBC)
         ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
     set_target_properties(test_freezeslot PROPERTIES OUTPUT_NAME test_freezeslot.prg)
 
-    # What the ethernet controller delivers, written to a sector the host reads
-    # back.  Not a CTest entry: there is no ethernet under Xemu on macOS, so
-    # this is run by hand against hardware.  See test/ethtest.c.
-    add_executable(ethtest ${CMAKE_SOURCE_DIR}/test/ethtest.c
-        filehost/eth.c filehost/arp.c filehost/ip.c filehost/dhcp.c filehost/netpoll.c
-        filehost/tftp.c ${COMMON})
-    add_dependencies(ethtest version_stamp)
-    target_compile_options(ethtest PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
-    target_compile_definitions(ethtest PRIVATE SCREEN_CELL_BYTES=2)
-    target_include_directories(ethtest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/filehost)
-    target_link_libraries(ethtest mega65libc mega65sdk)
-    target_link_options(ethtest PRIVATE -mlto-zp=16
-        ${CMAKE_CURRENT_SOURCE_DIR}/lowmem.ld
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_freezeslot.ld)
-    set_target_properties(ethtest PROPERTIES OUTPUT_NAME ethtest.prg)
 
     # What a multi-sector write costs against one at a time.  Also run by hand
     # against hardware -- the card routines' CMD25 calls have never executed.

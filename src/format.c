@@ -98,3 +98,11 @@ char* append_dec2(char* at, uint8_t value) {
     *at++ = (char)('0' + value % 10);
     return at;
 }
+
+uint32_t parse_dec(const char* text) {
+    uint32_t value = 0;
+    for (; *text >= '0' && *text <= '9'; text++) {
+        value = value * 10 + (uint8_t)(*text - '0');
+    }
+    return value;
+}

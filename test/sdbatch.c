@@ -153,8 +153,8 @@ int main(void) {
     m65_io_enable();
     sdcard_open();
     sdcard_visual_feedback(0);
-    /* The two a program writing sectors must set for itself, as test/ethtest.c
-     * and src/freezer/main.c do.  Without the first, sdcard.c addresses the
+    /* The two a program writing sectors must set for itself, as
+     * src/freezer/main.c does.  Without the first, sdcard.c addresses the
      * card in bytes rather than sectors and the controller never reports the
      * transfer complete; without the second, a write ships whatever the
      * floppy's buffer last held, both planes living at $FFD6E00. */

@@ -134,9 +134,10 @@ STEPS = [
     # the lease and the tool has to say so and put the card's catalogue back
     # rather than sit waiting -- the one part of the network path that can be
     # tested without a wire, and the part a user meets most often.
-    # Seen starting before its failure means anything: start-up has already
-    # left the same message on the status line, so without this the step passes
-    # on the previous screen even if the key did nothing.
+    #
+    # Nothing fetches at start-up any more, so this key is the first thing to
+    # touch the wire: seen starting before it fails is what proves the key did
+    # something rather than the screen already saying it.
     ("key", "f"),
     ("expect", "FETCHING THE CATALOGUE"),
     ("expect", "NO ADDRESS: NOTHING ANSWERED", 30),
@@ -151,12 +152,16 @@ STEPS = [
     ("key", "f"),
     ("key", "stop"),
     ("expect", "THE FETCH WAS STOPPED", 30),
-    # And an address typed in, since a household router names no TFTP server.
+    # And an address typed in.  Nothing names a proxy for us: a household
+    # router has no option for one, and this card carries no address file, so
+    # what the prompt says before anything is typed is that there is no proxy
+    # at all.
+    #
     # The field opens empty with the one in force named in the prompt, so what
     # the prompt says the second time is the only proof from outside that what
     # was typed the first time was kept rather than merely echoed.
     ("key", "t"),
-    ("expect", "NOW 192.168.68.57:6969"),
+    ("expect", "NOW 0.0.0.0"),
     # With a port, since a gateway on one of its own needs no root to run.
     ("type", "10.1.2.3:6969"),
     ("key", "return"),

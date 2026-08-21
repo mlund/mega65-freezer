@@ -28,6 +28,19 @@ static inline void net_put16(uint8_t* at, uint16_t value) {
     return (uint16_t)(((uint16_t)at[0] << 8) | at[1]);
 }
 
+/* The same, four bytes wide, for the sequence numbers RFC 793 counts a
+ * connection with -- the one field on this wire that does not fit sixteen
+ * bits. */
+static inline void net_put32(uint8_t* at, uint32_t value) {
+    net_put16(at, (uint16_t)(value >> 16));
+    net_put16(at + 2, (uint16_t)value);
+}
+
+/* Reads one back. */
+[[nodiscard]] static inline uint32_t net_get32(const uint8_t* at) {
+    return ((uint32_t)net_get16(at) << 16) | net_get16(at + 2);
+}
+
 /* Whether an address is all zeros, which across this stack means "not yet
  * given one": nothing claims such an address, answers for it, or matches
  * against it. */

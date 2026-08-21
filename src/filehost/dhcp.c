@@ -36,7 +36,6 @@ static constexpr uint8_t OPTION_REQUESTED_IP = 50;
 static constexpr uint8_t OPTION_MESSAGE_TYPE = 53;
 static constexpr uint8_t OPTION_SERVER_ID = 54;
 static constexpr uint8_t OPTION_PARAMETER_LIST = 55;
-static constexpr uint8_t OPTION_TFTP_ADDRESS = 150;
 static constexpr uint8_t OPTION_PAD = 0;
 static constexpr uint8_t OPTION_END = 255;
 
@@ -63,26 +62,21 @@ enum DhcpMessage : uint8_t {
  *
  * The requested ones come first, so the parameter list is a prefix of this
  * table rather than a second copy of it.  Asking for an option the walk cannot
- * store, and storing one never asked for, are both silent -- and the first is
- * how option 66 came to be requested and dropped.
+ * store, and storing one never asked for, are both silent.
  *
- * 66 is absent deliberately: it names a TFTP server rather than addressing
- * one, and resolving a name needs a resolver this does not have.  Option 6 is
- * asked for even so, being the address of the resolver -- the thing that would
- * make 66 usable rather than another thing that needs one. */
-static constexpr uint8_t ADDRESS_OPTIONS = 5;
-static constexpr uint8_t REQUESTED_OPTIONS = 4;
+ * Option 6 is the address of a resolver, which is the thing that would let a
+ * proxy be named rather than addressed.  Nothing reads it yet. */
+static constexpr uint8_t ADDRESS_OPTIONS = 4;
+static constexpr uint8_t REQUESTED_OPTIONS = 3;
 static const uint8_t ADDRESS_OPTION[ADDRESS_OPTIONS] = {OPTION_NETMASK,
     OPTION_ROUTER,
     OPTION_DNS,
-    OPTION_TFTP_ADDRESS,
     /* Always volunteered, never requested. */
     OPTION_SERVER_ID};
 static const uint8_t ADDRESS_FIELD[ADDRESS_OPTIONS] = {
     offsetof(struct DhcpLease, netmask),
     offsetof(struct DhcpLease, router),
     offsetof(struct DhcpLease, dns),
-    offsetof(struct DhcpLease, tftp),
     offsetof(struct DhcpLease, server),
 };
 
@@ -200,9 +194,6 @@ static enum DhcpMessage dhcp_parse(const uint8_t* payload,
             for (uint8_t i = 0; i < ADDRESS_OPTIONS; i++) {
                 if (ADDRESS_OPTION[i] == option) {
                     memcpy((uint8_t*)found + ADDRESS_FIELD[i], &payload[value], IPV4_BYTES);
-                    if (option == OPTION_TFTP_ADDRESS) {
-                        found->has_tftp = true;
-                    }
                     break;
                 }
             }
@@ -247,7 +238,7 @@ uint16_t dhcp_step(struct DhcpClient* client, const uint8_t* in, uint16_t in_len
     endpoints(client, &us, &server);
 
     if (in_length) {
-        struct UdpDatagram datagram;
+        struct Datagram datagram;
         if (!udp_parse(in, in_length, &us, &datagram)) {
             return 0;
         }

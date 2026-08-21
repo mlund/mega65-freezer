@@ -180,12 +180,17 @@ TEST_CASE("the exchange opens with a discover saying who is asking") {
     CHECK(p[242] == 1);   // DHCPDISCOVER
     CHECK_FALSE(dhcp_leased(&client.c));
 
-    /* The parameter list has to ask for a TFTP server, or no server will
-     * volunteer one and the whole reason for reading option 150 is gone. */
+    /* The parameter list has to ask for a router, or a machine that can reach
+     * its own subnet and nothing beyond it looks exactly like a working one --
+     * and the proxy is never on the subnet.
+     *
+     * Nothing asks for 150 any more: it names a TFTP server, and nothing
+     * fetches over TFTP. */
     const auto wanted = option_of(p, 55);
     REQUIRE_FALSE(wanted.empty());
-    CHECK(std::find(wanted.begin(), wanted.end(), 150) != wanted.end());
     CHECK(std::find(wanted.begin(), wanted.end(), 3) != wanted.end());
+    CHECK(std::find(wanted.begin(), wanted.end(), 1) != wanted.end());
+    CHECK(std::find(wanted.begin(), wanted.end(), 150) == wanted.end());
 }
 
 /* The transport is the module's now, so it is the module that has to get it
@@ -256,6 +261,9 @@ TEST_CASE("an offer is read for everything it carries") {
     r.option(3, {192, 168, 68, 1});
     r.option(6, {192, 168, 68, 1});
     r.option(54, {192, 168, 68, 1});
+    /* An option this client does not store, which must be walked past rather
+     * than mistaken for one it does: 150 named a TFTP server, and nothing
+     * fetches over TFTP any more. */
     r.option(150, {192, 168, 68, 57});
     r.end();
 
@@ -265,8 +273,6 @@ TEST_CASE("an offer is read for everything it carries") {
     CHECK(client.c.lease.router[3] == 1);
     CHECK(client.c.lease.dns[3] == 1);
     CHECK(client.c.lease.server[3] == 1);
-    CHECK(client.c.lease.has_tftp);
-    CHECK(client.c.lease.tftp[3] == 57);
 }
 
 TEST_CASE("an acknowledgement ends the exchange") {
@@ -274,14 +280,13 @@ TEST_CASE("an acknowledgement ends the exchange") {
     REQUIRE_FALSE(client.offered().empty());
 
     Reply ack(5, client.c.xid);
-    ack.option(150, {192, 168, 68, 57});
+    ack.option(54, {192, 168, 68, 1});
     ack.end();
     /* Nothing left to send, and nothing a later timeout should send either. */
     CHECK(client.step(ack.frame()).empty());
     CHECK(dhcp_leased(&client.c));
     CHECK(client.timeout().empty());
     CHECK(client.c.lease.ip[3] == 120);
-    CHECK(client.c.lease.has_tftp);
 }
 
 /* RFC 2131 has no acknowledgement that answers a discover, so one arriving
@@ -303,18 +308,22 @@ TEST_CASE("an acknowledgement nobody asked for is refused") {
     CHECK(p[242] == 1);
 }
 
-/* Most servers say nothing about TFTP, and that must not read as a server at
- * address zero. */
-TEST_CASE("a lease without a TFTP server says so") {
+/* An option carrying an address this client has no field for must be stepped
+ * over by its stated length like any other.  Read as one it does store, the
+ * lease comes back naming somebody else's machine as the router. */
+TEST_CASE("an option this client does not store is walked past") {
     Client client;
     REQUIRE_FALSE(client.offered().empty());
 
     Reply ack(5, client.c.xid);
+    ack.option(150, {10, 9, 8, 7});
+    ack.option(3, {192, 168, 68, 1});
     ack.option(54, {192, 168, 68, 1});
     ack.end();
     CHECK(client.step(ack.frame()).empty());
     REQUIRE(dhcp_leased(&client.c));
-    CHECK_FALSE(client.c.lease.has_tftp);
+    CHECK(client.c.lease.router[3] == 1);
+    CHECK(client.c.lease.ip[3] == 120);
 }
 
 /* The address asked for is not ours to have.  Sitting in the requesting stage
