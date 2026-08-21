@@ -207,11 +207,8 @@ static uint32_t last_dir_cluster;
  * another onto; only creating cares.
  *
  * One walk rather than two: removing a file asks the same question as creating
- * one, and a second copy is a second place for the cluster arithmetic to be
- * wrong.
- *
- * Out of line: MAKEDISK has only the one caller, and letting it inline there
- * measured 104 bytes more. */
+ * one, and a second copy is a second place to get the arithmetic wrong.  Out of
+ * line because inlining it into MAKEDISK's one caller measured 104 bytes more. */
 __attribute__((noinline)) static enum FatSlot find_in_root(const char* name) {
     uint32_t cluster = 2;
     while (cluster >= 2 && !fat_is_end_of_chain(cluster)) {
@@ -293,24 +290,11 @@ bool fat32_delete_file(const char* name) {
     return true;
 }
 
-/*
-  Create a file in the root directory of the new FAT32 filesystem
-  with the indicated name and size.
-
-  The file will be created contiguous on disk, and the first
-  sector of the created file returned.
-
-  The root directory is the start of cluster 2, and clusters are
-  assumed to be 4KB in size, to keep things simple.
-
-  XXX -- Should allow creation of files in sub-directories
-
-*/
 bool fat32_write_file_sector(
     uint32_t first_sector, uint32_t offset, const uint8_t* bytes, uint16_t length) {
     lcopy_near(bytes, sector_buffer, length);
     if (length < SD_SECTOR_SIZE) {
-        lfill_near(&sector_buffer[length], 0, SD_SECTOR_SIZE - length);
+        lfill((Addr28)(uint16_t)&sector_buffer[length], 0, SD_SECTOR_SIZE - length);
     }
     return sdcard_writesector(first_sector + offset / SD_SECTOR_SIZE, 0);
 }
@@ -349,6 +333,10 @@ bool fat32_write_file_sectors(
     return true;
 }
 
+/* A contiguous file of `size` in the root directory, returning its first
+ * sector.  Contiguous because the hardware mounts an image by counting sectors
+ * rather than walking the FAT.  Clusters are assumed 4KB, and the root
+ * directory the start of cluster 2; sub-directories are not handled. */
 uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
     uint16_t offset;
     uint16_t j;
