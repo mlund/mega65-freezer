@@ -7,6 +7,14 @@ set(LLVM_MOS_PLATFORM c64)
 find_package(llvm-mos-sdk REQUIRED)
 project(freezemenu LANGUAGES C CXX ASM)
 
+# The SDK's toolchain defaults the build type to MinSizeRel, whose stock flags
+# are "-Os -DNDEBUG".  -Oz is smaller than -Os on every target here, so it is
+# the one optimisation flag rather than a second one appended after it -- and
+# set at this level it reaches mega65-libc too, which add_compile_options() in
+# src/ never did.
+set(CMAKE_C_FLAGS_MINSIZEREL "-Oz -DNDEBUG" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS_MINSIZEREL "-Oz -DNDEBUG" CACHE STRING "" FORCE)
+
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
