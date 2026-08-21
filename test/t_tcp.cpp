@@ -11,13 +11,23 @@
  * pinned independently in t_ip.cpp -- against RFC 1071's worked example and
  * against a receiver's own check that a header sums to zero.
  *
- * Four of the cases below are here because WeeIP gets them wrong and the bugs
- * are invisible until they are not: a segment carrying options, whose payload
- * length WeeIP computes by subtracting a constant 40; the SYN's one sequence
- * number, which WeeIP adds behind a guard that is false on the first packet;
- * sequence comparison across the wrap; and an inbound checksum, which WeeIP
- * never verifies at all.  A wrong payload length copies option bytes into the
- * file, and nothing reports it. */
+ * Three of the cases below are here because WeeIP, the 6502 stack this could
+ * have been a port of, gets them wrong -- and the bugs are invisible until
+ * they are not.  Checked against its source rather than taken on trust:
+ *
+ *   - a segment carrying options: nwk.c:669 is `data_size -= 40`, above a
+ *     comment of its own admitting it assumes there are none;
+ *   - the SYN's one sequence number, spent in two conditional places at
+ *     nwk.c:436-437 rather than once;
+ *   - an inbound checksum: nwk.c:573-577 verifies the IPv4 header, and
+ *     nothing anywhere verifies TCP's.
+ *
+ * The wrap is tested here too, but not for that reason: nwk.c:660 subtracts
+ * before comparing, which is right, and it is the case a test is most likely
+ * to be missing rather than the case somebody got wrong.
+ *
+ * A wrong payload length copies option bytes into the file, and nothing
+ * reports it. */
 
 #include <array>
 #include <cstring>

@@ -159,8 +159,10 @@ static bool take(struct TcpClient* client, const uint8_t* in, uint16_t in_length
             return false;
         }
         /* Our SYN consumed one sequence number, unconditionally and here
-         * alone.  Applied in two places behind a guard, as WeeIP does, it is
-         * false on the very first packet and every byte after it is one out. */
+         * alone.  WeeIP spends it in two conditional places instead
+         * (nwk.c:436-437, on the flags being sent rather than on what was
+         * acknowledged); two rules for one increment is one too many, and a
+         * sequence number out by one puts every byte after it out by one. */
         if (acknowledged != client->send_next) {
             return false;
         }
