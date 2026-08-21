@@ -308,9 +308,9 @@ bool fat32_delete_file(const char* name) {
 */
 bool fat32_write_file_sector(
     uint32_t first_sector, uint32_t offset, const uint8_t* bytes, uint16_t length) {
-    lcopy((Addr28)(uint16_t)bytes, (Addr28)(uint16_t)sector_buffer, length);
+    lcopy_near(bytes, sector_buffer, length);
     if (length < SD_SECTOR_SIZE) {
-        lfill((Addr28)(uint16_t)&sector_buffer[length], 0, SD_SECTOR_SIZE - length);
+        lfill_near(&sector_buffer[length], 0, SD_SECTOR_SIZE - length);
     }
     return sdcard_writesector(first_sector + offset / SD_SECTOR_SIZE, 0);
 }
@@ -324,7 +324,7 @@ bool fat32_write_file_sectors(
 
     for (uint8_t block = 0; block < count; block++) {
         const uint16_t byte_offset = (uint16_t)block * SD_SECTOR_SIZE;
-        lcopy((Addr28)(uint16_t)&bytes[byte_offset], (Addr28)(uint16_t)sector_buffer, SD_SECTOR_SIZE);
+        lcopy_near(&bytes[byte_offset], sector_buffer, SD_SECTOR_SIZE);
         const bool wrote = block == 0 ? sdcard_writefirstsector(first)
             : block + 1 == count ? sdcard_writelastsector()
                                  : sdcard_writenextsector();

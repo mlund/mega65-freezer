@@ -193,7 +193,7 @@ void sdcard_readsector(const uint32_t sector_number) {
 
         if (!(SDCARD.status & SD_STATUS_UNSETTLED)) {
             // Copy data from hardware sector buffer via DMA
-            lcopy(SD_SECTORBUFFER, (Addr28)sector_buffer, SD_SECTOR_SIZE);
+            lcopy_in(SD_SECTORBUFFER, sector_buffer, SD_SECTOR_SIZE);
 
             return;
         }
@@ -279,7 +279,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     PHASE_MAX(sd_polls_before_read, sector_number);
 
     // Copy the read data to a buffer for verification
-    lcopy(SD_SECTORBUFFER, (Addr28)sd_verify_buffer, SD_SECTOR_SIZE);
+    lcopy_in(SD_SECTORBUFFER, sd_verify_buffer, SD_SECTOR_SIZE);
 
     uint16_t i;
     for (i = 0; i < SD_SECTOR_SIZE; i++) {
@@ -296,7 +296,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
         DEBUG_COUNT(sd_writes);
 
         // Copy data to hardware sector buffer via DMA
-        lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+        lcopy_out(sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
 
         if (!ready_or_refuse()) {
             DEBUG_COUNT(sd_write_failures);
@@ -330,7 +330,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             }
 
             // Copy the read data to a buffer for verification
-            lcopy(SD_SECTORBUFFER, (Addr28)sd_verify_buffer, SD_SECTOR_SIZE);
+            lcopy_in(SD_SECTORBUFFER, sd_verify_buffer, SD_SECTOR_SIZE);
 
             for (i = 0; i < SD_SECTOR_SIZE; i++) {
                 if (sector_buffer[i] != sd_verify_buffer[i]) {
@@ -416,7 +416,7 @@ bool sdcard_writefirstsector(const uint32_t sector_number) {
     if (!sdcard_ready()) {
         return false;
     }
-    lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    lcopy_out(sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
     DEBUG_COUNT(sd_writes);
     SDCARD.command = SDCARD_WRITE_GATE;
     SDCARD.command = SDCARD_WRITE_MULTI_FIRST;
@@ -436,7 +436,7 @@ bool sdcard_writenextsector(void) {
     if (!sdcard_ready()) {
         return false;
     }
-    lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    lcopy_out(sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
     DEBUG_COUNT(sd_writes);
     SDCARD.command = SDCARD_WRITE_GATE;
     SDCARD.command = SDCARD_WRITE_MULTI_NEXT;
@@ -451,7 +451,7 @@ bool sdcard_writelastsector(void) {
     if (!sdcard_ready()) {
         return false;
     }
-    lcopy((Addr28)sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
+    lcopy_out(sector_buffer, SD_SECTORBUFFER, SD_SECTOR_SIZE);
     DEBUG_COUNT(sd_writes);
     SDCARD.command = SDCARD_WRITE_GATE;
     SDCARD.command = SDCARD_WRITE_MULTI_LAST;

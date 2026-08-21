@@ -16,6 +16,23 @@ __attribute__((leaf)) uint8_t lpeek(uint32_t address);
 __attribute__((leaf)) void lpoke(uint32_t address, uint8_t value);
 
 void lcopy(Addr28 source_address, Addr28 destination_address, uint16_t count);
+
+/* The same copy and fill, for addresses the CPU can name directly.
+ *
+ * Two of an Addr28's four bytes are always zero below $10000, and this ABI
+ * carries two argument bytes free and charges about four bytes of code for
+ * each one after them, at every call site.  Widening a near pointer in here
+ * rather than out there is eight bytes per site for one such address and
+ * sixteen for two, against one body each.
+ *
+ * Out of line for that reason: inlined, the widening folds back into the
+ * caller and there is nothing left to save.  And a pointer rather than an
+ * integer deliberately -- the compiler then refuses a far address here, which
+ * is the one mistake this shape invites. */
+__attribute__((noinline)) void lcopy_near(const void* from, void* to, uint16_t count);
+__attribute__((noinline)) void lcopy_out(const void* from, Addr28 to, uint16_t count);
+__attribute__((noinline)) void lcopy_in(Addr28 from, void* to, uint16_t count);
+__attribute__((noinline)) void lfill_near(void* at, uint8_t value, uint16_t count);
 void lfill(Addr28 destination_address, unsigned char value, uint16_t count);
 
 /* As above, but stepping the destination `skip` bytes at a time, which is what

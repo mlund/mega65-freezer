@@ -109,6 +109,22 @@ void lcopy(Addr28 source_address, Addr28 destination_address, uint16_t count) {
     lcopy_skip(source_address, destination_address, count, 1);
 }
 
+void lcopy_near(const void* from, void* to, uint16_t count) {
+    lcopy_skip((Addr28)(uint16_t)from, (Addr28)(uint16_t)to, count, 1);
+}
+
+void lcopy_out(const void* from, Addr28 to, uint16_t count) {
+    lcopy_skip((Addr28)(uint16_t)from, to, count, 1);
+}
+
+void lcopy_in(Addr28 from, void* to, uint16_t count) {
+    lcopy_skip(from, (Addr28)(uint16_t)to, count, 1);
+}
+
+void lfill_near(void* at, uint8_t value, uint16_t count) {
+    lfill_skip((Addr28)(uint16_t)at, value, count, 1);
+}
+
 void lfill(Addr28 destination_address, unsigned char value, uint16_t count) {
     lfill_skip(destination_address, value, count, 1);
 }
