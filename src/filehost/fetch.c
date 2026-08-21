@@ -52,9 +52,9 @@ static bool store_stage(uint32_t offset, uint16_t bytes) {
 }
 
 /* Counted in video frames rather than in poll iterations: the poll must run
- * tight, because the controller queues only three frames and three of them
- * arrive in nineteen microseconds, so a loop that sleeps between looks drops
- * what it is waiting for.
+ * tight: the controller has room for three frames while this is busy (eth.c),
+ * and three arrive in nineteen microseconds, so a loop that sleeps between
+ * looks drops what it is waiting for.
  *
  * Only the physical raster's high bits ($D053.0-2), which read 0 below line
  * 256 and 1 above it, so one register says where in the frame we are and a
@@ -70,17 +70,24 @@ static uint8_t frames_since_said;
  * from the far end winds that one back to zero.  Counted here rather than by
  * watching frames_elapsed change from the poll loop, which cost a 16-bit load,
  * compare and branch on every iteration of the loop that must run tightest. */
+#ifdef ETH_COUNTERS
 static uint16_t frames_total;
+#endif
 static bool stopped;
 
+#ifdef ETH_COUNTERS
 struct FetchCounters fetch_counters;
+#define COUNT_FETCH(what) (what)
+#else
+#define COUNT_FETCH(what) ((void)0)
+#endif
 
 static void tick(void) {
     const uint8_t now = VICIV.fn_raster_msb & RASTER_HIGH;
     if (now < last_high) {
         frames_elapsed++;
         frames_since_said++;
-        frames_total++;
+        COUNT_FETCH(frames_total++);
         /* The keyboard is read here rather than in the loops that call this:
          * once a frame catches a key a hand can press, and the poll around it
          * runs thousands of times a second with three frames of room. */
@@ -251,7 +258,7 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
     *length = 0;
     status_code = 0;
     stopped = false;
-    fetch_counters = (struct FetchCounters){0};
+    COUNT_FETCH(fetch_counters = (struct FetchCounters){0});
     if (!leased()) {
         return stopped ? FetchStopped : FetchNoLease;
     }
@@ -273,7 +280,7 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
     http_start(&transfer, &us, &server, path, host_text, VICIV.fn_raster_lsb);
 
     begin_exchange();
-    frames_total = 0;
+    COUNT_FETCH(frames_total = 0);
     uint16_t said = http_step(&transfer, nullptr, 0, net_out);
     uint32_t written = 0;
     uint32_t stage_offset = 0;
@@ -295,7 +302,7 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
          * a segment the client is right to drop still proves the server is
          * there, and other LAN traffic says nothing about it. */
         if (got && http_heard(&transfer)) {
-            fetch_counters.heard++;
+            COUNT_FETCH(fetch_counters.heard++);
             heard_from_far_end();
         }
         /* Read where the step is made: data_length answers for that step, and
@@ -310,7 +317,7 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
         }
         if (got && transfer.data_length) {
             if (!written) {
-                fetch_counters.frames_to_first_byte = frames_total;
+                COUNT_FETCH(fetch_counters.frames_to_first_byte = frames_total);
             }
             /* And at the brink, for a server that never said. */
             if (written + transfer.data_length > limit) {
@@ -352,7 +359,7 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
         }
         if (!said && frames_since_said >= RESEND_FRAMES) {
             said = http_step(&transfer, nullptr, 0, net_out);
-            fetch_counters.stalls++;
+            COUNT_FETCH(fetch_counters.stalls++);
             /* Nothing new has arrived and the step has been said again, so the
              * screen must show that something is still being tried. */
             if (written) {
@@ -374,10 +381,10 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
         return FetchWriteFailed;
     }
 
-    fetch_counters.bytes = written;
-    fetch_counters.dropped = http_dropped(&transfer);
-    fetch_counters.retransmits = http_retransmits(&transfer);
-    fetch_counters.frames_total = frames_total;
+    COUNT_FETCH(fetch_counters.bytes = written);
+    COUNT_FETCH(fetch_counters.dropped = http_dropped(&transfer));
+    COUNT_FETCH(fetch_counters.retransmits = http_retransmits(&transfer));
+    COUNT_FETCH(fetch_counters.frames_total = frames_total);
     *length = written;
     status_code = transfer.status;
     if (http_done(&transfer)) {

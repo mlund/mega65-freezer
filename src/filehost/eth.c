@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Copyright 2026 Mikael Lund aka Wombat
-/* The 45E100 itself: the receive filter, the two buffers the controller
- * offers a page at a time, and the DMA that moves a frame across. */
+/* The 45E100 itself: the receive filter, the four buffers the controller
+ * rotates through a page at a time, and the DMA that moves a frame across.
+ *
+ * Four, from mega65-core src/vhdl/ethernet.vhdl:45 -- threaded down from
+ * machine.vhdl:59 through iomapper.vhdl:12 and never overridden.  One of them
+ * is the one the CPU side is reading, so three is what the ethernet side can
+ * fill while this is busy, which is what $D6E1.1-2 counts and saturates at. */
 
 #include "eth.h"
 
@@ -140,7 +145,7 @@ uint32_t eth_rx_no_free_buffers = 0;
 void eth_send(const uint8_t* frame, uint16_t length) {
     /* A bound, not a wait: the longest frame this sends clocks out in about
      * 46 microseconds and this covers 71, while a longer ceiling would block
-     * the receive queue -- three frames deep -- for milliseconds. */
+     * the receive queue -- three frames of room -- for milliseconds. */
     static constexpr uint8_t TX_IDLE_LIMIT = 255;
 
     /* The transmit buffer is one buffer: writing a second frame into it while

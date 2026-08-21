@@ -41,12 +41,17 @@ static_assert(TCP_PAYLOAD_AT + TCP_MSS + ETH_FCS_BYTES == ETH_MAX_RECEIVED,
 
 /* How much the server may have in flight before it must wait for us.
  *
- * Deliberately small.  The controller queues three frames and three arrive in
- * nineteen microseconds, so a window wider than it can hold is not throughput,
- * it is frames dropped and sent again.  Two segments is what leaves a third
- * slot free while the CPU is off writing a sector.  Raise it against the
- * benchmark, not against intuition. */
-constexpr uint16_t TCP_WINDOW_BYTES = 2 * TCP_MSS;
+ * Three segments, because three is what the controller can hold: it has four
+ * receive buffers (mega65-core src/vhdl/ethernet.vhdl:45, threaded down from
+ * machine.vhdl:59 and never overridden), one of which the CPU side holds, so
+ * eth_rx_buffers_free counts up to three and the $D6E1.1-2 field saturates
+ * there.  A window wider than that is not throughput, it is frames dropped and
+ * sent again.
+ *
+ * Throughput is the window divided by the round trip, so this is the number
+ * that sets it: measured against the live proxy at 23ms, two segments gave
+ * 86 KB/s and three give 122. */
+constexpr uint16_t TCP_WINDOW_BYTES = 3 * TCP_MSS;
 
 /* What the send buffer must hold beyond the request: the SYN carries a
  * maximum-segment-size option and nothing else ever does. */
@@ -94,13 +99,17 @@ struct TcpClient {
     uint16_t request_length;
     uint16_t data_at;
     uint16_t data_length;
+#ifdef ETH_COUNTERS
     uint16_t dropped;
     uint16_t retransmits;
+#endif
     enum TcpStage stage;
     bool heard;
     /* Whether anything has been sent yet, which is the difference between the
      * tick that opens the connection and every tick after it. */
+#ifdef ETH_COUNTERS
     bool spoke;
+#endif
 };
 
 /* Opens a connection to `server` and asks it `request`.
