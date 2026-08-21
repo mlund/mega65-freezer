@@ -143,7 +143,7 @@ static_assert(FETCH_SERVER_TEXT_BYTES > HTTP_HOST_MAX,
 
 __attribute__((noinline)) void fetch_set_server(const uint8_t* ip, uint16_t port,
     const char* host) {
-    memcpy(told_server, ip, IPV4_BYTES);
+    net_copy(told_server, ip, IPV4_BYTES);
     /* Resolved here rather than passed on as a zero: three modules holding an
      * opinion about what port 0 means is two too many. */
     told_port = port;
@@ -180,7 +180,7 @@ static bool leased(void) {
     uint8_t mac[MAC_BYTES];
     eth_mac(mac);
     us = (struct NetEndpoint){0};
-    memcpy(us.mac, mac, MAC_BYTES);
+    net_copy(us.mac, mac, MAC_BYTES);
 
     /* Where the beam happens to be is the only thing that differs between two
      * runs of the same tool loaded at the same address. */
@@ -204,7 +204,7 @@ static bool leased(void) {
     }
     /* The lease becomes this machine's address here and nowhere else: `us` is
      * what every later exchange means by "who we are". */
-    memcpy(us.ip, lease.lease.ip, IPV4_BYTES);
+    net_copy(us.ip, lease.lease.ip, IPV4_BYTES);
     return true;
 }
 
@@ -270,8 +270,8 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
     }
 
     struct NetEndpoint server = {0};
-    memcpy(server.mac, server_mac, MAC_BYTES);
-    memcpy(server.ip, told_server, IPV4_BYTES);
+    net_copy(server.mac, server_mac, MAC_BYTES);
+    net_copy(server.ip, told_server, IPV4_BYTES);
     /* Resolved here, at the one place a connection is actually opened. */
     server.port = told_port ? told_port : HTTP_DEFAULT_PORT;
     name_host();

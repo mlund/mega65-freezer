@@ -101,7 +101,7 @@ static uint8_t* build(uint8_t* payload, const struct DhcpClient* client, uint8_t
      * be ours.  Held in wire order, so it is copied rather than taken apart. */
     memcpy(&payload[BOOTP_XID], client->xid, sizeof client->xid);
     net_put16(&payload[BOOTP_FLAGS], BOOTP_BROADCAST);
-    memcpy(&payload[BOOTP_CHADDR], client->mac, MAC_BYTES);
+    net_copy(&payload[BOOTP_CHADDR], client->mac, MAC_BYTES);
     memcpy(&payload[BOOTP_COOKIE], MAGIC_COOKIE, sizeof MAGIC_COOKIE);
 
     uint8_t* at = &payload[DHCP_OPTIONS_AT];
@@ -157,7 +157,7 @@ static enum DhcpMessage dhcp_parse(const uint8_t* payload,
      * well formed and still must not land. */
     struct DhcpLease* found = out;
     *found = (struct DhcpLease){0};
-    memcpy(found->ip, &payload[BOOTP_YIADDR], IPV4_BYTES);
+    net_copy(found->ip, &payload[BOOTP_YIADDR], IPV4_BYTES);
 
     enum DhcpMessage message = DhcpNothing;
     uint16_t at = DHCP_OPTIONS_AT;
@@ -193,7 +193,7 @@ static enum DhcpMessage dhcp_parse(const uint8_t* payload,
              * say -- gives up its first, which is the one to use. */
             for (uint8_t i = 0; i < ADDRESS_OPTIONS; i++) {
                 if (ADDRESS_OPTION[i] == option) {
-                    memcpy((uint8_t*)found + ADDRESS_FIELD[i], &payload[value], IPV4_BYTES);
+                    net_copy((uint8_t*)found + ADDRESS_FIELD[i], &payload[value], IPV4_BYTES);
                     break;
                 }
             }
@@ -209,7 +209,7 @@ static enum DhcpMessage dhcp_parse(const uint8_t* payload,
 
 void dhcp_start(struct DhcpClient* client, const uint8_t* mac, uint16_t seed) {
     *client = (struct DhcpClient){.stage = DhcpDiscovering};
-    memcpy(client->mac, mac, MAC_BYTES);
+    net_copy(client->mac, mac, MAC_BYTES);
     /* Wire order, big-endian like everything else; the two halves do the two
      * jobs dhcp.h describes. */
     client->xid[0] = (uint8_t)(seed >> 8);
@@ -226,7 +226,7 @@ void dhcp_start(struct DhcpClient* client, const uint8_t* mac, uint16_t seed) {
 static void endpoints(
     const struct DhcpClient* client, struct NetEndpoint* us, struct NetEndpoint* server) {
     *us = (struct NetEndpoint){.port = DHCP_CLIENT_PORT};
-    memcpy(us->mac, client->mac, MAC_BYTES);
+    net_copy(us->mac, client->mac, MAC_BYTES);
     *server = (struct NetEndpoint){.port = DHCP_SERVER_PORT};
     memset(server->mac, 0xFF, MAC_BYTES);
     memset(server->ip, 0xFF, IPV4_BYTES);

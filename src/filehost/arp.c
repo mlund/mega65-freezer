@@ -42,15 +42,15 @@ static uint16_t arp_frame(uint8_t* frame,
     for (uint8_t i = 0; i < MAC_BYTES; i++) {
         their_mac[i] = peer_mac ? peer_mac[i] : 0xFF;
     }
-    memcpy(their_ip, peer_ip, IPV4_BYTES);
+    net_copy(their_ip, peer_ip, IPV4_BYTES);
 
     for (uint8_t i = 0; i < ARP_FRAME_BYTES; i++) {
         frame[i] = 0;
     }
     /* A question goes to everyone because nobody knows the answer yet; an
      * answer goes only to whoever asked. */
-    memcpy(&frame[ETH_DESTINATION], their_mac, MAC_BYTES);
-    memcpy(&frame[ETH_SOURCE], mac, MAC_BYTES);
+    net_copy(&frame[ETH_DESTINATION], their_mac, MAC_BYTES);
+    net_copy(&frame[ETH_SOURCE], mac, MAC_BYTES);
     net_put16(&frame[ETH_TYPE], ETHERTYPE_ARP);
 
     net_put16(&frame[ARP_HTYPE], ARP_ETHERNET);
@@ -58,13 +58,13 @@ static uint16_t arp_frame(uint8_t* frame,
     frame[ARP_HLEN] = MAC_BYTES;
     frame[ARP_PLEN] = IPV4_BYTES;
     net_put16(&frame[ARP_OPER], operation);
-    memcpy(&frame[ARP_SENDER_MAC], mac, MAC_BYTES);
-    memcpy(&frame[ARP_SENDER_IP], sender_ip, IPV4_BYTES);
+    net_copy(&frame[ARP_SENDER_MAC], mac, MAC_BYTES);
+    net_copy(&frame[ARP_SENDER_IP], sender_ip, IPV4_BYTES);
     /* A request leaves the target hardware address zero: it is the question. */
     if (operation == ARP_REPLY) {
-        memcpy(&frame[ARP_TARGET_MAC], their_mac, MAC_BYTES);
+        net_copy(&frame[ARP_TARGET_MAC], their_mac, MAC_BYTES);
     }
-    memcpy(&frame[ARP_TARGET_IP], their_ip, IPV4_BYTES);
+    net_copy(&frame[ARP_TARGET_IP], their_ip, IPV4_BYTES);
     return ARP_FRAME_BYTES;
 }
 
@@ -88,7 +88,7 @@ bool arp_reply_from(const uint8_t* frame, uint16_t length, const uint8_t* ip, ui
     if (!net_same(&frame[ARP_SENDER_IP], ip, IPV4_BYTES)) {
         return false;
     }
-    memcpy(mac_out, &frame[ARP_SENDER_MAC], MAC_BYTES);
+    net_copy(mac_out, &frame[ARP_SENDER_MAC], MAC_BYTES);
     return true;
 }
 

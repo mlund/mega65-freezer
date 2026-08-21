@@ -126,7 +126,7 @@ bool ip_parse(const char* text, uint8_t* out, uint16_t* port) {
         return false;
     }
 
-    memcpy(out, parsed, IPV4_BYTES);
+    net_copy(out, parsed, IPV4_BYTES);
     if (named) {
         *port = named;
     }
@@ -166,8 +166,8 @@ void ipv4_build_header(uint8_t* frame,
     const struct NetEndpoint* to,
     uint8_t protocol,
     uint16_t payload_length) {
-    memcpy(&frame[ETH_DESTINATION], to->mac, MAC_BYTES);
-    memcpy(&frame[ETH_SOURCE], from->mac, MAC_BYTES);
+    net_copy(&frame[ETH_DESTINATION], to->mac, MAC_BYTES);
+    net_copy(&frame[ETH_SOURCE], from->mac, MAC_BYTES);
     net_put16(&frame[ETH_TYPE], ETHERTYPE_IPV4);
 
     frame[IP_VERSION_IHL] = IPV4_VERSION_IHL;
@@ -178,8 +178,8 @@ void ipv4_build_header(uint8_t* frame,
     frame[IP_TTL] = IP_DEFAULT_TTL;
     frame[IP_PROTOCOL] = protocol;
     net_put16(&frame[IP_CHECKSUM], 0); /* zero while it is being computed over */
-    memcpy(&frame[IP_SOURCE], from->ip, IPV4_BYTES);
-    memcpy(&frame[IP_DESTINATION], to->ip, IPV4_BYTES);
+    net_copy(&frame[IP_SOURCE], from->ip, IPV4_BYTES);
+    net_copy(&frame[IP_DESTINATION], to->ip, IPV4_BYTES);
     net_put16(&frame[IP_CHECKSUM], ip_sum_final(ip_sum(0, &frame[IP_AT], IPV4_HEADER_BYTES)));
 }
 
@@ -227,8 +227,8 @@ bool ipv4_parse(const uint8_t* frame,
         return false;
     }
 
-    memcpy(out->from.ip, &frame[IP_SOURCE], IPV4_BYTES);
-    memcpy(out->from.mac, &frame[ETH_SOURCE], MAC_BYTES);
+    net_copy(out->from.ip, &frame[IP_SOURCE], IPV4_BYTES);
+    net_copy(out->from.mac, &frame[ETH_SOURCE], MAC_BYTES);
     out->payload_length = payload_length;
     return true;
 }

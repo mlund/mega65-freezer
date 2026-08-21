@@ -6,6 +6,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 /* What every protocol above ethernet needs and none of them owns.
  *
@@ -39,6 +40,26 @@ static inline void net_put32(uint8_t* at, uint32_t value) {
 /* Reads one back. */
 [[nodiscard]] static inline uint32_t net_get32(const uint8_t* at) {
     return ((uint32_t)net_get16(at) << 16) | net_get16(at + 2);
+}
+
+/* An address or a hardware address from one place to another.
+ *
+ * Not memcpy: every one of these is four or six bytes, and memcpy's length is
+ * a size_t -- sixteen bits marshalled into an imaginary register at every call
+ * site, for a count that never exceeds six. */
+static inline __attribute__((always_inline)) void net_copy(
+    uint8_t* to, const uint8_t* from, uint8_t count) {
+    /* Expanded only where the length is settled at compile time, which is
+     * every call here -- an address or a hardware address.  A length that is
+     * not goes to memcpy, so a later caller with a computed one cannot quietly
+     * inherit an expansion sized for four bytes. */
+    if (!__builtin_constant_p(count)) {
+        memcpy(to, from, count);
+        return;
+    }
+    for (uint8_t i = 0; i < count; i++) {
+        to[i] = from[i];
+    }
 }
 
 /* Whether an address is all zeros, which across this stack means "not yet
