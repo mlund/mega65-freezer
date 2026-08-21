@@ -296,7 +296,7 @@ if(LINK_LIBC)
     add_executable(httpbench ${CMAKE_SOURCE_DIR}/test/httpbench.c
         filehost/eth.c filehost/arp.c filehost/ip.c filehost/dhcp.c filehost/netpoll.c
         filehost/tcp.c filehost/http.c filehost/jsoncat.c filehost/fetch.c
-        filehost/catalog.c ${COMMON})
+        filehost/catalog.c fat32.c layout.c ${COMMON})
     add_dependencies(httpbench version_stamp)
     target_compile_options(httpbench PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-mcpu=${C_MCPU}>)
     target_compile_definitions(httpbench PRIVATE SCREEN_CELL_BYTES=2 ETH_COUNTERS)

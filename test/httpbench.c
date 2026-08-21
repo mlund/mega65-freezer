@@ -7,9 +7,12 @@
  * status line, which halts the CPU at instruction boundaries and slows the
  * very transfer being timed.
  *
- * Nothing is written to the card.  The catalogue is transcoded and counted,
- * the image is summed and thrown away, so what is left is the wire, the
- * checksums and the transcoder.
+ * Three passes, so the costs can be told apart: the catalogue transcoded and
+ * counted, the same image summed and thrown away, and the same image again
+ * onto the card.  The first two touch no storage at all, so the difference
+ * between the second and the third is the staging and the card and nothing
+ * else -- which through the browser is buried under its screen and its
+ * status line.
  *
  *   etherload -r httpbench.prg     then read the screen at $0400
  *
@@ -18,11 +21,14 @@
  */
 
 #include "dma.h"
+#include "fat32.h"
 #include "fetch.h"
+#include "helper.h"
 #include "http.h"
 #include "ip.h"
 #include "jsoncat.h"
 #include "mega65_regs.h"
+#include "sdcard.h"
 
 #include <mega65.h>
 #include <string.h>
@@ -35,6 +41,16 @@
 #endif
 
 #define CATALOGUE_PATH "/php/readfilespublic.php"
+
+/* Where the card copy goes: a file of the right length that is already there,
+ * written over where it lies.  Making a new one needs a wholly free run of
+ * FAT sectors, which a used card rarely has -- and the bytes written are the
+ * same bytes it already held, so nothing is lost either way.  This is what the
+ * browser's R does. */
+#ifndef IMAGE_FILE
+#define IMAGE_FILE "EASTEP30.D81"
+#endif
+static constexpr uint32_t IMAGE_BYTES = 819200;
 
 static constexpr uint32_t FETCH_MAX_BYTES = 1024UL * 1024;
 
@@ -93,25 +109,28 @@ static struct JsonCatalog transcoder;
 static uint8_t record[JSONCAT_RECORD_BYTES];
 static bool transcoding;
 static uint32_t sum32;
+/* Nonzero while the image is going onto the card, and the file's first sector
+ * when it is. */
+static uint32_t store_sector;
 
 bool fetch_cancelled(void) {
     return false;
 }
 
 bool fetch_stores_image(void) {
-    return false;
+    return store_sector != 0;
 }
 
 bool fetch_store_blocks(uint32_t offset, const uint8_t* bytes, uint8_t count) {
-    (void)offset;
-    (void)bytes;
-    (void)count;
-    return false;
+    return fat32_write_file_sectors(store_sector, offset, bytes, count);
 }
 
 /* The catalogue is transcoded and counted; an image is summed and dropped.
  * Neither is kept, which is the point: what is left is the transport. */
 bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
+    if (store_sector) {
+        return fat32_write_file_sector(store_sector, offset, bytes, length);
+    }
     (void)offset;
     if (!transcoding) {
         for (uint16_t i = 0; i < length; i++) {
@@ -168,7 +187,21 @@ static void bench(const char* label, const char* path) {
 }
 
 int main(void) {
+    __asm__ volatile("sei" ::: "memory");
+    POKE(0x00, CPU_PORT_DDR_ALL_OUTPUTS);
+    POKE(0x01, CPU_PORT_KERNAL_AND_IO);
     m65_io_enable();
+    /* hdos_new_attach, which reading the card's directory needs. */
+    mega65_dos_init();
+    /* And the two a program writing sectors must set for itself, which a
+     * freezer tool inherits and this does not: without the first, sdcard.c
+     * addresses the card in bytes rather than sectors and the controller
+     * never reports the transfer complete; without the second, a write ships
+     * whatever the floppy's buffer last held.  test/sdbatch.c says the same. */
+    sdcard_open();
+    sdcard_visual_feedback(0);
+    sdhc_card = (SDCARD.status & SD_SDHC_MASK) != 0;
+    SDCARD.control |= SD_BUFFSEL_MASK;
 
     for (uint16_t i = 0; i < 1000; i++) {
         SCREEN[i] = ' ';
@@ -206,6 +239,20 @@ int main(void) {
     at = number(at, sum32);
     *at = 0;
     say(line);
+
+    /* And the same image again, this time onto the card: what is left over
+     * the line above is the sector staging and the writes. */
+    if (fat32_open_file_system() == FreezerOk) {
+        store_sector = fat32_file_first_sector(IMAGE_FILE, IMAGE_BYTES);
+        if (store_sector) {
+            bench("TO CARD  ", BENCH_IMAGE);
+            store_sector = 0;
+        } else {
+            say("NO " IMAGE_FILE " OF THE RIGHT SIZE ON THE CARD");
+        }
+    } else {
+        say("CANNOT READ THE CARD");
+    }
 
     say("DONE");
     for (;;) {
