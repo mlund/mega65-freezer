@@ -142,8 +142,10 @@ Against the cc65 generated 0.97 binaries we get a 30-65% reduction in byte count
 
   <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
   
-- `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue over
-  plain HTTP, download and attach D81/prg files.
+- `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue over plain HTTP, download and attach D81/prg files.
+  
+  <img width="600" alt="Image" src="https://github.com/user-attachments/assets/b19141e9-19a1-41cb-ae7f-8c2d18cc736d" />
+  
 - `MAKEDISK`: the border reports while the card is busy.
 - SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
   a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
