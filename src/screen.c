@@ -13,7 +13,10 @@
 uint16_t screen_line_address = SCREEN_ADDRESS;
 char screen_column = 0;
 
-void screen_hex(uint16_t addr, int32_t value) {
+/* Out of line because its one caller is an error path.  Inlined, the 32-bit digit
+ * extraction is loop-invariant and gets hoisted out of the retry loop it sits
+ * in, so a write that never retries pays for it anyway. */
+__attribute__((noinline)) void screen_hex(uint16_t addr, int32_t value) {
     char dec[8];
     format_hex(dec, value, 8);
     for (char i = 0; i < 8; i++) {

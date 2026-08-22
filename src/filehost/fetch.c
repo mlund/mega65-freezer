@@ -276,7 +276,12 @@ enum FetchResult fetch_file(const char* path, uint32_t limit, uint32_t* length) 
     server.port = told_port ? told_port : HTTP_DEFAULT_PORT;
     name_host();
 
-    struct HttpClient transfer;
+    /* Static so its address is settled at link time.  As a local it reaches
+     * http_step() as a runtime pointer, and every 32-bit field update then
+     * builds the address in imaginary registers before it can store -- 669
+     * bytes for the one word.  http_start() clears it, so nothing carries over
+     * from the last fetch. */
+    static struct HttpClient transfer;
     http_start(&transfer, &us, &server, path, host_text, VICIV.fn_raster_lsb);
 
     begin_exchange();

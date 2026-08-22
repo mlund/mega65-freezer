@@ -29,7 +29,9 @@ uint32_t disk_bam_sector(const struct DiskGeometry* geom) {
     return (uint16_t)(geom->bam_track * geom->sectors_per_track);
 }
 
-uint8_t unbcd(uint8_t packed) {
+/* Out of line because rtc_decode() asks seven times: a byte in and a byte out
+ * is one jsr, against a shift and two subtracts expanded at every one. */
+__attribute__((noinline)) uint8_t unbcd(uint8_t packed) {
     const uint8_t tens = packed >> 4;
     return (uint8_t)(packed - (tens << 2) - (tens << 1));
 }

@@ -225,6 +225,17 @@ static __attribute__((section(".sdverify"))) uint8_t sd_verify_buffer[SD_SECTOR_
 volatile uint8_t sd_refuse_ready = 0;
 #endif
 
+/* Whether the card holds what we were about to write.  One copy: the write
+ * asks before writing and again after, and the loop is 512 bytes either way. */
+[[nodiscard]] __attribute__((noinline)) static bool verify_matches(void) {
+    for (uint16_t i = 0; i < SD_SECTOR_SIZE; i++) {
+        if (sector_buffer[i] != sd_verify_buffer[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* The card's readiness, or a refusal the harness asked for. */
 [[nodiscard]] static bool ready_or_refuse(void) {
 #ifdef SDCARD_FAULTS
@@ -272,13 +283,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
     // Copy the read data to a buffer for verification
     lcopy_in(SD_SECTORBUFFER, sd_verify_buffer, SD_SECTOR_SIZE);
 
-    uint16_t i;
-    for (i = 0; i < SD_SECTOR_SIZE; i++) {
-        if (sector_buffer[i] != sd_verify_buffer[i]) {
-            break;
-        }
-    }
-    if (i == SD_SECTOR_SIZE) {
+    if (verify_matches()) {
         DEBUG_COUNT(sd_writes_skipped);
         return true;
     }
@@ -323,12 +328,7 @@ bool sdcard_writesector(const uint32_t sector_number, uint8_t is_multi) {
             // Copy the read data to a buffer for verification
             lcopy_in(SD_SECTORBUFFER, sd_verify_buffer, SD_SECTOR_SIZE);
 
-            for (i = 0; i < SD_SECTOR_SIZE; i++) {
-                if (sector_buffer[i] != sd_verify_buffer[i]) {
-                    break;
-                }
-            }
-            if (i == SD_SECTOR_SIZE) {
+            if (verify_matches()) {
                 return true;
             }
             screen_hex(screen_line_address - 80 + 24, sector_number);
