@@ -96,7 +96,7 @@ static uint16_t say(const struct TcpClient* client, uint8_t* out) {
     ipv4_build_header(out, &client->us, &client->server, IPV4_PROTOCOL_TCP, length);
     /* Unlike UDP's, a TCP checksum is not optional and zero does not mean "not
      * computed", so there is no all-ones case to fold. */
-    uint32_t sum = ipv4_pseudo_sum(client->us.ip, client->server.ip, IPV4_PROTOCOL_TCP, length);
+    uint16_t sum = ipv4_pseudo_sum(client->us.ip, client->server.ip, IPV4_PROTOCOL_TCP, length);
     sum = ip_sum(sum, segment, length);
     net_put16(&segment[TCP_CHECKSUM], ip_sum_final(sum));
 
@@ -137,7 +137,7 @@ static bool take(struct TcpClient* client, const uint8_t* in, uint16_t in_length
 
     /* Verified, and not only the IPv4 header: a corrupted segment taken as
      * good is a corrupted file written down. */
-    uint32_t sum = ipv4_pseudo_sum(
+    uint16_t sum = ipv4_pseudo_sum(
         datagram.from.ip, client->us.ip, IPV4_PROTOCOL_TCP, datagram.payload_length);
     sum = ip_sum(sum, segment, datagram.payload_length);
     if (ip_sum_final(sum)) {

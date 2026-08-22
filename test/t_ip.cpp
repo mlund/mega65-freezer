@@ -90,7 +90,7 @@ TEST_CASE("an odd length pads with a zero low byte") {
  * a UDP checksum cover a pseudo header that is not in the datagram. */
 TEST_CASE("a sum can be carried across pieces") {
     const uint8_t whole[] = {0x45, 0x00, 0x00, 0x3c, 0x1c, 0x46};
-    const uint32_t split = ip_sum(ip_sum(0, whole, 2), whole + 2, 4);
+    const uint16_t split = ip_sum(ip_sum(0, whole, 2), whole + 2, 4);
     CHECK(ip_sum_final(split) == ip_sum_final(ip_sum(0, whole, sizeof whole)));
 }
 
@@ -488,8 +488,8 @@ TEST_CASE("a header claiming more than the frame carries is refused") {
 TEST_CASE("the pseudo header carries the protocol it was given") {
     const std::array<uint8_t, 4> a = {10, 0, 0, 1};
     const std::array<uint8_t, 4> b = {10, 0, 0, 2};
-    const uint32_t udp = ipv4_pseudo_sum(a.data(), b.data(), IPV4_PROTOCOL_UDP, 40);
-    const uint32_t tcp = ipv4_pseudo_sum(a.data(), b.data(), IPV4_PROTOCOL_TCP, 40);
+    const uint16_t udp = ipv4_pseudo_sum(a.data(), b.data(), IPV4_PROTOCOL_UDP, 40);
+    const uint16_t tcp = ipv4_pseudo_sum(a.data(), b.data(), IPV4_PROTOCOL_TCP, 40);
     CHECK(udp - tcp == IPV4_PROTOCOL_UDP - IPV4_PROTOCOL_TCP);
     /* And the length is in it: RFC 768 and RFC 793 both count the transport
      * header and its data, which is not a field the datagram repeats. */

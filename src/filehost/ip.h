@@ -43,9 +43,9 @@ constexpr uint8_t UDP_PAYLOAD_AT = ETH_HEADER_BYTES + IPV4_HEADER_BYTES + UDP_HE
  * datagram discarded in silence at the far end, so the sum is worth checking
  * against RFC 1071's own worked example directly rather than only through a
  * datagram built with it. */
-[[nodiscard]] uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length);
-/* Folds an accumulated sum into the sixteen bits a header carries. */
-[[nodiscard]] uint16_t ip_sum_final(uint32_t sum);
+[[nodiscard]] uint16_t ip_sum(uint16_t sum, const uint8_t* data, uint16_t length);
+/* Turns an accumulated sum into the sixteen bits a header carries. */
+[[nodiscard]] uint16_t ip_sum_final(uint16_t sum);
 
 /* The address in `text`, and the port after a colon if it names one: "10.0.0.1"
  * or "10.0.0.1:6969".  False when it is neither, and then both outputs are left
@@ -112,7 +112,7 @@ struct Datagram {
 /* The twelve bytes RFC 768 and RFC 793 both have a transport checksum cover
  * but neither transmits: the addresses, the protocol and the transport length
  * again.  `payload_length` counts the transport header and its data. */
-[[nodiscard]] uint32_t ipv4_pseudo_sum(
+[[nodiscard]] uint16_t ipv4_pseudo_sum(
     const uint8_t* source, const uint8_t* destination, uint8_t protocol, uint16_t payload_length);
 
 /* Fills `frame` with an ethernet/IPv4/UDP datagram carrying `payload`, and

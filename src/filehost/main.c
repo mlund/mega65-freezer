@@ -73,6 +73,13 @@ static constexpr uint8_t SERVER_TEXT_BYTES = FETCH_SERVER_TEXT_BYTES;
  * reason too. */
 static constexpr Addr28 CATALOG_BUFFER = 0x40000;
 static constexpr uint32_t CATALOG_BUFFER_BYTES = 0x10000;
+/* The last offset a record may start at, the header having its own room.
+ * Computed in the buffer's own width and narrowed once, so the comparison it
+ * is used in is between two like-sized values. */
+static constexpr uint16_t CATALOG_LAST_RECORD_AT
+    = CATALOG_BUFFER_BYTES - CATALOG_HEADER_BYTES - JSONCAT_RECORD_BYTES;
+static_assert(CATALOG_LAST_RECORD_AT / JSONCAT_RECORD_BYTES + 1 == 511,
+    "the buffer holds 511 records, one under what the browser can index");
 /* Where a program is staged, above the catalogue in the same bank.  Whole
  * before any of it reaches the frozen machine: there is no transaction on the
  * freeze slot, so half a program written into it resumes as a broken machine,
@@ -110,10 +117,12 @@ static __attribute__((section(".netbuf"))) uint8_t raw_record[CATALOG_HEADER_BYT
 /* The JSON turned into records as it arrives, because 292KB of it will not fit
  * anywhere on this machine and never exists whole. */
 static struct JsonCatalog transcoder;
-/* Where the next record goes, and so how long the catalogue is when the reply
- * ends.  Counts from past the header, which cannot be written until the record
- * count is known. */
-static uint32_t catalog_at;
+/* Where the next record goes, counted from past the header, which cannot be
+ * written until the record count is known -- and so how long the catalogue is
+ * when the reply ends.  Sixteen bits because the header is excluded: the
+ * records end at the buffer's last byte, and counting the header in would put
+ * the final offset one past what sixteen bits hold. */
+static uint16_t catalog_at;
 /* Whether what is arriving is JSON to transcode or bytes to keep as they are:
  * a program is fetched into the same window and must not go through the
  * transcoder. */
@@ -803,10 +812,11 @@ bool fetch_store(uint32_t offset, const uint8_t* bytes, uint16_t length) {
     while (left) {
         uint16_t taken = 0;
         if (jsoncat_take(&transcoder, bytes, left, &taken, raw_record)) {
-            if (catalog_at + JSONCAT_RECORD_BYTES > CATALOG_BUFFER_BYTES) {
+            if (catalog_at > CATALOG_LAST_RECORD_AT) {
                 return false; /* more records than there is room for */
             }
-            lcopy((Addr28)(uint16_t)raw_record, CATALOG_BUFFER + (Addr28)catalog_at,
+            lcopy((Addr28)(uint16_t)raw_record,
+                CATALOG_BUFFER + CATALOG_HEADER_BYTES + (Addr28)catalog_at,
                 JSONCAT_RECORD_BYTES);
             catalog_at += JSONCAT_RECORD_BYTES;
         }
@@ -986,12 +996,14 @@ static bool read_server_address(void) {
     return set_server(text);
 }
 
-/* Zeroes the catalogue buffer, a fill at a time: lfill counts in 16 bits and
- * the buffer is wider. */
+/* Zeroes the catalogue buffer.  Two fills rather than a loop over a 28-bit
+ * counter: lfill counts in 16 bits and the buffer is exactly twice that, so
+ * both addresses are settled at compile time. */
 static void clear_buffer(void) {
-    for (uint32_t at = 0; at < CATALOG_BUFFER_BYTES; at += CLEAR_STEP) {
-        lfill(CATALOG_BUFFER + (Addr28)at, 0, CLEAR_STEP);
-    }
+    static_assert(CATALOG_BUFFER_BYTES == 2 * (uint32_t)CLEAR_STEP,
+        "the buffer is two fills wide");
+    lfill(CATALOG_BUFFER, 0, CLEAR_STEP);
+    lfill(CATALOG_BUFFER + CLEAR_STEP, 0, CLEAR_STEP);
 }
 
 /* What is in the buffer, read as a catalogue, given that `bytes` of it are
@@ -1157,7 +1169,7 @@ static void fetch_catalog(void) {
     store_sector = 0;
     transcoding = true;
     jsoncat_begin(&transcoder);
-    catalog_at = CATALOG_HEADER_BYTES;
+    catalog_at = 0;
     uint32_t got = 0;
     const enum FetchResult result = fetch_file(CATALOG_PATH, CATALOGUE_MAX_BYTES, &got);
     transcoding = false;
@@ -1175,7 +1187,7 @@ static void fetch_catalog(void) {
     const bool whole = jsoncat_end(&transcoder, raw_record);
     lcopy((Addr28)(uint16_t)raw_record, CATALOG_BUFFER, CATALOG_HEADER_BYTES);
 
-    const bool usable = accept_catalog(catalog_at);
+    const bool usable = accept_catalog(CATALOG_HEADER_BYTES + (uint32_t)catalog_at);
     show_catalog();
     if (!usable) {
         return; /* accept_catalog() has already said what is wrong with it */
@@ -1189,7 +1201,7 @@ static void fetch_catalog(void) {
     }
     /* Once, into a variable: written twice in one expression this would write
      * the card twice. */
-    const bool kept = save_catalog(catalog_at);
+    const bool kept = save_catalog(CATALOG_HEADER_BYTES + (uint32_t)catalog_at);
     show_status(kept ? SchemeHighlight : SchemeWarning,
         kept ? "FETCHED AND KEPT ON THE CARD" : NO_ROOM);
 }

@@ -43,34 +43,27 @@ static constexpr uint16_t IP_FRAGMENTED = 0x3FFF;
  * is no counter to keep, and udp_build() stays a function of its arguments. */
 static constexpr uint16_t IP_DONT_FRAGMENT = 0x4000;
 
-uint32_t ip_sum(uint32_t sum, const uint8_t* data, uint16_t length) {
-    /* Sixteen bits with the carry folded back in as it happens, rather than a
-     * 32-bit accumulator carried to the end.  RFC 1071 section 1.2C: adding
-     * the carry back at the bottom is the same answer, and it costs two 8-bit
-     * adds and a branch where the wide accumulator cost two more `adc #0`
-     * chains and their stores on every word.  Measured at 40% fewer cycles on
-     * the one loop both fetches pay for every byte received.
-     *
-     * The upper half of `sum` is passed through untouched: a caller chains
-     * pieces through here and ip_sum_final() folds whatever is left. */
-    uint16_t total = (uint16_t)sum;
+/* One's-complement addition: the carry out of the top comes back in at the
+ * bottom.  RFC 1071 section 1.2C says that is the same answer as a wide
+ * accumulator folded at the end, and it costs two 8-bit adds and a branch
+ * where the wide one cost two more `adc #0` chains and their stores on every
+ * word.  Folding here rather than at the end is also what keeps every sum in
+ * this file sixteen bits wide. */
+[[nodiscard]] static uint16_t add_ones(uint16_t sum, uint16_t word) {
+    sum = (uint16_t)(sum + word);
+    return sum < word ? (uint16_t)(sum + 1) : sum;
+}
+
+uint16_t ip_sum(uint16_t sum, const uint8_t* data, uint16_t length) {
     for (; length >= 2; length -= 2, data += 2) {
-        const uint16_t word = net_get16(data);
-        total = (uint16_t)(total + word);
-        if (total < word) {
-            total++;
-        }
+        sum = add_ones(sum, net_get16(data));
     }
     /* An odd tail pads with a zero low byte, which is why only the last piece
      * of a multi-part sum may be odd. */
     if (length) {
-        const uint16_t word = (uint16_t)((uint16_t)*data << 8);
-        total = (uint16_t)(total + word);
-        if (total < word) {
-            total++;
-        }
+        sum = add_ones(sum, (uint16_t)((uint16_t)*data << 8));
     }
-    return (sum & 0xFFFF0000UL) | total;
+    return sum;
 }
 
 bool ip_parse(const char* text, uint8_t* out, uint16_t* port) {
@@ -145,19 +138,16 @@ const uint8_t* ip_next_hop(
     return target;
 }
 
-uint16_t ip_sum_final(uint32_t sum) {
-    while (sum >> 16) {
-        sum = (sum & 0xFFFF) + (sum >> 16);
-    }
+uint16_t ip_sum_final(uint16_t sum) {
     return (uint16_t)~sum;
 }
 
-uint32_t ipv4_pseudo_sum(
+uint16_t ipv4_pseudo_sum(
     const uint8_t* source, const uint8_t* destination, uint8_t protocol, uint16_t payload_length) {
-    uint32_t sum = ip_sum(0, source, IPV4_BYTES);
+    uint16_t sum = ip_sum(0, source, IPV4_BYTES);
     sum = ip_sum(sum, destination, IPV4_BYTES);
-    sum += protocol;
-    sum += payload_length;
+    sum = add_ones(sum, protocol);
+    sum = add_ones(sum, payload_length);
     return sum;
 }
 
@@ -249,7 +239,7 @@ uint16_t udp_build(uint8_t* frame,
         frame[UDP_PAYLOAD_AT + i] = payload[i];
     }
 
-    uint32_t sum = ipv4_pseudo_sum(from->ip, to->ip, IPV4_PROTOCOL_UDP, udp_length);
+    uint16_t sum = ipv4_pseudo_sum(from->ip, to->ip, IPV4_PROTOCOL_UDP, udp_length);
     sum = ip_sum(sum, &frame[UDP_AT], udp_length);
     const uint16_t checksum = ip_sum_final(sum);
     /* A computed zero is sent as all ones: zero on the wire is reserved for
@@ -289,7 +279,7 @@ bool udp_parse(
 
     const uint16_t checksum = net_get16(&frame[UDP_CHECKSUM]);
     if (checksum) {
-        uint32_t sum = ipv4_pseudo_sum(
+        uint16_t sum = ipv4_pseudo_sum(
             &frame[IP_SOURCE], &frame[IP_DESTINATION], IPV4_PROTOCOL_UDP, udp_length);
         sum = ip_sum(sum, &frame[UDP_AT], udp_length);
         if (ip_sum_final(sum)) {
