@@ -1,0 +1,11 @@
+# The mirror FILEHOST fetches through.  nginx because the whole server is a
+# reverse proxy and one substitution; see nginx.conf for what it does and why.
+#
+# From quay.io rather than docker.io: the registry software behind quay is
+# itself open source, and it does not meter anonymous pulls the way Docker Hub
+# does, which a runbook should not depend on.  nginx publish the image there
+# themselves.  It runs as uid 101 and so listens on 8080, which the host maps
+# down to 80 -- see the README.
+FROM quay.io/nginx/nginx-unprivileged:alpine
+COPY nginx.conf /etc/nginx/nginx.conf
+EXPOSE 8080

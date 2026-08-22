@@ -36,6 +36,17 @@ Two kinds of data are read off the card at run time and built here too:
 catalogue described below.  `FILEHOST` can also fetch it over the network with
 `F`, into memory rather than onto the card.
 
+## HTTP server
+
+`FILEHOST` has no TLS, so it fetches through a plain-HTTP mirror of
+`files.mega65.org`.  A (temporary) public one is set by `HTTP-IP.TXT` on the SD card.
+Press `T` to set alternative server for the session. You can run your own mirror:
+
+    podman build -t m65mirror proxy
+    podman run -d --name m65mirror -p 80:8080 m65mirror
+
+Should also work with Docker with `-f proxy/Containerfile`.
+
 ## Building
 
 Currently needs a patched llvm-mos: stock SDK v23.0.1 miscompiles.
@@ -132,13 +143,7 @@ Against the cc65 generated 0.97 binaries we get a 30-65% reduction in byte count
   <img width="1024" alt="Image" src="https://github.com/user-attachments/assets/729d47d2-7dd4-4520-87a4-0df59783208c" />
   
 - `FILEHOST`: browse the [FileHost](https://files.mega65.org) catalogue over
-  plain HTTP, through a proxy that mirrors the HTTPS original. No gateway on
-  your own LAN: one connection, port 80. Put the proxy's address and the name
-  to ask it by in `HTTP-IP.TXT` on the card --
-  `46.30.215.17 m65filehost.twistedpair.se` -- the name being what the `Host`
-  header carries, since the proxy is name-based virtual hosting. The catalogue
-  is transcoded from JSON on the machine and kept on the card, so it loads
-  instantly next time; `F` fetches a fresh one.
+  plain HTTP, download and attach D81/prg files.
 - `MAKEDISK`: the border reports while the card is busy.
 - SD traffic can be counted: `-DSDCARD_COUNTERS=ON` builds three counters that
   a test reads by name, `test/verify_sdcount_xemu.py` reporting what creating a
@@ -269,7 +274,7 @@ Pinned mega65-libc is automatically sources by CMake.
 
 Porting from cc65 to llvm-mos is deceptively simple: getting to a compiled state often requires mechanical changes only,
 which however is no guarantee of correctness. Memory placement, ZP, inline asm, volatiles all require attention. The lessons
-learned, including how to favor small byte counts, are condensed into the LLM skill
+learned, including how to favor small byte counts, are condensed into a LLM skill
 [`llvm-mos`](https://github.com/mlund/claude-skills/tree/main/plugins/llvm-mos) and is automatically activated
 by [`AGENTS.md`](AGENTS.md) in the the repo root.
 This also loads the [`mega65-dev`](https://github.com/mlund/claude-skills/tree/main/plugins/mega65-dev)
@@ -281,6 +286,6 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines and restrictions adapted
 The human operator needs to reign the LLM which has a habbit of producing large amounts of code and documentation.
 My experience is that code quality improves significantly by first do a planning step and ask critical questions: sway the LLM to look at the problem
 from different angles. Always look for testing opportunities.
-This requires domain knowledge - the more the better - which is of course the crux of the problem, but also true for traditional coding.
+This requires domain knowledge - the more the better - which is of course the crux of the problem, but also true for traditional programming.
 [`AGENTS.md`](AGENTS.md) details specifics for the project and is automatically picked up by most LLMs.
 
