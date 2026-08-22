@@ -109,14 +109,19 @@ enum FreezerError fat32_open_file_system(void) {
     return FreezerOk;
 }
 
+/* The byte offset of a cluster's entry within the FAT sector that holds it.
+ * Only the cluster's low byte decides it; the rest choose the sector. */
+static inline uint16_t fat_entry_offset(uint32_t cluster) {
+    return (uint16_t)(((uint8_t)cluster & (SECTORS_PER_FAT_SECTOR - 1)) << 2);
+}
+
 static uint32_t fat32_follow_cluster(uint32_t cluster) {
     // Read out the cluster number from the FAT, dropping the reserved top four
     // bits: a formatter may leave them set, and a link read with them compares
     // as neither a cluster number nor an end-of-chain marker -- which would
     // stop a directory walk early and report a file that exists as absent.
     sdcard_readsector(fat1_sector + (cluster / SECTORS_PER_FAT_SECTOR));
-    return *(uint32_t*)&sector_buffer[(cluster & (SECTORS_PER_FAT_SECTOR - 1)) << 2] &
-        FAT_CLUSTER_MASK;
+    return *(uint32_t*)&sector_buffer[fat_entry_offset(cluster)] & FAT_CLUSTER_MASK;
 }
 
 static uint32_t fat32_allocate_cluster(uint32_t cluster) {
@@ -142,7 +147,7 @@ static uint32_t fat32_allocate_cluster(uint32_t cluster) {
             // chain old cluster to new cluster
             fat_sector_num = cluster / 128;
             sdcard_readsector(fat1_sector + fat_sector_num);
-            *(uint32_t*)&sector_buffer[(cluster & 127) << 2] = new_cluster;
+            *(uint32_t*)&sector_buffer[fat_entry_offset(cluster)] = new_cluster;
             (void)sdcard_writesector(fat1_sector + fat_sector_num, 0);
             (void)sdcard_writesector(fat2_sector + fat_sector_num, 0);
             return new_cluster;
@@ -183,8 +188,7 @@ static void free_chain(uint32_t cluster) {
             fat_held_at = sector;
             fat_held = true;
         }
-        uint32_t* const link =
-            (uint32_t*)&sector_buffer[(cluster & (SECTORS_PER_FAT_SECTOR - 1)) << 2];
+        uint32_t* const link = (uint32_t*)&sector_buffer[fat_entry_offset(cluster)];
         cluster = *link & FAT_CLUSTER_MASK;
         *link = 0;
     }
