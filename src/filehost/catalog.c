@@ -108,7 +108,7 @@ const char* catalog_category_name(uint8_t category) {
     /* Indexed by the file's own value, so the order here is the format's and
      * not a choice.  A value past the end is a category invented after this was
      * written: nothing is the honest thing to draw for it. */
-    static const char* const NAMES[] = {
+    static const char* const names[] = {
         "",
         "GAME",
         "DEMO",
@@ -118,16 +118,16 @@ const char* catalog_category_name(uint8_t category) {
         "OTHER",
         "FIRMWARE",
     };
-    static_assert(sizeof NAMES / sizeof *NAMES == CatalogFirmware + 1,
+    static_assert(sizeof names / sizeof *names == CatalogFirmware + 1,
         "a category the format defines with no name would index past this table");
-    return category < sizeof NAMES / sizeof *NAMES ? NAMES[category] : "";
+    return category < sizeof names / sizeof *names ? names[category] : "";
 }
 
 uint8_t catalog_category_rank(uint8_t category) {
     /* The alphabetical position of each name above, in the enumeration's own
      * order: application, demo, firmware, game, manual, other, tool.  A test
      * walks the names to check this still says so. */
-    static const uint8_t RANK[] = {
+    static const uint8_t rank[] = {
         0, /* not stated, and named by nothing */
         4, /* game */
         2, /* demo */
@@ -137,6 +137,6 @@ uint8_t catalog_category_rank(uint8_t category) {
         6, /* other */
         3, /* firmware */
     };
-    static_assert(sizeof RANK == CatalogFirmware + 1, "a category with no place in the order");
-    return category < sizeof RANK ? RANK[category] : 0;
+    static_assert(sizeof rank == CatalogFirmware + 1, "a category with no place in the order");
+    return category < sizeof rank ? rank[category] : 0;
 }

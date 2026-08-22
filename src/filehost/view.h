@@ -39,7 +39,7 @@ enum ViewOrder : uint8_t {
 };
 
 /* How many records there are to choose from.  Clamped to VIEW_MAX. */
-void view_reset(uint16_t records);
+void view_reset(uint16_t count);
 
 /* Rebuilds the index: every record the search accepts, in the order given.
  *
@@ -47,7 +47,7 @@ void view_reset(uint16_t records);
  * that changes what is on screen changes both -- a search reorders nothing but
  * must respect the order in force, and an order applies only to what the search
  * left. */
-void view_build(enum ViewOrder order);
+void view_build(enum ViewOrder wanted);
 
 /* How many records the index holds, which is how many rows there are to show. */
 [[nodiscard]] uint16_t view_count(void);
@@ -62,7 +62,7 @@ void view_build(enum ViewOrder order);
 
 /* Whether a record passes the search in force.  Whoever links this owns the
  * search text and how a title is compared against it. */
-[[nodiscard]] bool view_matches(uint16_t record);
+[[nodiscard]] bool view_matches(uint16_t index);
 
 /* What to sort a record by, under `order`.  Asked once per record and then
  * kept, because answering it means reading the record out of far memory: asked
@@ -74,4 +74,4 @@ void view_build(enum ViewOrder order);
  * Always sorted ascending, so which way round an order reads is decided there
  * rather than here: newest first counts down, and a field the file did not
  * state answers VIEW_KEY_UNKNOWN, which puts it last instead of first. */
-[[nodiscard]] uint8_t view_key(uint16_t record, enum ViewOrder order);
+[[nodiscard]] uint8_t view_key(uint16_t index, enum ViewOrder order);

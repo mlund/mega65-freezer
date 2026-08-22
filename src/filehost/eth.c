@@ -108,9 +108,13 @@ bool eth_tx_idle(void) {
 /* Whether the bounded wait below ever runs out, which is the question these
  * answer: a frame written over one still going out is a frame the wire never
  * saw, and a lost acknowledgement mid-transfer is indistinguishable from the
- * server never having been answered.  `eth_sends` is the denominator. */
-uint32_t eth_sends = 0;
-uint32_t eth_tx_busy = 0;
+ * server never having been answered.  `eth_sends` is the denominator.
+ *
+ * External on purpose, hence the NOLINTs below: nothing in the program reads
+ * any of these back, so `static` would let the link prove the stores dead and
+ * drop the names test/verify_ethcount_hw.py looks up in the ELF. */
+uint32_t eth_sends = 0;   // NOLINT(misc-use-internal-linkage)
+uint32_t eth_tx_busy = 0; // NOLINT(misc-use-internal-linkage)
 
 /* And whether the rotation below actually happens, which is the same shape of
  * question at the other end.  The controller declines to advance the CPU's
@@ -123,14 +127,14 @@ uint32_t eth_tx_busy = 0;
  * registered and so lags the write by a cycle or more (ethernet.vhdl:1508),
  * which waiting cures, while a refusal is a rotation that does not happen at
  * all and which the receive path has to notice instead. */
-uint32_t eth_rx_rotates = 0;
-uint32_t eth_rx_late = 0;
-uint32_t eth_rx_norotate = 0;
+uint32_t eth_rx_rotates = 0;  // NOLINT(misc-use-internal-linkage)
+uint32_t eth_rx_late = 0;     // NOLINT(misc-use-internal-linkage)
+uint32_t eth_rx_norotate = 0; // NOLINT(misc-use-internal-linkage)
 /* $D6E1.1-2 says how many receive buffers the ethernet side can still take.
  * Zero means a frame in flight is vetoed before eth_receive() can observe it.
  * Shorter card work narrows that window but cannot close it, so this stays as
  * test instrumentation rather than making a passing fetch look conclusive. */
-uint32_t eth_rx_no_free_buffers = 0;
+uint32_t eth_rx_no_free_buffers = 0; // NOLINT(misc-use-internal-linkage)
 
 #define COUNT_ETH(counter) ((counter)++)
 #else

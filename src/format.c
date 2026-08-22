@@ -95,12 +95,13 @@ char* append_dec(char* at, uint16_t value) {
 #if defined(__mos__)
     __attribute__((section(".rodata")))
 #endif
-    static const uint16_t POWER[] = {10000, 1000, 100, 10};
+    static const uint16_t power[] = {10000, 1000, 100, 10};
+    static constexpr uint8_t POWER_COUNT = sizeof power / sizeof *power;
     bool any = false;
-    for (uint8_t i = 0; i < sizeof POWER / sizeof *POWER; i++) {
+    for (uint8_t i = 0; i < POWER_COUNT; i++) {
         uint8_t digit = 0;
-        while (value >= POWER[i]) {
-            value = (uint16_t)(value - POWER[i]);
+        while (value >= power[i]) {
+            value = (uint16_t)(value - power[i]);
             digit++;
         }
         /* Leading zeros are not digits, but a zero after the first one is. */

@@ -55,14 +55,14 @@ enum PrgVerdict prg_plan(
 }
 
 const char* prg_verdict_text(enum PrgVerdict verdict) {
-    static const char* const WHY[] = {
+    static const char* const why[] = {
         "",
         "TOO SHORT TO BE A PROGRAM",
         "NOT SAVED FROM EITHER BASIC",
         "SAVED FROM THE OTHER MODE, NOT THIS ONE",
         "TOO BIG TO FIT IN MEMORY",
     };
-    static_assert(sizeof WHY / sizeof *WHY == PrgTooBig + 1,
+    static_assert(sizeof why / sizeof *why == PrgTooBig + 1,
         "a verdict with no words would index past this table");
-    return verdict < sizeof WHY / sizeof *WHY ? WHY[verdict] : "";
+    return verdict < sizeof why / sizeof *why ? why[verdict] : "";
 }

@@ -126,8 +126,8 @@ void fat_name_to_entry(const char* name, uint8_t* entry) {
 }
 
 /* Where FAT32 put the two halves of the first cluster. */
-constexpr uint8_t FAT_ENTRY_CLUSTER_LOW = 0x1a;
-constexpr uint8_t FAT_ENTRY_CLUSTER_HIGH = 0x14;
+static constexpr uint8_t FAT_ENTRY_CLUSTER_LOW = 0x1a;
+static constexpr uint8_t FAT_ENTRY_CLUSTER_HIGH = 0x14;
 
 /* Compared as text, not by packing the wanted name and matching the eleven
  * stored bytes.  The packed form is 316 bytes smaller in FILEHOST and 145 in

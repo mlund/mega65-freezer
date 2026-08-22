@@ -12,17 +12,17 @@
  * detach of it (mega65-core, src/hyppo/dos.asm, dos_attach).  Detaching keeps
  * bits 0 and 6 only: the tools detach one named drive, so letting bit 1 pass
  * would turn that into both. */
-constexpr uint8_t DRIVE_MASK = 0x01;
-constexpr uint8_t DETACH_DRIVE_MASK = 0x41;
-constexpr uint8_t DETACH_FLAG = 0x80;
+static constexpr uint8_t DRIVE_MASK = 0x01;
+static constexpr uint8_t DETACH_DRIVE_MASK = 0x41;
+static constexpr uint8_t DETACH_FLAG = 0x80;
 /* Pre-1.3 hyppo numbers the two drives as separate functions. */
-constexpr uint8_t ATTACH_LEGACY_BASE = 0x40;
-constexpr uint8_t ATTACH_LEGACY_DRIVE1 = 0x06;
+static constexpr uint8_t ATTACH_LEGACY_BASE = 0x40;
+static constexpr uint8_t ATTACH_LEGACY_DRIVE1 = 0x06;
 /* dos_attach gained its current calling convention in hyppo DOS 1.3. */
-constexpr uint8_t HDOS_MAJOR_MIN = 1;
-constexpr uint8_t HDOS_MINOR_MIN = 3;
+static constexpr uint8_t HDOS_MAJOR_MIN = 1;
+static constexpr uint8_t HDOS_MINOR_MIN = 3;
 /* What a failed attach reports when hyppo has no code of its own to give. */
-constexpr uint8_t ATTACH_ERROR = 0xEF;
+static constexpr uint8_t ATTACH_ERROR = 0xEF;
 
 /* Starts true so that a tool which never calls mega65_dos_init() uses the
  * current attach convention rather than the pre-1.3 one. */
@@ -66,8 +66,11 @@ uint8_t mega65_dos_cdroot(void) {
 }
 
 /* Pre-1.3 hyppo has no dos_attach: each drive is its own function number, and
- * the SDK wraps neither, both being deprecated in the core. */
-static mega65_h_err attach_legacy(uint8_t drive) {
+ * the SDK wraps neither, both being deprecated in the core.
+ *
+ * Answers the raw error byte rather than mega65_h_err, because ATTACH_ERROR is
+ * ours and not one of the codes that enum names. */
+static uint8_t attach_legacy(uint8_t drive) {
     /* A carries the function number in and the error code out, so one
      * read-write operand rather than two: the trap answers where it was asked. */
     uint8_t fn = ATTACH_LEGACY_BASE + (drive ? ATTACH_LEGACY_DRIVE1 : 0);
