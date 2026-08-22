@@ -2,6 +2,8 @@
  * fixed-width run behind it. */
 #include "catalog.h"
 
+#include "mul32.h"
+
 /* Assembled byte by byte rather than read through a struct: the file is
  * little-endian and unaligned, and the host build has to see the same bytes
  * the machine does. */
@@ -89,7 +91,7 @@ uint32_t catalog_record_offset(uint16_t record_bytes, uint16_t index) {
      *
      * Widened before the multiply: `int` is 16 bits here, and the product
      * passes 16 bits at the 512th record. */
-    return CATALOG_HEADER_BYTES + (uint32_t)index * record_bytes;
+    return CATALOG_HEADER_BYTES + mul32(index, record_bytes);
 }
 
 void catalog_record(const uint8_t* raw, struct CatalogRecord* out) {

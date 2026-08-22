@@ -341,11 +341,10 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
     uint16_t offset;
     uint16_t j;
     uint16_t clusters;
-    uint32_t k;
+    uint16_t k;
     uint32_t start_cluster = 0;
-    uint32_t contiguous_clusters = 0;
     uint32_t fat_sector_num = 0;
-    uint32_t fat_sector_count = 0;
+    uint16_t fat_sector_count = 0;
 
     struct M65Tm tm = {};
 
@@ -376,9 +375,13 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
         }
     }
 
-    // Find where we have enough contiguous space
-    contiguous_clusters = 0;
-    start_cluster = 0;
+    /* Counted in FAT sectors, not clusters: a run long enough is the same
+     * question either way, and the sector the run starts at is the one the
+     * chain below has to be written from -- counting clusters meant reaching
+     * it again by multiplying by 128 here and dividing by 128 there. */
+    fat_sector_count = fat_sectors_for_clusters(clusters);
+    uint16_t contiguous = 0;
+    uint32_t start_fat_sector = 0;
     for (fat_sector_num = 0; fat_sector_num <= (uint32_t)(fat2_sector - fat1_sector);
         fat_sector_num++) {
 
@@ -396,40 +399,40 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
             }
         }
         if (j != SD_SECTOR_SIZE) {
-            // Reset count of contiguous clusters
-            contiguous_clusters = 0;
+            contiguous = 0;
             continue;
-        } else {
-            // Start from here
-            if (!contiguous_clusters) {
-                start_cluster = fat_sector_num * 128;
-            }
-            contiguous_clusters += 128;
         }
-        if (contiguous_clusters >= clusters) {
+        if (!contiguous) {
+            start_fat_sector = fat_sector_num;
+        }
+        contiguous++;
+        if (contiguous >= fat_sector_count) {
             break;
         }
     }
 
     // Abort if the disk is full
-    if (contiguous_clusters < clusters) {
+    if (contiguous < fat_sector_count) {
         TRACE("no free contiguous space");
         return 0;
     }
 
     // Write cluster chain into both FATs
-    fat_sector_num = start_cluster / SECTORS_PER_FAT_SECTOR;
-    fat_sector_count = fat_sectors_for_clusters(clusters);
+    fat_sector_num = start_fat_sector;
+    start_cluster = start_fat_sector * SECTORS_PER_FAT_SECTOR;
+    /* The entry number and the cluster it points at both only go up by one, so
+     * they are carried rather than rebuilt at every step. */
+    uint16_t entry = 0;
+    uint32_t next_cluster = start_cluster + 1;
+    const uint16_t last = clusters - 1;
     for (k = 0; k < fat_sector_count; k++) {
         // Entries past the end of the chain must read as free, and the buffer
         // still holds the previous sector.
         clear_sector_buffer();
-        for (offset = 0; offset < SD_SECTOR_SIZE; offset += 4) {
-            const uint16_t entry = (uint16_t)((k << 7) + (offset >> 2));
-            if (entry < clusters) {
-                *(uint32_t*)&sector_buffer[offset] =
-                    (entry == clusters - 1) ? FAT_END_OF_CHAIN : start_cluster + entry + 1;
-            }
+        for (offset = 0; offset < SD_SECTOR_SIZE && entry < clusters;
+            offset += 4, entry++, next_cluster++) {
+            *(uint32_t*)&sector_buffer[offset] =
+                (entry == last) ? FAT_END_OF_CHAIN : next_cluster;
         }
         // Write FAT sector to both FATs
         (void)sdcard_writesector(fat1_sector + fat_sector_num + k, 0);
@@ -448,11 +451,8 @@ uint32_t fat32_create_contiguous_file(const char* name, uint32_t size) {
     *(uint16_t*)&sector_buffer[found_offset + 0x0e] = fat_pack_time(&tm);
     *(uint16_t*)&sector_buffer[found_offset + 0x10] = fat_pack_date(&tm);
     fat_entry_set_first_cluster(&sector_buffer[found_offset], start_cluster);
-    // File length
-    sector_buffer[found_offset + 0x1C] = (size >> 0) & 0xff;
-    sector_buffer[found_offset + 0x1D] = (size >> 8L) & 0xff;
-    sector_buffer[found_offset + 0x1E] = (size >> 16L) & 0xff;
-    sector_buffer[found_offset + 0x1F] = (size >> 24l) & 0xff;
+    // File length, which FAT32 and this CPU both store little end first.
+    *(uint32_t*)&sector_buffer[found_offset + FAT_ENTRY_SIZE_AT] = size;
 
     (void)sdcard_writesector(found_sector, 0);
 

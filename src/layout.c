@@ -3,6 +3,8 @@
 
 #include "layout.h"
 
+#include "mul32.h"
+
 #include <string.h>
 
 /* D81 is the 1581's 80 tracks of 10 sectors a side.  D65 is the MEGA65 HD
@@ -18,11 +20,13 @@ const struct DiskGeometry* disk_geometry(bool is_d65) {
 }
 
 uint32_t disk_total_sectors(const struct DiskGeometry* geom) {
-    return (uint32_t)geom->tracks * geom->sectors_per_track;
+    /* 85 x 128 at the largest, so the product is 16-bit and the multiply that
+     * makes it need not be: widening first costs a 32-bit routine. */
+    return (uint16_t)(geom->tracks * geom->sectors_per_track);
 }
 
 uint32_t disk_bam_sector(const struct DiskGeometry* geom) {
-    return (uint32_t)geom->bam_track * geom->sectors_per_track;
+    return (uint16_t)(geom->bam_track * geom->sectors_per_track);
 }
 
 uint8_t unbcd(uint8_t packed) {
@@ -77,7 +81,7 @@ uint16_t fat_sectors_for_clusters(uint16_t clusters) {
 
 uint32_t fat_cluster_first_sector(
     uint32_t data_start_sector, uint32_t cluster, uint8_t sectors_per_cluster) {
-    return data_start_sector + (cluster - 2) * sectors_per_cluster;
+    return data_start_sector + mul32(cluster - 2, sectors_per_cluster);
 }
 
 void fat_name_from_entry(const uint8_t* entry, char* out) {
