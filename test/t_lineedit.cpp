@@ -9,6 +9,7 @@
  * Expected values are written out rather than computed: an oracle that built
  * them the way the editor does could not disagree with it. */
 
+#include <cstring>
 #include <string>
 #include <vector>
 
