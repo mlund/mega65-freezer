@@ -19,6 +19,25 @@ else()
     message(STATUS "hardware tests: skipped, set MEGA65_SERIAL to a serial monitor device")
 endif()
 
+# --- The FAT32 writer on the machine, which nothing else covers: the host
+# test drives test/fat32.py, the model the emulator fixtures are built from,
+# not src/fat32.c.  Needs no serial -- etherload runs the program and the file
+# it leaves is the result -- but it does write to the card, so it is gated on
+# both tools being named:
+#
+#   cmake -DMEGA65_FTP=.../mega65_ftp.osx -DMEGA65_ETHERLOAD=.../etherload.osx -B build
+#
+# Neither is on any PATH; both ship inside m65connect's Resources.
+if(MEGA65_FTP AND MEGA65_ETHERLOAD AND Python3_FOUND AND TARGET sdbatch)
+    add_test(NAME sdbatch_hw
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/verify_sdbatch_hw.py
+                --ftp ${MEGA65_FTP} --etherload ${MEGA65_ETHERLOAD}
+                --prg $<TARGET_FILE:sdbatch>)
+    set_tests_properties(sdbatch_hw PROPERTIES TIMEOUT 600 RUN_SERIAL TRUE)
+else()
+    message(STATUS "sdbatch_hw: skipped, set MEGA65_FTP and MEGA65_ETHERLOAD")
+endif()
+
 # --- doctest: the pure logic, called directly.  One binary, one TEST_SUITE per
 # subject, so `--test-suite=` gives ctest the same per-subject entries as before
 # and `ctest -R layout` still means what it did. -------------------------------
